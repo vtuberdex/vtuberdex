@@ -1,0 +1,25 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "node scripts/vercel-build.mjs",
+  "installCommand": "npm install && npm install --prefix web",
+  "framework": null,
+  "functions": {
+    "server.mjs": {
+      "includeFiles": [
+        "deploy/data/vtuberdex.db",
+        "deploy/data/images.json",
+        "public/index.html"
+      ]
+    }
+  },
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/images/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400, s-maxage=604800" }]
+    }
+  ]
+}

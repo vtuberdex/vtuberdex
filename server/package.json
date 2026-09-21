@@ -1,0 +1,22 @@
+{
+  "name": "vtuberdex-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "API + SQLite del VTuberDex (búsqueda, facetas, mantenedor)",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "dev": "node --watch src/index.mjs",
+    "seed": "node src/seed.mjs",
+    "reindex": "node src/seed.mjs --reset",
+    "import-ocr": "node src/import-ocr.mjs --reindex",
+    "test": "node --test \"test/*.test.mjs\"",
+    "admin": "node src/create-admin.mjs"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "sharp": "^0.35.4",
+    "zod": "^4.1.11"
+  }
+}

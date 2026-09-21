@@ -1,0 +1,29 @@
+# Dependencias
+node_modules/
+
+# Datos generados (reproducibles con `scraper/` y `server/seed.mjs`)
+data/images/
+data/*.db
+data/*.db-shm
+data/*.db-wal
+scraper/cache/
+scraper/out/
+
+# Builds
+web/dist/
+web/coverage/
+
+# Artefactos del deploy a Vercel (los regenera `npm run build`)
+public/
+deploy/
+
+# Escenario temporal de la verificación del bundle
+.verify-stage/
+
+# Entorno
+.env
+.env.local
+*.log
+.DS_Store
+.vercel
+.env*

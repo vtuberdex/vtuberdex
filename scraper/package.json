@@ -1,0 +1,17 @@
+{
+  "name": "vtuberdex-scraper",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Scraper del directorio VTuberDex: index + fichas de detalle + imagenes",
+  "scripts": {
+    "scrape": "node src/scrape.mjs",
+    "palette": "node src/palette.mjs",
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "sharp": "^0.35.4",
+    "tesseract.js": "^7.0.0"
+  }
+}

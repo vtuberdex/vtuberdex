@@ -1,0 +1,41 @@
+# Qué NO se sube al hacer `vercel deploy`.
+#
+# No es lo mismo que `.gitignore`: esto gobierna lo que el CLI empaqueta y manda
+# a Vercel. Sin él, el deploy arrastraría ~94 MB de caché HTML del scrape y los
+# `node_modules` locales (que Vercel reinstala con `installCommand`).
+
+# Caché del scrape (94 MB de HTML crudo) y sus salidas
+scraper/cache/
+scraper/out/
+
+# Dependencias locales: las instala Vercel desde package.json
+node_modules/
+web/node_modules/
+server/node_modules/
+scraper/node_modules/
+
+# Imágenes crudas: viven en Vercel Blob, no viajan en la función
+data/images/
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Artefactos locales que Vercel regenera en su build
+web/dist/
+public/
+deploy/
+.verify-stage/
+
+# El scraper entero no hace falta en el deploy del catálogo
+scraper/
+
+# Documentación y notas
+docs/
+IDEA.md
+
+# Entorno y credenciales (nunca deben viajar)
+.env
+.env.local
+.env*
+.vercel
+*.log

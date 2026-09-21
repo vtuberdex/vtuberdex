@@ -1,0 +1,84 @@
+/** Stats del VTuber en barras normalizadas + nivel y EXP. */
+import type { StatRow } from '../../lib/types';
+
+export interface StatBarsProps {
+  stats: StatRow[];
+  palette: { accent: string; secondary: string };
+  level: number | null;
+  experience: { current: number | null; max: number | null } | null;
+}
+
+/** Máximos de referencia para escalar las barras (los datos del origen son 0-400). */
+const REFERENCE_MAX = 400;
+
+export function StatBars({ stats, palette, level, experience }: StatBarsProps) {
+  const numeric = stats.filter((stat) => typeof stat.value === 'number');
+  if (numeric.length === 0) {
+    return (
+      <section className="rounded-2xl border border-dex-line bg-dex-panel/60 p-5">
+        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">Atributos</h2>
+        <p className="mt-3 text-sm text-dex-muted">Sin stats publicados para este VTuber.</p>
+      </section>
+    );
+  }
+
+  const expPercent =
+    experience?.current !== null && experience?.current !== undefined && experience?.max
+      ? Math.min(100, Math.round((experience.current / experience.max) * 100))
+      : null;
+
+  return (
+    <section className="rounded-2xl border border-dex-line bg-dex-panel/60 p-5" data-testid="stat-bars">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">Atributos</h2>
+        {level !== null && (
+          <span className="rounded-lg border border-dex-line px-2 py-0.5 font-mono text-xs text-dex-ink">NIVEL {level}</span>
+        )}
+      </div>
+
+      {experience && expPercent !== null && (
+        <div className="mt-4">
+          <div className="flex justify-between text-[11px] uppercase tracking-[0.12em] text-dex-muted">
+            <span>Experiencia</span>
+            <span className="font-mono">
+              {experience.current} / {experience.max}
+            </span>
+          </div>
+          <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full" style={{ width: `${expPercent}%`, background: palette.accent }} />
+          </div>
+        </div>
+      )}
+
+      <ul className="mt-4 space-y-3">
+        {numeric.map((stat) => {
+          const max = stat.max ?? REFERENCE_MAX;
+          const value = stat.value ?? 0;
+          const percent = Math.max(4, Math.min(100, Math.round((value / Math.max(max, 1)) * 100)));
+          return (
+            <li key={`${stat.slug}-${stat.position}`}>
+              <div className="flex items-baseline justify-between gap-3 text-xs">
+                <span className="uppercase tracking-[0.1em] text-dex-muted">{stat.label}</span>
+                <span className="font-mono text-dex-ink">
+                  {value}
+                  {stat.max ? ` / ${stat.max}` : ''}
+                </span>
+              </div>
+              <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-white/8">
+                <div
+                  className="h-full rounded-full transition-[width] duration-500"
+                  style={{
+                    width: `${percent}%`,
+                    background: `linear-gradient(90deg, ${palette.accent}, ${palette.secondary})`,
+                  }}
+                />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+export default StatBars;
