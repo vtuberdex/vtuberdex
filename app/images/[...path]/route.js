@@ -128,7 +128,30 @@ export async function GET(_request, { params }) {
   }
 
   if (usesLocalImages()) {
-    const local = published ? serveLocal(key) : null;
+    /**
+     * MODO LOCAL: se sirve el archivo de `data/images/` DIRECTAMENTE, sin exigir que
+     * esté en el manifiesto.
+     *
+     * POR QUÉ (fallo medido): antes esta rama era `published ? serveLocal(key) : null`,
+     * es decir, la lectura de disco estaba CONDICIONADA al manifiesto. El manifiesto lo
+     * genera `npm run build:data` a partir de las filas `asset` de la base, así que una
+     * imagen recién subida desde el mantenedor no está en él hasta que se regenera. El
+     * resultado era un 404 para el archivo que el usuario acababa de subir, con el
+     * archivo presente en disco: el síntoma exacto "subo una imagen y no se actualiza".
+     *
+     * En LOCAL el disco es la fuente de verdad —lo que hay en `data/images/` es lo que
+     * se acaba de subir—, y `isInsideRoot` sigue impidiendo salir de la carpeta.
+     *
+     * En PRODUCCIÓN el manifiesto sigue mandando y la carpeta retirada sigue dando 404:
+     * de eso se encargan las dos ramas de arriba, que se evalúan antes y son las que
+     * cubre `npm run verify` (`sirve solo lo publicado` + `carpeta retirada -> 404`).
+     *
+     * Lo que NO se pierde: la carpeta retirada que EXISTA en disco. Si algún día
+     * reaparece un `data/images/radar/`, sus archivos se servirían en local; en
+     * producción seguirían dando 404. Se acepta a cambio de que el ciclo
+     * subir -> ver funcione, que es el propósito de este script.
+     */
+    const local = serveLocal(key);
     if (local) return local;
     return Response.json({ error: 'imagen_no_publicada', path: key }, { status: 404 });
   }

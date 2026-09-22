@@ -349,18 +349,32 @@ Next reenvía `/api/admin/*` al Express con `VTUBERDEX_ADMIN_URL`. Si esa variab
 no está, la página `/admin` carga pero cada llamada da **404** — el mismo
 comportamiento que en producción, y lo que comprueba `npm run verify`.
 
-Tres trampas concretas de trabajar en local:
+Cuatro trampas concretas de trabajar en local:
 
-1. **Sin `VTUBERDEX_BLOB_BASE`, las imágenes se sirven de `data/images/`**
+1. **`VTUBERDEX_DB` es obligatoria y las dos bases NO pueden separarse.**
+   `lib/db.mjs` cae por defecto en `deploy/data/vtuberdex.db` (la base EMPAQUETADA,
+   correcta para la función serverless) mientras el Express escribe en
+   `data/vtuberdex.db`. Si se levanta Next a mano sin esa variable, **los dos
+   procesos leen bases distintas**: lo que se sube o edita en el mantenedor no
+   aparece en la app —imágenes recién subidas que dan 404 y `background: null`—
+   porque Next consulta otra base. `dev-up.sh` la fija para los dos; al arrancar
+   a mano, hay que exportarla en AMBOS lados.
+   **No "arreglar" esto apuntando el mantenedor a `deploy/`**: esa base está
+   saneada (`admin_user` y `audit_log` VACÍOS a propósito, para no publicar el
+   hash) y está versionada, así que el login sería imposible y cada subida
+   ensuciaría el repo con un binario de ~60 MB.
+2. **Sin `VTUBERDEX_BLOB_BASE`, las imágenes se sirven de `data/images/`**
    (rama local de `app/images/[...path]/route.js`). Antes esa ruta devolvía
    `null` y la app entera salía sin una sola imagen, difícil de diagnosticar.
-   El manifiesto se consulta en los dos modos, así que las carpetas retiradas
-   siguen dando 404 aunque sus archivos existan en disco.
-2. **Nada de `window`/`localStorage` durante el render.** Un componente
+   En local el **disco es la fuente de verdad** (sin exigir que el archivo esté
+   en el manifiesto, que solo se regenera con `npm run build:data`): sin eso, una
+   imagen recién subida daba 404 con el archivo ya en disco. El manifiesto manda
+   en PRODUCCIÓN, que es la rama que cubre `npm run verify`.
+3. **Nada de `window`/`localStorage` durante el render.** Un componente
    `'use client'` se renderiza igualmente en el servidor: acceder ahí daba
    `ReferenceError: window is not defined` y la página respondía **500**. El
    token del mantenedor se lee en un `useEffect`.
-3. **Next 16 mantiene un bloque gestionado en `AGENTS.md`** (entre
+4. **Next 16 mantiene un bloque gestionado en `AGENTS.md`** (entre
    `<!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
