@@ -309,30 +309,6 @@ export const BACKGROUND = {
    */
   parallax: 0.06,
   /**
-   * CUÁNTO FONDO SE VE DETRÁS DEL TEXTO DE LA CARTA (0 = nada, 1 = tanto como fuera).
-   *
-   * POR QUÉ EXISTE (fallo medido): el fondo se compone REEMPLAZANDO la textura de la
-   * carta donde el personaje es transparente (`mix(lit, fondo, cobertura)`), así que
-   * sobre el texto había que impedirlo o el título desaparecía bajo la imagen. La
-   * primera versión lo hacía con una exclusión BINARIA por cajas, y el resultado fue
-   * peor que el problema: la zona excluida dejaba ver el degradado del tema —que en el
-   * borde superior es `deep`, casi negro— así que aparecían RECTÁNGULOS OSCUROS justo
-   * alrededor de la cabecera, los chips y el pie, sobre un fondo claro. Se reportaron
-   * como "un fondo negro que no debería tener", y con razón: era un agujero, no un
-   * elemento del diseño.
-   *
-   * Ahora el fondo no se corta, se ATENÚA: detrás del texto conserva esta fracción de
-   * su intensidad. El texto mantiene su propia placa o su contraste (la cabecera y los
-   * chips ya se dibujan con su fondo translúcido encima) y alrededor no hay ninguna
-   * arista recta, porque el paso de atenuado está DIFUMINADO (ver `characterAlphaMask`).
-   *
-   * 0.35 medido: con 0 vuelven los rectángulos oscuros; con 0.6 el pie y la frase
-   * pierden contraste sobre fondos claros.
-   */
-  textKeep: 0.35,
-  /** Radio del difuminado del atenuado, en px del lienzo de 1008. */
-  textKeepBlur: 26,
-  /**
    * MARGEN del fondo para que el paralaje no lo saque del lienzo.
    *
    * POR QUÉ (fallo medido): el paralaje desplaza el muestreo, así que en los bordes
@@ -355,6 +331,119 @@ export const BACKGROUND = {
    */
   artFloor: 0.55,
   artLumGain: 0.9,
+} as const;
+
+/**
+ * ACABADO DEL TEXTO de la carta: la placa metálica del título, la palabra del pie y
+ * el realce de las letras.
+ *
+ * POR QUÉ VIVE AQUÍ Y NO EN `card-texture.ts`
+ * -------------------------------------------
+ * Este módulo no importa NADA (ni `lib/color`), así que poner aquí los números no
+ * crea ciclo con `card-texture.ts`, que pasa a importar la config. Y es la regla del
+ * repo: todo valor ajustable vive aquí y el dibujo contiene solo el CÓMO.
+ *
+ * CÓMO SE HACE METAL EN UN CANVAS 2D (la técnica, no el gusto)
+ * ------------------------------------------------------------
+ * El metal no es un color: es un GRADIENTE DE MUCHAS PARADAS con dos filos. Un metal
+ * pulido devuelve el entorno, así que tiene una banda clara pegada al borde superior,
+ * el cuerpo medio, un segundo brillo ancho en el centro y una línea oscura al fondo.
+ * Con dos paradas (claro/oscuro) se consigue plástico brillante; con las siete de
+ * `metalStops` se consigue una lámina. El bisel (`bevelLight`/`bevelDark`) es lo que
+ * la convierte en un objeto con ESPESOR: el filo claro arriba y la línea oscura abajo
+ * son lo que el ojo lee como canto.
+ *
+ * El metal NO se inventa un color propio de marca: se tiñe con `brandTint` del acento
+ * del VTuber, porque una placa de acero puro en una carta con identidad fuerte se lee
+ * como un elemento pegado de otra carta.
+ */
+export const TEXT_FINISH = {
+  /**
+   * Paradas del metal de la placa del título, de arriba (0) a abajo (1).
+   *
+   * Las dos primeras y las dos últimas están JUNTAS a propósito: el salto de `9aa3b2`
+   * a `f2f6fb` en el 8% del alto es el filo del bisel, y el de `b6bdc9` a `7f8896` en
+   * el 15% final es la sombra del canto inferior. Separarlas mata el efecto.
+   */
+  metalStops: [
+    { at: 0.0, color: '#7d8797' },
+    { at: 0.08, color: '#ffffff' },
+    { at: 0.24, color: '#b9c1cf' },
+    { at: 0.5, color: '#f6f8fc' },
+    { at: 0.72, color: '#cfd6e1' },
+    { at: 0.9, color: '#8b95a4' },
+    { at: 1.0, color: '#aab3c1' },
+  ],
+  /**
+   * Cuánto se tiñe el metal con el color de marca. Bajo a propósito: por encima de
+   * ~0.5 el acero deja de leerse como metal y vuelve a ser una placa de color.
+   */
+  brandTint: 0.22,
+  /**
+   * Barrido diagonal del metal: una banda ancha y otra estrecha, ambas casi
+   * transparentes. Es lo que distingue una lámina de un degradado plano.
+   */
+  sheen: [
+    { at: 0.0, alpha: 0.0 },
+    { at: 0.3, alpha: 0.3 },
+    { at: 0.45, alpha: 0.0 },
+    { at: 0.62, alpha: 0.22 },
+    { at: 1.0, alpha: 0.0 },
+  ],
+  /** Bisel de la placa: filo claro arriba y línea oscura abajo, en px del lienzo. */
+  bevel: { light: '#ffffff', lightAlpha: 0.5, dark: '#0a0c11', darkAlpha: 0.38, width: 2 },
+  /**
+   * GRABADO del texto oscuro sobre el metal: una copia clara desplazada hacia abajo
+   * hace que la letra parezca hundida en la placa. El desplazamiento va hacia ABAJO
+   * (la luz viene de arriba) y es corto: con más de 2 px la letra se ve borrosa.
+   */
+  engrave: { color: '#ffffff', alpha: 0.42, offsetY: 1.4, blur: 1.2 },
+  /**
+   * Placa del número de dex: acero más oscuro que la cabecera, para que el `#002`
+   * se lea como una pieza distinta y no como parte del mismo bloque.
+   */
+  badgeStops: [
+    { at: 0.0, color: '#4a5260' },
+    { at: 0.08, color: '#a3adbd' },
+    { at: 0.42, color: '#616a79' },
+    { at: 0.82, color: '#39404c' },
+    { at: 1.0, color: '#525b69' },
+  ],
+  /**
+   * MARCA del pie (VTUBERDEX): metálica SOLO EN LAS LETRAS.
+   *
+   * No se puede rellenar el texto con un gradiente y ya —eso daría una letra plana—:
+   * se dibuja el mismo texto tres veces, la copia oscura desplazada ABAJO, la clara
+   * desplazada ARRIBA y encima la del gradiente. Lo que asoma por los lados de esa
+   * última es el bisel, y es lo que hace que la palabra parezca una pieza de metal
+   * recortada en vez de una tipografía con color.
+   */
+  wordmark: {
+    stops: [
+      { at: 0.0, color: '#6f7887' },
+      { at: 0.12, color: '#ffffff' },
+      { at: 0.34, color: '#98a1b0' },
+      { at: 0.56, color: '#e6ebf3' },
+      { at: 0.78, color: '#7d8797' },
+      { at: 1.0, color: '#bcc4d0' },
+    ],
+    brandTint: 0.26,
+    bevelDarkOffset: 1.8,
+    bevelDarkAlpha: 0.9,
+    bevelLightOffset: -1.3,
+    bevelLightAlpha: 0.55,
+  },
+  /**
+   * SOMBRA NEGRA de las letras blancas de la carta.
+   *
+   * El texto del pie y la frase se dibujan en `#e8ecf5` casi opaco y, sobre un fondo
+   * subido con imágenes claras (mar, nieve, cielos), desaparecían. La sombra es negra
+   * y va desplazada abajo-derecha, que es la dirección de la luz del bisel del metal,
+   * para que toda la carta parezca iluminada desde el mismo sitio.
+   *
+   * `blur` corto: por encima de ~8 px la letra blanca se ensucia.
+   */
+  shadow: { color: '#000000', alpha: 0.95, blur: 8, offsetX: 3, offsetY: 3 },
 } as const;
 
 /** Barniz: reflejo especular de una fuente blanda. */

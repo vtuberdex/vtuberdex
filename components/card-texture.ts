@@ -13,6 +13,143 @@
  */
 import type { VtuberCard } from '@/lib/types';
 import { cardPalette, mixHex, rgba } from '@/lib/color';
+import { TEXT_FINISH } from './card3d-config';
+
+/**
+ * CÓMO SE DIBUJA EL METAL (vive aquí y los valores en `TEXT_FINISH`).
+ *
+ * Un canvas 2D no tiene reflejo especular, así que el metal se SIMULA con el perfil
+ * de luminancia de una lámina pulida: muchas paradas con un filo claro arriba, el
+ * cuerpo medio, un brillo ancho en el centro y la sombra del canto abajo. El bisel
+ * —filo claro y línea oscura— es lo que da el ESPESOR, y es lo que separa "plástico
+ * brillante" de "placa metálica".
+ */
+
+/** Relleno metálico: gradiente de paradas + barrido diagonal + tinte de marca. */
+function metalFill(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  stops: readonly { at: number; color: string }[],
+  brand: string,
+  brandTint: number,
+): CanvasGradient {
+  const g = ctx.createLinearGradient(x, y, x + w * 0.25, y + h);
+  for (const s of stops) g.addColorStop(s.at, mixHex(s.color, brand, brandTint));
+  return g;
+}
+
+/**
+ * Barrido diagonal del metal: rellena el área con bandas casi transparentes.
+ *
+ * Se recorta al área ANTES de pintar porque el gradiente es del ancho del área y
+ * cualquier trazo se saldría por las esquinas redondeadas de la placa.
+ */
+function metalSheen(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  const g = ctx.createLinearGradient(x, y, x + w * 0.55, y + h);
+  for (const s of TEXT_FINISH.sheen) {
+    g.addColorStop(s.at, `rgba(255, 255, 255, ${s.alpha})`);
+  }
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
+/** Bisel: filo claro arriba y línea oscura abajo, dentro del área redondeada. */
+function metalBevel(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radius: number,
+): void {
+  const { bevel } = TEXT_FINISH;
+  ctx.save();
+  ctx.beginPath();
+  roundRect(ctx, x, y, w, h, radius);
+  ctx.clip();
+  ctx.lineWidth = bevel.width;
+  ctx.strokeStyle = rgba(bevel.light, bevel.lightAlpha);
+  ctx.beginPath();
+  ctx.moveTo(x, y + bevel.width / 2);
+  ctx.lineTo(x + w, y + bevel.width / 2);
+  ctx.stroke();
+  ctx.strokeStyle = rgba(bevel.dark, bevel.darkAlpha);
+  ctx.beginPath();
+  ctx.moveTo(x, y + h - bevel.width / 2);
+  ctx.lineTo(x + w, y + h - bevel.width / 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Letra GRABADA sobre metal: copia clara desplazada hacia abajo bajo el texto oscuro.
+ *
+ * Se dibuja ANTES del texto real y en la misma posición, así que solo asoma por el
+ * filo inferior de cada letra: es lo que hace que la letra parezca hundida.
+ */
+function drawEngrave(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  font: string,
+  align: CanvasTextAlign,
+): void {
+  const { engrave } = TEXT_FINISH;
+  ctx.save();
+  ctx.font = font;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.filter = `blur(${engrave.blur}px)`;
+  ctx.fillStyle = rgba(engrave.color, engrave.alpha);
+  ctx.fillText(text, x, y + engrave.offsetY);
+  ctx.restore();
+}
+
+/**
+ * MARCA metálica del pie: solo las LETRAS llevan metal.
+ *
+ * Se pinta el texto tres veces para que lea como una pieza recortada y no como una
+ * tipografía con color: copia oscura abajo, copia clara arriba y encima el gradiente.
+ * Los dos desplazamientos son el bisel; sin ellos la letra queda plana.
+ */
+function drawMetalWordmark(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  right: number,
+  y: number,
+  font: string,
+  brand: string,
+): void {
+  const { wordmark } = TEXT_FINISH;
+  ctx.save();
+  ctx.font = font;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = rgba('#05060a', wordmark.bevelDarkAlpha);
+  ctx.fillText(text, right, y + wordmark.bevelDarkOffset);
+  ctx.fillStyle = rgba('#ffffff', wordmark.bevelLightAlpha);
+  ctx.fillText(text, right, y + wordmark.bevelLightOffset);
+  const g = ctx.createLinearGradient(right - ctx.measureText(text).width, y - 16, right, y + 16);
+  for (const s of wordmark.stops) g.addColorStop(s.at, mixHex(s.color, brand, wordmark.brandTint));
+  ctx.fillStyle = g;
+  ctx.fillText(text, right, y);
+  ctx.restore();
+}
 
 export const CARD_TEXTURE_WIDTH = 1008;
 /**
@@ -123,18 +260,7 @@ export function getLastTextBoxes(): Array<{ x0: number; y0: number; x1: number; 
   return lastTextBoxes;
 }
 
-/**
- * CAPA DE TEXTO de la última carta dibujada: los píxeles de la carta en las bandas donde
- * vive el texto (cabecera, chips, tipos, frase y pie), con transparencia fuera de ellas.
- *
- * El shader la pega ENCIMA del fondo. Ver el porqué en `drawCardFront`.
- */
-let textLayer: HTMLCanvasElement | null = null;
 
-/** Devuelve la capa de texto de la última carta dibujada. */
-export function getLastTextLayer(): HTMLCanvasElement | null {
-  return textLayer;
-}
 
 /**
  * Caja donde quedó dibujado el LOGO en la última llamada a `drawCardFront`. La usa
@@ -154,7 +280,6 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
 
   lastLogoBox = null;
   lastTextBoxes = null;
-  textLayer = null;
   const { accent, secondary, deep, mid, sheen } = cardPalette(card.themeColor, card.secondaryColor);
   /**
    * Todo el dibujo está escrito en unidades del lienzo CANÓNICO (1008 de ancho).
@@ -178,6 +303,25 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   ctx.fillStyle = bgGradient;
   ctx.fillRect(0, 0, W, H);
 
+  /**
+   * AGUJEROS EN EL FONDO para el texto transparente.
+   *
+   * El usuario pidió que las letras blancas (frase, pie, chips de estado) tengan fondo
+   * transparente con sombra negra, en vez de una placa opaca. El problema es que esta
+   * función pinta primero un degradado oscuro del color de marca (`deep`) que cubre toda
+   * la carta: aunque la máscara del shader atenúe el fondo subido, debajo sigue ese
+   * degradado y el texto se lee mal.
+   *
+   * Solución: borrar (hacer transparente) el fondo de la carta en las zonas donde el
+   * texto debe flotar. Así el shader ve alfa 0, no pinta el fondo subido allí, y lo que
+   * se ve detrás es el fondo de la escena 3D (FOG). El texto con sombra negra se dibuja
+   * después encima.
+   *
+   * Las PLACAS metálicas (cabecera, chips de tipo) NO se agujerean: ellas mismas son
+   * opacas. El LOGO tampoco: se protege con su máscara.
+   */
+  const textHoles: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
+
   // ------------------------------------------------------------- ARTE (full) ---
   // El arte se ajusta SIEMPRE al ALTO completo de la carta, conservando su
   // proporción. No se recorta ni se amplía por encima del marco:
@@ -188,6 +332,18 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   // Antes se ampliaba con un término extra (`(H + headerBottom) / art.height`)
   // pensado para "colar" el arte por debajo de la cabecera: eso hacía que la
   // imagen se saliera del marco y que el personaje se viera a medias.
+  // Hacer los agujeros ANTES de pintar el arte: el personaje se pinta encima y
+  // tapa lo que le toque; donde es transparente, queda el agujero.
+  if (textHoles.length > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    for (const h of textHoles) {
+      ctx.fillRect(h.x0, h.y0, h.x1 - h.x0, h.y1 - h.y0);
+    }
+    ctx.restore();
+  }
+
   if (art) {
     const scaleToHeight = H / art.height;
     const dw = art.width * scaleToHeight;
@@ -208,12 +364,29 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   // Tinte del color de marca: unifica el arte con la identidad del VTuber, pero
   // MUY sutil. Antes iba a 0.22-0.30 sobre toda la carta y, sumado a las veladuras
   // y a la viñeta, apagaba la imagen entera.
+  /**
+   * Función auxiliar para pintar un rectángulo completo MENOS los agujeros del texto
+   * transparente. Así las veladuras y el tinte no vuelven a oscurecer las zonas que
+   * deben quedar transparentes.
+   */
+  const fillWithHoles = (paintFn: () => void) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    for (const h of textHoles) {
+      ctx.rect(h.x0, h.y0, h.x1 - h.x0, h.y1 - h.y0);
+    }
+    ctx.clip('evenodd');
+    paintFn();
+    ctx.restore();
+  };
+
   const tint = ctx.createLinearGradient(0, 0, W, H);
   tint.addColorStop(0, rgba(accent, 0.16));
   tint.addColorStop(0.5, rgba(deep, 0.1));
   tint.addColorStop(1, rgba(secondary, 0.14));
   ctx.fillStyle = tint;
-  ctx.fillRect(0, 0, W, H);
+  fillWithHoles(() => ctx.fillRect(0, 0, W, H));
 
   // ------------------------------------------------- VELADURAS DE LEGABILIDAD ---
   // Arriba (cabecera) y abajo (frase/tipos/barra): sin esto el texto no se lee
@@ -223,7 +396,7 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   topShade.addColorStop(0.55, 'rgba(5,6,10,0.62)');
   topShade.addColorStop(1, 'rgba(5,6,10,0)');
   ctx.fillStyle = topShade;
-  ctx.fillRect(0, 0, W, 300);
+  fillWithHoles(() => ctx.fillRect(0, 0, W, 300));
 
   // El degradado inferior arranca MÁS ABAJO y es menos opaco: antes empezaba al
   // 42% de la altura y llegaba a 0.95 de opacidad al 62%, así que oscurecía media
@@ -239,7 +412,7 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   bottomShade.addColorStop(0.70, 'rgba(5,6,10,0.34)');
   bottomShade.addColorStop(1, 'rgba(5,6,10,0.46)');
   ctx.fillStyle = bottomShade;
-  ctx.fillRect(0, H * 0.58, W, H * 0.42);
+  fillWithHoles(() => ctx.fillRect(0, H * 0.58, W, H * 0.42));
 
   // Rejilla técnica sutil sobre todo el conjunto.
   ctx.strokeStyle = rgba(sheen, 0.05);
@@ -258,23 +431,40 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   // shader con el Fresnel del color de marca, que sí se degrada con la luz.
 
   // ------------------------------------------------------------ cabecera ---
-  // Placa de cabecera translúcida (deja ver el arte) para anclar número+nombre.
+  /**
+   * PLACA METÁLICA de cabecera.
+   *
+   * Antes era una placa TRANSLÚCIDA del color de marca (acento 0.95 -> secundario
+   * 0.75). Se cambió a metal por petición, y el cambio NO es solo de color: el perfil
+   * de paradas y el bisel son lo que la hacen leer como una lámina con espesor. Ver
+   * `TEXT_FINISH` para la técnica y por qué el metal va teñido del color de marca.
+   */
   const headerTop = 44;
   const headerH = 116;
-  const headerGradient = ctx.createLinearGradient(pad, headerTop, W - pad, headerTop + headerH);
-  headerGradient.addColorStop(0, rgba(accent, 0.95));
-  headerGradient.addColorStop(1, rgba(secondary, 0.75));
-  ctx.fillStyle = headerGradient;
-  roundRect(ctx, pad, headerTop, W - pad * 2, headerH, 22);
+  const headerW = W - pad * 2;
+  const headerRadius = 22;
+  ctx.fillStyle = metalFill(ctx, pad, headerTop, headerW, headerH, TEXT_FINISH.metalStops, accent, TEXT_FINISH.brandTint);
+  roundRect(ctx, pad, headerTop, headerW, headerH, headerRadius);
   ctx.fill();
+  metalSheen(ctx, pad, headerTop, headerW, headerH);
+  metalBevel(ctx, pad, headerTop, headerW, headerH, headerRadius);
 
-  // Número de dex en placa metálica.
+  // Número de dex: placa propia, de acero más oscuro, sobre la cabecera.
   const badge = `#${String(card.dexNumber).padStart(3, '0')}`;
-  ctx.fillStyle = rgba('#05060a', 0.6);
-  roundRect(ctx, pad + 16, headerTop + 21, 168, 74, 16);
+  const badgeX = pad + 16;
+  const badgeY = headerTop + 21;
+  const badgeW = 168;
+  const badgeH = 74;
+  const badgeRadius = 16;
+  ctx.fillStyle = metalFill(ctx, badgeX, badgeY, badgeW, badgeH, TEXT_FINISH.badgeStops, accent, TEXT_FINISH.brandTint);
+  roundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeRadius);
   ctx.fill();
-  ctx.fillStyle = sheen;
-  ctx.font = `800 44px ${FONT}`;
+  metalSheen(ctx, badgeX, badgeY, badgeW, badgeH);
+  metalBevel(ctx, badgeX, badgeY, badgeW, badgeH, badgeRadius);
+  const badgeFont = `800 44px ${FONT}`;
+  drawEngrave(ctx, badge, pad + 100, headerTop + 59, badgeFont, 'center');
+  ctx.fillStyle = '#0a0c11';
+  ctx.font = badgeFont;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(badge, pad + 100, headerTop + 59);
@@ -287,7 +477,9 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   const nameMax = W - pad * 2 - 232 - countryWidth;
   ctx.textAlign = 'left';
   const nameSize = fitText(ctx, card.name.toUpperCase(), nameMax, 58, '800');
-  ctx.font = `800 ${nameSize}px ${FONT}`;
+  const nameFont = `800 ${nameSize}px ${FONT}`;
+  drawEngrave(ctx, card.name.toUpperCase(), pad + 212, headerTop + 59, nameFont, 'left');
+  ctx.font = nameFont;
   ctx.fillStyle = '#0a0c11';
   ctx.fillText(card.name.toUpperCase(), pad + 212, headerTop + 59);
 
@@ -371,15 +563,14 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   for (const chip of stateChips) {
     ctx.font = `700 24px ${FONT}`;
     const chipW = ctx.measureText(chip).width + 30;
-    ctx.fillStyle = 'rgba(5,6,10,0.62)';
-    roundRect(ctx, stateX, stateY, chipW, 42, 12);
-    ctx.fill();
-    ctx.strokeStyle = rgba(accent, 0.6);
-    ctx.lineWidth = 1.5;
-    roundRect(ctx, stateX, stateY, chipW, 42, 12);
-    ctx.stroke();
-    ctx.fillStyle = accent;
+    // Sin placa opaca: el texto lee por la SOMBRA NEGRA, igual que la frase y el pie.
+    ctx.fillStyle = rgba('#e8ecf5', 0.85);
+    ctx.shadowColor = rgba(TEXT_FINISH.shadow.color, TEXT_FINISH.shadow.alpha);
+    ctx.shadowBlur = TEXT_FINISH.shadow.blur;
+    ctx.shadowOffsetX = TEXT_FINISH.shadow.offsetX;
+    ctx.shadowOffsetY = TEXT_FINISH.shadow.offsetY;
     ctx.fillText(chip, stateX + 15, stateY + 22);
+    ctx.shadowColor = 'transparent';
     stateX += chipW + 10;
   }
   /**
@@ -407,6 +598,14 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   ctx.font = `500 32px ${FONT}`;
+  /**
+   * Sombra negra también en la frase: es el texto blanco más largo de la carta y el
+   * que más se perdía sobre un fondo claro. Misma dirección de luz que el pie.
+   */
+  ctx.shadowColor = rgba(TEXT_FINISH.shadow.color, TEXT_FINISH.shadow.alpha);
+  ctx.shadowBlur = TEXT_FINISH.shadow.blur;
+  ctx.shadowOffsetX = TEXT_FINISH.shadow.offsetX;
+  ctx.shadowOffsetY = TEXT_FINISH.shadow.offsetY;
   ctx.fillStyle = rgba('#e8ecf5', 0.94);
   const lineHeight = 42;
   const maxPhraseLines = Math.max(1, Math.floor((phraseBottomLimit - phraseTopLimit) / lineHeight));
@@ -454,6 +653,12 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
       pad + ctx.measureText('Sin presentación registrada').width,
     );
   }
+
+  // La sombra se apaga aquí: los chips y la barra se dibujan limpios.
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
 
   // Chips de tipos, anclados sobre la barra.
   /**
@@ -507,19 +712,53 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   });
 
   // ------------------------------------------------------------------- pie ---
+  /**
+   * Letras blancas con SOMBRA NEGRA.
+   *
+   * El pie era `#e8ecf5` casi opaco sobre arte claro y se perdía. La sombra va
+   * desplazada abajo-derecha, la misma dirección que el bisel de la placa metálica,
+   * para que toda la carta parezca iluminada desde el mismo sitio.
+   */
+  const { shadow } = TEXT_FINISH;
+  const setShadow = () => {
+    ctx.shadowColor = rgba(shadow.color, shadow.alpha);
+    ctx.shadowBlur = shadow.blur;
+    ctx.shadowOffsetX = shadow.offsetX;
+    ctx.shadowOffsetY = shadow.offsetY;
+  };
+  const clearShadow = () => {
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+  };
+
   ctx.font = `600 26px ${FONT}`;
-  ctx.fillStyle = rgba('#e8ecf5', 0.68);
   ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  setShadow();
+  ctx.fillStyle = rgba('#e8ecf5', 0.68);
   const socialCount = card.socialCount ?? 0;
   ctx.fillText(socialCount > 0 ? `${socialCount} redes enlazadas` : 'Sin redes enlazadas', pad, H - 86);
+  clearShadow();
 
+  /**
+   * MARCA del pie: metálica SOLO en las letras, sin placa debajo.
+   *
+   * `sheen` era el color de marca translúcido; ahora el metal sale de
+   * `TEXT_FINISH.wordmark` con doble bisel. La sombra negra se pone ANTES de las tres
+   * pasadas para que la sombra la proyecte el conjunto y no cada copia del bisel.
+   */
   ctx.textAlign = 'right';
-  ctx.fillStyle = rgba(sheen, 0.8);
-  ctx.font = `800 28px ${FONT}`;
-  ctx.fillText('VTUBERDEX', W - pad, H - 86);
+  setShadow();
+  drawMetalWordmark(ctx, 'VTUBERDEX', W - pad, H - 86, `800 28px ${FONT}`, accent);
+  clearShadow();
+  ctx.textAlign = 'right';
+  setShadow();
   ctx.font = `500 22px ${FONT}`;
   ctx.fillStyle = rgba('#e8ecf5', 0.5);
   ctx.fillText(primary ? `${primary.name}` : 'Sin país', W - pad, H - 54);
+  clearShadow();
 
   /**
    * CAJAS DE TEXTO que el fondo no puede pisar.
@@ -578,56 +817,33 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
     y1: (b.y1 + FONDO_TEXTO_MARGEN) / H,
   }));
 
-  /**
-   * CAPA DE TEXTO: el ancho de la carta en la banda del texto, para recomponerlo ENCIMA
-   * del fondo en el shader.
-   *
-   * POR QUÉ ASÍ Y NO EXCLUYENDO EL FONDO (el fallo costó dos intentos)
-   * ----------------------------------------------------------------
-   * Como el shader compone el fondo REEMPLAZANDO la carta donde el personaje es
-   * transparente, el texto de esa zona desaparece bajo la imagen. Se intentó primero
-   * EXCLUIR el fondo de las cajas de texto: dejaba ver el degradado oscuro del tema y la
-   * veladura de legibilidad, o sea RECTÁNGULOS NEGROS pegados a la cabecera, los chips y
-   * el pie. Se intentó después ATENUARLO: menos negro, pero seguía viéndose la franja.
-   *
-   * El problema es de fondo: cualquier cosa que deje asomar la textura bajo el fondo se
-   * ve oscura, porque esa zona de la carta es una placa casi negra a propósito (para que
-   * el texto se lea sobre cualquier arte). Lo correcto es lo que el repo ya hace con el
-   * LOGO: no cortar el fondo, sino RE-COMPONER el elemento por encima.
-   *
-   * Así que esta capa lleva copiados los píxeles de la carta en las bandas del texto
-   * —placa, chips, frase y pie, con sus degradados— y su ALFA marca dónde van. El shader
-   * dibuja el fondo sin exclusiones en todo el lienzo y después pega esta capa encima: el
-   * texto queda idéntico al de siempre y el fondo llega a los cuatro bordes.
-   */
-  textLayer = document.createElement('canvas');
-  textLayer.width = canvas.width;
-  textLayer.height = canvas.height;
-  const tl = textLayer.getContext('2d');
-  if (tl) {
-    /**
-     * CAJAS EXACTAS, sin margen: el recorte coincide con el borde de cada placa.
-     *
-     * POR QUE SIN MARGEN (fallo medido): la primera version usaba BANDAS de ancho
-     * completo, y eso volvia a tapar el fondo en toda la franja — se veia un corte
-     * horizontal a la altura del chip, o sea el mismo defecto con otra forma. Con las
-     * cajas ajustadas, el fondo llega al borde superior y al lateral, y lo unico que se
-     * repone encima son las placas.
-     *
-     * Tampoco vale el margen que usa `lastTextBoxes` (14 px): esos 14 px de mas son
-     * textura de la carta, que en la cabecera es la veladura oscura, asi que saldria un
-     * anillo oscuro alrededor de cada placa.
-     */
-    for (const b of boxes) {
-      const x = Math.round(b.x0 * scale);
-      const y = Math.round(b.y0 * scale);
-      const w = Math.round((b.x1 - b.x0) * scale);
-      const h = Math.round((b.y1 - b.y0) * scale);
-      if (w <= 0 || h <= 0) continue;
-      tl.drawImage(canvas, x, y, w, h, x, y, w, h);
-    }
-  }
 
+  // ----------------------------------------------------- AGUJEROS FINALES ---
+  // Llenar las zonas de texto transparente. Las placas metálicas no entran.
+  // Cabecera, chips de tipo y logo NO son transparentes.
+  // Estado chips, frase y pie SÍ son transparentes.
+  if (stateChips.length > 0) {
+    textHoles.push({ x0: pad, y0: stateY - 4, x1: stateChipsEnd + 4, y1: stateY + 46 });
+  }
+  textHoles.push({
+    x0: pad,
+    y0: phrase && phraseBoxRight > pad ? phraseBoxTop - 4 : phraseBottomLimit - 30,
+    x1: Math.max(phraseBoxRight, pad + 320) + 4,
+    y1: phraseBottomLimit + 14,
+  });
+  // Pie: redes (izquierda) y país (derecha). VTUBERDEX es metálico, no agujereado.
+  textHoles.push({ x0: pad, y0: H - 108, x1: W / 2 - 10, y1: H - 40 });
+  textHoles.push({ x0: W / 2 + 10, y0: H - 54 - 26, x1: W - pad, y1: H - 40 });
+
+  if (textHoles.length > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    for (const h of textHoles) {
+      ctx.fillRect(h.x0, h.y0, h.x1 - h.x0, h.y1 - h.y0);
+    }
+    ctx.restore();
+  }
   return canvas;
 }
 

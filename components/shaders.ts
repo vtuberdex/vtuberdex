@@ -229,12 +229,7 @@ export const cardFragmentShader = /* glsl */ `
    * encienda igual que el del personaje y las dos capas no parezcan de técnica distinta.
    */
   uniform sampler2D uBgEdgeMap;
-  /**
-   * CAPA DE TEXTO de la carta (cabecera, chips, tipos, frase y pie). Se pega ENCIMA del
-   * fondo para que el texto no quede bajo la imagen y para que no haya que recortar el
-   * fondo alrededor de el. Su alfa marca donde va.
-   */
-  uniform sampler2D uTextLayer;
+
   uniform float uBgEdgeStrength;
   /** Suelo de luminancia del arte del fondo: se ajusta en vivo. */
   uniform float uBgArtFloor;
@@ -808,23 +803,6 @@ ${FACTION_SIZES}
         bgArtLevel + bgArtLevel * bgLayer + bgLayer * uBgLayerWeight + bgEdgeLayer,
         bgCover
       );
-      /**
-       * RECOMPOSICION DEL TEXTO: la carta se vuelve a pegar ENCIMA del fondo en las bandas
-       * donde vive el texto (cabecera, chips, tipos, frase y pie).
-       *
-       * POR QUE SE RECOMPONE Y NO SE EXCLUYE EL FONDO (el fallo costo dos intentos): la
-       * zona del texto de la carta es una placa casi negra a proposito, para que el texto
-       * se lea sobre cualquier arte. Excluir el fondo alli dejaba ver esa placa como
-       * RECTANGULOS NEGROS pegados a la cabecera, los chips y el pie; atenuarlo dejaba la
-       * misma franja, mas suave. El error era el planteamiento: no hay que decidir cuanto
-       * fondo se pinta ahi, hay que volver a poner el texto ENCIMA, que es lo que este
-       * shader ya hace con el logo (uLogoSticker) por la misma razon.
-       *
-       * Se muestrea SIN paralaje: el texto es parte de la carta, no de la escena de fondo,
-       * asi que no debe desplazarse con el puntero.
-       */
-      vec4 textPix = texture2D(uTextLayer, vUv);
-      lit = mix(lit, textPix.rgb, textPix.a);
     }
 
     // Colores de marca del VTuber como tinte del borde.
