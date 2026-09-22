@@ -326,22 +326,18 @@ describe('HoloCard', () => {
 describe('cardTexture', () => {
   it('degrada sin contexto 2D en vez de lanzar', () => {
     const card = makeCard();
-    const canvas = drawCardFront({ card, art: null, logo: null });
-    // Se valida la PROPORCIÓN, no números mágicos: el lienzo debe ser el de una
-    // carta coleccionable (1.4), el mismo que el CSS `aspect-[5/7]` y el asset.
+    const canvas = drawCardFront({ card, art: null, logo: null, background: null });
     expect(canvas.width).toBe(CARD_TEXTURE_WIDTH);
     expect(canvas.height).toBe(CARD_TEXTURE_HEIGHT);
     expect(canvas.height / canvas.width).toBeCloseTo(1.4, 2);
   });
 
   it('respeta el ancho reducido sin cambiar la proporción', () => {
-    // La grilla dibuja a la mitad para no gastar 6,2× píxeles de los que se ven:
-    // lo que se comprueba es que el lienzo encoge MANTENIENDO la proporción de
-    // carta, que es lo que impide que el arte salga deformado.
     const canvas = drawCardFront({
       card: makeCard(),
       art: null,
       logo: null,
+      background: null,
       width: CARD_TEXTURE_TILE_WIDTH,
     });
     expect(canvas.width).toBe(CARD_TEXTURE_TILE_WIDTH);

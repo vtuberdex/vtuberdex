@@ -113,6 +113,21 @@ export const cardFragmentShader = /* glsl */ `
 
   uniform sampler2D uMap;
   /**
+   * 7 capas con paralaje independiente. Ver [card3d-config.ts] PARALLAX_LAYERS.
+   * Cuando uUseLayers es 1, uMap pasa a ser solo fallback/debug y la composición
+   * se arma en el shader desde estas capas.
+   */
+  uniform sampler2D uLayer0;
+  uniform sampler2D uLayer1;
+  uniform sampler2D uLayer2;
+  uniform sampler2D uLayer3;
+  uniform sampler2D uLayer4;
+  uniform sampler2D uLayer5;
+  uniform sampler2D uLayer6;
+  uniform float uUseLayers;
+  uniform int uLayerCount;
+  uniform float uParallaxFactors[ 7 ];
+  /**
    * Máscara de TINTA Y PIEL: el lineart negro y los tonos de piel del personaje.
    * Se mezcla en modo LUZ como capa holográfica: enciende el dibujo y la piel sin
    * tocar el resto de la carta.
@@ -409,6 +424,35 @@ ${SPECTRUM_FN}
 
   void main() {
     vec4 tex = texture2D(uMap, vUv);
+    vec3 base;
+    float finalAlpha;
+
+    if (uUseLayers > 0.5) {
+      vec2 parallax = uPointer;
+      vec4 layer0 = texture2D(uLayer0, vUv + parallax * uParallaxFactors[0]);
+      vec4 layer1 = texture2D(uLayer1, vUv + parallax * uParallaxFactors[1]);
+      vec4 layer2 = texture2D(uLayer2, vUv + parallax * uParallaxFactors[2]);
+      vec4 layer3 = texture2D(uLayer3, vUv + parallax * uParallaxFactors[3]);
+      vec4 layer4 = texture2D(uLayer4, vUv + parallax * uParallaxFactors[4]);
+      vec4 layer5 = texture2D(uLayer5, vUv + parallax * uParallaxFactors[5]);
+      vec4 layer6 = texture2D(uLayer6, vUv + parallax * uParallaxFactors[6]);
+
+      // Degradado de marca cuando el fondo no cubre un píxel.
+      vec3 themeGradient = mix(uSecondary, mix(uAccent, vec3(0.031, 0.035, 0.063), vUv.y), 0.55);
+      base = themeGradient;
+      base = mix(base, layer0.rgb, layer0.a);
+      base = mix(base, layer1.rgb, layer1.a);
+      base = mix(base, layer2.rgb, layer2.a);
+      base = mix(base, layer3.rgb, layer3.a);
+      base = mix(base, layer4.rgb, layer4.a);
+      base = mix(base, layer5.rgb, layer5.a);
+      base = mix(base, layer6.rgb, layer6.a);
+      finalAlpha = max(max(max(max(max(max(layer0.a, layer1.a), layer2.a), layer3.a), layer4.a), layer5.a), layer6.a);
+    } else {
+      base = tex.rgb;
+      finalAlpha = tex.a;
+    }
+
     // Alcance del efecto: solo la imagen, nunca los items de la carta.
     float zone = artZoneMask(vUv);
     /**
@@ -509,7 +553,7 @@ ${SPECTRUM_FN}
     float glossAmount = gloss.x * uGloss;
     // El brillo respeta el arte: sobre zonas ya claras aporta menos (evita el
     // efecto "lechoso" que arruina los colores planos).
-    float luminance = dot(tex.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float luminance = dot(base, vec3(0.2126, 0.7152, 0.0722));
     float glossWeight = mix(
       1.0,
       uHighlightWeight,
@@ -538,7 +582,7 @@ ${SPECTRUM_FN}
     // que se lean como holograma superpuesto sin manchar la carta. Cada emblema
     // recibe su propio tinte iridiscente y su fase de latido, así no parecen un
     // mismo sello repetido.
-    vec3 base = tex.rgb;
+
     if (uFactionCounts.x > 0.5) {
       // Posición de cada slot en la carta (x,y) y su tamaño relativo, generados
       // desde FACTION.slots: 1º arriba-derecha, 2º abajo-izquierda,
@@ -684,7 +728,7 @@ ${FACTION_SIZES}
      * quite nada. Y sin fondo subido (uHasBackground = 0) el bloque entero se
      * salta: la ficha queda exactamente como estaba.
      */
-    if (uHasBackground > 0.5) {
+    if (uHasBackground > 0.5 && uUseLayers < 0.5) {
       /**
        * El CONTENIDO se muestrea DESPLAZADO por el puntero (paralaje) mientras la
        * máscara se lee en la posición FIJA.
@@ -708,7 +752,7 @@ ${FACTION_SIZES}
       /**
        * Interferencia del fondo: MISMO modelo de película delgada que el frente, mismos
        * pesos de HOLOGRAM y —esto es lo que se corrigió— MISMAS frecuencias espaciales
-       * (HOLOGRAM.surfaceX/surfaceY), no las suyas propias.
+       * (HOLOGRAM surfaceX y surfaceY), no las suyas propias.
        *
        * POR QUÉ (fallo medido): antes esta capa sumaba un patrón propio de 5 ciclos
        * (BACKGROUND.foilCycles, contra 1.6 del frente) y frecuencias de superficie
@@ -720,7 +764,7 @@ ${FACTION_SIZES}
        *
        * Lo que sí distingue al fondo es la INTENSIDAD y el CROMA (uBgHolo,
        * uBgLayerWeight), no la frecuencia. La ANIMACIÓN temporal se conserva con su
-       * propio ritmo (BACKGROUND.timeShift), que es un desfase deliberado: el fondo no
+       * propio ritmo (BACKGROUND timeShift), que es un desfase deliberado: el fondo no
        * cambia de color al unísono con el personaje, igual que en una lámina real la
        * capa de detrás no late con la de delante.
        */
@@ -751,7 +795,7 @@ ${FACTION_SIZES}
        * TINTA Y PIEL del fondo: su propia capa de realce de contornos.
        *
        * POR QUÉ SE AÑADIÓ (lo pidió el usuario): el frente tenía esta perilla
-       * (EDGE.strength) y el fondo no, así que el lineart del fondo no se encendía
+       * (EDGE strength) y el fondo no, así que el lineart del fondo no se encendía
        * como el del personaje y las dos capas se veían de técnica distinta. Es el mismo
        * efecto que la CAPA 4 del frente, con dos diferencias deliberadas:
        *
@@ -868,7 +912,7 @@ ${FACTION_SIZES}
     // La capa de color superpuesta no debe alterar el alfa del arte (el brillo
     // es luz, no pigmento): así no "mancha" los bordes recortados. La máscara de
     // esquinas va sobre el alfa para que el recorte coincida con el canto.
-    float alpha = tex.a * cardCornerMask(vUv);
+    float alpha = finalAlpha * cardCornerMask(vUv);
     if (alpha < ${f(CFG.SILHOUETTE.alphaCutoff)}) discard;
 
     /**

@@ -659,6 +659,49 @@ export const LOGO = {
 } as const;
 
 /**
+ * CAPAS PARALLAX de la carta, de abajo arriba.
+ *
+ * El usuario pidió 7 capas separadas con paralaje propio. Cada valor es la
+ * FRACCIÓN DEL ANCHO de carta que se desplaza con el puntero (que va de -1 a 1).
+ * Signo positivo = se mueve con el puntero; negativo = en contra (más cerca del
+ * cristal).
+ *
+ *   0 background   -> capa más lejana, movimiento opuesto al frente, escala 1.10
+ *   1 character    -> el personaje, anclado a la carta (casi sin paralaje)
+ *   2 logo         -> marca, desplazamiento medio
+ *   3 title        -> placa metálica del título
+ *   4 texts        -> frase, pie, estado (texto blanco con sombra)
+ *   5 tags         -> chips de tipo
+ *   6 wordmark     -> "VTUBERDEX"
+ *
+ * El background se escala en CPU (overscan 1.10) para no ver bordes al inclinar.
+ */
+export const PARALLAX_LAYERS = [
+  { name: 'background', index: 0, factor: -0.06, scale: 1.10 },
+  { name: 'character', index: 1, factor: 0.005, scale: 1.0 },
+  { name: 'logo', index: 2, factor: -0.03, scale: 1.0 },
+  { name: 'title', index: 3, factor: 0.015, scale: 1.0 },
+  { name: 'texts', index: 4, factor: 0.012, scale: 1.0 },
+  { name: 'tags', index: 5, factor: 0.018, scale: 1.0 },
+  { name: 'wordmark', index: 6, factor: 0.01, scale: 1.0 },
+] as const;
+
+export type LayerName = typeof PARALLAX_LAYERS[number]['name'];
+export const LAYER_COUNT = PARALLAX_LAYERS.length;
+export const LAYER_UNIFORM_NAMES: string[] = PARALLAX_LAYERS.map((l) => `uLayer${l.index}`);
+export const LAYER_PARALLAX_FACTORS: number[] = PARALLAX_LAYERS.map((l) => l.factor);
+export const LAYER_SCALES: number[] = PARALLAX_LAYERS.map((l) => l.scale);
+export const LAYER_LABELS: Record<LayerName, string> = {
+  background: 'Fondo',
+  character: 'Personaje',
+  logo: 'Logo',
+  title: 'Título',
+  texts: 'Textos',
+  tags: 'Tags',
+  wordmark: 'VTUBERDEX',
+};
+
+/**
  * Resplandor de marca ALREDEDOR de la carta (plano aparte, aditivo).
  *
  * Subió de 0.55 a 0.73 en el ajuste en vivo: es el halo que despega la carta del fondo,
@@ -691,6 +734,34 @@ export const SILHOUETTE = {
   aaMinRatio: 0.0012,
   /** Alfa por debajo del cual se descarta el fragmento. */
   alphaCutoff: 0.02,
+} as const;
+
+/**
+ * CAPAS PARALLAX de la carta, de abajo arriba.
+ *
+ * El usuario pidió 7 capas separadas con paralaje propio. Cada valor es la
+ * FRACCIÓN DEL ANCHO de carta que se desplaza con el puntero (que va de -1 a 1).
+ * Signo positivo = se mueve con el puntero; negativo = en contra (más cerca del
+ * cristal).
+ *
+ *   0 background   -> capa más lejana, movimiento opuesto al frente
+ *   1 character    -> el personaje, anclado a la carta (casi sin paralaje)
+ *   2 logo         -> marca, desplazamiento medio
+ *   3 title        -> placa metálica del título
+ *   4 texts        -> frase, pie, estado (texto blanco con sombra)
+ *   5 tags         -> chips de tipo
+ *   6 wordmark     -> "VTUBERDEX"
+ *
+ * El background es 10% más grande en CPU para no ver bordes al inclinar.
+ */
+export const PARALLAX = {
+  background: -0.06,
+  character: 0.005,
+  logo: -0.03,
+  title: 0.015,
+  texts: 0.012,
+  tags: 0.018,
+  wordmark: 0.01,
 } as const;
 
 /** Movimiento de la carta: inclinación por puntero y flotación. */

@@ -117,7 +117,13 @@ const LITERALES_LEGITIMOS = [
   // Centrado respecto a la mitad (UV 0..1 y puntero -1..1) y umbral de ACTIVO/INACTIVO
   // de los emblemas de facción (una cuenta de facciones llega como 0 o 1, así que el
   // corte es 0.5 por construcción, no una perilla).
-  { valor: '0.5', en: /-\s*0\.5\b|vec2\(0\.5\)|\*\s*0\.5\s*\+\s*0\.5|fract\([^)]*\)\s*-\s*0\.5|uFactionCounts\.\w\s*>\s*0\.5|uHasBackground\s*>\s*0\.5|activo\s*<\s*0\.5|float\(i\)\s*\*\s*0\.5|uCardSize\s*\*\s*0\.5|\/\s*size\s*\+\s*0\.5/ },
+  { valor: '0.5', en: /-\s*0\.5\b|vec2\(0\.5\)|\*\s*0\.5\s*\+\s*0\.5|fract\([^)]*\)\s*-\s*0\.5|uFactionCounts\.\w\s*>\s*0\.5|uHasBackground\s*>\s*0\.5|activo\s*<\s*0\.5|float\(i\)\s*\*\s*0\.5|uCardSize\s*\*\s*0\.5|\/\s*size\s*\+\s*0\.5|uUseLayers\s*>\s*0\.5/ },
+  // Color de fondo por defecto cuando no hay background (capas): gris muy oscuro.
+  { valor: '0.031', en: /vec3\(\s*0\.031,\s*0\.035,\s*0\.063\s*\)/ },
+  { valor: '0.035', en: /vec3\(\s*0\.031,\s*0\.035,\s*0\.063\s*\)/ },
+  { valor: '0.063', en: /vec3\(\s*0\.031,\s*0\.035,\s*0\.063\s*\)/ },
+  // Mezcla del degradado por defecto (estructura, no perilla).
+  { valor: '0.55', en: /mix\(\s*uSecondary,\s*mix\(\s*uAccent,\s*vec3\([^)]*\),\s*vUv\.y\s*\),\s*0\.55\s*\)/ },
   { valor: '2.0', en: /\*\s*2\.0\b|\/\s*2\.0\b/ },
   // Luminancia Rec.709: constante de la física del color, no un ajuste.
   { valor: '0.2126', en: /\.2126|dot\(/ },
