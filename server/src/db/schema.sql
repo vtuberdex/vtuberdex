@@ -179,7 +179,7 @@ CREATE INDEX IF NOT EXISTS idx_social_vtuber ON social (vtuber_id, position);
 CREATE TABLE IF NOT EXISTS asset (
   id         INTEGER PRIMARY KEY,
   vtuber_id  INTEGER NOT NULL REFERENCES vtuber (id) ON DELETE CASCADE,
-  kind       TEXT NOT NULL CHECK (kind IN ('card', 'thumb', 'logo', 'character', 'radar')),
+  kind       TEXT NOT NULL CHECK (kind IN ('card', 'thumb', 'logo', 'character', 'radar', 'background')),
   path       TEXT NOT NULL,
   source_url TEXT,
   width      INTEGER,

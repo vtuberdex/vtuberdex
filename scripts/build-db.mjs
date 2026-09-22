@@ -40,14 +40,44 @@ const OUT_DB = path.join(OUT_DIR, 'vtuberdex.db');
 const OUT_MANIFEST = path.join(OUT_DIR, 'images.json');
 
 /**
+ * `--if-missing` salta el trabajo si los artefactos ya están.
+ *
+ * Existe por el build de Vercel: allí `data/` NO existe (está ignorado y las
+ * imágenes crudas nunca viajan), así que `VACUUM INTO` no tendría origen. Con
+ * esta bandera el build usa el artefacto ya versionado en `deploy/` y solo lo
+ * regenera quien tiene los datos locales (el scraper y el seed).
+ */
+const IF_MISSING = args.includes('--if-missing');
+
+/**
  * Tablas que NO deben viajar a producción: identifican al mantenedor y
  * registran su actividad. En Vercel no hay sesiones, así que vaciarlas no quita
  * ninguna función y sí evita publicar un artefacto de autenticación.
  */
 const CREDENTIAL_TABLES = ['admin_user', 'audit_log'];
 
-/** Carpetas de imagen que el front realmente pide (verificado sobre web/src). */
-const USED_FOLDERS = ['character', 'logo', 'radar', 'faction'];
+/**
+ * Carpetas de imagen que el front realmente pide.
+ *
+ * Se publican SOLO estas tres, y la lista es deliberadamente corta porque cada
+ * carpeta de más son megabytes en Blob y una ruta que nadie va a pedir:
+ *
+ *   · `character` — la imagen fuente del VTuber (lienzo 720x1008). La usan la
+ *     carta 3D, el listado y la ficha.
+ *   · `logo`      — la capa superior de la carta.
+ *   · `faction`   — el emblema de facción que la carta superpone.
+ *
+ * Quedaron fuera, y sus archivos ya no están en disco:
+ *   · `thumb`  — ninguna vista la pedía (18 MB).
+ *   · `avatar` — duplicado legacy de `character` (13 MB).
+ *   · `ficha`  — la ficha apaisada del sitio; era el respaldo de `character` y
+ *                hoy los 785 lo tienen, así que nunca se mostraba (33 MB).
+ *   · `radar`  — el gráfico de atributos. Se DIBUJA desde los datos con
+ *                `StatBars` en la misma página, así que la imagen raster era
+ *                redundante (8 MB).
+ *   · `card`   — vacía desde siempre.
+ */
+const USED_FOLDERS = ['character', 'logo', 'faction', 'background'];
 
 function stripCredentials(db) {
   const removed = {};
@@ -57,6 +87,22 @@ function stripCredentials(db) {
     removed[table] = before;
   }
   return removed;
+}
+
+/**
+ * Reescribe el archivo para que no queden rastros de lo borrado.
+ *
+ * `DELETE` en SQLite NO borra los datos: marca las páginas como libres y los
+ * bytes siguen ahí, recuperables con `strings`. Comprobado: tras vaciar
+ * `admin_user`, el archivo seguía conteniendo el hash de la contraseña del
+ * mantenedor y el nombre de usuario, listos para viajar al repositorio.
+ *
+ * `VACUUM` reconstruye el archivo desde cero y deja fuera esas páginas, así que
+ * la base publicada no conserva ni el hash ni ningún resto del registro que se
+ * quiso eliminar.
+ */
+function vacuumAwayDeletedRows(db) {
+  db.exec('VACUUM');
 }
 
 /**
@@ -113,6 +159,11 @@ function buildDatabase() {
   const out = new DatabaseSync(OUT_DB);
   out.exec('PRAGMA journal_mode = DELETE');
   const removed = stripCredentials(out);
+  // `DELETE` deja los bytes en las páginas liberadas: sin este VACUUM, el hash
+  // de la contraseña del mantenedor seguía siendo recuperable del archivo que se
+  // publica. Va ANTES de escribirlo en `meta` para que el VACUUM tampoco deje
+  // rastro de esa escritura.
+  vacuumAwayDeletedRows(out);
   // Se deja constancia en `meta` de que el artefacto está saneado: así el
   // propio deploy puede demostrarlo sin inspeccionar tablas.
   out
@@ -125,6 +176,20 @@ function buildDatabase() {
     integrity = 'no_comprobado';
   }
   out.close();
+
+  // Comprobación de que el saneado fue REAL: si los bytes del hash siguieran
+  // ahí, el artefacto no debe publicarse ni versionarse.
+  //
+  // Se busca la FORMA del hash (`scrypt$<salt>$<derivado>`, que es lo que
+  // escribe `server/src/auth.mjs`), no la palabra "password_hash": esa aparece
+  // en el ESQUEMA de la tabla (`CREATE TABLE admin_user (... password_hash TEXT
+  // NOT NULL ...)`), que sí viaja porque el esquema es inofensivo. Buscar la
+  // palabra daba un falso positivo permanente.
+  const bytes = fs.readFileSync(OUT_DB);
+  if (/scrypt\$[0-9a-f]{16,}\$[0-9a-f]{32,}/.test(bytes.toString('latin1'))) {
+    console.error('✖ la base saneada TODAVÍA contiene el hash de una credencial');
+    process.exit(1);
+  }
 
   return { counts, removed, paths, integrity, bytes: fs.statSync(OUT_DB).size };
 }
@@ -180,6 +245,19 @@ function buildManifest(paths, blobBase) {
     },
     missing,
   };
+}
+
+/**
+ * ¿Hay que hacer el trabajo?
+ *
+ * Con `--if-missing` (el modo del build de Vercel) se reutiliza lo que ya esté
+ * construido: sin `data/` no habría de dónde sacar la base, y lo que importa es
+ * que el artefacto ESTÉ, no de dónde venga. Sin la bandera se reconstruye
+ * siempre, que es lo que quieren el scraper y el seed tras cambiar el dataset.
+ */
+if (IF_MISSING && fs.existsSync(OUT_DB) && fs.existsSync(OUT_MANIFEST)) {
+  console.log(`[build-db] ya existen los artefactos en ${path.relative(ROOT, OUT_DIR)}; se reutilizan`);
+  process.exit(0);
 }
 
 const BLOB_BASE = value('blob-base', process.env.VTUBERDEX_BLOB_BASE ?? '');

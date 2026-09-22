@@ -31,6 +31,7 @@ const CARD_SELECT = `
     a_thumb.path AS thumbImage,
     a_logo.path  AS logoImage,
     a_character.path AS characterImage,
+    a_background.path AS backgroundImage,
     a_radar.path AS radarImage,
     (SELECT json_group_array(json_object('slug', c.slug, 'name', c.name, 'flag', c.flag))
        FROM (SELECT country_id FROM vtuber_country WHERE vtuber_id = v.id ORDER BY position) vc
@@ -58,6 +59,7 @@ const CARD_SELECT = `
   LEFT JOIN asset a_thumb  ON a_thumb.vtuber_id = v.id AND a_thumb.kind = 'thumb'
   LEFT JOIN asset a_logo   ON a_logo.vtuber_id = v.id AND a_logo.kind = 'logo'
   LEFT JOIN asset a_character ON a_character.vtuber_id = v.id AND a_character.kind = 'character'
+  LEFT JOIN asset a_background ON a_background.vtuber_id = v.id AND a_background.kind = 'background'
   LEFT JOIN asset a_radar  ON a_radar.vtuber_id = v.id AND a_radar.kind = 'radar'
 `;
 
@@ -125,6 +127,12 @@ export function mapCard(row) {
        * proporción correcta, así que estirarla a un marco no lo deforma.
        */
       character: toPublicPath(row.characterImage),
+      /**
+       * El FONDO: capa opcional que la carta 3D pinta POR DETRÁS del personaje.
+       * Puede ser `null` —hoy lo es en las 785 fichas, porque el tipo acaba de
+       * nacer y nadie ha subido ninguna— y la carta se dibuja igual que antes.
+       */
+      background: toPublicPath(row.backgroundImage),
       /** La FICHA apaisada del sitio (legacy): respaldo si no hay personaje. */
       card: toPublicPath(row.cardImage),
       thumb: toPublicPath(row.thumbImage),

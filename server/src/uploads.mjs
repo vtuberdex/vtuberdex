@@ -39,6 +39,15 @@ export const UPLOADABLE_KINDS = {
   thumb: { folder: 'thumb', width: 360, keepAlpha: true, ratio: 1.4 },
   logo: { folder: 'logo', width: 900, keepAlpha: true, trim: true },
   radar: { folder: 'radar', width: 512 },
+  /**
+   * El FONDO de la carta 3D: la capa que se pinta POR DETRÁS del personaje.
+   *
+   * Se normaliza al MISMO lienzo que el personaje (720x1008, `cover`): así el fondo
+   * y el personaje comparten encuadre y el paralaje entre las dos capas no arrastra
+   * un desajuste de proporción. Se conserva el alfa porque un fondo puede traerlo
+   * (un cielo calado, un degradado con transparencia).
+   */
+  background: { folder: 'background', width: 720, keepAlpha: true, ratio: 1.4 },
 };
 
 /** Tamaño máximo aceptado para una imagen subida (12 MB). */

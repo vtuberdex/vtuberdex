@@ -73,6 +73,36 @@ const MIGRATIONS = [
     id: '2026-09-unify-character-asset',
     sql: `UPDATE OR REPLACE asset SET kind = 'character' WHERE kind = 'avatar';`,
   },
+  {
+    /**
+     * Da cabida al asset `background`: la imagen que la carta 3D pinta POR DETRÁS
+     * del personaje. Es un cuarto tipo de imagen fuente, y el único que puede
+     * faltar sin que se note: sin fila, `uHasBackground` queda en 0 y la carta se
+     * dibuja exactamente como antes.
+     *
+     * Se reconstruye la tabla porque SQLite no permite modificar un CHECK con
+     * ALTER TABLE, igual que en la migración de `character`. La vista se suelta
+     * primero: la recrea `VIEWS_SQL` al terminar de aplicar las migraciones.
+     */
+    id: '2026-09-asset-background-kind',
+    sql: `DROP VIEW IF EXISTS v_vtuber_card;
+          CREATE TABLE asset_new (
+            id         INTEGER PRIMARY KEY,
+            vtuber_id  INTEGER NOT NULL REFERENCES vtuber (id) ON DELETE CASCADE,
+            kind       TEXT NOT NULL CHECK (kind IN ('card', 'thumb', 'logo', 'avatar', 'radar', 'character', 'background')),
+            path       TEXT NOT NULL,
+            source_url TEXT,
+            width      INTEGER,
+            height     INTEGER,
+            bytes      INTEGER,
+            UNIQUE (vtuber_id, kind)
+          );
+          INSERT INTO asset_new (id, vtuber_id, kind, path, source_url, width, height, bytes)
+            SELECT id, vtuber_id, kind, path, source_url, width, height, bytes FROM asset;
+          DROP TABLE asset;
+          ALTER TABLE asset_new RENAME TO asset;
+          CREATE INDEX IF NOT EXISTS idx_asset_vtuber ON asset (vtuber_id);`,
+  },
 ];
 
 /**
@@ -99,6 +129,7 @@ SELECT
   (SELECT path FROM asset WHERE vtuber_id = v.id AND kind = 'logo')  AS logoImage,
   (SELECT path FROM asset WHERE vtuber_id = v.id AND kind = 'radar') AS radarImage,
   (SELECT path FROM asset WHERE vtuber_id = v.id AND kind = 'character') AS characterImage,
+  (SELECT path FROM asset WHERE vtuber_id = v.id AND kind = 'background') AS backgroundImage,
   (SELECT group_concat(c.name, ', ') FROM vtuber_country vc
      JOIN country c ON c.id = vc.country_id WHERE vc.vtuber_id = v.id) AS countryNames,
   (SELECT c.name FROM vtuber_country vc JOIN country c ON c.id = vc.country_id

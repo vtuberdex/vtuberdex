@@ -22,7 +22,7 @@ scripts/   dev-up.sh (levanta API y web) y refresh.sh (re-scrape completo)
 
 ```
 vtuberdex.com  ──scraper──▶  dataset.json ──seed──▶  SQLite  ──API──▶  React (3D)
-   (HTML plano)              (normalizado)          (1 archivo)       (Vite build)
+   (HTML plano)              (normalizado)          (1 archivo)      (Next.js App Router)
 ```
 
 - **Scraper** (Node + cheerio): descarga el index y las fichas de detalle,
@@ -69,40 +69,56 @@ cd scraper && npm install && npm run scrape
 # 2. Base de datos
 cd ../server && npm install && npm run seed && npm run admin -- admin <tu-password>
 
-# 3. Front (build de producción o servidor de desarrollo)
-cd ../web && npm install && npm run build     # el server sirve web/dist
-cd ../server && npm start                     # http://localhost:4000
-
-# o en desarrollo, con recarga en caliente
-cd web && npm run dev                         # http://localhost:5173 (proxy a la API)
+# 3. App (Next.js, en la raíz)
+cd .. && npm install && npm run dev            # http://localhost:3000
+npm run build && npm start                     # build de producción, misma URL
 ```
 
-Atajos: `scripts/dev-up.sh` levanta API + Vite en local; `scripts/refresh.sh`
-re-hace el scrape y re-importa; `scripts/dev-docker.sh` publica ambos a la LAN
-para revisar desde otra máquina (ver abajo).
+Atajos: `scripts/dev-up.sh` levanta Next + el servidor del mantenedor en local;
+`scripts/refresh.sh` re-hace el scrape y re-importa; `scripts/dev-docker.sh`
+publica ambos a la LAN para revisar desde otra máquina (ver abajo).
+
+El mantenedor (`/admin`) corre **solo en local**: necesita escribir en disco y el
+sistema de archivos de Vercel es de solo lectura. En producción esa ruta devuelve
+404 a propósito.
+
+## Despliegue
+
+Todo el catálogo corre en Vercel: las rutas de `app/api/*` consultan una copia
+**saneada** de SQLite empaquetada en la función, y `/images/*` redirige a Vercel
+Blob. No hay base de datos externa ni servicio aparte.
+
+```bash
+npm run build:data               # regenera deploy/ desde data/ (tras scrape o edición)
+npm run publish:images           # sube las imágenes a Vercel Blob (reanudable)
+npm run verify                   # 32 comprobaciones sobre un escenario de producción
+npx vercel deploy --prod         # publica
+```
+
+`AGENTS.md` documenta las reglas del deploy y las trampas ya pagadas (FS de solo
+lectura, base empaquetada vía `outputFileTracingIncludes`, saneado con `VACUUM`).
 
 ## Revisar desde otra máquina (modo dev)
 
 Este entorno corre dentro de un contenedor Docker cuyos puertos **no están
-publicados** al host, así que `localhost:4000` no es alcanzable desde otro PC.
+publicados** al host, así que `localhost:3000` no es alcanzable desde otro PC.
 Como `/home/madkoding/proyectos` es un bind-mount del host, el daemon de Docker
 resuelve esa ruta y sí puede publicar puertos de verdad:
 
 ```bash
-./scripts/dev-docker.sh          # levanta API (4000) + Vite (5173) publicados a 0.0.0.0
+./scripts/dev-docker.sh          # levanta Next (3000) + mantenedor, publicados a 0.0.0.0
 ./scripts/dev-docker.sh --logs   # sigue los logs
 ./scripts/dev-docker.sh --down   # los detiene
 ```
 
-El navegador de la otra máquina habla **solo con Vite** (`:5173`); su proxy
-interno reenvía `/api` y `/images` al contenedor de la API por nombre de red,
-así que funciona desde cualquier IP sin tocar CORS.
+El navegador de la otra máquina habla **solo con Next** (`:3000`); sus rutas
+`/api` y `/images` las sirve la propia app, así que funciona desde cualquier IP
+sin tocar CORS.
 
 | Acceso | URL |
 | --- | --- |
-| Front | `http://192.168.100.90:5173/` |
-| Mantenedor | `http://192.168.100.90:5173/admin` |
-| API directa | `http://192.168.100.90:4000/api/health` |
+| Front | `http://192.168.100.90:3000/` |
+| Mantenedor | `http://192.168.100.90:3000/admin` |
 
 Si la IP del host cambia, el script la detecta solo (contenedor en `--network host`).
 

@@ -12,42 +12,54 @@ y los errores que ya costaron tiempo.
 
 - **Node 22+ obligatorio.** `server/src/db/index.mjs` usa `node:sqlite`
   (`DatabaseSync`), que no existe antes de Node 22. Verificado con v22.23.2.
-- Tres paquetes npm **independientes**, cada uno con su `node_modules` y sus
-  scripts: `scraper/`, `server/`, `web/`. No hay workspaces ni lockfile raíz.
-- `scraper`: cheerio + sharp + tesseract.js · `server`: Express 5 + zod ·
-  `web`: React 19 + Tailwind 4 + three.js/react-three-fiber + Vite 7.
-- Los datos (`data/`, `scraper/out/`, `scraper/cache/`, `web/dist/`) están en
-  `.gitignore`: son **reproducibles**, no se versionan.
+  En Vercel corre Node 24, donde `node:sqlite` ya es estable.
+- **La app es un solo paquete Next.js** en la raíz: **Next 16 (App Router)** +
+  React 19 + Tailwind 4 + three.js/react-three-fiber. `scraper/` y `server/`
+  siguen siendo paquetes npm independientes con su `node_modules`.
+  `server/src/*.mjs` **no es un servidor Express separado en producción**: es la
+  capa de datos que importan las rutas de Next (`search.mjs`, `validation.mjs`,
+  `db/index.mjs`). Express solo queda para el mantenedor en local.
+- Los datos crudos (`data/`, `scraper/out/`, `scraper/cache/`) están en
+  `.gitignore`: son **reproducibles**, no se versionan. `deploy/data/` sí se
+  versiona (ver «Despliegue en Vercel»).
 
 ```
-scraper/  ──▶ scraper/out/dataset.json + data/images/  ──▶ server (seed) ──▶ data/vtuberdex.db ──▶ web (API)
+scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed.mjs ──▶ data/vtuberdex.db
+                                                                                    │
+                                                        scripts/build-db.mjs ──▶ deploy/data/ (al repo)
+                                                                                    │
+                                          app/ (rutas Next) ──▶ SQLite empaquetada + Vercel Blob
 ```
 
 ## Comandos
 
 ```bash
-# Tests — cada paquete por separado (no hay test raíz)
+# Tests (desde la raíz)
+npm test                   # 76 tests (vitest): utilidades, componentes, páginas
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 52 tests: búsqueda, facetas, API HTTP, mantenedor
-cd web     && npm test     # 76 tests (vitest): utilidades, componentes, páginas
 
-# Verificación del front antes de dar algo por terminado
-cd web && npm run typecheck && npm run build
+# Gate real antes de dar algo por terminado
+npm run typecheck && npm run build
 
 # Puesta en marcha
 cd scraper && npm install && npm run scrape      # reanudable: cachea el HTML
 cd ../server && npm install && npm run seed && npm run admin -- admin <pass>
-cd ../web && npm install && npm run build        # el server sirve web/dist
-cd ../server && npm start                        # http://localhost:4000
+cd .. && npm install && npm run dev               # http://localhost:3000
 
 # Atajos (desde la raíz)
-./scripts/dev-up.sh          # API + Vite en local
+./scripts/dev-up.sh          # Next dev + servidor del mantenedor (Express, local)
 ./scripts/dev-docker.sh      # publica ambos a la LAN (0.0.0.0) para revisar desde otro PC
 ./scripts/refresh.sh         # re-scrape completo (6 pasos) + re-seed + build
+
+# Despliegue
+npm run build:data           # regenera deploy/ (base saneada + manifiesto)
+npm run publish:images       # sube las imágenes a Vercel Blob (reanudable)
+npm run verify               # 32 comprobaciones sobre un escenario de producción
 ```
 
-`docs/README.md` cita 15/32/57 tests: son cifras **viejas**. Las de arriba son
-las reales (medidas). Si añades tests, actualiza aquí.
+`docs/README.md` cita 15/32/57 tests: son cifras **viejas**. Las reales son
+**25/52/76** (medidas). Si añades tests, actualiza aquí.
 
 ## Arquitectura: las reglas que no se negocian
 
@@ -56,11 +68,9 @@ las reales (medidas). Si añades tests, actualiza aquí.
    al lienzo de carta **720x1008 (proporción 1.4)**. Es lo que consumen la carta
    3D, el listado y la ficha. Nunca se deforma al encajarlo porque ya viene en la
    proporción correcta.
-2. **La CARTA no se guarda: la compone el visor 3D** en el navegador
-   (personaje + logo + marco). `asset.kind = 'card'` apunta a
-   `data/images/ficha/<slug>.webp`, que es la **ficha apaisada del sitio
-   (legacy)**: solo el respaldo cuando no hay personaje.
-   `data/images/card/` está **vacío y no se usa** — no escribas ahí.
+2. **Se publican SOLO tres carpetas de imagen: `character`, `logo`, `faction`.**
+   Todo lo demás se retiró (ver «Imágenes: qué se publica y qué no»). No añadas
+   carpetas al manifiesto sin comprobar antes que alguna vista las pide.
 3. **Los nombres de archivo son canónicos por slug**
    (`<carpeta>/<slug>.webp`). Subir desde el mantenedor y regenerar con el
    scraper escriben el MISMO archivo; nunca hay dos copias que se contradicen.
@@ -71,7 +81,7 @@ las reales (medidas). Si añades tests, actualiza aquí.
    pública (`/v/:slug`). El seed hace upsert por `dex_number`, así que re-scrapear
    no duplica fichas.
 6. **La URL es el estado de la búsqueda.** Todo filtro vive en el querystring
-   (`web/src/lib/query.ts`); un resultado filtrado se comparte por enlace.
+   (`lib/query.ts`); un resultado filtrado se comparte por enlace.
 7. **Una sola carta WebGL por pantalla.** La grilla usa CSS 3D (24 contextos
    WebGL matarían el rendimiento en móvil); el canvas con shaders vive en el
    detalle.
@@ -116,7 +126,16 @@ las reales (medidas). Si añades tests, actualiza aquí.
   la carta sale negra.
 - **`half` es palabra reservada en GLSL ES 3.0.** Usarla como variable en un
   shader hace que NO compile ("Illegal use of reserved word") y la carta sale
-  negra. En `web/src/features/card3d/shaders.ts` se usa `halfSize`.
+  negra. En `components/shaders.ts` se usa `halfSize`.
+- **Los shaders no tienen los valores, tienen la fórmula.** Todo lo ajustable
+  (intensidades, pesos, geometría, luces) vive en `components/card3d-config.ts`,
+  que es el archivo que se abre para tocar el efecto; el GLSL se genera desde ahí
+  y `components/factions.test.ts` comprueba que las posiciones de facción salen de
+  la config y no de literales sueltos. `npm run check:shaders` (encadenar al
+  build) detecta uniforms sin declarar, uniforms declarados que nadie lee y
+  uniforms creados en CPU que ningún shader consume — ninguno de los tres lo ve
+  `tsc`. **Nada de backticks en los comentarios GLSL**: cierran el template
+  literal y dejan el archivo con un error que `tsc` reporta en la línea SIGUIENTE.
 - **Vite 7 rechaza un `Host` que no sea IP** (DNS rebinding): abrir la app por
   nombre de máquina da "Blocked request". Se resuelve con `allowedHosts` +
   `VTUBERDEX_ALLOWED_HOSTS` (`web/vite.config.ts`).
@@ -126,6 +145,31 @@ las reales (medidas). Si añades tests, actualiza aquí.
 - **`express.json` global está en 1 MB**: las subidas de imagen usan
   `express.raw` con su propio límite (12 MB) solo en esas rutas, y validan el
   tipo **por contenido** con `sharp`, nunca por extensión ni `Content-Type`.
+- **`node scripts/x.mjs` es relativo al `cwd`.** Parado dentro de `scripts/`, anteponer
+  `scripts/` otra vez busca `scripts/scripts/x.mjs` y Node lo reporta como
+  `MODULE_NOT_FOUND` con una ruta que parece un archivo perdido (el archivo existe).
+  Lánzalos con `npm run <tarea>` —npm sube solo hasta el `package.json`, así que da
+  igual en qué subcarpeta estés— o desde la raíz del repo. `npm run admin:hash`
+  (`scripts/admin-hash.mjs`) es el que produce `VTUBERDEX_ADMIN_PASSWORD_HASH` para
+  Vercel: sin TTY lee la clave de una línea de stdin en vez de colgarse en un `await`
+  que nunca resuelve (que Node reportaba como "unsettled top-level await").
+- **Cambiar la contraseña del mantenedor son DOS pasos, no uno.** Vercel **hornea las
+  variables por despliegue** ("changes to environment variables are not applied to previous
+  deployments"): `vercel env add ... VTUBERDEX_ADMIN_PASSWORD_HASH production` guarda el hash
+  pero el despliegue que ya estaba sirviendo sigue comparando contra el ANTERIOR, y el login
+  responde el mismo `401 credenciales_invalidas` de una contraseña equivocada. Hay que
+  **redeployar** (`vercel redeploy --target production`, o un `vercel deploy` nuevo) para que
+  la función reciba el valor actualizado. `npm run admin:verificar` comprueba el resultado
+  (login real + sesión en Turso) y, si hay 401, distingue "hash mal pegado" de "contraseña
+  equivocada" leyendo el diagnóstico de FORMA que ahora devuelve el 401.
+- **No marques `VTUBERDEX_ADMIN_PASSWORD_HASH` como *sensitive*.** El panel y
+  `npx vercel env add` ofrecen *Sensitive*/**Secret** por defecto, y Vercel guarda esos valores
+  en un **formato ilegible para siempre**: ni el CLI, ni `vercel env pull`, ni la API con
+  `decrypt=true` dejan volver a leerlos (devuelven un placeholder o un sobre cifrado;
+  comprobado). Un hash `scrypt` no es un secreto reutilizable —es irreversible y salado—, así
+  que guárdalo como *encrypted*/**Config** (`--no-sensitive`): se puede releer para comparar y
+  el fallo deja de ser indepurable. `formatoDeHash` (`lib/admin-auth.mjs`) solo puede
+  describir la FORMA, nunca recuperar el valor.
 - **`scripts/` no es `web/scripts/`**: `scripts/*.sh` es infraestructura del
   repo; `web/scripts/*.mjs` son sondas de desarrollo (medir tinte, volcar
   texturas, capturas). Las sondas y `screenshots.mjs` esperan un Chrome en
@@ -148,9 +192,11 @@ las reales (medidas). Si añades tests, actualiza aquí.
 
 - **Comentarios y JSDoc que expliquen el POR QUÉ, no el qué.** Es el rasgo más
   fuerte del repo: los bloques documentan el problema medido, la alternativa que
-  se probó y por qué se descartó (ver `HoloCard.tsx`, `shaders.ts`,
+  se probó y por qué se descartó (ver `holo-card.tsx`, `shaders.ts`,
   `uploads.mjs`). Respeta ese estilo; un cambio de comportamiento sin esa nota
-  se lee como una regresión.
+  se lee como una regresión. **Los valores del efecto van en
+  `components/card3d-config.ts`, no en los shaders ni en el componente**: si
+  añades una perilla, va ahí con el comentario de por qué ese número.
 - **Idioma: español** (es-CL) en comentarios, docs, UI y mensajes de error de la
   API (`no_encontrado`, `payload_invalido`, `slug_duplicado`). Slugs y claves en
   ASCII sin acentos.
@@ -171,76 +217,158 @@ las reales (medidas). Si añades tests, actualiza aquí.
 
 ## Despliegue en Vercel
 
-El catálogo corre en producción como **una función** con SQLite empaquetada y las
-imágenes en Vercel Blob. El mantenedor **no** existe en producción.
+La app es **Next.js con App Router** (Vercel la detecta como framework nativo). El
+catálogo corre como funciones con SQLite empaquetada y las imágenes en Vercel
+Blob. El mantenedor **no** existe en producción.
 
 ```
-GitHub vtuberdex/vtuberdex ─▶ vercel deploy ─▶ server.mjs (Node server)
-                                                ├─ /api/*    → SQLite (readOnly, del bundle)
-                                                ├─ /images/* → 301 a Vercel Blob
-                                                └─ resto     → public/ (index) + CDN
+GitHub vtuberdex/vtuberdex ─▶ vercel build ─▶ app/ (Next)
+                                               ├─ app/api/*              → SQLite (readOnly, del bundle)
+                                               ├─ app/images/[...path]   → 301 a Vercel Blob
+                                               ├─ app/api/admin/[...path]→ 404 en prod (solo local)
+                                               └─ app/(dex)/*            → catálogo + detalle
 ```
 
 ```bash
-npm install                      # deps de la RAÍZ: express + zod (las de la función)
-npm run build                    # typecheck + build del front → public/, y los artefactos
+npm install                      # deps del proyecto (root)
+npm run build                    # next build (usa deploy/ ya construido)
+npm run build:data               # regenera deploy/ desde data/ (local, tras scrape o edición)
 npm run publish:images           # sube las imágenes a Blob (reanudable)
-npm run verify                   # 25 comprobaciones sobre un árbol de solo lectura
-npm run deploy                   # build + vercel deploy --prod
+npm run verify                   # 32 comprobaciones sobre un escenario de producción
+npx vercel deploy --prod         # publica
 ```
 
 ### Las reglas del deploy
 
 1. **El FS de Vercel es de SOLO LECTURA** y `/tmp` no se comparte entre
    instancias. Nada de lo que la app necesita puede escribirse en runtime: por eso
-   la base viaja como asset (`includeFiles` en `vercel.json`) y se abre con
-   `readonly: true`.
-2. **`express.static()` se IGNORA en Vercel.** El front lo reparte el CDN desde
-   `public/**` (lo copia `scripts/vercel-build.mjs`). `app.mjs` conserva el
-   middleware solo como respaldo local; en producción quien sirve el HTML es el CDN.
-3. **La base NO puede quedar en `public/`** — sería descargable por HTTP. Vive en
-   `deploy/data/` y solo entra al bundle de la función. El build falla si la
-   detecta en `public/`.
-4. **La base que se despliega va SANEADA**: `admin_user` y `audit_log` se vacían
-   al construirla (`scripts/build-db.mjs`). En producción no hay sesiones, así que
-   no se pierde ninguna función. Nunca edites `deploy/data/vtuberdex.db` a mano:
-   se regenera.
-5. **`server.mjs` (raíz) es el entrypoint**, no la carpeta `api/`: se usa el
-   patrón de "Node server" con `app.listen()`. La razón es que **las reglas de
-   rewrite de Vercel cambian la URL interna** y el router tendría que
-   reconstruirla; así Express recibe la URL tal como la pidió el navegador.
-6. **La URL de Blob se resuelve en runtime** (`VTUBERDEX_BLOB_BASE`); el
-   manifiesto guarda rutas canónicas, no URLs, para que cambiar de store no
-   obligue a recompilar.
-7. **El deploy NO puede ser por integración Git**: el team es **Hobby** y Vercel
-   no conecta repos de organizaciones en ese plan (limitación de plataforma). Se
+   la base se abre con `readonly: true`. Verificado que SQLite consulta —FTS5
+   incluido— sobre un filesystem inmutable.
+2. **La base de datos viaja EMPAQUETADA en la función**, declarada en
+   `outputFileTracingIncludes` (`next.config.mjs`). El trazador de Next no puede
+   deducir una ruta que se lee con `fs`, así que sin esa declaración la función
+   arranca sin catálogo. Comprobado: aparece en el `.nft.json` de 5 funciones.
+3. **Las rutas de archivos se resuelven de forma ESTÁTICA.** Escribir
+   `path.resolve(process.cwd(), x)` dentro de un bucle hace que Turbopack lo
+   detecte como acceso dinámico y **trace el proyecto entero** dentro de cada
+   función (aviso explícito del build). Las rutas se escriben literales.
+4. **`deploy/data/` SÍ se versiona** (a diferencia del resto de datos generados):
+   en Vercel no existe `data/`, así que la base saneada y el manifiesto tienen que
+   estar en el repo. `next build` los reutiliza con `--if-missing`.
+5. **La base que se despliega va SANEADA**: `admin_user` y `audit_log` se vacían,
+   y después se hace **`VACUUM`**. Esto último no es opcional: `DELETE` deja los
+   bytes en las páginas liberadas y el hash `scrypt` de la contraseña seguía
+   siendo recuperable con `strings` del archivo que se publica. El build **falla**
+   si detecta un hash, y hay una comprobación en `npm run verify`.
+6. **La base NO puede quedar en `public/`** — sería descargable por HTTP. El
+   verificador lo comprueba mirando el **contenido** de la respuesta, no el status:
+   un `status === 404` da falso positivo porque el fallback responde el index.
+7. **La URL de Blob se resuelve en runtime** (`VTUBERDEX_BLOB_BASE`); el
+   manifiesto guarda rutas canónicas, no URLs, para que cambiar de store no obligue
+   a recompilar.
+8. **El mantenedor devuelve 404 en producción** (`app/api/admin/[...path]`). No es
+   una degradación silenciosa: en Vercel el catálogo es de solo lectura, así que
+   arrastrar `sharp` y subidas de 12 MB a una función que no puede escribir no
+   aportaría nada. En local se reenvía al Express con `VTUBERDEX_ADMIN_URL`.
+9. **El deploy NO puede ser por integración Git**: el team es **Hobby** y Vercel no
+   conecta repos de organizaciones en ese plan (limitación de plataforma). Se
    despliega con `vercel deploy`, o con un GitHub Action con token.
-8. **`sharp` no está en las dependencias de la raíz a propósito**: solo lo usa la
-   ruta de subida del mantenedor (`await import('sharp')`), que en producción no
-   se ejerce. Añadirlo engordaría la función sin dar nada.
 
 ### Verificación del deploy
 
-`npm run verify` monta un escenario con el árbol en **solo lectura** y sin
-`data/images/`, arranca el MISMO `server.mjs` que despliega y pide rutas por HTTP.
-Comprueba 25 cosas: catálogo (785 fichas, FTS5, facetas, detalle), imágenes
-(redirect a Blob, 404 explícito en lo no publicado), seguridad (base saneada y no
-descargable, rutas de admin en 401) y front (index, rutas profundas del SPA).
+`npm run verify` monta un escenario **sin los datos crudos de desarrollo**, arranca
+un `next start` real y pide rutas por HTTP. Son **32 comprobaciones**: catálogo (785
+fichas, FTS5, facetas, detalle, validación 400), imágenes (301 a Blob, 404 en lo no
+publicado, **carpetas retiradas**), seguridad (base saneada, no descargable,
+mantenedor en 404) y front.
 
-Dos trampas que ese script ya encontró y que conviene no reintroducir:
-`res.sendFile` **falla en un FS de solo lectura** (daba 500 en `/v/:slug`, solo
-en rutas profundas; se usa `readFileSync` + `res.send`), y comprobar el "leak" de
-la base con un `status === 404` es un **falso positivo**, porque el fallback del
-SPA responde 200 con el index a cualquier ruta; hay que mirar el contenido.
+Trampas que ese script ya encontró y conviene no reintroducir:
+`res.sendFile` **falla en un FS de solo lectura** (daba 500 en rutas profundas del
+SPA), y el "leak" de la base hay que comprobarlo por contenido, no por status.
+
+## Imágenes: qué se publica y qué no
+
+Solo **tres carpetas** viajan a Blob, y la decisión es por uso real verificado en
+el front, no por lo que exista en disco:
+
+| Carpeta | Estado | Por qué |
+|---|---|---|
+| `character` | ✅ publicado | La imagen fuente del VTuber |
+| `logo` | ✅ publicado | Capa superior de la carta |
+| `faction` | ✅ publicado | Emblema que la carta superpone como holograma |
+| `thumb` | ❌ eliminado | Ninguna vista la pedía (18 MB) |
+| `avatar` | ❌ eliminado | Duplicado legacy de `character` (13 MB) |
+| `ficha` | ❌ eliminado | Respaldo de `character`; hoy los 785 lo tienen (33 MB) |
+| `radar` | ❌ eliminado | Gráfico de atributos **dibujado desde los datos** por `StatBars` en la misma página (8 MB) |
+| `card` | ❌ eliminada | Vacía desde siempre |
+
+`data/images/` pasó de **143 MB a 73 MB**; el manifiesto publica **1593** objetos
+(785 + 785 + 23). Las rutas de las carpetas retiradas responden **404 explícito**,
+comprobado en `npm run verify`.
+
+**Ojo:** los tipos `card`/`thumb`/`radar` siguen en el contrato de la API y en el
+esquema de la base (el `seed` los sigue escribiendo); lo que se retiró es su
+publicación. Si vuelves a necesitarlos, hay que reponer la carpeta en disco,
+añadirla a `USED_FOLDERS` de `scripts/build-db.mjs` y republicar.
 
 ## Verificación antes de decir "listo"
 
-1. `cd web && npm run typecheck && npm run build` (el build es el gate real).
+1. `npm run typecheck && npm run build` (el build es el gate real).
 2. `npm test` en el paquete que tocaste; si cambiaste el esquema o la búsqueda,
    corre también `server` y, si aplica, `scraper`.
 3. Si tocaste la carta 3D o el shader, **no basta con que compile**: mira la
    carta renderizada (o al menos confirma que el fallback 2D responde) — los
    fallos de WebGL no aparecen en los tests, que corren sin WebGL a propósito
-   (`web/src/test/setup.ts` anula `getContext`).
+   (`test/setup.ts` anula `getContext`).
 4. Si cambiaste el seed o el scraper, re-ejecuta `verifySeed()` y confirma
    `vtubers == expected == fts`: el proceso sale con código 2 si no cuadra.
+5. Si tocaste el manifiesto de imágenes, `npm run verify` comprueba que las
+   carpetas retiradas dan 404 y que el conteo declarado coincide con lo subido.
+
+## Desarrollo local (lo que ya costó tiempo)
+
+`./scripts/dev-up.sh` levanta **dos** procesos y los dos hacen falta:
+
+| Puerto | Qué | Por qué |
+|---|---|---|
+| 3000 | la app Next | catálogo, API de lectura, imágenes |
+| 4000 | `server/src/index.mjs` (Express) | el mantenedor: es el ÚNICO que escribe |
+
+Next reenvía `/api/admin/*` al Express con `VTUBERDEX_ADMIN_URL`. Si esa variable
+no está, la página `/admin` carga pero cada llamada da **404** — el mismo
+comportamiento que en producción, y lo que comprueba `npm run verify`.
+
+Tres trampas concretas de trabajar en local:
+
+1. **Sin `VTUBERDEX_BLOB_BASE`, las imágenes se sirven de `data/images/`**
+   (rama local de `app/images/[...path]/route.js`). Antes esa ruta devolvía
+   `null` y la app entera salía sin una sola imagen, difícil de diagnosticar.
+   El manifiesto se consulta en los dos modos, así que las carpetas retiradas
+   siguen dando 404 aunque sus archivos existan en disco.
+2. **Nada de `window`/`localStorage` durante el render.** Un componente
+   `'use client'` se renderiza igualmente en el servidor: acceder ahí daba
+   `ReferenceError: window is not defined` y la página respondía **500**. El
+   token del mantenedor se lee en un `useEffect`.
+3. **Next 16 mantiene un bloque gestionado en `AGENTS.md`** (entre
+   `<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->`, al
+   final). Es inofensivo: se **añade** y todo lo escrito fuera de los marcadores
+   se **preserva**. No lo borres de un diff sin querer — `next dev` lo vuelve a
+   crear; commitearlo con el resto deja el árbol limpio.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

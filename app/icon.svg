@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="VTuberDex">
+  <!--
+    Icono de la app: la marca del sitio — el punto luminoso turquesa de la cabecera
+    sobre el fondo oscuro. Es SVG y va en app/icon.svg, que Next sirve como
+    /icon.svg y enlaza solo en el <head>: así el navegador deja de pedir
+    /favicon.ico (que daba 404 y ensuciaba la consola en cada carga).
+  -->
+  <rect width="32" height="32" rx="7" fill="#05060a" />
+  <circle cx="16" cy="16" r="6.5" fill="#2ee6c5" />
+  <circle cx="16" cy="16" r="3" fill="#eafffb" opacity="0.9" />
+</svg>

@@ -160,7 +160,7 @@ function replaceChildren(db, vtuberId, payload) {
    * añade un `character` aparte: sería la MISMA ruta en dos filas y la API
    * devolvería la imagen por duplicado bajo dos claves.
    */
-  const kinds = ['card', 'thumb', 'logo', 'character', 'radar'];
+  const kinds = ['card', 'thumb', 'logo', 'character', 'radar', 'background'];
   for (const kind of kinds) {
     const assetPath = assets[kind];
     if (!assetPath) continue;

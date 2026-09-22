@@ -3,16 +3,22 @@
 # No es lo mismo que `.gitignore`: esto gobierna lo que el CLI empaqueta y manda
 # a Vercel. Sin él, el deploy arrastraría ~94 MB de caché HTML del scrape y los
 # `node_modules` locales (que Vercel reinstala con `installCommand`).
+#
+# OJO: `deploy/` NO se ignora. Ahí viven los dos artefactos que la función
+# necesita para arrancar (`deploy/data/vtuberdex.db` y `images.json`), y
+# `outputFileTracingIncludes` de `next.config.mjs` los empaqueta desde esa ruta.
+# Excluirla dejaba el deploy sin catálogo — la app habría arrancado pero cada
+# consulta a `/api/vtubers` fallaría.
 
 # Caché del scrape (94 MB de HTML crudo) y sus salidas
 scraper/cache/
 scraper/out/
 
+# El scraper entero no hace falta en el deploy del catálogo
+scraper/
+
 # Dependencias locales: las instala Vercel desde package.json
 node_modules/
-web/node_modules/
-server/node_modules/
-scraper/node_modules/
 
 # Imágenes crudas: viven en Vercel Blob, no viajan en la función
 data/images/
@@ -21,13 +27,7 @@ data/*.db-shm
 data/*.db-wal
 
 # Artefactos locales que Vercel regenera en su build
-web/dist/
-public/
-deploy/
 .verify-stage/
-
-# El scraper entero no hace falta en el deploy del catálogo
-scraper/
 
 # Documentación y notas
 docs/

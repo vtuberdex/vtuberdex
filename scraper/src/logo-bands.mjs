@@ -1,6 +1,6 @@
 /**
  * Constantes de la banda donde vive el logo dentro de la carta.
- * Viven en su propio módulo para que `extract-logo2.mjs` y `logo-blob.mjs`
+ * Viven en su propio módulo para que `extract-logo2.mjs` y `logo-edges.mjs`
  * puedan usarlas sin importarse circularmente.
  */
 

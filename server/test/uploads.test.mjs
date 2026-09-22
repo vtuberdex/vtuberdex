@@ -317,3 +317,42 @@ test('el PERSONAJE subido se recorta a la proporción de la carta (1.4)', async 
   const savedLogo = await saveUploadedImage({ buffer: logo, kind: 'logo', slug: 'recto', imageRoot: root, sharp });
   assert.ok(savedLogo.height / savedLogo.width < 1, 'el logo sigue siendo apaisado');
 });
+
+test('el FONDO se normaliza al MISMO lienzo que el personaje', async () => {
+  const root = tmpRoot();
+  /**
+   * El encuadre del fondo tiene que coincidir con el del personaje: el paralaje
+   * desplaza las dos capas una respecto de la otra y, si vinieran con proporciones
+   * distintas, el desplazamiento arrastraría un desajuste visible. Se sube una
+   * imagen muy apaisada y se exige el lienzo de carta exacto.
+   */
+  const apaisada = await sharp({ create: { width: 1600, height: 400, channels: 3, background: { r: 30, g: 60, b: 90 } } })
+    .jpeg()
+    .toBuffer();
+  const fondo = await saveUploadedImage({ buffer: apaisada, kind: 'background', slug: 'fondo', imageRoot: root, sharp });
+  const personaje = UPLOADABLE_KINDS.character;
+  assert.equal(fondo.width, personaje.width, 'mismo ancho que el personaje');
+  assert.equal(fondo.height, Math.round(personaje.width * personaje.ratio), 'mismo alto que el personaje');
+  assert.equal(fondo.path, 'images/background/fondo.webp', 'va a su propia carpeta, con nombre canónico');
+  assert.ok(fs.existsSync(path.join(root, 'background', 'fondo.webp')), 'el archivo queda en disco');
+
+  // Se conserva el alfa: un fondo puede traerlo (degradados, cielos calados).
+  const conAlfa = await sharp({ create: { width: 400, height: 560, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: await sharp({ create: { width: 200, height: 280, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } } }).png().toBuffer(), left: 100, top: 140 }])
+    .png()
+    .toBuffer();
+  const fondo2 = await saveUploadedImage({ buffer: conAlfa, kind: 'background', slug: 'calado', imageRoot: root, sharp });
+  assert.equal(fondo2.hasAlpha, true, 'el alfa del fondo se conserva');
+});
+
+test('el FONDO se borra de su propia carpeta y no toca al personaje', async () => {
+  const root = tmpRoot();
+  const png = await pngBuffer(400, 560);
+  await saveUploadedImage({ buffer: png, kind: 'background', slug: 'kuro', imageRoot: root, sharp });
+  await saveUploadedImage({ buffer: png, kind: 'character', slug: 'kuro', imageRoot: root, sharp });
+
+  const removed = await removeUploadedImage({ kind: 'background', slug: 'kuro', imageRoot: root });
+  assert.equal(removed.path, 'images/background/kuro.webp');
+  assert.equal(fs.existsSync(path.join(root, 'background', 'kuro.webp')), false, 'el fondo se borró');
+  assert.ok(fs.existsSync(path.join(root, 'character', 'kuro.webp')), 'el personaje sigue intacto');
+});

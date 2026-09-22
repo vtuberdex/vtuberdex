@@ -1,7 +1,7 @@
 # Dependencias
 node_modules/
 
-# Datos generados (reproducibles con `scraper/` y `server/seed.mjs`)
+# Datos crudos: reproducibles con `scraper/` + `server/seed.mjs`, no se versionan
 data/images/
 data/*.db
 data/*.db-shm
@@ -10,12 +10,11 @@ scraper/cache/
 scraper/out/
 
 # Builds
+.next/
+out/
 web/dist/
 web/coverage/
-
-# Artefactos del deploy a Vercel (los regenera `npm run build`)
 public/
-deploy/
 
 # Escenario temporal de la verificación del bundle
 .verify-stage/
@@ -27,3 +26,22 @@ deploy/
 .DS_Store
 .vercel
 .env*
+
+# ---------------------------------------------------------------------------
+# `deploy/` SÍ se versiona, a diferencia del resto de datos generados.
+#
+# En Vercel no existe `data/` (está ignorado y las 154 MB de imágenes crudas
+# nunca viajan), así que los dos artefactos que la función necesita para
+# arrancar tienen que estar EN EL REPO:
+#
+#   · deploy/data/vtuberdex.db  — catálogo, 2,9 MB, ya saneado de credenciales
+#   · deploy/data/images.json   — qué imágenes están publicadas en Vercel Blob
+#
+# El build de Vercel los reutiliza tal cual (ver `--if-missing` en
+# `scripts/build-db.mjs`); los regenera quien tiene el dataset local tras un
+# scrape o una edición en el mantenedor.
+# ---------------------------------------------------------------------------
+!deploy/
+!deploy/data/
+!deploy/data/vtuberdex.db
+!deploy/data/images.json
