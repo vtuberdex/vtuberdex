@@ -1,14 +1,16 @@
 {
- "generatedAt": "2026-09-22T18:05:44.757Z",
+ "generatedAt": "2026-09-22T18:23:58.845Z",
  "blobBase": "",
  "folders": {
   "logo": 785,
   "character": 785,
+  "background": 1,
   "faction": 23
  },
- "count": 1593,
- "totalBytes": 67297222,
+ "count": 1594,
+ "totalBytes": 68230126,
  "images": {
+  "images/background/corny-holocean.webp": "images/background/corny-holocean.webp",
   "images/character/3d-ssen.webp": "images/character/3d-ssen.webp",
   "images/character/3lpantuflas-exe.webp": "images/character/3lpantuflas-exe.webp",
   "images/character/4.webp": "images/character/4.webp",
