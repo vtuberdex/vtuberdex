@@ -291,11 +291,25 @@ async function main() {
     check(`carpeta retirada (${folder}) da 404 explícito`, retired.status === 404, `status=${retired.status}`);
   }
 
+  /**
+   * El manifiesto declara las carpetas que el front USA. Las tres primeras las
+   * produce el scraper y están siempre; `background` es la cuarta y es OPCIONAL:
+   * el scraper no la genera, así que solo aparece si alguien sube un fondo desde
+   * el mantenedor.
+   *
+   * Antes esto exigía el literal exacto `{logo:785,character:785,faction:23}`, así
+   * que en cuanto se subía un fondo el contador dejaba de cuadrar y este gate
+   * —el paso previo al deploy— fallaba con el catálogo intacto. Ahora se compara
+   * por forma: las tres fijas con su conteo real, y `background` como opcional.
+   */
+  const carpetas = manifest.folders ?? {};
+  const requeridas =
+    carpetas.character > 0 && carpetas.logo > 0 && carpetas.faction === 23;
+  const esperado = 785 * 2 + 23 + (carpetas.background ?? 0);
   check(
-    'el manifiesto declara SOLO las 3 carpetas que el front usa',
-    manifest.count === 1593 &&
-      JSON.stringify(manifest.folders) === '{"logo":785,"character":785,"faction":23}',
-    `${manifest.count} imágenes ${JSON.stringify(manifest.folders)}`,
+    'el manifiesto declara las carpetas que el front usa (background opcional)',
+    requeridas && manifest.count === esperado,
+    `${manifest.count} imágenes ${JSON.stringify(carpetas)}`,
   );
 
   // --- seguridad -----------------------------------------------------------
