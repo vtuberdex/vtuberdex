@@ -374,7 +374,20 @@ Cuatro trampas concretas de trabajar en local:
    `'use client'` se renderiza igualmente en el servidor: acceder ahí daba
    `ReferenceError: window is not defined` y la página respondía **500**. El
    token del mantenedor se lee en un `useEffect`.
-4. **Next 16 mantiene un bloque gestionado en `AGENTS.md`** (entre
+4. **`next build` y `next dev` NO pueden compartir `.next/`.** El build deja su
+   `BUILD_ID` dentro de `.next/`, y un dev server arrancado encima escribe en el mismo
+   directorio: quedan las dos salidas mezcladas (`BUILD_ID` **y** `dev/`). El síntoma es
+   que la app **se ve negra / las fichas no cargan** aunque los puertos respondan 200 y
+   el log del servidor no marque ni un error — parece un fallo del shader y no lo es.
+   Ya pasó **tres veces**; dos de ellas el culpable fue correr los gates mientras el dev
+   server del usuario estaba vivo.
+   - **Antes de `npm run build` o `npm run verify`, para el dev server.**
+   - Para diagnosticarlo: `ls .next/BUILD_ID` (si existe con un dev server corriendo,
+     está mezclado) y `ls -d .next/dev`.
+   - El arreglo es `rm -rf .next` y arrancar en frío. No hay que tocar el shader.
+   - Es un síntoma que **no** distingue el navegador del usuario: él ve el canvas negro
+     y no hay nada en los logs. Antes de buscar la causa en el GLSL, descarta esto.
+5. **Next 16 mantiene un bloque gestionado en `AGENTS.md`** (entre
    `<!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
