@@ -331,6 +331,34 @@ export const BACKGROUND = {
    */
   artFloor: 0.55,
   artLumGain: 0.9,
+  /**
+   * TINTE HOLOGRÁFICO DEL BORDE del fondo.
+   *
+   * POR QUÉ (petición concreta): el fondo llevaba el holograma repartido por igual por
+   * toda su superficie, así que en el centro se veía tenue y el efecto no se leía. En una
+   * lámina de verdad el ángulo rasante del borde es el que más desplaza el color, y esa
+   * concentración es lo que hace el borde visiblemente iridiscente. El frente ya tenía su
+   * Fresnel; el fondo no, y por eso su canto quedaba apagado.
+   *
+   * `edgeTint` pesa cuánto se AÑADE el espectro en el contorno (0 lo deja como estaba).
+   * El exponente lo concentra: cuanto más alto, más pegado al filo queda el color.
+   */
+  edgeTint: 0.85,
+  edgeTintPower: 2.4,
+  /**
+   * Ciclos del espectro en el borde. Más alto = bandas de color más finas recorriendo el
+   * contorno; con muy pocos se ve un borde de un solo color.
+   */
+  edgeTintCycles: 2.2,
+  /**
+   * Suelo del arte sobre el que se suma el tinte del canto.
+   *
+   * POR QUÉ HACE FALTA: el tinte se multiplica por la luminancia del arte para no
+   * encender un fondo oscuro como si fuera claro. Pero en un fondo MUY oscuro ese
+   * producto tiende a 0 y el canto desaparecía justo cuando más se nota. Este suelo
+   * garantiza que el borde tenga siempre sobre qué sumarse.
+   */
+  edgeTintFloor: 0.15,
 } as const;
 
 /**
@@ -444,6 +472,78 @@ export const TEXT_FINISH = {
    * `blur` corto: por encima de ~8 px la letra blanca se ensucia.
    */
   shadow: { color: '#000000', alpha: 0.95, blur: 8, offsetX: 3, offsetY: 3 },
+} as const;
+
+/**
+ * REFLEJO VIVO DEL METAL: el barrido que sigue al puntero sobre el título y el wordmark.
+ *
+ * EL PROBLEMA QUE RESUELVE (y por qué no podía hacerse donde parecía natural)
+ * --------------------------------------------------------------------------
+ * El metal de `TEXT_FINISH` se pinta en canvas 2D y se SUBE COMO TEXTURA. Un gradiente
+ * de canvas es un cálculo por píxel ya resuelto: queda congelado en los píxeles de la
+ * capa. Por eso el brillo del título estaba QUIETO — no era un ajuste mal puesto, era
+ * el sitio equivocado. Ningún valor de `TEXT_FINISH` puede hacer que ese reflejo se
+ * mueva, porque a esas alturas ya no hay nada que recalcular.
+ *
+ * La pieza que sí puede moverse es la del SHADER, que se reevalúa en cada frame y tiene
+ * `uPointer` y `uTilt`. Lo que hace este bloque es SUPERponer una banda de luz viva
+ * sobre la placa ya pintada: la textura aporta el acero (sus paradas y su bisel) y el
+ * shader aporta el reflejo que barre. Sumadas se leen como una sola lámina.
+ *
+ * Se aplica a las capas 3 (título) y 6 (wordmark) enmascarado por SU PROPIO ALFA: solo
+ * las letras y la placa llevan el barrido, nunca el hueco entre ellas. Si se aplicara a
+ * toda la carta, el reflejo mancharía al personaje y al fondo.
+ */
+export const LIVE_SHEEN = {
+  /**
+   * Peso global del reflejo vivo. Es una perilla de verdad y no un adorno: con 0 el
+   * barrido desaparece y se conserva solo el metal pintado en la textura, que es
+   * exactamente la comparación que hace falta para MEDIR el efecto (mismo puntero, misma
+   * carta, único cambio el barrido). Sin este conmutador, cualquier A/B queda contaminado
+   * porque uPointer también mueve el paralaje de las 7 capas y el glare del holograma.
+   */
+  strength: 1.0,
+  /**
+   * Centro del recorrido, en la coordenada del barrido.
+   *
+   * POR QUÉ HACE FALTA UN CENTRO: la coordenada del reflejo NO está centrada en 0. Lleva
+   * la inclinación (vUv.y * slant), así que su rango sobre la carta va de -0.69 a +0.19,
+   * con el medio en -0.25. Sin desplazarlo, medio recorrido del ratón se gastaba en sacar
+   * la banda por arriba del lienzo y el reflejo DESAPARECÍA con el cursor en un lado —
+   * medido: con el puntero al extremo el diff era exactamente 0.
+   *
+   * El valor sale de dónde está el metal de verdad en la carta (la placa arriba y el
+   * wordmark abajo), no del centro geométrico: medido, la zona útil va de -0.35 a +0.5.
+   */
+  centerOffset: 0.05,
+  /**
+   * Cuánto acompaña el barrido al puntero.
+   *
+   * MEDIDO, no elegido a ojo: la zona útil de la coordenada mide ~0.85 de ancho, así que
+   * el recorrido total del barrido debe ser aproximadamente eso (0.42 por lado) para que
+   * el ratón lleve el reflejo de un canto al otro SIN sacarlo de la carta. Con 1.0 la
+   * banda se salía y el reflejo desaparecía en los extremos.
+   */
+  pointerTravel: 0.45,
+  /**
+   * Inclinación de la banda. Un reflejo vertical puro no lee como metal (parece una
+   * columna de luz); inclinada acompaña la diagonal de la placa.
+   */
+  slant: 0.38,
+  /**
+   * Cuánto la mueve el GIRO de la carta, además del puntero. No es redundante: girar sin
+   * mover el ratón también tiene que correr el reflejo, o la carta parece una calcomanía.
+   */
+  tiltTravel: 0.22,
+  /**
+   * Dos bandas: una ANCHA y tenue (el cuerpo del reflejo) y otra ESTRECHA y fuerte (el
+   * filo especular dentro de ella). Con una sola se ve un degradado suave; el filo es lo
+   * que da la sensación de superficie pulida. En unidades de UV.
+   */
+  wideWidth: 0.34,
+  wideGain: 0.3,
+  coreWidth: 0.1,
+  coreGain: 0.55,
 } as const;
 
 /** Barniz: reflejo especular de una fuente blanda. */

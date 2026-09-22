@@ -88,6 +88,31 @@ const bloques = [...fuente.matchAll(/\/\*\s*glsl\s*\*\/\s*`([\s\S]*?)`/g)].map((
   linea: fuente.slice(0, m.index).split('\n').length,
 }));
 
+/**
+ * GLSL SIN COMENTARIOS.
+ *
+ * POR QUÉ (fallo medido DOS veces): la coincidencia corre sobre el cuerpo entero, no
+ * línea a línea, así que la palabra "uniform" escrita en un COMENTARIO se traga todo el
+ * texto siguiente hasta el primer `;` como si fuera una declaración. El resultado es un
+ * guard que inventa uniforms fantasma ("declarado y nunca usado") en cuanto un comentario
+ * menciona la palabra — y este repo comenta el porqué con profusión, así que mencionar un
+ * uniform es lo normal.
+ *
+ * La primera vez se corrigió SOLO dentro del bucle por bloque, y volvió a morder en el
+ * recuento global (el que compara contra lo que crea la CPU): un comentario que decía
+ * "uniforme" delante de una declaración hacía que la declaración dejara de contarse y el
+ * guard avisaba de un uniforme huérfano que SÍ está declarado. Por eso ahora es una sola
+ * función que usan LOS DOS sitios: el mismo error no puede volver por la mitad que se
+ * arregló y la que no.
+ *
+ * Se reemplazan por ESPACIOS del mismo largo conservando los saltos de línea, para que
+ * los números de línea que reportan los problemas sigan siendo los del archivo.
+ */
+const sinComentarios = (glsl) =>
+  glsl
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/\/\/[^\n]*/g, (m) => ' '.repeat(m.length));
+
 if (bloques.length === 0) {
   console.error(
     'check-shaders: no encontré ningún shader con la marca /* glsl *​/. ' +
@@ -154,9 +179,7 @@ for (const { cuerpo, linea } of bloques) {
    * Se reemplazan por ESPACIOS del mismo largo conservando los saltos de línea, para
    * que los números de línea que reportan los problemas sigan siendo los del archivo.
    */
-  const limpio = cuerpo
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-    .replace(/\/\/[^\n]*/g, (m) => ' '.repeat(m.length));
+  const limpio = sinComentarios(cuerpo);
 
   const declarados = new Set();
   for (const decl of limpio.matchAll(/\buniform\s+\w+\s+([^;]+);/g)) {
@@ -249,7 +272,7 @@ if (existsSync(rutaDeclarante)) {
   const declarante = readFileSync(rutaDeclarante, 'utf8');
   const enShaders = new Set();
   for (const { cuerpo } of bloques) {
-    for (const decl of cuerpo.matchAll(/\buniform\s+\w+\s+([^;]+);/g)) {
+    for (const decl of sinComentarios(cuerpo).matchAll(/\buniform\s+\w+\s+([^;]+);/g)) {
       for (const nombre of decl[1].split(',')) {
         const limpio = nombre.trim().replace(/\[.*\]$/, '');
         if (limpio) enShaders.add(limpio);

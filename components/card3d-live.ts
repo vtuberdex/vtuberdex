@@ -96,6 +96,7 @@ export const KNOBS: readonly Knob[] = [
   { key: 'holoSelf', label: 'Luz propia de la lámina', hint: 'Luz que la lámina añade por su cuenta', min: 0, max: 1, step: 0.01, config: 'COMPOSITE.holoSelf', grupo: 'frente' },
   { key: 'highlightWeight', label: 'Respeto por las zonas claras', hint: 'Cuánto se frena el brillo sobre arte claro', min: 0, max: 1, step: 0.01, config: 'GLOSS.highlightWeight', grupo: 'frente' },
   { key: 'glareStrength', label: 'Barrido del puntero', hint: 'Brillo que sigue al cursor', min: 0, max: 1, step: 0.01, config: 'HOLOGRAM.glareStrength', grupo: 'frente' },
+  { key: 'sheenStrength', label: 'Reflejo del metal', hint: 'El brillo que BARRE sobre el título y el wordmark siguiendo al cursor (0 = solo el metal pintado)', min: 0, max: 2, step: 0.01, config: 'LIVE_SHEEN.strength', grupo: 'frente' },
   { key: 'tiltFactor', label: 'Arcoíris al inclinar', hint: 'Cuánto sube el efecto con el tilt', min: 0, max: 5, step: 0.05, config: 'HOLOGRAM.tiltFactor', grupo: 'frente' },
   { key: 'baseMask', label: 'Piso del holograma', hint: 'Efecto visible con la carta quieta', min: 0, max: 1, step: 0.01, config: 'HOLOGRAM.baseMask', grupo: 'frente' },
   { key: 'logoParallax', label: 'Paralaje del logo', hint: 'El plano de DELANTE: al inclinar, la marca se despega del personaje', min: -0.2, max: 0.2, step: 0.005, config: 'LOGO.parallax', grupo: 'frente' },
@@ -121,6 +122,8 @@ export interface LiveKnobs {
   holoSelf: number;
   highlightWeight: number;
   glareStrength: number;
+  /** Reflejo vivo del metal sobre título y wordmark. */
+  sheenStrength: number;
   tiltFactor: number;
   baseMask: number;
   /** Holograma de la capa de FONDO: se ajusta aparte del del personaje. */
@@ -151,6 +154,7 @@ export const DEFAULTS: LiveKnobs = {
   holoSelf: CFG.COMPOSITE.holoSelf,
   highlightWeight: CFG.GLOSS.highlightWeight,
   glareStrength: CFG.HOLOGRAM.glareStrength,
+  sheenStrength: CFG.LIVE_SHEEN.strength,
   tiltFactor: CFG.HOLOGRAM.tiltFactor,
   baseMask: CFG.HOLOGRAM.baseMask,
   bgHolo: CFG.BACKGROUND.holo,

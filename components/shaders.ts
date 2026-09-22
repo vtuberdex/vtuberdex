@@ -178,6 +178,12 @@ export const cardFragmentShader = /* glsl */ `
   // moverlo obligaría a recompilar el material (y el slider daría tirones).
   uniform float uLayerWeight;
   uniform float uGlareStrength;
+  /**
+   * Peso del reflejo vivo del metal (título y wordmark). Existe como uniform y no como
+   * constante del shader para poder MEDIR el efecto: mismo puntero, misma carta, con el
+   * barrido a 0 y a 1. Y para que el tuner lo pueda apagar, que es como se ajusta.
+   */
+  uniform float uSheenStrength;
   uniform float uTiltFactor;
   uniform float uBaseMask;
   uniform float uGlossSelf;
@@ -678,6 +684,38 @@ ${FACTION_SIZES}
     lit += edgeLayer;
 
     /**
+     * REFLEJO VIVO DEL METAL (título y wordmark).
+     *
+     * POR QUÉ AQUÍ Y NO EN LA TEXTURA
+     * -------------------------------
+     * El acero del título y de la palabra del pie está PINTADO en canvas 2D (TEXT_FINISH)
+     * y llega como píxeles ya resueltos: su brillo no puede moverse, por mucho que se
+     * ajuste. Un reflejo que sigue al ratón tiene que calcularse en cada frame, y eso solo
+     * pasa aquí. La textura aporta el material (sus paradas, su bisel) y este bloque
+     * aporta el barrido: sumados se leen como una sola lámina pulida.
+     *
+     * El ALFA de cada capa hace de máscara, así que la banda de luz solo cae sobre la
+     * placa y sobre las LETRAS —nunca en el hueco entre ellas ni sobre el personaje—. Es
+     * la razón de no usar una máscara propia: la silueta ya está en la textura.
+     */
+    /**
+     * Coordenada y centro RELATIVOS al medio de la carta, no absolutos: así el barrido
+     * queda centrado por construcción y no hace falta corregirlo con medio ancho de banda
+     * (que era un término de estructura colado en medio del efecto).
+     */
+    float sheenCoord = (vUv.x - 0.5) + (vUv.y - 0.5) * ${f(CFG.LIVE_SHEEN.slant)};
+    float sheenPos = ${f(CFG.LIVE_SHEEN.centerOffset)}
+      + uPointer.x * ${f(CFG.LIVE_SHEEN.pointerTravel)}
+      + uTilt.y * ${f(CFG.LIVE_SHEEN.tiltTravel)};
+    float sheenDist = abs(sheenCoord - sheenPos);
+    float sheenWide = smoothstep(${f(CFG.LIVE_SHEEN.wideWidth)}, 0.0, sheenDist) * ${f(CFG.LIVE_SHEEN.wideGain)};
+    float sheenCore = smoothstep(${f(CFG.LIVE_SHEEN.coreWidth)}, 0.0, sheenDist) * ${f(CFG.LIVE_SHEEN.coreGain)};
+    float sheenAmount = (sheenWide + sheenCore) * uSheenStrength;
+    // Solo las capas de metal: el título (3) y el wordmark (6).
+    float sheenMask = clamp(max(layer3.a, layer6.a), 0.0, 1.0);
+    lit += sheenAmount * sheenMask;
+
+    /**
      * CAPA 0: el FONDO del VTuber, por DEBAJO del personaje.
      *
      * POR QUÉ SE COMPONE AQUÍ Y NO AL PRINCIPIO
@@ -759,6 +797,12 @@ ${FACTION_SIZES}
       );
       vec3 bgFilm = wavelengthToRgb(fract(cosView * ${f(CFG.HOLOGRAM.viewAngleWeight)} + bgPhase));
       /**
+       * Fase PROPIA del canto: va atada al giro (uTilt) y no al puntero, para que las
+       * bandas del borde no viajen sincronizadas con las del resto de la lámina. Si
+       * compartieran fase, el efecto se leería como una sola textura deslizándose.
+       */
+      float bgEdgePhase = uTilt.x * ${f(CFG.HOLOGRAM.viewAngleWeight)} + uTime * ${f(CFG.BACKGROUND.timeShift)};
+      /**
        * Desaturación y suelo metálico con perillas PROPIAS, más generosas que las del
        * frente: BACKGROUND.metalFloorMix pesa más que HOLOGRAM.metalFloorMix, así que
        * el matiz domina sobre el gris y el fondo se lee como una lámina teñida en vez
@@ -777,6 +821,24 @@ ${FACTION_SIZES}
       ) * uBgHolo;
 
       /**
+       * TINTE HOLOGRÁFICO DEL BORDE.
+       *
+       * El holograma del fondo iba repartido por igual, así que su canto quedaba apagado:
+       * en una lámina real el ángulo rasante del borde es el que más desplaza el color.
+       * El frente ya tenía su Fresnel; al fondo le faltaba.
+       *
+       * Se AÑADE al bgMask en lugar de sustituirlo, para que el holograma de superficie
+       * que ya había no se pierda: lo que cambia es que ahora el contorno tiene más.
+       * El espectro del borde usa una fase propia (bgEdgePhase, atada al giro) para que
+       * las bandas del canto no vayan sincronizadas con las del resto de la lámina.
+       */
+      float bgEdgeFresnel = pow(fresnel, ${f(CFG.BACKGROUND.edgeTintPower)});
+      vec3 bgEdgeSpectrum = wavelengthToRgb(
+        fract(bgEdgePhase + bgEdgeFresnel * ${f(CFG.BACKGROUND.edgeTintCycles)})
+      );
+      vec3 bgEdgeTint = bgEdgeSpectrum * bgEdgeFresnel * ${f(CFG.BACKGROUND.edgeTint)};
+
+      /**
        * Composición sobre el arte del fondo. Se respeta su LUMINANCIA (un fondo oscuro
        * no puede encenderse como uno claro, o dejaría de parecer la imagen que se
        * subió: el arte se escala por su propia claridad) y el color espectral se SUMA,
@@ -785,9 +847,16 @@ ${FACTION_SIZES}
       float bgLum = dot(bgArt, vec3(0.2126, 0.7152, 0.0722));
       vec3 bgArtLevel = bgArt * (uBgArtFloor + bgLum * ${f(CFG.BACKGROUND.artLumGain)});
       vec3 bgLayer = bgFoilColor * bgMask * uBgLayerWeight;
+      /**
+       * El tinte del canto entra SUMADO al arte, no dentro de bgLayer: el contorno tiene
+       * que leerse aunque el holograma de superficie esté bajo (o en 0). Se multiplica por
+       * bgCover igual que el resto para que no se derrame sobre el personaje.
+       */
+      vec3 bgEdgeLit = bgArtLevel + bgArtLevel * bgLayer + bgLayer * uBgLayerWeight;
+      bgEdgeLit += bgEdgeTint * (bgArtLevel + ${f(CFG.BACKGROUND.edgeTintFloor)}) * uBgLayerWeight;
       lit = mix(
         lit,
-        bgArtLevel + bgArtLevel * bgLayer + bgLayer * uBgLayerWeight,
+        bgEdgeLit,
         bgCover
       );
     }

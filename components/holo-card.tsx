@@ -296,6 +296,7 @@ function CardMesh({
       uCardRadius: { value: CFG.GEOMETRY.cornerRadius },
       uLayerWeight: { value: CFG.HOLOGRAM.layerWeight as number },
       uGlareStrength: { value: CFG.HOLOGRAM.glareStrength as number },
+      uSheenStrength: { value: CFG.LIVE_SHEEN.strength as number },
       uTiltFactor: { value: CFG.HOLOGRAM.tiltFactor as number },
       uBaseMask: { value: CFG.HOLOGRAM.baseMask as number },
       uGlossSelf: { value: CFG.COMPOSITE.glossSelf as number },
@@ -368,6 +369,7 @@ function CardMesh({
     uniforms.front.uTime.value = t;
     uniforms.front.uLayerWeight.value = live.layerWeight;
     uniforms.front.uGlareStrength.value = live.glareStrength;
+    uniforms.front.uSheenStrength.value = live.sheenStrength;
     uniforms.front.uTiltFactor.value = live.tiltFactor;
     uniforms.front.uBaseMask.value = live.baseMask;
     uniforms.front.uBgHolo.value = live.bgHolo;

@@ -13,6 +13,7 @@
  */
 import type { VtuberCard } from '@/lib/types';
 import { cardPalette, mixHex, rgba } from '@/lib/color';
+import { TEXT_FINISH } from './card3d-config';
 
 export const CARD_TEXTURE_WIDTH = 1008;
 export const CARD_TEXTURE_HEIGHT = 1411;
@@ -100,6 +101,163 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, 
   return size;
 }
 
+/**
+ * CÓMO SE DIBUJA EL METAL (la técnica vive aquí, los valores en TEXT_FINISH).
+ *
+ * Un canvas 2D no tiene reflejo especular, así que el metal se SIMULA con el perfil de
+ * luminancia de una lámina pulida: muchas paradas con un filo claro arriba, el cuerpo
+ * medio, un brillo ancho en el centro y la sombra del canto abajo. El bisel —filo claro
+ * y línea oscura— es lo que da el ESPESOR, y es lo que separa "plástico brillante" de
+ * "placa metálica".
+ *
+ * Este bloque se había quedado fuera al trocear la carta en 7 capas (la versión plana de
+ * `drawCardFront` lo tenía y las capas nuevas nacieron sin él). Se recupera aquí y lo
+ * consumen la placa del título, el badge del número y el wordmark.
+ */
+
+/** Relleno metálico: gradiente de paradas + tinte de marca. */
+function metalFill(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  stops: readonly { at: number; color: string }[],
+  brand: string,
+  brandTint: number,
+): CanvasGradient {
+  const g = ctx.createLinearGradient(x, y, x + w * 0.25, y + h);
+  for (const s of stops) g.addColorStop(s.at, mixHex(s.color, brand, brandTint));
+  return g;
+}
+
+/**
+ * Barrido diagonal del metal: bandas casi transparentes que dan el reflejo.
+ *
+ * Se recorta al área ANTES de pintar porque el gradiente es del ancho del área y
+ * cualquier trazo se saldría por las esquinas redondeadas de la placa.
+ */
+function metalSheen(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  const g = ctx.createLinearGradient(x, y, x + w * 0.55, y + h);
+  for (const s of TEXT_FINISH.sheen) g.addColorStop(s.at, `rgba(255, 255, 255, ${s.alpha})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
+/** Bisel: filo claro arriba y línea oscura abajo, dentro del área redondeada. */
+function metalBevel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, radius: number): void {
+  const { bevel } = TEXT_FINISH;
+  ctx.save();
+  ctx.beginPath();
+  roundRect(ctx, x, y, w, h, radius);
+  ctx.clip();
+  ctx.lineWidth = bevel.width;
+  ctx.strokeStyle = rgba(bevel.light, bevel.lightAlpha);
+  ctx.beginPath();
+  ctx.moveTo(x, y + bevel.width / 2);
+  ctx.lineTo(x + w, y + bevel.width / 2);
+  ctx.stroke();
+  ctx.strokeStyle = rgba(bevel.dark, bevel.darkAlpha);
+  ctx.beginPath();
+  ctx.moveTo(x, y + h - bevel.width / 2);
+  ctx.lineTo(x + w, y + h - bevel.width / 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Letra GRABADA sobre metal: copia clara desplazada hacia abajo bajo el texto oscuro.
+ *
+ * Se dibuja ANTES del texto real y en la misma posición, así que solo asoma por el filo
+ * inferior de cada letra: es lo que hace que la letra parezca hundida en la placa.
+ */
+function drawEngrave(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  font: string,
+  align: CanvasTextAlign,
+): void {
+  const { engrave } = TEXT_FINISH;
+  ctx.save();
+  ctx.font = font;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.filter = `blur(${engrave.blur}px)`;
+  ctx.fillStyle = rgba(engrave.color, engrave.alpha);
+  ctx.fillText(text, x, y + engrave.offsetY);
+  ctx.restore();
+}
+
+/**
+ * TEXTO BLANCO CON SOMBRA NEGRA.
+ *
+ * Por qué existe: el texto de la carta es `#e8ecf5` casi opaco y, sobre un fondo subido
+ * con imágenes claras (mar, nieve, cielos), se perdía. La sombra es negra y va desplazada
+ * abajo-derecha —la misma dirección de luz que el bisel del metal— para que toda la carta
+ * parezca iluminada desde el mismo sitio. `blur` corto: por encima de ~8 px la letra se
+ * ensucia.
+ *
+ * Se centraliza aquí porque lo usan la frase, los chips de estado, el pie y los tags: si
+ * cada sitio se configurara la suya, la dirección de luz dejaría de ser consistente.
+ */
+function fillShadowedText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  color: string,
+  alpha = 0.9,
+): void {
+  const s = TEXT_FINISH.shadow;
+  ctx.save();
+  ctx.shadowColor = rgba(s.color, s.alpha);
+  ctx.shadowBlur = s.blur;
+  ctx.shadowOffsetX = s.offsetX;
+  ctx.shadowOffsetY = s.offsetY;
+  ctx.fillStyle = rgba(color, alpha);
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+/**
+ * MARCA metálica del pie: solo las LETRAS llevan metal.
+ *
+ * No se puede rellenar el texto con un gradiente y ya —eso daría una letra plana—: se
+ * pinta el texto tres veces para que lea como una pieza recortada y no como una
+ * tipografía con color. Copia oscura desplazada ABAJO, copia clara desplazada ARRIBA y
+ * encima el gradiente. Lo que asoma por los lados de esa última es el bisel.
+ */
+function drawMetalWordmark(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  right: number,
+  y: number,
+  font: string,
+  brand: string,
+): void {
+  const { wordmark } = TEXT_FINISH;
+  ctx.save();
+  ctx.font = font;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = rgba('#05060a', wordmark.bevelDarkAlpha);
+  ctx.fillText(text, right, y + wordmark.bevelDarkOffset);
+  ctx.fillStyle = rgba('#ffffff', wordmark.bevelLightAlpha);
+  ctx.fillText(text, right, y + wordmark.bevelLightOffset);
+  const g = ctx.createLinearGradient(right - ctx.measureText(text).width, y - 16, right, y + 16);
+  for (const s of wordmark.stops) g.addColorStop(s.at, mixHex(s.color, brand, wordmark.brandTint));
+  ctx.fillStyle = g;
+  ctx.fillText(text, right, y);
+  ctx.restore();
+}
+
 /** Capa 0: background/fondo. Si no existe background, se deja transparente. */
 export function drawBackgroundLayer({ background, width }: { background: HTMLImageElement | null; width: number }): HTMLCanvasElement {
   const { canvas, ctx, W, H } = createLayer(width);
@@ -162,33 +320,44 @@ export function drawTitleLayer({ card, width }: { card: VtuberCard; width: numbe
   const headerW = W - pad * 2;
   const headerRadius = 22;
 
-  // Placa translúcida del color de marca (sin metal por ahora).
-  const { accent, secondary } = cardPalette(card.themeColor, card.secondaryColor);
-  const plate = ctx.createLinearGradient(0, headerTop, 0, headerTop + headerH);
-  plate.addColorStop(0, rgba(accent, 0.95));
-  plate.addColorStop(1, rgba(secondary, 0.75));
-  ctx.fillStyle = plate;
+  /**
+   * PLACA METÁLICA de cabecera.
+   *
+   * Antes era una placa TRANSLÚCIDA del color de marca (acento 0.95 -> secundario 0.75).
+   * El cambio NO es solo de color: el perfil de paradas y el bisel son lo que la hacen
+   * leer como una lámina con espesor. Ver TEXT_FINISH para la técnica y por qué el metal
+   * va teñido del color de marca (por encima de ~0.5 de tinte deja de leerse como acero).
+   */
+  const { accent } = cardPalette(card.themeColor, card.secondaryColor);
+  ctx.fillStyle = metalFill(ctx, pad, headerTop, headerW, headerH, TEXT_FINISH.metalStops, accent, TEXT_FINISH.brandTint);
   roundRect(ctx, pad, headerTop, headerW, headerH, headerRadius);
   ctx.fill();
+  metalSheen(ctx, pad, headerTop, headerW, headerH);
+  metalBevel(ctx, pad, headerTop, headerW, headerH, headerRadius);
 
-  // Número de dex.
+  // Número de dex: placa propia, de acero más oscuro, para que el `#002` se lea como una
+  // pieza distinta y no como parte del mismo bloque.
   const badge = `#${String(card.dexNumber).padStart(3, '0')}`;
   const badgeX = pad + 16;
   const badgeY = headerTop + 21;
   const badgeW = 168;
   const badgeH = 74;
   const badgeRadius = 16;
-  ctx.fillStyle = rgba('#0a0c11', 0.55);
+  ctx.fillStyle = metalFill(ctx, badgeX, badgeY, badgeW, badgeH, TEXT_FINISH.badgeStops, accent, TEXT_FINISH.brandTint);
   roundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeRadius);
   ctx.fill();
+  metalSheen(ctx, badgeX, badgeY, badgeW, badgeH);
+  metalBevel(ctx, badgeX, badgeY, badgeW, badgeH, badgeRadius);
 
-  ctx.font = `800 44px ${FONT}`;
+  const badgeFont = `800 44px ${FONT}`;
+  drawEngrave(ctx, badge, pad + 100, headerTop + 59, badgeFont, 'center');
+  ctx.font = badgeFont;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#e8ecf5';
+  ctx.fillStyle = '#0a0c11';
   ctx.fillText(badge, pad + 100, headerTop + 59);
 
-  // Nombre.
+  // Nombre: reserva el ancho del país para que nunca se solapen.
   const primary = card.countries[0];
   const countryLabel = primary ? `${primary.flag ?? ''} ${primary.name}`.trim() : '';
   ctx.font = `600 34px ${FONT}`;
@@ -196,7 +365,12 @@ export function drawTitleLayer({ card, width }: { card: VtuberCard; width: numbe
   const nameMax = W - pad * 2 - 232 - countryWidth;
   ctx.textAlign = 'left';
   const nameSize = fitText(ctx, card.name.toUpperCase(), nameMax, 58, '800');
-  ctx.font = `800 ${nameSize}px ${FONT}`;
+  const nameFont = `800 ${nameSize}px ${FONT}`;
+  // Grabado: el nombre va hundido en el metal, no impreso encima.
+  drawEngrave(ctx, card.name.toUpperCase(), pad + 212, headerTop + 59, nameFont, 'left');
+  ctx.font = nameFont;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = '#0a0c11';
   ctx.fillText(card.name.toUpperCase(), pad + 212, headerTop + 59);
 
@@ -220,7 +394,8 @@ export function drawTextsLayer({ card, width, info }: { card: VtuberCard; width:
 
   ctx.textBaseline = 'middle';
 
-  // Chips de estado.
+  // Chips de estado. SIN placa opaca: el texto lee por la SOMBRA NEGRA, y así el fondo
+  // subido se ve a través de la cabecera en vez de quedar tapado por un rectángulo.
   const stateChips = [
     card.level !== null ? `NIV ${card.level}` : null,
     card.powerScore ? `PODER ${card.powerScore}` : null,
@@ -229,10 +404,10 @@ export function drawTextsLayer({ card, width, info }: { card: VtuberCard; width:
   let stateX = pad;
   ctx.font = `700 24px ${FONT}`;
   ctx.textAlign = 'left';
-  ctx.fillStyle = '#e8ecf5';
+  ctx.textBaseline = 'middle';
   for (const chip of stateChips) {
     const chipW = ctx.measureText(chip).width + 30;
-    ctx.fillText(chip, stateX + 15, stateY + 22);
+    fillShadowedText(ctx, chip, stateX + 15, stateY + 22, '#e8ecf5', 0.85);
     stateX += chipW + 10;
   }
 
@@ -242,10 +417,11 @@ export function drawTextsLayer({ card, width, info }: { card: VtuberCard; width:
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   ctx.font = `500 32px ${FONT}`;
-  ctx.fillStyle = '#e8ecf5';
   const lineHeight = 42;
   const maxPhraseLines = Math.max(1, Math.floor((info.phraseBottom - info.typesTop + 22) / lineHeight));
   const phraseBottomLimit = info.phraseBottom;
+  // La frase es el texto blanco más largo de la carta y es el que más se pierde sobre un
+  // fondo claro: sombra negra, misma dirección de luz que el pie y el bisel del metal.
   if (phrase) {
     const words = phrase.split(' ');
     const lines: string[] = [];
@@ -265,27 +441,31 @@ export function drawTextsLayer({ card, width, info }: { card: VtuberCard; width:
     const total = visible.length;
     let y = phraseBottomLimit - (total - 1) * lineHeight;
     for (const line of visible) {
-      ctx.fillText(line, pad, y);
+      fillShadowedText(ctx, line, pad, y, '#e8ecf5', 0.94);
       y += lineHeight;
     }
   } else {
-    ctx.fillStyle = 'rgba(232,236,245,0.5)';
-    ctx.fillText('Sin presentación registrada', pad, phraseBottomLimit);
+    fillShadowedText(ctx, 'Sin presentación registrada', pad, phraseBottomLimit, '#e8ecf5', 0.5);
   }
 
   // Pie: redes.
   ctx.font = `600 26px ${FONT}`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = 'rgba(232,236,245,0.68)';
   const socialCount = card.socialCount ?? 0;
-  ctx.fillText(socialCount > 0 ? `${socialCount} redes enlazadas` : 'Sin redes enlazadas', pad, H - 86);
+  fillShadowedText(
+    ctx,
+    socialCount > 0 ? `${socialCount} redes enlazadas` : 'Sin redes enlazadas',
+    pad,
+    H - 86,
+    '#e8ecf5',
+    0.68,
+  );
 
   // País en pie.
   ctx.textAlign = 'right';
   ctx.font = `500 22px ${FONT}`;
-  ctx.fillStyle = 'rgba(232,236,245,0.5)';
-  ctx.fillText(card.countries[0] ? card.countries[0].name : 'Sin país', W - pad, H - 54);
+  fillShadowedText(ctx, card.countries[0] ? card.countries[0].name : 'Sin país', W - pad, H - 54, '#e8ecf5', 0.5);
 
   return canvas;
 }
@@ -347,6 +527,8 @@ export function drawTagsLayer({ card, width, info }: { card: VtuberCard; width: 
         ctx.fillStyle = typeGradient;
         roundRect(ctx, tx, ty, tw, 42, 21);
         ctx.fill();
+        // El rótulo del chip es texto oscuro sobre placa clara: aquí la sombra negra no
+        // ayuda (oscurecería un texto ya oscuro), así que se deja plano y legible.
         ctx.fillStyle = '#080a10';
         ctx.fillText(label, tx + 16, ty + 23);
         tx += tw + 12;
@@ -358,16 +540,19 @@ export function drawTagsLayer({ card, width, info }: { card: VtuberCard; width: 
   return canvas;
 }
 
-/** Capa 6: wordmark VTUBERDEX. TEXTO PLANO. */
+/**
+ * Capa 6: wordmark VTUBERDEX — METÁLICO SOLO EN LAS LETRAS.
+ *
+ * El metal va en el TEXTO, no en una placa detrás: se pinta la palabra tres veces (copia
+ * oscura abajo, copia clara arriba, gradiente encima) para que lea como una pieza
+ * recortada. Ver `drawMetalWordmark` y `TEXT_FINISH.wordmark`.
+ */
 export function drawWordmarkLayer({ card, width }: { card: VtuberCard; width: number }): HTMLCanvasElement {
   const { canvas, ctx, W, H } = createLayer(width);
   if (!ctx) return canvas;
   const pad = 46;
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'alphabetic';
-  ctx.font = `800 28px ${FONT}`;
-  ctx.fillStyle = '#e8ecf5';
-  ctx.fillText('VTUBERDEX', W - pad, H - 86);
+  const { accent } = cardPalette(card.themeColor, card.secondaryColor);
+  drawMetalWordmark(ctx, 'VTUBERDEX', W - pad, H - 86, `800 28px ${FONT}`, accent);
   return canvas;
 }
 
