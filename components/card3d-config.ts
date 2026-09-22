@@ -273,11 +273,29 @@ export const BACKGROUND = {
   spectrumDesaturation: 0.3,
   metalFloorMix: 0.72,
   /**
-   * Paralaje VERTICAL del fondo respecto del personaje, en UV por unidad de
-   * inclinación. El signo POSITIVO es deliberado: el fondo se mueve en sentido
-   * contrario al frente, que es lo que lee como estar más lejos.
+   * Paralaje del fondo respecto del personaje. El valor es una FRACCIÓN DEL ANCHO
+   * DE CARTA: con 0.06 el fondo recorre un 6% del ancho en el recorrido completo del
+   * puntero. Se multiplica por `uPointer`, que va de -1 a 1, no por `uTilt` (esa es
+   * una rotación en radianes y llega a 0.38, así que con ella el desplazamiento real
+   * se quedaba en el 2,3% del ancho y no se percibía por más que se subiera el valor).
+   *
+   * El SIGNO se aplica en el shader (se resta el puntero): el fondo va al CONTRARIO
+   * que el frente, que es lo que se lee como estar más lejos.
    */
-  parallax: 0.02,
+  parallax: 0.06,
+  /**
+   * MARGEN del fondo para que el paralaje no lo saque del lienzo.
+   *
+   * POR QUÉ (fallo medido): el paralaje desplaza el muestreo, así que en los bordes
+   * la lectura se sale de [0,1]. La textura está clampeada, así que ese sobrante NO
+   * se envuelve: se ESTIRA el píxel del borde y el fondo sale con bandas deformadas
+   * justo al inclinar, que es cuando se mira.
+   *
+   * El recorrido máximo es `parallax` (0.06 del ancho), así que hace falta más de un
+   * 3% de margen por lado. Con 1.14 el fondo se amplía un 14% y sobran 7% por lado:
+   * cubre el recorrido y deja holgura sin que la imagen parezca mal escalada.
+   */
+  overscanFactor: 1.14,
   /**
    * Nivel base del arte del fondo y cuánto lo realza su propia claridad.
    *
@@ -481,6 +499,20 @@ export const LOGO = {
   rimWidth: 2.0,
   rimFalloff: 1.6,
   rimWeight: 0.22,
+  /**
+   * PARALAJE del LOGO como plano PROPIO, también como fracción del ancho de carta.
+   *
+   * El logo no es una capa aparte del shader: se recompone como PEGATINA al final
+   * (uLogoSticker) porque es la única forma de que ningún efecto lo tiña. Pero su
+   * muestreo SÍ se desplaza, y eso lo convierte en el tercer plano: fondo →
+   * personaje → logo, cada uno moviéndose a su ritmo.
+   *
+   * Va en NEGATIVO y más fuerte que el fondo: el logo es lo que está más cerca del
+   * cristal, así que es lo que más se desplaza, y al ir al contrario que el fondo los
+   * dos se separan del personaje. Un recorrido del 8% del ancho se ve sin que la
+   * marca llegue a despegarse de su sitio.
+   */
+  parallax: -0.08,
 } as const;
 
 /**
@@ -535,7 +567,7 @@ export const MOTION = {
   bendRange: 1.1,
   /** Cuánto se acentúa la curva en su centro. */
   bendGain: 4.0,
-  parallax: 0.012,
+  parallax: 0.028,
 } as const;
 
 /** Luces de la escena. La CARA no las recibe (usa su ShaderMaterial): encienden el CANTO. */

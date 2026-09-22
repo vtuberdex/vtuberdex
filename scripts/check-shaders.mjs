@@ -134,16 +134,36 @@ const LITERALES_LEGITIMOS = [
 
 const problemas = [];
 for (const { cuerpo, linea } of bloques) {
+  /**
+   * GLSL SIN COMENTARIOS para el análisis.
+   *
+   * POR QUÉ (fallo medido): la coincidencia de declaraciones corre sobre el cuerpo
+   * entero, no línea a línea, así que la palabra "uniform" escrita en un COMENTARIO
+   * se tragaba todo el texto siguiente hasta el primer `;` como si fuera una
+   * declaración. El resultado era un guard que inventaba uniforms fantasma
+   * ("uniform puntero (-1 a 1) y no con el de inclinación: ... declarado y nunca
+   * usado") en cuanto un comentario mencionaba la palabra. Y como este repo usa
+   * comentarios largos que explican el porqué, mencionar un uniform es lo normal.
+   *
+   * Se reemplazan por ESPACIOS del mismo largo conservando los saltos de línea, para
+   * que los números de línea que reportan los problemas sigan siendo los del archivo.
+   */
+  const limpio = cuerpo
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/\/\/[^\n]*/g, (m) => ' '.repeat(m.length));
+
   const declarados = new Set();
-  for (const decl of cuerpo.matchAll(/\buniform\s+\w+\s+([^;]+);/g)) {
+  for (const decl of limpio.matchAll(/\buniform\s+\w+\s+([^;]+);/g)) {
     for (const nombre of decl[1].split(',')) {
-      const limpio = nombre.trim().replace(/\[.*\]$/, '');
-      if (limpio) declarados.add(limpio);
+      const sucio = nombre.trim().replace(/\[.*\]$/, '');
+      // Un nombre de uniform es un identificador; si trae espacios o símbolos es
+      // texto que se coló, no una declaración.
+      if (/^[A-Za-z_]\w*$/.test(sucio)) declarados.add(sucio);
     }
   }
 
   const usados = new Set();
-  for (const uso of cuerpo.matchAll(/\bu[A-Z]\w*/g)) usados.add(uso[0]);
+  for (const uso of limpio.matchAll(/\bu[A-Z]\w*/g)) usados.add(uso[0]);
 
   for (const nombre of usados) {
     if (!declarados.has(nombre) && !APORTADOS.has(nombre)) {

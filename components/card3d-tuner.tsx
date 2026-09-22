@@ -29,7 +29,7 @@
  */
 import { useCallback, useState } from 'react';
 
-import { KNOBS, type LiveKnobs, cambios, live, resetLive, setKnob } from '@/components/card3d-live';
+import { GRUPOS, KNOBS, type Grupo, type LiveKnobs, cambios, live, resetLive, setKnob } from '@/components/card3d-live';
 
 export function Card3dTuner() {
   const [abierto, setAbierto] = useState(true);
@@ -57,7 +57,7 @@ export function Card3dTuner() {
     .join('\n');
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-2xl border border-dex-line bg-dex-panel/95 p-4 text-xs shadow-2xl backdrop-blur">
+    <div className="fixed bottom-4 right-4 z-50 w-[42rem] max-w-[95vw] rounded-2xl border border-dex-line bg-dex-panel/95 p-4 text-xs shadow-2xl backdrop-blur">
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
@@ -74,27 +74,45 @@ export function Card3dTuner() {
             copia solo los movidos.
           </p>
 
-          {KNOBS.map((knob) => (
-            <label key={knob.key} className="block">
-              <span className="flex items-baseline justify-between gap-2">
-                <span className="text-dex-ink">{knob.label}</span>
-                <span className="font-mono text-dex-accent">{live[knob.key]}</span>
-              </span>
-              <input
-                type="range"
-                min={knob.min}
-                max={knob.max}
-                step={knob.step}
-                value={live[knob.key]}
-                aria-label={knob.label}
-                onChange={(e) => mover(knob.key, Number(e.target.value))}
-                className="mt-1 w-full accent-dex-accent"
-              />
-              <span className="mt-0.5 block text-[10px] leading-tight text-dex-muted">
-                {knob.hint}
-              </span>
-            </label>
-          ))}
+          {/**
+           * DOS COLUMNAS: personaje a la izquierda, fondo a la derecha. Son efectos
+           * independientes (uno por capa), así que mezclarlos en una lista única
+           * obligaba a leer la etiqueta para saber cuál manda sobre qué. En pantalla
+           * estrecha se apilan solas con el `grid` responsivo.
+           */}
+          <div className="grid gap-4 md:grid-cols-2">
+            {GRUPOS.map((g) => (
+              <div key={g.id} className="min-w-0">
+                <p className="mb-2 border-b border-dex-line pb-1 font-bold text-dex-ink">
+                  {g.titulo}
+                </p>
+                <p className="mb-2 text-[10px] leading-tight text-dex-muted">{g.nota}</p>
+                <div className="dex-scroll max-h-[52vh] space-y-3 overflow-y-auto pr-1">
+                  {KNOBS.filter((k) => k.grupo === (g.id as Grupo)).map((knob) => (
+                    <label key={knob.key} className="block">
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="text-dex-ink">{knob.label}</span>
+                        <span className="font-mono text-dex-accent">{live[knob.key]}</span>
+                      </span>
+                      <input
+                        type="range"
+                        min={knob.min}
+                        max={knob.max}
+                        step={knob.step}
+                        value={live[knob.key]}
+                        aria-label={`${g.titulo}: ${knob.label}`}
+                        onChange={(e) => mover(knob.key, Number(e.target.value))}
+                        className="mt-1 w-full accent-dex-accent"
+                      />
+                      <span className="mt-0.5 block text-[10px] leading-tight text-dex-muted">
+                        {knob.hint}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
 
           <div className="flex gap-2 pt-1">
             <button

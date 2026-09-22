@@ -36,7 +36,16 @@
  */
 import * as CFG from '@/components/card3d-config';
 
-/** Nombre legible + rango de cada perilla, para el panel. */
+/**
+ * Nombre legible + rango de cada perilla, para el panel.
+ *
+ * `grupo` decide en QUÉ COLUMNA del panel se pinta. El panel tiene dos: el
+ * personaje (todo lo que afecta al frente de la carta) y el fondo (su capa
+ * propia). Se agrupa así y no por "importancia" porque son dos efectos
+ * INDEPENDIENTES: ajustar el fondo moviendo perillas del personaje no tiene
+ * sentido, y mezclados en una sola lista el panel se vuelve una lista larga donde
+ * no se sabe cuál manda sobre qué.
+ */
 export interface Knob {
   /** Clave en el objeto `live`. */
   key: keyof LiveKnobs;
@@ -52,7 +61,18 @@ export interface Knob {
    * escribe literal para que el panel pueda mostrar exactamente qué línea tocar.
    */
   config: string;
+  /** Columna del panel a la que pertenece la perilla. */
+  grupo: Grupo;
 }
+
+/** Las dos columnas del panel. `frente` = personaje y carta; `fondo` = su capa. */
+export type Grupo = 'frente' | 'fondo';
+
+/** Título de cada columna, para el panel. */
+export const GRUPOS: ReadonlyArray<{ id: Grupo; titulo: string; nota: string }> = [
+  { id: 'frente', titulo: 'Personaje y carta', nota: 'El frente: barniz, tinta, lámina, emblemas y paralaje del logo.' },
+  { id: 'fondo', titulo: 'Fondo', nota: 'La capa de detrás. Independiente del frente y más marcada a propósito.' },
+];
 
 /**
  * Las perillas que se pueden mover en vivo.
@@ -66,20 +86,27 @@ export interface Knob {
  * sea el que de verdad se quiere mover.
  */
 export const KNOBS: readonly Knob[] = [
-  { key: 'gloss', label: 'Barniz (gloss)', hint: 'El que más lava: +40% de luz medido', min: 0, max: 1, step: 0.01, config: 'INTENSITY.gloss' },
-  { key: 'edge', label: 'Tinta y piel (edge)', hint: 'Realce de contornos: +25% de luz', min: 0, max: 1, step: 0.01, config: 'EDGE.strength' },
-  { key: 'holo', label: 'Lámina (holo)', hint: 'Arcoíris: apenas +0.8% de luz', min: 0, max: 1, step: 0.01, config: 'INTENSITY.holo' },
-  { key: 'faction', label: 'Emblemas de facción', hint: 'Opacidad de los emblemas superpuestos', min: 0, max: 1, step: 0.01, config: 'FACTION.strength' },
-  { key: 'glow', label: 'Resplandor exterior', hint: 'Aro de luz alrededor de la carta', min: 0, max: 1.5, step: 0.01, config: 'GLOW.strength' },
-  { key: 'layerWeight', label: 'Peso del color espectral', hint: 'Cuánto arcoíris se SUMA al arte (saturación)', min: 0, max: 0.2, step: 0.005, config: 'HOLOGRAM.layerWeight' },
-  { key: 'glossSelf', label: 'Luz propia del barniz', hint: 'Luz que el barniz añade por su cuenta', min: 0, max: 1, step: 0.01, config: 'COMPOSITE.glossSelf' },
-  { key: 'holoSelf', label: 'Luz propia de la lámina', hint: 'Luz que la lámina añade por su cuenta', min: 0, max: 1, step: 0.01, config: 'COMPOSITE.holoSelf' },
-  { key: 'highlightWeight', label: 'Respeto por las zonas claras', hint: 'Cuánto se frena el brillo sobre arte claro', min: 0, max: 1, step: 0.01, config: 'GLOSS.highlightWeight' },
-  { key: 'glareStrength', label: 'Barrido del puntero', hint: 'Brillo que sigue al cursor', min: 0, max: 1, step: 0.01, config: 'HOLOGRAM.glareStrength' },
-  { key: 'tiltFactor', label: 'Arcoíris al inclinar', hint: 'Cuánto sube el efecto con el tilt', min: 0, max: 5, step: 0.05, config: 'HOLOGRAM.tiltFactor' },
-  { key: 'baseMask', label: 'Piso del holograma', hint: 'Efecto visible con la carta quieta', min: 0, max: 1, step: 0.01, config: 'HOLOGRAM.baseMask' },
-  { key: 'bgHolo', label: 'Fondo: intensidad', hint: 'Holograma de la capa de fondo (más fuerte que el del personaje)', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.holo' },
-  { key: 'bgLayerWeight', label: 'Fondo: saturación', hint: 'Cuánto arcoíris se SUMA al fondo', min: 0, max: 1, step: 0.01, config: 'BACKGROUND.layerWeight' },
+  { key: 'gloss', label: 'Barniz (gloss)', hint: 'El que más lava: +40% de luz medido', min: 0, max: 1, step: 0.01, config: 'INTENSITY.gloss', grupo: 'frente' },
+  { key: 'edge', label: 'Tinta y piel (edge)', hint: 'Realce de contornos: +25% de luz', min: 0, max: 1, step: 0.01, config: 'EDGE.strength', grupo: 'frente' },
+  { key: 'holo', label: 'Lámina (holo)', hint: 'Arcoíris: apenas +0.8% de luz', min: 0, max: 1, step: 0.01, config: 'INTENSITY.holo', grupo: 'frente' },
+  { key: 'faction', label: 'Emblemas de facción', hint: 'Opacidad de los emblemas superpuestos', min: 0, max: 1, step: 0.01, config: 'FACTION.strength', grupo: 'frente' },
+  { key: 'glow', label: 'Resplandor exterior', hint: 'Aro de luz alrededor de la carta', min: 0, max: 1.5, step: 0.01, config: 'GLOW.strength', grupo: 'frente' },
+  { key: 'layerWeight', label: 'Peso del color espectral', hint: 'Cuánto arcoíris se SUMA al arte (saturación)', min: 0, max: 0.2, step: 0.005, config: 'HOLOGRAM.layerWeight', grupo: 'frente' },
+  { key: 'glossSelf', label: 'Luz propia del barniz', hint: 'Luz que el barniz añade por su cuenta', min: 0, max: 1, step: 0.01, config: 'COMPOSITE.glossSelf', grupo: 'frente' },
+  { key: 'holoSelf', label: 'Luz propia de la lámina', hint: 'Luz que la lámina añade por su cuenta', min: 0, max: 1, step: 0.01, config: 'COMPOSITE.holoSelf', grupo: 'frente' },
+  { key: 'highlightWeight', label: 'Respeto por las zonas claras', hint: 'Cuánto se frena el brillo sobre arte claro', min: 0, max: 1, step: 0.01, config: 'GLOSS.highlightWeight', grupo: 'frente' },
+  { key: 'glareStrength', label: 'Barrido del puntero', hint: 'Brillo que sigue al cursor', min: 0, max: 1, step: 0.01, config: 'HOLOGRAM.glareStrength', grupo: 'frente' },
+  { key: 'tiltFactor', label: 'Arcoíris al inclinar', hint: 'Cuánto sube el efecto con el tilt', min: 0, max: 5, step: 0.05, config: 'HOLOGRAM.tiltFactor', grupo: 'frente' },
+  { key: 'baseMask', label: 'Piso del holograma', hint: 'Efecto visible con la carta quieta', min: 0, max: 1, step: 0.01, config: 'HOLOGRAM.baseMask', grupo: 'frente' },
+  { key: 'logoParallax', label: 'Paralaje del logo', hint: 'El plano de DELANTE: al inclinar, la marca se despega del personaje', min: -0.2, max: 0.2, step: 0.005, config: 'LOGO.parallax', grupo: 'frente' },
+  // --- columna FONDO -------------------------------------------------------
+  { key: 'bgHolo', label: 'Intensidad', hint: 'Holograma de la capa de fondo (más fuerte que el del personaje)', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.holo', grupo: 'fondo' },
+  { key: 'bgLayerWeight', label: 'Saturación', hint: 'Cuánto arcoíris se SUMA al fondo', min: 0, max: 1, step: 0.01, config: 'BACKGROUND.layerWeight', grupo: 'fondo' },
+  { key: 'bgBaseMask', label: 'Piso del holograma', hint: 'Efecto visible con la carta quieta', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.baseMask', grupo: 'fondo' },
+  { key: 'bgTiltFactor', label: 'Arcoíris al inclinar', hint: 'Cuánto sube el efecto del fondo con el tilt', min: 0, max: 6, step: 0.05, config: 'BACKGROUND.tiltFactor', grupo: 'fondo' },
+  { key: 'bgGlareStrength', label: 'Barrido del puntero', hint: 'El brillo del fondo que sigue al cursor', min: 0, max: 2, step: 0.01, config: 'BACKGROUND.glareStrength', grupo: 'fondo' },
+  { key: 'bgParallax', label: 'Paralaje', hint: 'Signo POSITIVO: va al contrario que el frente, que es lo que lee como lejos', min: -0.15, max: 0.15, step: 0.005, config: 'BACKGROUND.parallax', grupo: 'fondo' },
+  { key: 'bgArtFloor', label: 'Brillo base del arte', hint: 'Subirlo aclara el fondo; bajarlo lo deja más apagado', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.artFloor', grupo: 'fondo' },
 ];
 
 /** Valores que se leen en cada frame. Las claves son las de `KNOBS`. */
@@ -99,6 +126,13 @@ export interface LiveKnobs {
   /** Holograma de la capa de FONDO: se ajusta aparte del del personaje. */
   bgHolo: number;
   bgLayerWeight: number;
+  bgBaseMask: number;
+  bgTiltFactor: number;
+  bgGlareStrength: number;
+  bgParallax: number;
+  bgArtFloor: number;
+  /** Paralaje del LOGO: el plano de delante, el que más se desplaza. */
+  logoParallax: number;
 }
 
 /**
@@ -121,6 +155,12 @@ export const DEFAULTS: LiveKnobs = {
   baseMask: CFG.HOLOGRAM.baseMask,
   bgHolo: CFG.BACKGROUND.holo,
   bgLayerWeight: CFG.BACKGROUND.layerWeight,
+  bgBaseMask: CFG.BACKGROUND.baseMask,
+  bgTiltFactor: CFG.BACKGROUND.tiltFactor,
+  bgGlareStrength: CFG.BACKGROUND.glareStrength,
+  bgParallax: CFG.BACKGROUND.parallax,
+  bgArtFloor: CFG.BACKGROUND.artFloor,
+  logoParallax: CFG.LOGO.parallax,
 };
 
 /**

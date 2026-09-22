@@ -176,6 +176,13 @@ export const cardFragmentShader = /* glsl */ `
   uniform sampler2D uLogoSticker;
   /** Máscara de la silueta del logo (1 sobre la marca): define dónde va el sticker. */
   uniform sampler2D uLogoMask;
+  /**
+   * Paralaje del fondo, como FRACCIÓN DEL ANCHO DE CARTA (se multiplica por el
+   * puntero, que va de -1 a 1). El signo se aplica en el shader para que el fondo
+   * vaya al CONTRARIO que el frente: por eso el mismo valor positivo aquí produce
+   * los dos sentidos y no hay que alternar el signo de la constante.
+   */
+  uniform float uLogoParallax;
   uniform float uCardRadius;
   /**
    * FONDO de la carta: la imagen del VTuber por DEBAJO del personaje.
@@ -214,6 +221,8 @@ export const cardFragmentShader = /* glsl */ `
    * lo hace moverse al CONTRARIO que la carta, que es lo que se lee como lejanía.
    */
   uniform float uBgParallax;
+  /** Suelo de luminancia del arte del fondo: se ajusta en vivo. */
+  uniform float uBgArtFloor;
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -392,11 +401,20 @@ ${SPECTRUM_FN}
     vec4 tex = texture2D(uMap, vUv);
     // Alcance del efecto: solo la imagen, nunca los items de la carta.
     float zone = artZoneMask(vUv);
-    // Cobertura del logotipo, leída de su silueta real. sinLogo (1 fuera del
-    // logo, 0 dentro) se calcula aquí para que TODAS las capas holográficas —la
-    // interferencia, los emblemas de facción y el barrido— puedan suprimirse sobre
-    // la marca sin repetir la resta en cada una.
-    float logoCover = texture2D(uLogoMask, vUv).r;
+    /**
+     * Cobertura del logotipo, leída de su silueta real. sinLogo (1 fuera del
+     * logo, 0 dentro) se calcula aquí para que TODAS las capas holográficas —la
+     * interferencia, los emblemas de facción y el barrido— puedan suprimirse sobre
+     * la marca sin repetir la resta en cada una.
+     *
+     * Se lee en la MISMA coordenada desplazada que el sticker (aplicando el
+     * parámetro de paralaje del logo, con el puntero y no la inclinación): el
+     * holograma tiene que apagarse debajo de donde la marca SE VE, no donde estaba.
+     * Con la coordenada fija, al mover la carta la marca se corría y la supresión se
+     * quedaba atrás, dejando un fantasma brillante con forma de logo en el sitio
+     * viejo — justo el logo duplicado que se veía.
+     */
+    float logoCover = texture2D(uLogoMask, vUv + uPointer * uLogoParallax).r;
     float sinLogo = 1.0 - logoCover;
 
     // Normal en espacio de vista -> intensidad de Fresnel en los bordes.
@@ -658,17 +676,22 @@ ${FACTION_SIZES}
      */
     if (uHasBackground > 0.5) {
       /**
-       * El CONTENIDO se muestrea DESPLAZADO por la inclinación (paralaje) mientras la
+       * El CONTENIDO se muestrea DESPLAZADO por el puntero (paralaje) mientras la
        * máscara se lee en la posición FIJA.
        *
        * Ese reparto es lo que produce la sensación de profundidad: el agujero de la
        * silueta se queda donde está —es parte del personaje, del plano de delante— y
        * lo que se desliza por detrás es la escena. Si la máscara se desplazara
        * también, el hueco viajaría con el fondo y las dos capas se leerían como un
-       * solo plano móvil. En el eje vertical el signo va a CONTRARIO del frente, que
-       * es como se lee "está más lejos".
+       * solo plano móvil. El signo va a CONTRARIO del frente, que es como se lee
+       * "está más lejos".
+       *
+       * Se desplaza con el uniform del puntero (-1 a 1) y no con el de inclinación:
+       * ese es una rotación en radianes que llega a 0.38, así que el recorrido se
+       * quedaba en el 2,3% del ancho. Con el puntero el valor de la config es
+       * directamente una fracción del ancho de carta, que es lo que se quiere ajustar.
        */
-      vec2 bgUv = vUv - vec2(uTilt.y, -uTilt.x) * uBgParallax;
+      vec2 bgUv = vUv - vec2(uPointer.x, uPointer.y) * uBgParallax;
       vec3 bgArt = texture2D(uBackgroundMap, bgUv).rgb;
       float bgCover = texture2D(uBackgroundMask, vUv).r;
 
@@ -714,7 +737,7 @@ ${FACTION_SIZES}
        * que es lo que hace que el efecto se note aunque el fondo sea oscuro.
        */
       float bgLum = dot(bgArt, vec3(0.2126, 0.7152, 0.0722));
-      vec3 bgArtLevel = bgArt * (${f(CFG.BACKGROUND.artFloor)} + bgLum * ${f(CFG.BACKGROUND.artLumGain)});
+      vec3 bgArtLevel = bgArt * (uBgArtFloor + bgLum * ${f(CFG.BACKGROUND.artLumGain)});
       vec3 bgLayer = bgFoilColor * bgMask * uBgLayerWeight;
       lit = mix(lit, bgArtLevel + bgArtLevel * bgLayer + bgLayer * uBgLayerWeight, bgCover);
     }
@@ -789,9 +812,21 @@ ${FACTION_SIZES}
      * STICKER del LOGO: se aplica con su mezcla alfa SOBRE el color ya calculado,
      * después de todos los efectos. El logotipo recupera sus píxeles originales
      * (sin arcoíris, sin tinte y sin barrido) y mantiene su propia transparencia.
+     *
+     * El paralaje va como DESPLAZAMIENTO DE MÁSCARA, no de muestreo, y eso es
+     * deliberado. La versión anterior desplazaba solo el arte y dejaba la máscara
+     * fija; medido, eso parte la marca en dos: la máscara (la silueta) sigue en su
+     * sitio mientras el arte se corre, así que dentro de la silueta entra un trozo
+     * del logo vecino y fuera de ella se recorta el que debería estar. El resultado
+     * es exactamente el "logo duplicado y raro" que se veía.
+     *
+     * Con el desplazamiento en la coordenada de MUESTREO, el arte y la máscara se
+     * leen en el mismo punto relativo y la marca se mueve ENTERA y con su forma: se
+     * un solo logo, desplazado respecto del personaje.
      */
-    vec4 logoPix = texture2D(uLogoSticker, vUv);
-    float logoAlpha = logoPix.a * texture2D(uLogoMask, vUv).r;
+    vec2 logoUv = vUv + uPointer * uLogoParallax;
+    vec4 logoPix = texture2D(uLogoSticker, logoUv);
+    float logoAlpha = logoPix.a * texture2D(uLogoMask, logoUv).r;
     if (logoAlpha > ${f(CFG.LOGO.stickerCutoff)}) {
       /**
        * BRILLO METÁLICO del logotipo.
@@ -808,6 +843,13 @@ ${FACTION_SIZES}
        *    ese negativo el efecto es un lavado, no un brillo.
        * 3. TINTE FRÍO en las luces y cálido en las sombras: es lo que distingue el
        *    metal de una superficie pintada.
+       */
+      /**
+       * El barrido metálico se calcula en la posición LOCAL del logo, la del
+       * fragmento, no en la desplazada. Es el reflejo de una lámina: tiene que
+       * recorrer la MARCA tal como se ve ahora, que es justo lo que se está mirando.
+       * Con la coordenada desplazada el reflejo perseguiría la marca vieja y se
+       * descuadraría del paralaje.
        */
       vec2 logoGloss = specularGloss(vUv, uPointer, vNormal);
       // Coordenada del barrido: diagonal, movida por el tilt y el puntero.

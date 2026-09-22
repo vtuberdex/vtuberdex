@@ -316,7 +316,21 @@ function CardMesh({
       backgroundCanvas.height = canvas.height;
       if (background) {
         const bgCtx = backgroundCanvas.getContext('2d');
-        bgCtx?.drawImage(background, 0, 0, canvas.width, canvas.height);
+        /**
+         * El fondo se dibuja con MARGEN (centrado y un poco más grande que el
+         * lienzo). El paralaje desplaza su muestreo, así que sin ese sobrante los
+         * bordes se leerían fuera de la textura y, como está clampeada, el píxel del
+         * borde se estira: el fondo se ve deformado al inclinar. El factor vive en
+         * `BACKGROUND.overscanFactor`.
+         */
+        const over = canvas.width * (CFG.BACKGROUND.overscanFactor - 1);
+        bgCtx?.drawImage(
+          background,
+          -over / 2,
+          -over / 2,
+          canvas.width + over,
+          canvas.height + over,
+        );
       }
       const backgroundTexture = new THREE.CanvasTexture(backgroundCanvas);
       backgroundTexture.colorSpace = THREE.SRGBColorSpace;
@@ -441,12 +455,14 @@ function CardMesh({
         uBackgroundMap: { value: null as THREE.Texture | null },
         uBackgroundMask: { value: null as THREE.Texture | null },
         uHasBackground: { value: 0 },
+        uLogoParallax: { value: CFG.LOGO.parallax as number },
         uBgHolo: { value: CFG.BACKGROUND.holo as number },
         uBgLayerWeight: { value: CFG.BACKGROUND.layerWeight as number },
         uBgGlareStrength: { value: CFG.BACKGROUND.glareStrength as number },
         uBgBaseMask: { value: CFG.BACKGROUND.baseMask as number },
         uBgTiltFactor: { value: CFG.BACKGROUND.tiltFactor as number },
         uBgParallax: { value: CFG.BACKGROUND.parallax as number },
+        uBgArtFloor: { value: CFG.BACKGROUND.artFloor as number },
       },
       glow: {
         /**
@@ -529,6 +545,12 @@ function CardMesh({
     // Perillas del FONDO: se ajustan aparte de las del personaje, que es el punto.
     uniforms.front.uBgHolo.value = live.bgHolo;
     uniforms.front.uBgLayerWeight.value = live.bgLayerWeight;
+    uniforms.front.uBgBaseMask.value = live.bgBaseMask;
+    uniforms.front.uBgTiltFactor.value = live.bgTiltFactor;
+    uniforms.front.uBgGlareStrength.value = live.bgGlareStrength;
+    uniforms.front.uBgParallax.value = live.bgParallax;
+    uniforms.front.uBgArtFloor.value = live.bgArtFloor;
+    uniforms.front.uLogoParallax.value = live.logoParallax;
     uniforms.front.uGlossSelf.value = live.glossSelf;
     uniforms.front.uHoloSelf.value = live.holoSelf;
     uniforms.front.uHighlightWeight.value = live.highlightWeight;
