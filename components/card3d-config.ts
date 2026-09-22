@@ -309,6 +309,30 @@ export const BACKGROUND = {
    */
   parallax: 0.06,
   /**
+   * CUÁNTO FONDO SE VE DETRÁS DEL TEXTO DE LA CARTA (0 = nada, 1 = tanto como fuera).
+   *
+   * POR QUÉ EXISTE (fallo medido): el fondo se compone REEMPLAZANDO la textura de la
+   * carta donde el personaje es transparente (`mix(lit, fondo, cobertura)`), así que
+   * sobre el texto había que impedirlo o el título desaparecía bajo la imagen. La
+   * primera versión lo hacía con una exclusión BINARIA por cajas, y el resultado fue
+   * peor que el problema: la zona excluida dejaba ver el degradado del tema —que en el
+   * borde superior es `deep`, casi negro— así que aparecían RECTÁNGULOS OSCUROS justo
+   * alrededor de la cabecera, los chips y el pie, sobre un fondo claro. Se reportaron
+   * como "un fondo negro que no debería tener", y con razón: era un agujero, no un
+   * elemento del diseño.
+   *
+   * Ahora el fondo no se corta, se ATENÚA: detrás del texto conserva esta fracción de
+   * su intensidad. El texto mantiene su propia placa o su contraste (la cabecera y los
+   * chips ya se dibujan con su fondo translúcido encima) y alrededor no hay ninguna
+   * arista recta, porque el paso de atenuado está DIFUMINADO (ver `characterAlphaMask`).
+   *
+   * 0.35 medido: con 0 vuelven los rectángulos oscuros; con 0.6 el pie y la frase
+   * pierden contraste sobre fondos claros.
+   */
+  textKeep: 0.35,
+  /** Radio del difuminado del atenuado, en px del lienzo de 1008. */
+  textKeepBlur: 26,
+  /**
    * MARGEN del fondo para que el paralaje no lo saque del lienzo.
    *
    * POR QUÉ (fallo medido): el paralaje desplaza el muestreo, así que en los bordes

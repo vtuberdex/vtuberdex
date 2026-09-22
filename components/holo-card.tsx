@@ -30,6 +30,7 @@ import {
   drawCardFront,
   characterAlphaMask,
   getLastTextBoxes,
+  getLastTextLayer,
   getLastLogoBox,
   inkAndSkinMask,
   logoMask,
@@ -147,6 +148,8 @@ function CardMesh({
     backgroundMask: THREE.CanvasTexture;
     /** Tinta y piel DE LA IMAGEN DEL FONDO (realce de contornos de esa capa). */
     backgroundEdge: THREE.CanvasTexture;
+    /** Capa de TEXTO: se pega encima del fondo para que el texto nunca quede debajo. */
+    textLayer: THREE.CanvasTexture;
   } | null>(null);
   /**
    * ARTE del fondo, aparte de `textures` porque es OPCIONAL: solo hay textura si la
@@ -380,6 +383,22 @@ function CardMesh({
       edgeTexture.anisotropy = 4;
       edgeTexture.needsUpdate = true;
 
+      /**
+       * CAPA DE TEXTO: la publica `drawCardFront` con los pixeles de la carta en las bandas
+       * del texto. El shader la pega ENCIMA del fondo, igual que hace con el logo, para que
+       * el texto no quede bajo la imagen ni haya que recortar el fondo a su alrededor.
+       * Sin fondo subido (`uHasBackground` = 0) no se usa: el bloque entero se salta.
+       */
+      const textLayerCanvas = getLastTextLayer() ?? document.createElement('canvas');
+      if (!getLastTextLayer()) {
+        textLayerCanvas.width = canvas.width;
+        textLayerCanvas.height = canvas.height;
+      }
+      const textLayerTexture = new THREE.CanvasTexture(textLayerCanvas);
+      textLayerTexture.colorSpace = THREE.SRGBColorSpace;
+      textLayerTexture.anisotropy = 4;
+      textLayerTexture.needsUpdate = true;
+
       setTextures({
         front: texture,
         edge: edgeTexture,
@@ -387,6 +406,7 @@ function CardMesh({
         logoSticker: logoStickerTexture,
         backgroundMask: backgroundMaskTexture,
         backgroundEdge: backgroundEdgeTexture,
+        textLayer: textLayerTexture,
       });
       setBackgroundTexture(backgroundTexture);
     });
@@ -506,6 +526,7 @@ function CardMesh({
         uBgArtFloor: { value: CFG.BACKGROUND.artFloor as number },
         /** Tinta y piel del fondo: su máscara (se sincroniza con las texturas) y su peso. */
         uBgEdgeMap: { value: null as THREE.Texture | null },
+        uTextLayer: { value: null as THREE.Texture | null },
         uBgEdgeStrength: { value: CFG.BACKGROUND.edgeStrength as number },
       },
       glow: {
@@ -533,6 +554,7 @@ function CardMesh({
     uniforms.front.uLogoSticker.value = textures.logoSticker;
     uniforms.front.uBackgroundMask.value = textures.backgroundMask;
     uniforms.front.uBgEdgeMap.value = textures.backgroundEdge;
+    uniforms.front.uTextLayer.value = textures.textLayer;
   }, [textures, uniforms]);
 
   /**

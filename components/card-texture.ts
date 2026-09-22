@@ -124,6 +124,19 @@ export function getLastTextBoxes(): Array<{ x0: number; y0: number; x1: number; 
 }
 
 /**
+ * CAPA DE TEXTO de la última carta dibujada: los píxeles de la carta en las bandas donde
+ * vive el texto (cabecera, chips, tipos, frase y pie), con transparencia fuera de ellas.
+ *
+ * El shader la pega ENCIMA del fondo. Ver el porqué en `drawCardFront`.
+ */
+let textLayer: HTMLCanvasElement | null = null;
+
+/** Devuelve la capa de texto de la última carta dibujada. */
+export function getLastTextLayer(): HTMLCanvasElement | null {
+  return textLayer;
+}
+
+/**
  * Caja donde quedó dibujado el LOGO en la última llamada a `drawCardFront`. La usa
  * `logoMask()` para generar su máscara en la posición exacta.
  */
@@ -141,6 +154,7 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
 
   lastLogoBox = null;
   lastTextBoxes = null;
+  textLayer = null;
   const { accent, secondary, deep, mid, sheen } = cardPalette(card.themeColor, card.secondaryColor);
   /**
    * Todo el dibujo está escrito en unidades del lienzo CANÓNICO (1008 de ancho).
@@ -201,7 +215,7 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   ctx.fillStyle = tint;
   ctx.fillRect(0, 0, W, H);
 
-  // ------------------------------------------------- VELADURAS DE LEGIBILIDAD ---
+  // ------------------------------------------------- VELADURAS DE LEGABILIDAD ---
   // Arriba (cabecera) y abajo (frase/tipos/barra): sin esto el texto no se lee
   // sobre una foto clara.
   const topShade = ctx.createLinearGradient(0, 0, 0, 300);
@@ -564,6 +578,56 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
     y1: (b.y1 + FONDO_TEXTO_MARGEN) / H,
   }));
 
+  /**
+   * CAPA DE TEXTO: el ancho de la carta en la banda del texto, para recomponerlo ENCIMA
+   * del fondo en el shader.
+   *
+   * POR QUÉ ASÍ Y NO EXCLUYENDO EL FONDO (el fallo costó dos intentos)
+   * ----------------------------------------------------------------
+   * Como el shader compone el fondo REEMPLAZANDO la carta donde el personaje es
+   * transparente, el texto de esa zona desaparece bajo la imagen. Se intentó primero
+   * EXCLUIR el fondo de las cajas de texto: dejaba ver el degradado oscuro del tema y la
+   * veladura de legibilidad, o sea RECTÁNGULOS NEGROS pegados a la cabecera, los chips y
+   * el pie. Se intentó después ATENUARLO: menos negro, pero seguía viéndose la franja.
+   *
+   * El problema es de fondo: cualquier cosa que deje asomar la textura bajo el fondo se
+   * ve oscura, porque esa zona de la carta es una placa casi negra a propósito (para que
+   * el texto se lea sobre cualquier arte). Lo correcto es lo que el repo ya hace con el
+   * LOGO: no cortar el fondo, sino RE-COMPONER el elemento por encima.
+   *
+   * Así que esta capa lleva copiados los píxeles de la carta en las bandas del texto
+   * —placa, chips, frase y pie, con sus degradados— y su ALFA marca dónde van. El shader
+   * dibuja el fondo sin exclusiones en todo el lienzo y después pega esta capa encima: el
+   * texto queda idéntico al de siempre y el fondo llega a los cuatro bordes.
+   */
+  textLayer = document.createElement('canvas');
+  textLayer.width = canvas.width;
+  textLayer.height = canvas.height;
+  const tl = textLayer.getContext('2d');
+  if (tl) {
+    /**
+     * CAJAS EXACTAS, sin margen: el recorte coincide con el borde de cada placa.
+     *
+     * POR QUE SIN MARGEN (fallo medido): la primera version usaba BANDAS de ancho
+     * completo, y eso volvia a tapar el fondo en toda la franja — se veia un corte
+     * horizontal a la altura del chip, o sea el mismo defecto con otra forma. Con las
+     * cajas ajustadas, el fondo llega al borde superior y al lateral, y lo unico que se
+     * repone encima son las placas.
+     *
+     * Tampoco vale el margen que usa `lastTextBoxes` (14 px): esos 14 px de mas son
+     * textura de la carta, que en la cabecera es la veladura oscura, asi que saldria un
+     * anillo oscuro alrededor de cada placa.
+     */
+    for (const b of boxes) {
+      const x = Math.round(b.x0 * scale);
+      const y = Math.round(b.y0 * scale);
+      const w = Math.round((b.x1 - b.x0) * scale);
+      const h = Math.round((b.y1 - b.y0) * scale);
+      if (w <= 0 || h <= 0) continue;
+      tl.drawImage(canvas, x, y, w, h, x, y, w, h);
+    }
+  }
+
   return canvas;
 }
 
@@ -661,34 +725,18 @@ export function characterAlphaMask(
   }
 
   const artData = artCanvas?.getContext('2d')?.getImageData(0, 0, width, height).data ?? null;
-  /** Cajas en píxeles, para poder comparar contra `x`/`y` del bucle. */
-  const forbiden = (boxes ?? []).map((b) => ({
-    x0: b.x0 * width,
-    y0: b.y0 * height,
-    x1: b.x1 * width,
-    y1: b.y1 * height,
-  }));
-  /** Fila a fila se descartan las cajas que no la cruzan: evita 5 comparaciones por píxel. */
+
+  /**
+   * COBERTURA = transparencia del PERSONAJE, sin más.
+   *
+   * El texto NO se protege aquí: se recompone encima del fondo con la capa de texto (ver
+   * `drawCardFront`). Se intentó antes excluirlo y atenuarlo con este mismo mapa y las dos
+   * versiones dejaban ver la placa oscura de la carta como franjas negras, porque el
+   * problema no era cuánto fondo se pinta sino que la textura de debajo es casi negra.
+   */
   for (let y = 0; y < height; y += 1) {
-    const spansAtY = forbiden.filter((b) => y >= b.y0 && y <= b.y1);
     for (let x = 0; x < width; x += 1) {
-      /** Sobre el texto no se pinta fondo: es lo único que el fondo debe respetar. */
-      let onText = false;
-      for (const b of spansAtY) {
-        if (x >= b.x0 && x <= b.x1) {
-          onText = true;
-          break;
-        }
-      }
-      if (onText) continue;
-      let coverage: number;
-      if (!artData) {
-        // Sin personaje no hay nada que tapar: el fondo llena todo lo que no sea texto.
-        coverage = 1;
-      } else {
-        const alpha = artData[(y * width + x) * 4 + 3] / 255;
-        coverage = 1 - alpha;
-      }
+      const coverage = artData ? 1 - artData[(y * width + x) * 4 + 3] / 255 : 1;
       const i = (y * width + x) * 4;
       o[i] = Math.round(coverage * 255);
       o[i + 1] = Math.round(coverage * 255);
