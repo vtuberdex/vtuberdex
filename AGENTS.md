@@ -35,7 +35,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 100 tests (vitest): utilidades, componentes, páginas
+npm test                   # 99 tests (vitest): utilidades, componentes, páginas
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -59,7 +59,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` cita 15/32/57 tests: son cifras **viejas**. Las reales son
-**25/59/100** (medidas). Si añades tests, actualiza aquí.
+**25/59/99** (medidas). Si añades tests, actualiza aquí.
 
 ## Arquitectura: las reglas que no se negocian
 

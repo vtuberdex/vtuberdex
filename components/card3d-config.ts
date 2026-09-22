@@ -243,9 +243,23 @@ export const ART_ZONE = {
  * personaje apenas se notaría; aquí interesa justo lo contrario, que las dos capas
  * se distingan. Todos los pesos van por encima de los equivalentes de `HOLOGRAM`:
  *   · `layerWeight` 0.42 contra 0.15 del personaje (2,8×).
- *   · `foilCycles` 5.0 contra 1.6 del `SPECTRUM.foil` (3,1×), que es lo que dibuja
- *     franjas visibles en vez de un color plano.
- *   · `metalFloorMix` 0.72 contra 0.45: más color espectral y menos gris metálico.
+ *   · `baseMask` y `tiltFactor` por encima de los de `HOLOGRAM`, para que el efecto
+ *     se vea también con la carta quieta.
+ *   · `edgeStrength`, que es la perilla de TINTA Y PIEL solo para esta capa.
+ *
+ * LO QUE *NO* CAMBIA, Y POR QUÉ (fallo medido)
+ * --------------------------------------------
+ * El PATRÓN espacial del arcoíris es EXACTAMENTE el del personaje: los mismos
+ * `HOLOGRAM.surfaceX/surfaceY` y el mismo `viewAngleWeight`. Antes esta capa sumaba
+ * su propio `bgFoil` de 5 ciclos (contra 1,6 del frente) y usaba frecuencias de
+ * superficie distintas (2,1/1,2 contra 1,1/0,8), así que las franjas del fondo tenían
+ * otra escala que las del personaje: las dos capas se leían como dos láminas
+ * holográficas distintas pegadas una sobre otra, y el efecto se veía falso. Un
+ * holograma es una propiedad de la SUPERFICIE que se mira, no de la imagen que hay
+ * debajo, así que la franja tiene que tener el mismo tamaño en las dos capas.
+ *
+ * Lo que distingue al fondo es entonces la INTENSIDAD y el CROMA, no la frecuencia:
+ * por eso se sube `holo`/`layerWeight` y se deja el patrón compartido.
  */
 export const BACKGROUND = {
   /**
@@ -255,11 +269,22 @@ export const BACKGROUND = {
   holo: 0.9,
   /** Peso del color espectral que se SUMA al arte del fondo (su saturación). */
   layerWeight: 0.42,
-  /** Ciclos del patrón espacial: cuántas franjas caben en el lienzo del fondo. */
-  foilCycles: 5.0,
-  /** Franjas DIAGONALES (reparte el tono por la superficie en vez de dejarlo plano). */
-  foilX: 2.1,
-  foilY: 1.2,
+  /**
+   * FUERZA de TINTA Y PIEL solo para el fondo.
+   *
+   * El frente tiene la suya (`EDGE.strength`) y el fondo no tenía ninguna: el realce
+   * de contornos del personaje se aplicaba a la carta entera por la zona de arte, sin
+   * forma de ajustarlo por capa. La máscara es la MISMA para las dos (`inkAndSkinMask`
+   * se calcula sobre la imagen del fondo en el mismo encuadre), lo que cambia es el
+   * peso con el que cada capa la usa.
+   *
+   * Va por encima de `EDGE.strength` (0.1) con el mismo criterio que el resto de esta
+   * capa: el fondo se ve menos, así que sus efectos van más marcados para que las dos
+   * se distingan.
+   *
+   * AJUSTADO EN VIVO a 0.75: con 0.28 el realce casi no se notaba sobre el fondo.
+   */
+  edgeStrength: 0.75,
   /** El barrido que sigue al puntero y el desplazamiento por inclinación. */
   glareStrength: 1.15,
   glareRadius: 0.7,
@@ -509,10 +534,15 @@ export const LOGO = {
    *
    * Va en NEGATIVO y más fuerte que el fondo: el logo es lo que está más cerca del
    * cristal, así que es lo que más se desplaza, y al ir al contrario que el fondo los
-   * dos se separan del personaje. Un recorrido del 8% del ancho se ve sin que la
-   * marca llegue a despegarse de su sitio.
+   * dos se separan del personaje.
+   *
+   * AJUSTE EN VIVO (dos vueltas): con 0.08 la marca se despegaba de su sitio y se leía
+   * como un elemento suelto flotando sobre la carta; con 0.05 seguía siendo demasiado.
+   * En 0.03 el desplazamiento es perceptible pero la marca mantiene su anclaje: sigue
+   * habiendo separación con el fondo (0.06, en sentido contrario, así que entre los dos
+   * planos hay 0.09 del ancho) sin que el logo parezca flotar.
    */
-  parallax: -0.08,
+  parallax: -0.03,
 } as const;
 
 /**

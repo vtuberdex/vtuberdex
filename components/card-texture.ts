@@ -92,16 +92,35 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, 
 
 /** Dibuja la cara frontal y devuelve el canvas listo para usar como textura. */
 /**
- * Banda de la carta en la que se puede pintar el FONDO sin pisar nada.
+/**
+ * Rectángulos que el FONDO no puede pisar, en UV normalizado.
  *
- * La publica `drawCardFront` porque solo ella conoce la geometría real: la frase
- * sube o baja según cuántas líneas tenga y el logo ocupa una franja variable, así
- * que un valor fijo dejaría el fondo comiéndose texto en unas fichas y sobrando en
- * otras. `characterAlphaMask` la usa para recortar la cobertura.
+ * POR QUÉ CAJAS Y NO UNA BANDA DE ALTO COMPLETO
+ * ---------------------------------------------
+ * La primera versión protegía una BANDA horizontal —de debajo de los chips de estado
+ * al techo de la frase— y eso dejaba dos FRANJAS SIN FONDO arriba y abajo, que es
+ * exactamente lo que se veía como "el fondo se corta". El fondo cubría el 100% del
+ * ancho pero solo una parte del alto, y con una arista recta en cada extremo.
+ *
+ * El texto de la carta no ocupa filas enteras: la cabecera va de `pad` a `W-pad`, los
+ * chips de estado solo a la IZQUIERDA, el logo solo a la DERECHA y los de tipos y la
+ * frase abajo. Proteger la fila completa tiraba el fondo de franjas donde el único
+ * texto es una esquina.
+ *
+ * Así que la zona prohibida son las CAJAS del texto, y el fondo se dibuja en todo lo
+ * demás, con un margen (`FONDO_TEXTO_MARGEN`) que mantiene la separación para que no
+ * se lea pegado.
+ *
+ * Los valores salen de las MISMAS constantes con las que se dibuja cada bloque en
+ * `drawCardFront`, no de una estimación: si allí se mueve un bloque, aquí cambia solo.
  */
-let lastSafeZone: { top: number; bottom: number } | null = null;
-export function getLastSafeZone(): { top: number; bottom: number } | null {
-  return lastSafeZone;
+const FONDO_TEXTO_MARGEN = 14;
+
+let lastTextBoxes: Array<{ x0: number; y0: number; x1: number; y1: number }> | null = null;
+
+/** Publica las cajas del texto de la carta que se acaba de dibujar. */
+export function getLastTextBoxes(): Array<{ x0: number; y0: number; x1: number; y1: number }> | null {
+  return lastTextBoxes;
 }
 
 /**
@@ -121,7 +140,7 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   if (!ctx) return canvas;
 
   lastLogoBox = null;
-  lastSafeZone = null;
+  lastTextBoxes = null;
   const { accent, secondary, deep, mid, sheen } = cardPalette(card.themeColor, card.secondaryColor);
   /**
    * Todo el dibujo está escrito en unidades del lienzo CANÓNICO (1008 de ancho).
@@ -300,19 +319,29 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   const typesHeight = chipRowsPreview.length * rowHeight + 12;
 
   // El logo vive en su propia banda, encima de los chips y subido sobre la frase.
+  /**
+   * SE MIDE SU CAJA, PERO NO SE DIBUJA (fallo medido).
+   *
+   * Antes el logo se dibujaba aquí Y el shader lo recomponía como pegatina al final
+   * (`uLogoSticker`), así que había DOS logos: el horneado en la textura —fijo— y el
+   * sticker —con paralaje—. En reposo el sticker tapa al horneado y no se nota, pero en
+   * cuanto la carta se inclina el sticker se corre y deja al descubierto el horneado:
+   * eso era el "logo duplicado, uno quieto y otro moviéndose".
+   *
+   * El horneado no lo consume nadie más: la carta 3D dibuja el sticker y el respaldo 2D
+   * usa un `<img>` del arte, no esta textura. Así que se deja de dibujar y solo se
+   * publica la caja, que es lo que el sticker y su máscara necesitan para colocarse.
+   *
+   * Sigue haciendo falta la caja para reservar el ESPACIO: `phraseTopLimit` la usa más
+   * abajo para que la frase no suba a la banda del logo.
+   */
   if (logo && logoWidth) {
     const lx = W - pad - logoWidth.dw;
     const ly = logosBase - typesHeight - logoWidth.dh - 70;
-    // Se publica dónde quedó el logo para que `logoMask()` dibuje su máscara en el
-    // MISMO sitio: la exclusión del holográfico debe calcar la silueta real del
+    // Se publica dónde IRÍA el logo para que `logoMask()` y `logoSticker()` lo dibujen
+    // en el MISMO sitio: la exclusión del holográfico debe calcar la silueta real del
     // logotipo, no un rectángulo aproximado que dejaba un parche sin efecto.
     lastLogoBox = { x: lx, y: ly, w: logoWidth.dw, h: logoWidth.dh };
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.72)';
-    ctx.shadowBlur = 18;
-    ctx.shadowOffsetY = 3;
-    ctx.drawImage(logo, lx, ly, logoWidth.dw, logoWidth.dh);
-    ctx.restore();
   }
 
   // --------------------------------------------------------- chips de estado ---
@@ -339,6 +368,13 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
     ctx.fillText(chip, stateX + 15, stateY + 22);
     stateX += chipW + 10;
   }
+  /**
+   * Borde derecho REAL de la fila de chips de estado. Se toma aquí, cuando ya se han
+   * medido, porque el ancho depende del texto (nivel y poder varían por ficha). La
+   * máscara del fondo lo necesita para proteger solo lo que llega a ocupar, en vez de
+   * una fila entera de ancho completo.
+   */
+  const stateChipsEnd = stateChips.length > 0 ? stateX - 10 : pad;
 
   // ----------------------------------------------------------------- tipos ---
   // Repartidos en filas; su altura se descuenta del espacio de la frase.
@@ -360,6 +396,15 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   ctx.fillStyle = rgba('#e8ecf5', 0.94);
   const lineHeight = 42;
   const maxPhraseLines = Math.max(1, Math.floor((phraseBottomLimit - phraseTopLimit) / lineHeight));
+  /**
+   * Caja REAL de la frase, para la máscara del fondo. Se siguen los extremos que la
+   * frase acaba ocupando de verdad —el renglón más ancho y la primera línea— en vez de
+   * `phraseTopLimit`, que es un LÍMITE DE ESPACIO y no la posición del texto: con la
+   * frase vacía ese límite queda a media carta y bloqueaba el fondo por debajo de la
+   * mitad, que es el corte que se veía.
+   */
+  let phraseBoxTop = phraseBottomLimit - 26;
+  let phraseBoxRight = pad;
   if (phrase) {
     // Se parte en líneas y se coloca desde abajo hacia arriba para no chocar con
     // los tipos; si sobra texto, se recorta con "…".
@@ -381,18 +426,32 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
     if (lines.length > visible.length) visible[visible.length - 1] = `${visible[visible.length - 1]}…`;
     const total = visible.length;
     y = phraseBottomLimit - (total - 1) * lineHeight;
+    phraseBoxTop = y - 26;
     for (const line of visible) {
+      phraseBoxRight = Math.max(phraseBoxRight, pad + ctx.measureText(line).width);
       ctx.fillText(line, pad, y);
       y += lineHeight;
     }
   } else {
     ctx.fillStyle = rgba('#e8ecf5', 0.5);
     ctx.fillText('Sin presentación registrada', pad, phraseBottomLimit);
+    phraseBoxRight = Math.max(
+      phraseBoxRight,
+      pad + ctx.measureText('Sin presentación registrada').width,
+    );
   }
 
   // Chips de tipos, anclados sobre la barra.
+  /**
+   * Extremos que ocupan los chips de tipos. Igual que los de estado, se miden: hay
+   * fichas sin tipos (el fondo puede llegar hasta la barra) y otras con cuatro, y solo
+   * la fila más ancha debe quedar protegida.
+   */
+  let typesTop = barY - 22;
+  let typesRight = pad;
   if (chipRows.length > 0) {
     let ty = barY - 22 - chipRows.length * rowHeight;
+    typesTop = ty;
     for (const row of chipRows) {
       let tx = pad;
       ctx.font = chipFont;
@@ -410,6 +469,7 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
         ctx.textBaseline = 'alphabetic';
         tx += tw + 12;
       }
+      typesRight = Math.max(typesRight, tx - 12);
       ty += rowHeight;
     }
   }
@@ -448,22 +508,61 @@ export function drawCardFront({ card, art, logo, width = CARD_TEXTURE_WIDTH }: C
   ctx.fillText(primary ? `${primary.name}` : 'Sin país', W - pad, H - 54);
 
   /**
-   * Zona SEGURA para el fondo: de debajo de los chips de estado a encima de la
-   * primera cosa que se dibuja en el pie.
+   * CAJAS DE TEXTO que el fondo no puede pisar.
    *
-   * Se publica aquí, al final, porque ahora ya se conocen los dos números que la
-   * determinan y al principio no: `phraseTopLimit` depende de si hay logo (y de su
-   * alto, que varía con la proporción de cada marca) y de cuántas filas de chips de
-   * tipo hay. Con un valor fijo, en una ficha con logo grande el fondo borraría parte
-   * de la frase; en una sin logo, sobraría espacio sin usar.
+   * Antes aquí se publicaba una BANDA de alto completo (`top`/`bottom`) y de ahí salían
+   * las franjas negras arriba y abajo que se reportaron: el fondo cubría el 100% del
+   * ancho pero se recortaba a una franja horizontal. El texto de la carta NO ocupa
+   * filas enteras —los chips de estado van solo a la izquierda, el logo solo a la
+   * derecha, la frase solo a la izquierda— así que prohibir la fila completa borraba
+   * fondo de zonas donde no hay nada.
    *
-   * El margen extra baja de la frase a su límite: el fondo puede llegar justo hasta
-   * debajo del último renglón sin tocarlo.
+   * Se publican las cajas REALES, con los extremos medidos durante el dibujo:
+   *
+   *   - cabecera: la placa completa (número + nombre + país)
+   *   - chips de estado: de `pad` al borde medido del último chip, a la izquierda
+   *   - logo: su caja, a la derecha
+   *   - tipos y frase: el bloque de abajo, con su ancho medido
+   *
+   * Nada de esto es una estimación: cada valor sale de la misma medición con la que se
+   * dibujó el bloque, así que si allí cambia, aquí cambia solo.
    */
-  lastSafeZone = {
-    top: (headerTop + headerH + 34 + 42 + 16) / H,
-    bottom: (phraseTopLimit - 8) / H,
-  };
+  const boxes: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
+  // Cabecera: placa completa.
+  boxes.push({ x0: pad, y0: headerTop, x1: W - pad, y1: headerTop + headerH });
+  // Chips de estado (izquierda).
+  if (stateChips.length > 0) {
+    boxes.push({ x0: pad, y0: stateY, x1: stateChipsEnd, y1: stateY + 42 });
+  }
+  // Logo (derecha).
+  if (logoWidth) {
+    boxes.push({
+      x0: W - pad - logoWidth.dw,
+      y0: logosBase - typesHeight - logoWidth.dh - 70,
+      x1: W - pad,
+      y1: logosBase - typesHeight - 70,
+    });
+  }
+  // Tipos (izquierda, sobre la barra).
+  if (chipRows.length > 0) {
+    boxes.push({ x0: pad, y0: typesTop, x1: typesRight, y1: barY - 22 });
+  }
+  // Frase (izquierda, bajo los tipos).
+  boxes.push({
+    x0: pad,
+    y0: phrase && phraseBoxRight > pad ? phraseBoxTop : phraseBottomLimit - 26,
+    x1: Math.max(phraseBoxRight, pad + 320),
+    y1: phraseBottomLimit + 10,
+  });
+  // Pie: redes y créditos, a los dos lados.
+  boxes.push({ x0: pad, y0: H - 108, x1: W / 2, y1: H - 40 });
+  boxes.push({ x0: W / 2, y0: H - 108, x1: W - pad, y1: H - 40 });
+  lastTextBoxes = boxes.map((b) => ({
+    x0: (b.x0 - FONDO_TEXTO_MARGEN) / W,
+    y0: (b.y0 - FONDO_TEXTO_MARGEN) / H,
+    x1: (b.x1 + FONDO_TEXTO_MARGEN) / W,
+    y1: (b.y1 + FONDO_TEXTO_MARGEN) / H,
+  }));
 
   return canvas;
 }
@@ -496,22 +595,31 @@ export function canvasToTextureSource(canvas: HTMLCanvasElement): HTMLCanvasElem
  *      gradual en vez de con un corte duro. En las fichas cuyo arte es un rectángulo
  *      opaco (medido: 684 de 785 cubren ≥98% del alto) la cobertura sale casi toda 0
  *      y el fondo apenas se ve — comportamiento aceptado a propósito.
- *   2. **Está dentro de la zona segura del texto.** Fuera de esa banda vale 0, así
- *      que el fondo no puede borrar la cabecera, los chips, la frase ni el pie. Sin
- *      esto, el alfa transparente de los márgenes laterales se llevaría por delante
- *      el texto que `card-texture.ts` dibuja encima del arte.
+ *   2. **No cae sobre una CAJA DE TEXTO.** A diferencia de la versión anterior, que
+ *      solo permitía el fondo dentro de una BANDA horizontal, la cobertura ahora vale
+ *      en TODO el lienzo salvo donde hay texto. Esa banda dejaba dos franjas sin fondo
+ *      —arriba y abajo— porque el texto no ocupa filas enteras: los chips de estado van
+ *      a la izquierda, el logo a la derecha y la frase a la izquierda. Con las cajas, el
+ *      fondo cubre el ancho y el alto completos y solo se aparta de lo que de verdad hay
+ *      que leer.
+ *
+ * ALCANCE DEL FONDO
+ * -----------------
+ * El fondo NO llega a los bordes de la carta: se queda en el interior del canto, que
+ * es lo que evita que asome por los filos al inclinar. El recorte lo hace el propio
+ * cuerpo 3D con sus esquinas redondeadas, así que aquí no hace falta.
  *
  * @param art     imagen del personaje ya cargada (null si la ficha no tiene)
  * @param width   ancho del lienzo de la carta
  * @param height  alto del lienzo
- * @param zone    banda segura `{top, bottom}` en UV (de `getLastSafeZone`)
+ * @param boxes   cajas de texto a proteger, en UV (de `getLastTextBoxes`)
  * @returns canvas en escala de grises; el shader lo lee por su canal rojo
  */
 export function characterAlphaMask(
   art: CanvasImageSource | null,
   width: number,
   height: number,
-  zone: { top: number; bottom: number } | null,
+  boxes: Array<{ x0: number; y0: number; x1: number; y1: number }> | null,
 ): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -553,16 +661,29 @@ export function characterAlphaMask(
   }
 
   const artData = artCanvas?.getContext('2d')?.getImageData(0, 0, width, height).data ?? null;
-  const topPx = zone ? zone.top * height : 0;
-  const bottomPx = zone ? zone.bottom * height : height;
-
+  /** Cajas en píxeles, para poder comparar contra `x`/`y` del bucle. */
+  const forbiden = (boxes ?? []).map((b) => ({
+    x0: b.x0 * width,
+    y0: b.y0 * height,
+    x1: b.x1 * width,
+    y1: b.y1 * height,
+  }));
+  /** Fila a fila se descartan las cajas que no la cruzan: evita 5 comparaciones por píxel. */
   for (let y = 0; y < height; y += 1) {
-    /** Fuera de la banda segura no se pinta fondo: protege el texto de la carta. */
-    if (y < topPx || y > bottomPx) continue;
+    const spansAtY = forbiden.filter((b) => y >= b.y0 && y <= b.y1);
     for (let x = 0; x < width; x += 1) {
+      /** Sobre el texto no se pinta fondo: es lo único que el fondo debe respetar. */
+      let onText = false;
+      for (const b of spansAtY) {
+        if (x >= b.x0 && x <= b.x1) {
+          onText = true;
+          break;
+        }
+      }
+      if (onText) continue;
       let coverage: number;
       if (!artData) {
-        // Sin personaje no hay nada que tapar: el fondo llena la zona segura.
+        // Sin personaje no hay nada que tapar: el fondo llena todo lo que no sea texto.
         coverage = 1;
       } else {
         const alpha = artData[(y * width + x) * 4 + 3] / 255;

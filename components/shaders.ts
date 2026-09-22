@@ -221,6 +221,15 @@ export const cardFragmentShader = /* glsl */ `
    * lo hace moverse al CONTRARIO que la carta, que es lo que se lee como lejanía.
    */
   uniform float uBgParallax;
+  /**
+   * TINTA Y PIEL del fondo: su máscara y su fuerza.
+   *
+   * Misma máscara de realce de contornos que el frente, pero calculada sobre la IMAGEN
+   * DEL FONDO (ver holo-card.tsx) y con peso propio, para que el lineart del fondo se
+   * encienda igual que el del personaje y las dos capas no parezcan de técnica distinta.
+   */
+  uniform sampler2D uBgEdgeMap;
+  uniform float uBgEdgeStrength;
   /** Suelo de luminancia del arte del fondo: se ajusta en vivo. */
   uniform float uBgArtFloor;
 
@@ -696,20 +705,27 @@ ${FACTION_SIZES}
       float bgCover = texture2D(uBackgroundMask, vUv).r;
 
       /**
-       * Interferencia del fondo: mismo modelo de película delgada que el frente (de
-       * ahí que se reutilicen wavelengthToRgb y los pesos de HOLOGRAM), pero con el
-       * patrón ESPACIAL muy marcado (BACKGROUND.foilX/foilY/foilCycles) para que se
-       * vean franjas repartidas por la superficie. En el frente el patrón se descartó
-       * por lavar al personaje; aquí es justo lo que hacía falta, porque el fondo es
-       * una superficie detrás y las franjas son lo que le da cuerpo.
+       * Interferencia del fondo: MISMO modelo de película delgada que el frente, mismos
+       * pesos de HOLOGRAM y —esto es lo que se corrigió— MISMAS frecuencias espaciales
+       * (HOLOGRAM.surfaceX/surfaceY), no las suyas propias.
+       *
+       * POR QUÉ (fallo medido): antes esta capa sumaba un patrón propio de 5 ciclos
+       * (BACKGROUND.foilCycles, contra 1.6 del frente) y frecuencias de superficie
+       * distintas (2.1/1.2 contra 1.1/0.8), así que las franjas del fondo tenían otra
+       * ESCALA que las del personaje. El resultado eran dos tramas holográficas
+       * desalineadas sobre la misma carta: el efecto se leía falso, como una calcomanía
+       * pegada encima. Un holograma es una propiedad de la SUPERFICIE que se mira, no de
+       * la imagen que hay debajo: la franja tiene que medir lo mismo en las dos capas.
+       *
+       * Lo que sí distingue al fondo es la INTENSIDAD y el CROMA (uBgHolo,
+       * uBgLayerWeight), no la frecuencia. La ANIMACIÓN temporal se conserva con su
+       * propio ritmo (BACKGROUND.timeShift), que es un desfase deliberado: el fondo no
+       * cambia de color al unísono con el personaje, igual que en una lámina real la
+       * capa de detrás no late con la de delante.
        */
-      float bgFoil = fract(
-        bgUv.x * ${f(CFG.BACKGROUND.foilX)} + bgUv.y * ${f(CFG.BACKGROUND.foilY)}
-          + uTime * ${f(CFG.BACKGROUND.timeShift)}
-      ) * ${f(CFG.BACKGROUND.foilCycles)};
       float bgPhase = fract(
         bgUv.x * ${f(CFG.HOLOGRAM.surfaceX)} + bgUv.y * ${f(CFG.HOLOGRAM.surfaceY)}
-          + bgFoil + uTilt.y * ${f(CFG.BACKGROUND.tiltShift)}
+          + uTilt.y * ${f(CFG.BACKGROUND.tiltShift)} + uTime * ${f(CFG.BACKGROUND.timeShift)}
       );
       vec3 bgFilm = wavelengthToRgb(fract(cosView * ${f(CFG.HOLOGRAM.viewAngleWeight)} + bgPhase));
       /**
@@ -731,6 +747,43 @@ ${FACTION_SIZES}
       ) * uBgHolo;
 
       /**
+       * TINTA Y PIEL del fondo: su propia capa de realce de contornos.
+       *
+       * POR QUÉ SE AÑADIÓ (lo pidió el usuario): el frente tenía esta perilla
+       * (EDGE.strength) y el fondo no, así que el lineart del fondo no se encendía
+       * como el del personaje y las dos capas se veían de técnica distinta. Es el mismo
+       * efecto que la CAPA 4 del frente, con dos diferencias deliberadas:
+       *
+       *   · La máscara se calcula sobre la IMAGEN DEL FONDO (uBgEdgeMap), en el mismo
+       *     encuadre que su arte, no sobre el personaje: resalta el dibujo que hay
+       *     debajo del fondo, que es lo que se está mirando.
+       *   · El peso es propio (uBgEdgeStrength) para poder ajustarlo por capa.
+       *
+       * Se muestrea DESPLAZADO por el paralaje, igual que el arte del fondo: si se
+       * leyera fijo, el lineart se quedaría clavado en su sitio mientras la imagen se
+       * mueve, y se vería un contorno fantasma despegado de la figura.
+       */
+      vec3 bgEdgeLayer = vec3(0.0);
+      if (uBgEdgeStrength > 0.001) {
+        vec4 bgEdgeTex = texture2D(uBgEdgeMap, bgUv);
+        float bgEdgeLum = dot(bgEdgeTex.rgb, vec3(0.2126, 0.7152, 0.0722));
+        /** El mismo ángulo rasante del frente: ahí el corrimiento espectral es mayor. */
+        float bgCosEdge = clamp(cosView - ${f(CFG.EDGE.angleOffset)}, 0.0, 1.0);
+        float bgEdgeFilm = thinFilmWavelength(
+          bgCosEdge,
+          ${f(CFG.EDGE.filmThickness)},
+          uTime * ${f(CFG.EDGE.timeShift)} + bgUv.x * ${f(CFG.EDGE.surfaceShift)}
+        );
+        vec3 bgEdgeTint = wavelengthToRgb(bgEdgeFilm);
+        float bgEdgeMask = bgEdgeTex.a * clamp(
+          ${f(CFG.EDGE.maskBase)} + tiltAmount * ${f(CFG.EDGE.maskTilt)} + bgGlare * ${f(CFG.EDGE.maskGlare)},
+          0.0,
+          ${f(CFG.EDGE.maskCeiling)}
+        );
+        bgEdgeLayer = bgEdgeTint * bgEdgeLum * bgEdgeMask * uBgEdgeStrength;
+      }
+
+      /**
        * Composición sobre el arte del fondo. Se respeta su LUMINANCIA (un fondo oscuro
        * no puede encenderse como uno claro, o dejaría de parecer la imagen que se
        * subió: el arte se escala por su propia claridad) y el color espectral se SUMA,
@@ -739,7 +792,16 @@ ${FACTION_SIZES}
       float bgLum = dot(bgArt, vec3(0.2126, 0.7152, 0.0722));
       vec3 bgArtLevel = bgArt * (uBgArtFloor + bgLum * ${f(CFG.BACKGROUND.artLumGain)});
       vec3 bgLayer = bgFoilColor * bgMask * uBgLayerWeight;
-      lit = mix(lit, bgArtLevel + bgArtLevel * bgLayer + bgLayer * uBgLayerWeight, bgCover);
+      /**
+       * El realce de tinta y piel se SUMA aparte, en modo luz, igual que en el frente:
+       * multiplicarlo por el arte lo apagaría justo en las zonas oscuras, que son las
+       * que tiene que encender (el lineart).
+       */
+      lit = mix(
+        lit,
+        bgArtLevel + bgArtLevel * bgLayer + bgLayer * uBgLayerWeight + bgEdgeLayer,
+        bgCover
+      );
     }
 
     // Colores de marca del VTuber como tinte del borde.

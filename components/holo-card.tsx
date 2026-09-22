@@ -29,7 +29,7 @@ import {
   CARD_TEXTURE_TILE_WIDTH,
   drawCardFront,
   characterAlphaMask,
-  getLastSafeZone,
+  getLastTextBoxes,
   getLastLogoBox,
   inkAndSkinMask,
   logoMask,
@@ -145,6 +145,8 @@ function CardMesh({
     logoSticker: THREE.CanvasTexture;
     /** Cobertura del fondo: 1 donde el personaje es transparente y cabe el fondo. */
     backgroundMask: THREE.CanvasTexture;
+    /** Tinta y piel DE LA IMAGEN DEL FONDO (realce de contornos de esa capa). */
+    backgroundEdge: THREE.CanvasTexture;
   } | null>(null);
   /**
    * ARTE del fondo, aparte de `textures` porque es OPCIONAL: solo hay textura si la
@@ -294,15 +296,15 @@ function CardMesh({
         logoBox && logo ? logoSticker(logo, logoBox, canvas.width, canvas.height) : logoStickerCanvas,
       );
       /**
-       * COBERTURA DEL FONDO: dónde puede verse el fondo (fuera del personaje y dentro
-       * de la banda segura de texto). Se calcula desde el ARTE original, no desde la
+       * COBERTURA DEL FONDO: dónde puede verse el fondo (fuera del personaje y sin
+       * pisar el texto de la carta). Se calcula desde el ARTE original, no desde la
        * carta compuesta, porque en la carta la transparencia del personaje ya se ha
-       * perdido bajo el degradado de tema. La zona segura la acaba de publicar
-       * `drawCardFront` para ESTA ficha concreta (depende de su frase y su logo), así
-       * que se lee aquí y no de una constante.
+       * perdido bajo el degradado de tema. Las cajas de texto las acaba de publicar
+       * `drawCardFront` para ESTA ficha concreta (dependen de su frase, su logo y sus
+       * tipos), así que se leen aquí y no de una constante.
        */
       const backgroundMaskTexture = new THREE.CanvasTexture(
-        characterAlphaMask(art, canvas.width, canvas.height, getLastSafeZone()),
+        characterAlphaMask(art, canvas.width, canvas.height, getLastTextBoxes()),
       );
       /**
        * TEXTURA DEL FONDO: el arte subido, o un canvas VACÍO cuando la ficha no tiene.
@@ -317,25 +319,63 @@ function CardMesh({
       if (background) {
         const bgCtx = backgroundCanvas.getContext('2d');
         /**
-         * El fondo se dibuja con MARGEN (centrado y un poco más grande que el
-         * lienzo). El paralaje desplaza su muestreo, así que sin ese sobrante los
-         * bordes se leerían fuera de la textura y, como está clampeada, el píxel del
-         * borde se estira: el fondo se ve deformado al inclinar. El factor vive en
-         * `BACKGROUND.overscanFactor`.
+         * El fondo se dibuja con MARGEN (centrado y un poco más grande que el lienzo).
+         * El paralaje desplaza su muestreo, así que sin ese sobrante la lectura se sale
+         * de [0,1] y, como la textura está clampeada, el píxel del borde se estira: el
+         * fondo sale con bandas deformadas al inclinar.
+         *
+         * FALLO MEDIDO QUE ESTO CORRIGE: el margen se calculaba con el ANCHO y se
+         * aplicaba tal cual al ALTO, así que las dos escalas no coincidían — 1008 pasaba
+         * a 1149 (×1,140) mientras 1411 pasaba a 1552 (×1,100). Con factores distintos la
+         * imagen se deformaba un 3,65% (más ancha en proporción a su alto), y eso es lo
+         * que se veía como que el fondo "no concuerda con el tamaño de la carta".
+         *
+         * Ahora se calcula un COVER: la misma escala en los dos ejes, elegida para que la
+         * imagen cubra el lienzo Y sobre el sobrante que el paralaje necesita. Al salir de
+         * las dimensiones reales de la imagen (no de las del lienzo) también queda bien
+         * con un fondo que no traiga ya la proporción de carta: con un fondo 16:9 el
+         * código anterior lo deformaba un 60%, y con el cover entra recortado pero con su
+         * proporción intacta.
          */
-        const over = canvas.width * (CFG.BACKGROUND.overscanFactor - 1);
-        bgCtx?.drawImage(
-          background,
-          -over / 2,
-          -over / 2,
-          canvas.width + over,
-          canvas.height + over,
-        );
+        const escala = CFG.BACKGROUND.overscanFactor;
+        const objetivoW = canvas.width * escala;
+        const objetivoH = canvas.height * escala;
+        const bgW = (background as { width?: number }).width ?? 0;
+        const bgH = (background as { height?: number }).height ?? 0;
+        if (bgW > 0 && bgH > 0) {
+          /** `cover`: cubre el objetivo y recorta el sobrante, sin deformar. */
+          const fit = Math.max(objetivoW / bgW, objetivoH / bgH);
+          const dwBg = bgW * fit;
+          const dhBg = bgH * fit;
+          bgCtx?.drawImage(background, (canvas.width - dwBg) / 2, (canvas.height - dhBg) / 2, dwBg, dhBg);
+        }
       }
       const backgroundTexture = new THREE.CanvasTexture(backgroundCanvas);
       backgroundTexture.colorSpace = THREE.SRGBColorSpace;
       backgroundTexture.anisotropy = 4;
       backgroundTexture.needsUpdate = true;
+      /**
+       * TINTA Y PIEL DEL FONDO: la misma máscara que el frente, pero calculada sobre la
+       * IMAGEN DEL FONDO y en el MISMO encuadre con el que se acaba de dibujar (cover
+       * centrado). Sin fondo el canvas queda transparente y la máscara vale 0: el shader
+       * no la lee porque todo el bloque del fondo está tras `uHasBackground`.
+       *
+       * Se calcula sobre `backgroundCanvas` (el arte YA colocado), no sobre la imagen
+       * original: `inkAndSkinMask` ajusta lo que recibe al lienzo completo, así que
+       * pasarle el canvas ya compuesto evita repetir aquí la matemática del cover y
+       * garantiza que el realce caiga exactamente sobre la figura.
+       */
+      const backgroundEdgeCanvas = document.createElement('canvas');
+      backgroundEdgeCanvas.width = canvas.width;
+      backgroundEdgeCanvas.height = canvas.height;
+      if (background) {
+        const mascara = inkAndSkinMask(backgroundCanvas, canvas.width, canvas.height);
+        backgroundEdgeCanvas.getContext('2d')?.drawImage(mascara, 0, 0);
+      }
+      const backgroundEdgeTexture = new THREE.CanvasTexture(backgroundEdgeCanvas);
+      backgroundEdgeTexture.colorSpace = THREE.SRGBColorSpace;
+      backgroundEdgeTexture.anisotropy = 4;
+      backgroundEdgeTexture.needsUpdate = true;
       edgeTexture.colorSpace = THREE.SRGBColorSpace;
       edgeTexture.anisotropy = 4;
       edgeTexture.needsUpdate = true;
@@ -346,6 +386,7 @@ function CardMesh({
         logoMask: logoMaskTexture,
         logoSticker: logoStickerTexture,
         backgroundMask: backgroundMaskTexture,
+        backgroundEdge: backgroundEdgeTexture,
       });
       setBackgroundTexture(backgroundTexture);
     });
@@ -463,6 +504,9 @@ function CardMesh({
         uBgTiltFactor: { value: CFG.BACKGROUND.tiltFactor as number },
         uBgParallax: { value: CFG.BACKGROUND.parallax as number },
         uBgArtFloor: { value: CFG.BACKGROUND.artFloor as number },
+        /** Tinta y piel del fondo: su máscara (se sincroniza con las texturas) y su peso. */
+        uBgEdgeMap: { value: null as THREE.Texture | null },
+        uBgEdgeStrength: { value: CFG.BACKGROUND.edgeStrength as number },
       },
       glow: {
         /**
@@ -488,6 +532,7 @@ function CardMesh({
     uniforms.front.uLogoMask.value = textures.logoMask;
     uniforms.front.uLogoSticker.value = textures.logoSticker;
     uniforms.front.uBackgroundMask.value = textures.backgroundMask;
+    uniforms.front.uBgEdgeMap.value = textures.backgroundEdge;
   }, [textures, uniforms]);
 
   /**
@@ -550,6 +595,7 @@ function CardMesh({
     uniforms.front.uBgGlareStrength.value = live.bgGlareStrength;
     uniforms.front.uBgParallax.value = live.bgParallax;
     uniforms.front.uBgArtFloor.value = live.bgArtFloor;
+    uniforms.front.uBgEdgeStrength.value = live.bgEdgeStrength;
     uniforms.front.uLogoParallax.value = live.logoParallax;
     uniforms.front.uGlossSelf.value = live.glossSelf;
     uniforms.front.uHoloSelf.value = live.holoSelf;
