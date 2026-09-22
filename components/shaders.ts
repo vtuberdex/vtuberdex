@@ -111,11 +111,19 @@ export const cardVertexShader = /* glsl */ `
 export const cardFragmentShader = /* glsl */ `
   precision highp float;
 
-  uniform sampler2D uMap;
   /**
    * 7 capas con paralaje independiente. Ver [card3d-config.ts] PARALLAX_LAYERS.
-   * Cuando uUseLayers es 1, uMap pasa a ser solo fallback/debug y la composición
-   * se arma en el shader desde estas capas.
+   *
+   * POR QUÉ SE ELIMINÓ EL FALLBACK uMap (fallo medido)
+   * --------------------------------------------------
+   * El shader llegó a declarar 18 samplers con uMap y el juego completo del fondo
+   * antiguo, y el driver corta en 16: el material no compilaba
+   * ("Implementation limit of 16 active fragment shader samplers exceeded") y la
+   * carta salía NEGRA, sin un solo error en tsc ni en los tests, que corren sin
+   * WebGL. Con las 7 capas declaradas, uMap era además un fallback muerto: la
+   * composición se arma siempre desde las capas, así que su rama nunca se ejecutaba.
+   * Los samplers del fondo (uBackgroundMap/uBackgroundMask/uBgEdgeMap) también
+   * sobraban: la capa 0 YA ES el fondo, con su paralaje propio.
    */
   uniform sampler2D uLayer0;
   uniform sampler2D uLayer1;
@@ -124,9 +132,7 @@ export const cardFragmentShader = /* glsl */ `
   uniform sampler2D uLayer4;
   uniform sampler2D uLayer5;
   uniform sampler2D uLayer6;
-  uniform float uUseLayers;
-  uniform int uLayerCount;
-  uniform float uParallaxFactors[ 7 ];
+  uniform float uParallaxFactors[7];
   /**
    * Máscara de TINTA Y PIEL: el lineart negro y los tonos de piel del personaje.
    * Se mezcla en modo LUZ como capa holográfica: enciende el dibujo y la piel sin
@@ -200,28 +206,6 @@ export const cardFragmentShader = /* glsl */ `
   uniform float uLogoParallax;
   uniform float uCardRadius;
   /**
-   * FONDO de la carta: la imagen del VTuber por DEBAJO del personaje.
-   *
-   * POR QUÉ LA MÁSCARA Y NO UNA COMPROBACIÓN DE ALFA
-   * ------------------------------------------------
-   * La tentación es leer el alfa de uMap y pintar el fondo donde el personaje sea
-   * transparente. No sirve: uMap es la CARTA ya compuesta —el degradado del color
-   * de tema se pinta OPACO sobre todo el lienzo antes del arte—, así que su alfa es 1
-   * en cualquier píxel y la transparencia del personaje se perdió al componerla.
-   *
-   * La cobertura del personaje se calcula entonces en CPU desde la imagen original
-   * (characterAlphaMask en card-texture.ts) y viaja como su PROPIA textura, el
-   * mismo recurso que ya usan uLogoMask y uEdgeMap. Ese cálculo aprovecha para
-   * acotar la ventana: fuera de la banda de arte y dentro de las zonas de TEXTO la
-   * máscara vale 0, así el fondo no puede borrar la cabecera, los chips, la frase ni
-   * el logotipo.
-   */
-  uniform sampler2D uBackgroundMap;
-  /** Cobertura donde el fondo debe verse (1 sí, 0 no), calculada en CPU. */
-  uniform sampler2D uBackgroundMask;
-  /** 0 = la ficha no tiene fondo subido. Sin él la capa no toca un solo píxel. */
-  uniform float uHasBackground;
-  /**
    * El holograma del fondo es su PROPIO juego de perillas. Sus valores son más
    * altos que los del personaje a propósito: el fondo es una superficie lejana y
    * en penumbra, y con el peso del personaje apenas se notaría.
@@ -231,21 +215,6 @@ export const cardFragmentShader = /* glsl */ `
   uniform float uBgGlareStrength;
   uniform float uBgBaseMask;
   uniform float uBgTiltFactor;
-  /**
-   * Paralaje del fondo respecto del frente, en UV por unidad de inclinación. El signo
-   * lo hace moverse al CONTRARIO que la carta, que es lo que se lee como lejanía.
-   */
-  uniform float uBgParallax;
-  /**
-   * TINTA Y PIEL del fondo: su máscara y su fuerza.
-   *
-   * Misma máscara de realce de contornos que el frente, pero calculada sobre la IMAGEN
-   * DEL FONDO (ver holo-card.tsx) y con peso propio, para que el lineart del fondo se
-   * encienda igual que el del personaje y las dos capas no parezcan de técnica distinta.
-   */
-  uniform sampler2D uBgEdgeMap;
-
-  uniform float uBgEdgeStrength;
   /** Suelo de luminancia del arte del fondo: se ajusta en vivo. */
   uniform float uBgArtFloor;
 
@@ -423,35 +392,33 @@ ${SPECTRUM_FN}
   }
 
   void main() {
-    vec4 tex = texture2D(uMap, vUv);
-    vec3 base;
-    float finalAlpha;
+    /**
+     * COMPOSICIÓN DESDE LAS 7 CAPAS.
+     *
+     * Ya no hay rama alternativa: la carta se arma SIEMPRE desde las capas, así que
+     * el antiguo else con uMap desapareció. Cada capa se muestrea desplazada por su
+     * factor de paralaje (uParallaxFactors), que es lo que da la profundidad.
+     */
+    vec2 parallax = uPointer;
+    vec4 layer0 = texture2D(uLayer0, vUv + parallax * uParallaxFactors[0]);
+    vec4 layer1 = texture2D(uLayer1, vUv + parallax * uParallaxFactors[1]);
+    vec4 layer2 = texture2D(uLayer2, vUv + parallax * uParallaxFactors[2]);
+    vec4 layer3 = texture2D(uLayer3, vUv + parallax * uParallaxFactors[3]);
+    vec4 layer4 = texture2D(uLayer4, vUv + parallax * uParallaxFactors[4]);
+    vec4 layer5 = texture2D(uLayer5, vUv + parallax * uParallaxFactors[5]);
+    vec4 layer6 = texture2D(uLayer6, vUv + parallax * uParallaxFactors[6]);
 
-    if (uUseLayers > 0.5) {
-      vec2 parallax = uPointer;
-      vec4 layer0 = texture2D(uLayer0, vUv + parallax * uParallaxFactors[0]);
-      vec4 layer1 = texture2D(uLayer1, vUv + parallax * uParallaxFactors[1]);
-      vec4 layer2 = texture2D(uLayer2, vUv + parallax * uParallaxFactors[2]);
-      vec4 layer3 = texture2D(uLayer3, vUv + parallax * uParallaxFactors[3]);
-      vec4 layer4 = texture2D(uLayer4, vUv + parallax * uParallaxFactors[4]);
-      vec4 layer5 = texture2D(uLayer5, vUv + parallax * uParallaxFactors[5]);
-      vec4 layer6 = texture2D(uLayer6, vUv + parallax * uParallaxFactors[6]);
-
-      // Degradado de marca cuando el fondo no cubre un píxel.
-      vec3 themeGradient = mix(uSecondary, mix(uAccent, vec3(0.031, 0.035, 0.063), vUv.y), 0.55);
-      base = themeGradient;
-      base = mix(base, layer0.rgb, layer0.a);
-      base = mix(base, layer1.rgb, layer1.a);
-      base = mix(base, layer2.rgb, layer2.a);
-      base = mix(base, layer3.rgb, layer3.a);
-      base = mix(base, layer4.rgb, layer4.a);
-      base = mix(base, layer5.rgb, layer5.a);
-      base = mix(base, layer6.rgb, layer6.a);
-      finalAlpha = max(max(max(max(max(max(layer0.a, layer1.a), layer2.a), layer3.a), layer4.a), layer5.a), layer6.a);
-    } else {
-      base = tex.rgb;
-      finalAlpha = tex.a;
-    }
+    // Degradado de marca cuando el fondo no cubre un píxel.
+    vec3 themeGradient = mix(uSecondary, mix(uAccent, vec3(0.031, 0.035, 0.063), vUv.y), 0.55);
+    vec3 base = themeGradient;
+    base = mix(base, layer0.rgb, layer0.a);
+    base = mix(base, layer1.rgb, layer1.a);
+    base = mix(base, layer2.rgb, layer2.a);
+    base = mix(base, layer3.rgb, layer3.a);
+    base = mix(base, layer4.rgb, layer4.a);
+    base = mix(base, layer5.rgb, layer5.a);
+    base = mix(base, layer6.rgb, layer6.a);
+    float finalAlpha = max(max(max(max(max(max(layer0.a, layer1.a), layer2.a), layer3.a), layer4.a), layer5.a), layer6.a);
 
     // Alcance del efecto: solo la imagen, nunca los items de la carta.
     float zone = artZoneMask(vUv);
@@ -715,7 +682,7 @@ ${FACTION_SIZES}
      *
      * POR QUÉ SE COMPONE AQUÍ Y NO AL PRINCIPIO
      * -----------------------------------------
-     * El sitio natural parecería el arranque del shader (vec3 base = tex.rgb), pero
+     * El sitio natural parecería el arranque del shader, donde se arma base, pero
      * ahí el fondo todavía recibiría encima el barniz, la interferencia, los emblemas
      * y la tinta del frente: TODAS las capas del personaje se aplican sobre base, de
      * modo que el fondo saldría teñido con el efecto del frente y sus perillas
@@ -723,31 +690,48 @@ ${FACTION_SIZES}
      * después, cada capa conserva su carácter: el frente con su holograma suave y el
      * fondo con el suyo, más marcado.
      *
-     * Esto es correcto además por definición: la máscara vale 1 SOLO donde el
-     * personaje es transparente, así que no hay píxel del personaje al que se le
-     * quite nada. Y sin fondo subido (uHasBackground = 0) el bloque entero se
-     * salta: la ficha queda exactamente como estaba.
+     * POR QUÉ NO HAY SAMPLERS PROPIOS (fallo medido)
+     * ----------------------------------------------
+     * Esta capa llegó a leer uBackgroundMap, uBackgroundMask y uBgEdgeMap: TRES
+     * samplers más que, sumados a los siete de las capas, llevaban el shader a 18
+     * samplers contra un límite de 16 del driver. El material NO compilaba
+     * ("Implementation limit of 16 active fragment shader samplers exceeded") y la
+     * carta salía NEGRA, sin un error en tsc, en los tests ni en el build — los tres
+     * corren sin WebGL.
+     *
+     * Ahora el fondo se compone con lo que YA está muestreado:
+     *   · El ART es layer0, que es la capa 0 y trae su propio paralaje.
+     *   · La COBERTURA (dónde el personaje no tapa) sale del ALFA de layer1, la capa
+     *     del personaje: esa capa se dibuja aislada y transparente, así que su alfa
+     *     es exactamente 1 donde hay personaje y 0 donde no. Antes esa cobertura
+     *     viajaba como textura aparte (characterAlphaMask) sólo porque la carta era
+     *     una imagen única y opaca; con las capas separadas, el dato ya está aquí.
      */
-    if (uHasBackground > 0.5 && uUseLayers < 0.5) {
+    {
       /**
-       * El CONTENIDO se muestrea DESPLAZADO por el puntero (paralaje) mientras la
-       * máscara se lee en la posición FIJA.
+       * El contenido se muestrea con el desplazamiento que ya tiene layer0; la
+       * cobertura se lee del alfa de layer1.
        *
        * Ese reparto es lo que produce la sensación de profundidad: el agujero de la
        * silueta se queda donde está —es parte del personaje, del plano de delante— y
-       * lo que se desliza por detrás es la escena. Si la máscara se desplazara
-       * también, el hueco viajaría con el fondo y las dos capas se leerían como un
-       * solo plano móvil. El signo va a CONTRARIO del frente, que es como se lee
-       * "está más lejos".
-       *
-       * Se desplaza con el uniform del puntero (-1 a 1) y no con el de inclinación:
-       * ese es una rotación en radianes que llega a 0.38, así que el recorrido se
-       * quedaba en el 2,3% del ancho. Con el puntero el valor de la config es
-       * directamente una fracción del ancho de carta, que es lo que se quiere ajustar.
+       * lo que se desliza por detrás es la escena.
        */
-      vec2 bgUv = vUv - vec2(uPointer.x, uPointer.y) * uBgParallax;
-      vec3 bgArt = texture2D(uBackgroundMap, bgUv).rgb;
-      float bgCover = texture2D(uBackgroundMask, vUv).r;
+      vec3 bgArt = layer0.rgb;
+      /**
+       * COBERTURA: el fondo solo pinta donde NO hay nada más encima.
+       *
+       * Antes era 1.0 - layer1.a, es decir "todo donde no esté el personaje". Eso
+       * incluía el título, los textos, los tags y el wordmark (capas 2..6), que en esas
+       * zonas quedaban REEMPLAZADOS por el arte del fondo: el bloque de abajo hacía una
+       * mezcla sobre un lit que YA llevaba esas capas compuestas. En una carta con
+       * fondo, los textos desaparecían.
+       *
+       * Ahora la cobertura descuenta también el alfa de las capas superiores, así que el
+       * fondo solo actúa en los píxeles que nadie más reclama. La capa 0 sigue por
+       * DEBAJO porque base ya la compone antes que las capas 1..6.
+       */
+      float upperCover = max(max(max(layer2.a, layer3.a), max(layer4.a, layer5.a)), layer6.a);
+      float bgCover = 1.0 - max(layer1.a, upperCover);
 
       /**
        * Interferencia del fondo: MISMO modelo de película delgada que el frente, mismos
@@ -768,6 +752,7 @@ ${FACTION_SIZES}
        * cambia de color al unísono con el personaje, igual que en una lámina real la
        * capa de detrás no late con la de delante.
        */
+      vec2 bgUv = vUv + uPointer * uParallaxFactors[0];
       float bgPhase = fract(
         bgUv.x * ${f(CFG.HOLOGRAM.surfaceX)} + bgUv.y * ${f(CFG.HOLOGRAM.surfaceY)}
           + uTilt.y * ${f(CFG.BACKGROUND.tiltShift)} + uTime * ${f(CFG.BACKGROUND.timeShift)}
@@ -792,43 +777,6 @@ ${FACTION_SIZES}
       ) * uBgHolo;
 
       /**
-       * TINTA Y PIEL del fondo: su propia capa de realce de contornos.
-       *
-       * POR QUÉ SE AÑADIÓ (lo pidió el usuario): el frente tenía esta perilla
-       * (EDGE strength) y el fondo no, así que el lineart del fondo no se encendía
-       * como el del personaje y las dos capas se veían de técnica distinta. Es el mismo
-       * efecto que la CAPA 4 del frente, con dos diferencias deliberadas:
-       *
-       *   · La máscara se calcula sobre la IMAGEN DEL FONDO (uBgEdgeMap), en el mismo
-       *     encuadre que su arte, no sobre el personaje: resalta el dibujo que hay
-       *     debajo del fondo, que es lo que se está mirando.
-       *   · El peso es propio (uBgEdgeStrength) para poder ajustarlo por capa.
-       *
-       * Se muestrea DESPLAZADO por el paralaje, igual que el arte del fondo: si se
-       * leyera fijo, el lineart se quedaría clavado en su sitio mientras la imagen se
-       * mueve, y se vería un contorno fantasma despegado de la figura.
-       */
-      vec3 bgEdgeLayer = vec3(0.0);
-      if (uBgEdgeStrength > 0.001) {
-        vec4 bgEdgeTex = texture2D(uBgEdgeMap, bgUv);
-        float bgEdgeLum = dot(bgEdgeTex.rgb, vec3(0.2126, 0.7152, 0.0722));
-        /** El mismo ángulo rasante del frente: ahí el corrimiento espectral es mayor. */
-        float bgCosEdge = clamp(cosView - ${f(CFG.EDGE.angleOffset)}, 0.0, 1.0);
-        float bgEdgeFilm = thinFilmWavelength(
-          bgCosEdge,
-          ${f(CFG.EDGE.filmThickness)},
-          uTime * ${f(CFG.EDGE.timeShift)} + bgUv.x * ${f(CFG.EDGE.surfaceShift)}
-        );
-        vec3 bgEdgeTint = wavelengthToRgb(bgEdgeFilm);
-        float bgEdgeMask = bgEdgeTex.a * clamp(
-          ${f(CFG.EDGE.maskBase)} + tiltAmount * ${f(CFG.EDGE.maskTilt)} + bgGlare * ${f(CFG.EDGE.maskGlare)},
-          0.0,
-          ${f(CFG.EDGE.maskCeiling)}
-        );
-        bgEdgeLayer = bgEdgeTint * bgEdgeLum * bgEdgeMask * uBgEdgeStrength;
-      }
-
-      /**
        * Composición sobre el arte del fondo. Se respeta su LUMINANCIA (un fondo oscuro
        * no puede encenderse como uno claro, o dejaría de parecer la imagen que se
        * subió: el arte se escala por su propia claridad) y el color espectral se SUMA,
@@ -837,14 +785,9 @@ ${FACTION_SIZES}
       float bgLum = dot(bgArt, vec3(0.2126, 0.7152, 0.0722));
       vec3 bgArtLevel = bgArt * (uBgArtFloor + bgLum * ${f(CFG.BACKGROUND.artLumGain)});
       vec3 bgLayer = bgFoilColor * bgMask * uBgLayerWeight;
-      /**
-       * El realce de tinta y piel se SUMA aparte, en modo luz, igual que en el frente:
-       * multiplicarlo por el arte lo apagaría justo en las zonas oscuras, que son las
-       * que tiene que encender (el lineart).
-       */
       lit = mix(
         lit,
-        bgArtLevel + bgArtLevel * bgLayer + bgLayer * uBgLayerWeight + bgEdgeLayer,
+        bgArtLevel + bgArtLevel * bgLayer + bgLayer * uBgLayerWeight,
         bgCover
       );
     }

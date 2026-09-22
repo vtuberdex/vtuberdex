@@ -105,9 +105,8 @@ export const KNOBS: readonly Knob[] = [
   { key: 'bgBaseMask', label: 'Piso del holograma', hint: 'Efecto visible con la carta quieta', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.baseMask', grupo: 'fondo' },
   { key: 'bgTiltFactor', label: 'Arcoíris al inclinar', hint: 'Cuánto sube el efecto del fondo con el tilt', min: 0, max: 6, step: 0.05, config: 'BACKGROUND.tiltFactor', grupo: 'fondo' },
   { key: 'bgGlareStrength', label: 'Barrido del puntero', hint: 'El brillo del fondo que sigue al cursor', min: 0, max: 2, step: 0.01, config: 'BACKGROUND.glareStrength', grupo: 'fondo' },
-  { key: 'bgParallax', label: 'Paralaje', hint: 'Signo POSITIVO: va al contrario que el frente, que es lo que lee como lejos', min: -0.15, max: 0.15, step: 0.005, config: 'BACKGROUND.parallax', grupo: 'fondo' },
+  { key: 'bgParallax', label: 'Paralaje', hint: 'Cuánto se desplaza la capa de fondo; negativo va al contrario que el frente', min: -0.15, max: 0.15, step: 0.005, config: 'PARALLAX_LAYERS[0].factor', grupo: 'fondo' },
   { key: 'bgArtFloor', label: 'Brillo base del arte', hint: 'Subirlo aclara el fondo; bajarlo lo deja más apagado', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.artFloor', grupo: 'fondo' },
-  { key: 'bgEdgeStrength', label: 'Tinta y piel (edge)', hint: 'Realce de contornos DE LA IMAGEN DEL FONDO', min: 0, max: 1, step: 0.01, config: 'BACKGROUND.edgeStrength', grupo: 'fondo' },
 ];
 
 /** Valores que se leen en cada frame. Las claves son las de `KNOBS`. */
@@ -132,8 +131,6 @@ export interface LiveKnobs {
   bgGlareStrength: number;
   bgParallax: number;
   bgArtFloor: number;
-  /** Tinta y piel del FONDO: realce de contornos de la imagen de detrás. */
-  bgEdgeStrength: number;
   /** Paralaje del LOGO: el plano de delante, el que más se desplaza. */
   logoParallax: number;
 }
@@ -163,7 +160,6 @@ export const DEFAULTS: LiveKnobs = {
   bgGlareStrength: CFG.BACKGROUND.glareStrength,
   bgParallax: CFG.BACKGROUND.parallax,
   bgArtFloor: CFG.BACKGROUND.artFloor,
-  bgEdgeStrength: CFG.BACKGROUND.edgeStrength,
   logoParallax: CFG.LOGO.parallax,
 };
 

@@ -30,7 +30,6 @@ import {
   CARD_TEXTURE_FULL_WIDTH,
   CARD_TEXTURE_TILE_WIDTH,
   drawCardLayers,
-  characterAlphaMask,
   inkAndSkinMask,
   logoMask,
   logoSticker,
@@ -117,8 +116,6 @@ function CardMesh({
     edge: THREE.CanvasTexture;
     logoMask: THREE.CanvasTexture;
     logoSticker: THREE.CanvasTexture;
-    backgroundMask: THREE.CanvasTexture;
-    backgroundEdge: THREE.CanvasTexture;
   } | null>(null);
   const palette = useMemo(() => cardPalette(card.themeColor, card.secondaryColor), [card.themeColor, card.secondaryColor]);
 
@@ -182,7 +179,15 @@ function CardMesh({
         return tex;
       });
 
-      // Capa combinada para el fallback plano (uMap) y la máscara de tinta/piel.
+      /**
+       * Capa COMBINADA: se usa SOLO como fuente de la máscara de tinta y piel.
+       *
+       * Antes también alimentaba un uMap de respaldo, que se eliminó al pasarse el
+       * shader a las 7 capas (18 samplers contra el límite de 16 del driver: la carta
+       * salía negra). La máscara de tinta no se puede calcular por capa porque el
+       * lineart y la piel son propiedades del ARTE, así que la combinada se mantiene
+       * para ese único cálculo y no se sube como textura.
+       */
       const flatCanvas = document.createElement('canvas');
       flatCanvas.width = width;
       flatCanvas.height = layers[0].image.height;
@@ -196,10 +201,6 @@ function CardMesh({
         flatCtx.drawImage(layerCanvases.tags, 0, 0);
         flatCtx.drawImage(layerCanvases.wordmark, 0, 0);
       }
-      const flatTexture = new THREE.CanvasTexture(flatCanvas);
-      flatTexture.colorSpace = THREE.SRGBColorSpace;
-      flatTexture.anisotropy = 8;
-      flatTexture.needsUpdate = true;
 
       const edgeTexture = new THREE.CanvasTexture(inkAndSkinMask(flatCanvas, width, flatCanvas.height));
       edgeTexture.colorSpace = THREE.SRGBColorSpace;
@@ -217,42 +218,12 @@ function CardMesh({
         logoBox && logo ? logoSticker(logo, logoBox, width, flatCanvas.height) : emptyCanvas,
       );
 
-      // Fondo: capa 0 ya tiene el arte del background; usamos su canvas para la textura.
-      const backgroundCanvas = layerCanvases.background;
-      const backgroundTexture = new THREE.CanvasTexture(backgroundCanvas);
-      backgroundTexture.colorSpace = THREE.SRGBColorSpace;
-      backgroundTexture.anisotropy = 4;
-      backgroundTexture.needsUpdate = true;
-
-      // Máscara del fondo: cobertura del personaje.
-      const backgroundMaskTexture = new THREE.CanvasTexture(
-        characterAlphaMask(art, width, flatCanvas.height),
-      );
-
-      // Tinta/piel del fondo (calculado sobre el backgroundCanvas ya escalado).
-      const backgroundEdgeCanvas = document.createElement('canvas');
-      backgroundEdgeCanvas.width = width;
-      backgroundEdgeCanvas.height = flatCanvas.height;
-      if (background) {
-        const mascara = inkAndSkinMask(backgroundCanvas, width, flatCanvas.height);
-        backgroundEdgeCanvas.getContext('2d')?.drawImage(mascara, 0, 0);
-      }
-      const backgroundEdgeTexture = new THREE.CanvasTexture(backgroundEdgeCanvas);
-      backgroundEdgeTexture.colorSpace = THREE.SRGBColorSpace;
-      backgroundEdgeTexture.anisotropy = 4;
-      backgroundEdgeTexture.needsUpdate = true;
-
       setTextures({
         layers,
         edge: edgeTexture,
         logoMask: logoMaskTexture,
         logoSticker: logoStickerTexture,
-        backgroundMask: backgroundMaskTexture,
-        backgroundEdge: backgroundEdgeTexture,
       });
-      // `flatTexture` se usa como uMap fallback; lo guardamos en la primera capa
-      // extra para no perderlo. (Simplificación: se asigna luego a uMap uniform.)
-      (layerCanvases as any)._flatTexture = flatTexture;
     });
     return () => {
       cancelled = true;
@@ -265,8 +236,6 @@ function CardMesh({
       textures?.edge.dispose();
       textures?.logoMask.dispose();
       textures?.logoSticker.dispose();
-      textures?.backgroundMask.dispose();
-      textures?.backgroundEdge.dispose();
     },
     [textures],
   );
@@ -304,7 +273,6 @@ function CardMesh({
     const accent = new THREE.Color(palette.accent);
     const secondary = new THREE.Color(palette.secondary);
     const front: Record<string, { value: unknown }> = {
-      uMap: { value: null as THREE.Texture | null },
       uEdgeMap: { value: null as THREE.Texture | null },
       uEdgeStrength: { value: CFG.EDGE.strength as number },
       uFactionMap0: { value: null as THREE.Texture | null },
@@ -338,14 +306,9 @@ function CardMesh({
       uBgGlareStrength: { value: CFG.BACKGROUND.glareStrength as number },
       uBgBaseMask: { value: CFG.BACKGROUND.baseMask as number },
       uBgTiltFactor: { value: CFG.BACKGROUND.tiltFactor as number },
-      uBgParallax: { value: CFG.BACKGROUND.parallax as number },
       uBgArtFloor: { value: CFG.BACKGROUND.artFloor as number },
-      uBgEdgeMap: { value: null as THREE.Texture | null },
-      uBgEdgeStrength: { value: CFG.BACKGROUND.edgeStrength as number },
       uLogoParallax: { value: CFG.LOGO.parallax as number },
-      uLayerCount: { value: 7 },
       uParallaxFactors: { value: new Float32Array(CFG.LAYER_PARALLAX_FACTORS) },
-      uUseLayers: { value: 1 },
     };
 
     // Generar uniforms de capas desde la config.
@@ -372,18 +335,6 @@ function CardMesh({
     uniforms.front.uEdgeMap.value = textures.edge;
     uniforms.front.uLogoMask.value = textures.logoMask;
     uniforms.front.uLogoSticker.value = textures.logoSticker;
-    uniforms.front.uBackgroundMask.value = textures.backgroundMask;
-    uniforms.front.uBgEdgeMap.value = textures.backgroundEdge;
-    // uMap es la composición plana; la mantenemos para debug/fallback.
-    const flat = (textures as any)._flatTexture as THREE.CanvasTexture | undefined;
-    if (flat) uniforms.front.uMap.value = flat;
-  }, [textures, uniforms]);
-
-  useEffect(() => {
-    if (!textures) return;
-    const bg = textures.layers[0];
-    uniforms.front.uBackgroundMap.value = bg ?? null;
-    uniforms.front.uHasBackground.value = bg && bg.image && (bg.image.width ?? 0) > 0 ? 1 : 0;
   }, [textures, uniforms]);
 
   useEffect(() => {
@@ -424,9 +375,7 @@ function CardMesh({
     uniforms.front.uBgBaseMask.value = live.bgBaseMask;
     uniforms.front.uBgTiltFactor.value = live.bgTiltFactor;
     uniforms.front.uBgGlareStrength.value = live.bgGlareStrength;
-    uniforms.front.uBgParallax.value = live.bgParallax;
     uniforms.front.uBgArtFloor.value = live.bgArtFloor;
-    uniforms.front.uBgEdgeStrength.value = live.bgEdgeStrength;
     uniforms.front.uLogoParallax.value = live.logoParallax;
     uniforms.front.uGlossSelf.value = live.glossSelf;
     uniforms.front.uHoloSelf.value = live.holoSelf;
@@ -439,6 +388,13 @@ function CardMesh({
     const px = pointer.current.x;
     const py = pointer.current.y;
     (uniforms.front.uPointer.value as THREE.Vector2).set(px, py);
+    /**
+     * El paralaje del FONDO sale del factor de la capa 0, que es la que lleva su arte.
+     * Antes el shader tenía un uniforme propio (uBgParallax) con una textura de fondo
+     * aparte; al pasarse a 7 capas, el fondo ES la capa 0 y su desplazamiento lo fija
+     * uParallaxFactors[0]. El slider escribe ahí para que siga mandando en vivo.
+     */
+    (uniforms.front.uParallaxFactors.value as Float32Array)[0] = live.bgParallax;
     const group3d = group.current;
     if (group3d) {
       (uniforms.front.uTilt.value as THREE.Vector2).set(group3d.rotation.x, group3d.rotation.y);
