@@ -127,15 +127,34 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 - **`half` es palabra reservada en GLSL ES 3.0.** Usarla como variable en un
   shader hace que NO compile ("Illegal use of reserved word") y la carta sale
   negra. En `components/shaders.ts` se usa `halfSize`.
-- **`uMap` es OPACO: el shader NO puede ver la transparencia del personaje.** El
-  degradado del color de tema se pinta a sangre sobre todo el lienzo ANTES del
-  arte (`card-texture.ts`), así que la silueta del personaje no existe en esa
-  textura. Cualquier recorte por alfa en GLSL deja de funcionar por esto. El
-  patrón del repo es calcular la máscara en CPU y pasarla como su propia textura
-  (`logoMask`, `inkAndSkinMask`); la capa de fondo usa `characterCoverageMask` y
-  la restringe a la banda segura de texto que publica `drawCardFront`. Medido
-  sobre las 785 fichas: 9 son recortes reales, 155 abarcan todo el ancho, el
-  resto tiene bandas laterales transparentes donde el fondo SÍ se ve.
+- **El límite de samplers del driver no lo ve NINGÚN gate.** El fragment shader
+  llegó a 18 samplers contra un límite de 16 y el material no compilaba
+  (`Implementation limit of 16 active fragment shader samplers exceeded`) mientras
+  `typecheck`, `test` y `build` pasaban en verde: tsc lee el shader como una
+  cadena, los tests corren sin WebGL a propósito (`test/setup.ts` anula
+  `getContext`) y next build no compila GLSL. El único síntoma es la carta NEGRA y
+  un error que sale solo en la consola del navegador. Al añadir un `sampler2D`
+  nuevo hay que contar los declarados y quedarse por debajo de 16 — el refactor de
+  7 capas dejó el presupuesto en 14. Un sampler declarado pero no leído lo elimina
+  el compilador, así que la cifra que importa es la de samplers ACTIVOS del
+  programa enlazado, no las líneas del fuente.
+- **Ojo con `//` y backticks dentro de los comentarios GLSL**: el shader es un
+  template literal de TypeScript, así que un backtick suelto cierra la cadena y
+  `tsc` reporta el error en la línea SIGUIENTE (confuso). Y un bloque `/** ... */`
+  al que le falte la apertura deja el texto suelto y rompe el GLSL con un error de
+  sintaxis que solo aparece al compilar el shader de verdad, no en `tsc`.
+- **El alfa de la CAPA es la silueta: el shader no puede ver la transparencia del
+  arte combinado.** Las capas del refactor se dibujan aisladas y transparentes, así
+  que `uLayer1.a` es exactamente 1 donde hay personaje y 0 donde no — de ahí sale la
+  cobertura del fondo, sin textura de máscara aparte (antes viajaba
+  `characterAlphaMask` como sampler propio y eso, sumado a los 7 de las capas,
+  reventaba el límite de 16). Lo que NO se puede hacer es leer el alfa de una imagen
+  ya compuesta: el degradado del color de tema se pintaba a sangre sobre todo el
+  lienzo ANTES del arte, así que ahí la silueta no existe. El patrón del repo para
+  las otras máscaras es calcularlas en CPU y pasarlas como su propia textura
+  (`logoMask`, `inkAndSkinMask`). Medido sobre las 785 fichas: 9 son recortes
+  reales, 155 abarcan todo el ancho, el resto tiene bandas laterales transparentes
+  donde el fondo SÍ se ve.
 - **Los shaders no tienen los valores, tienen la fórmula.** Todo lo ajustable
   (intensidades, pesos, geometría, luces) vive en `components/card3d-config.ts`,
   que es el archivo que se abre para tocar el efecto; el GLSL se genera desde ahí

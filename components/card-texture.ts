@@ -500,52 +500,13 @@ export function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-/** Máscara de cobertura del personaje (para fondo subido). */
-export function characterAlphaMask(art: CanvasImageSource | null, width: number, height: number): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return canvas;
-
-  const out = ctx.createImageData(width, height);
-  const o = out.data;
-  let artCanvas: HTMLCanvasElement | null = null;
-  let dx = 0;
-  let dw = 0;
-
-  if (art) {
-    const anyArt = art as { width?: number; height?: number };
-    const artW = anyArt.width ?? 0;
-    const artH = anyArt.height ?? 0;
-    if (artW > 0 && artH > 0) {
-      artCanvas = document.createElement('canvas');
-      artCanvas.width = width;
-      artCanvas.height = height;
-      const artCtx = artCanvas.getContext('2d');
-      if (artCtx) {
-        const scaleToHeight = height / artH;
-        dw = artW * scaleToHeight;
-        dx = (width - dw) / 2;
-        artCtx.drawImage(art, dx, 0, dw, height);
-      }
-    }
-  }
-
-  const artData = artCanvas?.getContext('2d')?.getImageData(0, 0, width, height).data ?? null;
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const coverage = artData ? 1 - artData[(y * width + x) * 4 + 3] / 255 : 1;
-      const i = (y * width + x) * 4;
-      o[i] = Math.round(coverage * 255);
-      o[i + 1] = Math.round(coverage * 255);
-      o[i + 2] = Math.round(coverage * 255);
-      o[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(out, 0, 0);
-  return canvas;
-}
+/*
+ * NOTA: aquí vivía `characterAlphaMask()`, que calculaba en CPU la silueta del
+ * personaje para el fondo subido. Se eliminó junto con el sampler `uBackgroundMask`:
+ * con las 7 capas separadas, el alfa de la capa del personaje (uLayer1.a) ES esa
+ * silueta, así que la máscara era trabajo duplicado —y un sampler de más, que fue
+ * justo lo que reventó el límite de 16 del driver.
+ */
 
 export function inkAndSkinMask(art: CanvasImageSource, width: number, height: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
