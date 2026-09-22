@@ -35,9 +35,9 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 76 tests (vitest): utilidades, componentes, páginas
+npm test                   # 100 tests (vitest): utilidades, componentes, páginas
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
-cd server  && npm test     # 52 tests: búsqueda, facetas, API HTTP, mantenedor
+cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
 # Gate real antes de dar algo por terminado
 npm run typecheck && npm run build
@@ -59,7 +59,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` cita 15/32/57 tests: son cifras **viejas**. Las reales son
-**25/52/76** (medidas). Si añades tests, actualiza aquí.
+**25/59/100** (medidas). Si añades tests, actualiza aquí.
 
 ## Arquitectura: las reglas que no se negocian
 
@@ -127,6 +127,15 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 - **`half` es palabra reservada en GLSL ES 3.0.** Usarla como variable en un
   shader hace que NO compile ("Illegal use of reserved word") y la carta sale
   negra. En `components/shaders.ts` se usa `halfSize`.
+- **`uMap` es OPACO: el shader NO puede ver la transparencia del personaje.** El
+  degradado del color de tema se pinta a sangre sobre todo el lienzo ANTES del
+  arte (`card-texture.ts`), así que la silueta del personaje no existe en esa
+  textura. Cualquier recorte por alfa en GLSL deja de funcionar por esto. El
+  patrón del repo es calcular la máscara en CPU y pasarla como su propia textura
+  (`logoMask`, `inkAndSkinMask`); la capa de fondo usa `characterCoverageMask` y
+  la restringe a la banda segura de texto que publica `drawCardFront`. Medido
+  sobre las 785 fichas: 9 son recortes reales, 155 abarcan todo el ancho, el
+  resto tiene bandas laterales transparentes donde el fondo SÍ se ve.
 - **Los shaders no tienen los valores, tienen la fórmula.** Todo lo ajustable
   (intensidades, pesos, geometría, luces) vive en `components/card3d-config.ts`,
   que es el archivo que se abre para tocar el efecto; el GLSL se genera desde ahí
@@ -288,14 +297,16 @@ SPA), y el "leak" de la base hay que comprobarlo por contenido, no por status.
 
 ## Imágenes: qué se publica y qué no
 
-Solo **tres carpetas** viajan a Blob, y la decisión es por uso real verificado en
-el front, no por lo que exista en disco:
+Publican **cuatro carpetas**: las tres primeras las produce el scraper y viajan
+siempre; `background` es nueva y viaja **vacía** por defecto. La decisión es por
+uso real verificado en el front, no por lo que exista en disco:
 
 | Carpeta | Estado | Por qué |
 |---|---|---|
 | `character` | ✅ publicado | La imagen fuente del VTuber |
 | `logo` | ✅ publicado | Capa superior de la carta |
 | `faction` | ✅ publicado | Emblema que la carta superpone como holograma |
+| `background` | ✅ publicado (vacía) | Capa POR DETRÁS del personaje, con holograma y paralaje propios. **El scraper NO la produce**: solo se llena si alguien sube una desde el mantenedor |
 | `thumb` | ❌ eliminado | Ninguna vista la pedía (18 MB) |
 | `avatar` | ❌ eliminado | Duplicado legacy de `character` (13 MB) |
 | `ficha` | ❌ eliminado | Respaldo de `character`; hoy los 785 lo tienen (33 MB) |
@@ -303,8 +314,8 @@ el front, no por lo que exista en disco:
 | `card` | ❌ eliminada | Vacía desde siempre |
 
 `data/images/` pasó de **143 MB a 73 MB**; el manifiesto publica **1593** objetos
-(785 + 785 + 23). Las rutas de las carpetas retiradas responden **404 explícito**,
-comprobado en `npm run verify`.
+(785 + 785 + 23) mientras nadie suba un fondo. Las rutas de las carpetas retiradas
+responden **404 explícito**, comprobado en `npm run verify`.
 
 **Ojo:** los tipos `card`/`thumb`/`radar` siguen en el contrato de la API y en el
 esquema de la base (el `seed` los sigue escribiendo); lo que se retiró es su
