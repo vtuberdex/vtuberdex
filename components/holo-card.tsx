@@ -442,6 +442,26 @@ function CardMesh({
      * uParallaxFactors[0]. El slider escribe ahí para que siga mandando en vivo.
      */
     (uniforms.front.uParallaxFactors.value as Float32Array)[0] = live.bgParallax;
+    /**
+     * El LOGO se dibuja DOS veces: la capa 2 (el arte de la marca en su caja) y el
+     * STICKER final (sus píxeles originales, sin efectos, recompuestos encima). Cada
+     * uno tenía su PROPIA fuente de desplazamiento:
+     *
+     *   - la capa 2 lee uParallaxFactors[2], que es un valor de CONFIG que solo se
+     *     escribe al crear los uniformes;
+     *   - el sticker lee uLogoParallax, que es el que mueve el slider "Paralaje del
+     *     logo" en cada frame.
+     *
+     * Coincidían por casualidad (ambos -0.03), así que en el estado por defecto el
+     * logo se veía bien — pero en cuanto el slider se movía, solo se desplazaba el
+     * sticker y quedaban DOS copias de la marca, una por cada fuente. Es el
+     * "logo duplicado" que reportaba el usuario, y se reproduce de forma
+     * determinista moviendo el slider.
+     *
+     * Los dos tienen que salir del MISMO número: el logo es una capa, y su sticker
+     * es la recomposición de esa misma capa, así que no pueden desincronizarse.
+     */
+    (uniforms.front.uParallaxFactors.value as Float32Array)[2] = live.logoParallax;
     const group3d = group.current;
     if (group3d) {
       (uniforms.front.uTilt.value as THREE.Vector2).set(group3d.rotation.x, group3d.rotation.y);
