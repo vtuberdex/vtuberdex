@@ -259,8 +259,13 @@ describe('DetailPage', () => {
     // ningún control para ajustarlas.
     expect(screen.queryByLabelText(/holográf/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/reflejo/i)).not.toBeInTheDocument();
+    // Las DOS intensidades tienen que estar DEFINIDAS (son las perillas del efecto), pero no
+    // hace falta que sean > 0: el holograma de película delgada se puede apagar a propósito
+    // (INTENSITY.holo = 0) y dejar que el barniz lleve el acabado. Fijar > 0 aquí convertía
+    // una decisión de acabado en un test roto.
+    expect(typeof INTENSITY.gloss.detail).toBe('number');
+    expect(typeof INTENSITY.holo.detail).toBe('number');
     expect(INTENSITY.gloss.detail).toBeGreaterThan(0);
-    expect(INTENSITY.holo.detail).toBeGreaterThan(0);
   });
 
   it('muestra el texto personalizado de la carta con su confianza de OCR', async () => {

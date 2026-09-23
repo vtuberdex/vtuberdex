@@ -157,8 +157,8 @@ export const GEOMETRY = {
  * `EDGE.strength`, NO `holo`.
  */
 export const INTENSITY = {
-  holo: { default: 0.7, tile: 0.7, detail: 0.7, noThemeFloor: 0.45 },
-  gloss: { default: 0.63, tile: 0.63, detail: 0.63 },
+  holo: { default: 0, tile: 0, detail: 0, noThemeFloor: 0.45 },
+  gloss: { default: 0.8, tile: 0.8, detail: 0.8 },
 } as const;
 
 /** Capa holográfica: interferencia de película delgada. */
@@ -266,7 +266,7 @@ export const BACKGROUND = {
    * Intensidad global del efecto del fondo. Como `INTENSITY.holo` pero SOLO para
    * esta capa: apagarla deja el fondo con su arte intacto y sin holograma.
    */
-  holo: 0.9,
+  holo: 0.76,
   /** Peso del color espectral que se SUMA al arte del fondo (su saturación). */
   layerWeight: 0.42,
   /**
@@ -389,22 +389,112 @@ export const HDR = {
   /**
    * Cuánto se multiplican SOLO los términos de luz (reflejo del metal, destello del
    * canto, barniz y holograma). Es lo que lleva los reflejos por encima de 1.0 para que
-   * el codo tenga algo que comprimir. Con 1.0 no hay HDR: todo queda por debajo del codo
-   * y la imagen es la de antes.
+   * el límite tenga algo que comprimir. Con 1.0 no hay HDR: los reflejos quedan como
+   * antes.
    */
-  highlightBoost: 1.9,
+  highlightBoost: 1.5,
   /**
-   * Codo: hasta aquí la señal es lineal e intacta. Por encima empieza la compresión.
-   * Bajarlo comprime más zona (aspecto más suave y "fotográfico"); subirlo reserva el
-   * efecto a las luces más fuertes. 0.75 deja intacto el arte de la carta.
+   * TECHO DE LA LUZ: lo máximo que puede sumar el canal de luz sobre el arte.
+   *
+   * POR QUÉ ES UN TECHO Y NO UN CODO (fallo medido, con un fondo claro)
+   * -----------------------------------------------------------------
+   * La primera versión comprimía el color YA SUMADO, con un codo en 0.75. Sobre un fondo
+   * oscuro funcionaba, pero con una imagen CLARA el arte queda por encima del codo y la
+   * compresión se lo come: medido con un cielo de nubes (arte ~212/255), bajar el codo a
+   * 0.45 dejaba el cielo en 206 y a 0.25 en 186 — es decir, el HDR OSCURECÍA la imagen en
+   * vez de darle brillo. El usuario lo describió como "no veo los reflejos HDR" y tenía
+   * razón: no había brillo que ver.
+   *
+   * La luz se comprime ahora en su PROPIO canal, empezando en 0 y sin zona de identidad,
+   * así que:
+   *   · el ARTE nunca se toca (por claro que sea el fondo, no se oscurece), y
+   *   · las luces siguen teniendo un rolloff suave en vez de recortarse en plano.
+   * Es lo que hace el HDR de verdad: comprime el rango de LUZ sobre un soporte intacto.
    */
-  knee: 0.75,
+  lightCeiling: 1.5,
   /**
-   * Rango del hombro: cuánto sobrante se necesita para llegar a la mitad del margen que
-   * queda. BAJARLO hace que las luces se aplasten antes (blanco más agresivo, más
-   * "quemado"); subirlo las conserva más tiempo con color.
+   * Rango del rolloff. Con el techo en el denominador, un valor de 1 mantiene la parte
+   * baja CASI lineal (la luz pequeña pasa tal cual) y lleva el resto al techo. Subirlo
+   * hace la caída más suave y conserva más medios tonos de luz; bajarlo aplasta antes.
    */
-  headroom: 1.6,
+  headroom: 1.15,
+} as const;
+
+/**
+ * REFLEJO DE ESPEJO DEL METAL (environment mapping con el arte subido).
+ *
+ * QUÉ PIDIÓ EL USUARIO
+ * --------------------
+ * "las cosas que tienen textura metálica deberían tener reflejo tipo espejo con la imagen
+ * que te adjunté". La imagen es un CIELO CON NUBES: un mapa de entorno, no decoración. Lo
+ * que se pide es que el metal REFLEJE esa imagen — que las nubes aparezcan DENTRO del
+ * acero, deformadas por la superficie, como en un pulido real.
+ *
+ * CÓMO, SIN GASTAR UN SAMPLER
+ * ---------------------------
+ * El cielo no es un plano de la carta: es un ENTORNO. Así que no se proyecta en UV de
+ * pantalla (eso daría un calco pegado encima) sino con una proyección de esfera: se toma
+ * la normal de la superficie y se refleja la dirección de vista, y de la dirección
+ * resultante (x, y) se saca un UV del cielo. Las nubes así CURVAN con el ángulo, que es lo
+ * que hace que se lea como espejo y no como calcomanía.
+ *
+ * El truco para no gastar presupuesto: el FONDO de la carta ya es una textura enlazada
+ * (uLayer0). El metal refleja EL FONDO. Cero samplers nuevos, y el reflejo usa exactamente
+ * la imagen que el usuario subió.
+ *
+ * La perturbación de la normal (abollado) es lo que rompe el espejo perfecto en facetas
+ * irregulares: sin ella el material parece plástico brillante, no acero pulido.
+ */
+export const METAL_REFLECT = {
+  /** Fuerza del reflejo sobre el metal (0 = metal mate, 1 = espejo pleno). */
+  strength: 1.0,
+  /**
+   * Abollado de la superficie: cuánto se desvía la normal antes de reflejar. Es lo que da
+   * el aspecto de acero cepillado/pulido con micro-facetas en vez de un espejo de baño.
+   */
+  bump: 0.32,
+  /** Escala del abollado en UV: más alto = facetas más pequeñas y densas. */
+  bumpScale: 0.55,
+  /**
+   * REFUERZO del reflejo. El metal se modula (su color x el entorno), así que con 1.0 el
+   * reflejo es literal y puede salir apagado. Este valor devuelve el brillo para que el
+   * entorno se lea dentro del metal sin lavar su color.
+   */
+  gain: 1.35,
+  /**
+   * MAPA DE ENTORNO: la imagen que el metal refleja.
+   *
+   * POR QUÉ ES UNA IMAGEN APARTE Y NO EL FONDO DE LA CARTA
+   * -----------------------------------------------------
+   * El reflejo estuvo leyendo uLayer0 (el fondo del VTuber) para no gastar un sampler, y
+   * estaba mal por dos motivos: (1) si el VTuber no tiene fondo subido, esa capa está vacía
+   * y el metal salía NEGRO — medido, exactamente el caso de "si el background no existe,
+   * que lo deje transparente"; y (2) aunque hubiera fondo, el metal reflejaba el ARTE del
+   * personaje (un pulpo), no un cielo.
+   *
+   * Un reflejo describe DÓNDE ESTÁ el metal, no qué hay impreso detrás, así que su imagen es
+   * una foto de cielo propia. El archivo es components/metal-env.webp y lo IMPORTA el
+   * componente (next/image-types declara el módulo), así que viaja en el bundle: no puede
+   * vivir en public/ porque public/ está en .gitignore y el asset no llegaría al deploy.
+   *
+   * Es un sampler más: el presupuesto queda en 15 de los 16 que admite el driver (contado
+   * sobre el programa enlazado en el harness, no sobre las líneas del fuente).
+   */
+  /**
+   * GRIS MEDIO del mapa de entorno (0-1), MEDIDO sobre la imagen real (210.6/255 = 0.826).
+   *
+   * El reflejo se divide por este valor para modular en torno a la luminancia del metal en
+   * vez de blanquearlo. Si se cambia la imagen de entorno hay que volver a medirlo: es su
+   * luminancia media, no una constante de estilo.
+   */
+  envMean: 0.826,
+  /**
+   * Énfasis de curvatura: cuánto se abre el reflejo al alejarse del centro de la carta.
+   * Subirlo exagera el efecto de superficie convexa (más "pulido y brillante"). Va aparte
+   * del abollado porque son dos cosas distintas: uno es la forma de la pieza y el otro las
+   * micro-facetas del pulido.
+   */
+  curvature: 0.042,
 } as const;
 
 /**
@@ -479,7 +569,7 @@ export const BG_NOISE = {
    * (cuando esta perilla multiplicaba un gradiente SIN acotar) el fondo se convertía en
    * un mapa de curvas de nivel psicodélico.
    */
-  normalStrength: 0.07,
+  normalStrength: 0.1,
   /**
    * Paso de las diferencias finitas para el gradiente. Más fino = más detalle pero más
    * sensible al aliasing; más grueso = facetas más amplias.
@@ -721,7 +811,7 @@ export const GLOSS = {
    * las zonas claras del personaje son buena parte de la carta, y ahí el barniz es
    * donde más se notaba el aspecto lechoso.
    */
-  highlightWeight: 0.5,
+  highlightWeight: 0.7,
 } as const;
 
 /** Emblemas de facción, superpuestos como holograma. */
@@ -781,7 +871,7 @@ export const FACTION = {
  * se enciende sin aclarar el arte, que es el efecto que se buscaba.
  */
 export const EDGE = {
-  strength: 0.1,
+  strength: 0.15,
 
   /** El ángulo se desplaza: en el borde el corrimiento espectral es mayor. */
   angleOffset: 0.35,
@@ -810,7 +900,7 @@ export const COMPOSITE = {
    * bajó de 0.35 a 0.1 en el ajuste en vivo, la mitad del arreglo del aspecto lavado.
    */
   glossSelf: 0.1,
-  holoSelf: 0.5,
+  holoSelf: 0.7,
 } as const;
 
 /** Borde metálico: barrido direccional con contraste y espectro. */
@@ -942,7 +1032,7 @@ export const LAYER_LABELS: Record<LayerName, string> = {
  * y al bajar el brillo de la propia carta el halo tenía que subir para compensar.
  */
 export const GLOW = {
-  strength: 0.73,
+  strength: 0.91,
   /** Caída exponencial desde el canto, que es como decae la luz. */
   falloffRate: 12.0,
   falloffWeight: 0.6,

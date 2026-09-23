@@ -224,13 +224,26 @@ export const cardFragmentShader = /* glsl */ `
   /** Suelo de luminancia del arte del fondo: se ajusta en vivo. */
   uniform float uBgArtFloor;
   /**
-   * HDR: codo (dónde empieza la compresión) y ganancia de las luces. Son uniforms, no
-   * constantes, para poder medir el efecto con ellos a 0/1 y ajustarlos en vivo.
+   * HDR: techo del canal de luz (rolloff del brillo) y ganancia de las luces. Son
+   * uniforms, no constantes, para poder medir el efecto y ajustarlo en vivo.
    */
   uniform float uHdrBoost;
-  uniform float uHdrKnee;
+  uniform float uHdrCeiling;
   /** Fuerza de la textura de micro-superficie del fondo (0 = lámina lisa). */
   uniform float uBgNoiseStrength;
+  /** Fuerza del reflejo de espejo del metal (0 = mate). */
+  uniform float uMetalReflect;
+  /** Abollado del pulido: desviación de la normal y frecuencia de las micro-facetas. */
+  uniform float uMetalBump;
+  uniform float uMetalBumpScale;
+  /** Refuerzo del reflejo (perilla real: METAL_REFLECT.gain). */
+  uniform float uMetalGain;
+  /**
+   * Peso del reflejo de espejo del metal.
+   * (El uniform uMetalEnv se eliminó: el entorno es el mapa dedicado uMetalEnvMap, que
+   * tiene su propio alfa de cobertura — así no hacen falta dos perillas para lo mismo.)
+   */
+  uniform sampler2D uMetalEnvMap;
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -389,29 +402,105 @@ export const cardFragmentShader = /* glsl */ `
   }
 
   /**
-   * COMPRESIÓN HDR (codo suave).
+   * REFLEJO DE ESPEJO DEL METAL: el entorno (el arte subido, o sea el cielo) reflejado
+   * DENTRO del acero.
    *
-   * POR QUÉ HACE FALTA
-   * ------------------
-   * El framebuffer es RGBA8: todo lo que pase de 1.0 se RECORTA al mismo blanco. Un
-   * reflejo así no tiene centro ni degradado — la zona brillante entera es igual de
-   * blanca y se lee como una mancha de pintura. En una foto real las luces tienen rango:
-   * el núcleo llega a blanco y alrededor BAJA conservando el color.
+   * Se proyecta como ENTORNO, no como calco: se perturba la normal con ruido (el pulido
+   * tiene micro-facetas), se refleja la dirección de vista y de ahí sale el UV del cielo.
+   * Eso hace que las nubes CURVEN con el ángulo de la superficie, que es lo que distingue
+   * un espejo de una calcomanía.
    *
-   * CÓMO
-   * ----
-   * Por debajo del codo la señal sale INTACTA (identidad exacta, sin aproximación): por
-   * eso el arte de la carta y los tonos medios no cambian en nada. Solo lo que pasa del
-   * codo se comprime, con una exponencial que se acerca al blanco sin llegar nunca a
-   * recortarse — así el degradado del brillo sobrevive.
+   * NO es una copia de textura en coordenada desplazada (que es lo que triplicaba el
+   * wordmark): el offset lo produce una perturbación de NORMAL, así que la imagen reflejada
+   * es siempre la misma zona del entorno deformada, nunca el texto repetido.
    */
-  vec3 hdrComprimir(vec3 c) {
-    // El codo sale del uniform (y no de una constante generada): así el tuner lo mueve en
-    // vivo y se puede medir con él a distintos valores sin recompilar el material.
-    vec3 codo = vec3(clamp(uHdrKnee, 0.05, 1.0));
-    vec3 sobre = max(c - codo, 0.0);
-    vec3 rango = vec3(max(1.0 - clamp(uHdrKnee, 0.05, 1.0), 0.05) * ${f(CFG.HDR.headroom)});
-    return min(c, codo) + (1.0 - codo) * (1.0 - exp(-sobre / rango));
+  vec3 metalReflejo(vec2 uv, float cobertura, out float peso) {
+    peso = 0.0;
+    if (cobertura <= 0.0 || uMetalReflect <= 0.0) return vec3(0.0);
+    vec2 abollado = bgNoiseNormal(uv * uMetalBumpScale)
+      / max(uBgNoiseStrength, 0.05) * uMetalBump;
+    /**
+     * LA COORDENADA DEL ENTORNO. Aquí está el detalle que hace que se lea como espejo.
+     *
+     * Primer intento (fallo medido): se comprimía todo alrededor del centro con
+     * (uv - 0.5) * curvatura. Como la carta es PLANA y mira al frente, eso mandaba toda la
+     * placa a la MISMA zona del cielo — la más clara y uniforme — así que el metal no
+     * reflejaba estructura, solo se BLANQUEABA: medido, la desviación de la placa caía de
+     * 63 a 33 al subir el reflejo (se aplanaba hacia blanco) en vez de ganar detalle.
+     *
+     * Un espejo plano refleja el entorno que tiene delante: la muestra correcta está en la
+     * MISMA zona que el metal, y lo que la convierte en reflejo de superficie es el
+     * ABOLLADO (las micro-facetas del pulido). Así el metal hereda la ESTRUCTURA del cielo
+     * —nubes claras y huecos oscuros— en su propio sitio, que es lo que de verdad se lee
+     * como "reflejo tipo espejo" y no como un baño de blanco.
+     *
+     * La curvatura se queda como perilla de énfasis, mucho más suave.
+     */
+    vec2 espejo = clamp(uv + abollado + (uv - 0.5) * ${f(CFG.METAL_REFLECT.curvature)}, 0.0, 1.0);
+    /**
+     * EL ENTORNO ES SU PROPIO MAPA, no el fondo de la carta.
+     *
+     * Primera versión: el reflejo leía uLayer0 (el fondo del VTuber). Estaba mal por dos
+     * motivos: (1) si el VTuber no tiene fondo subido esa capa está vacía y el metal salía
+     * NEGRO — medido, justo el caso de "si el background no existe, que lo deje
+     * transparente"; y (2) aunque hubiera fondo, el metal reflejaba el ARTE del personaje.
+     *
+     * Un reflejo describe DÓNDE ESTÁ el metal, no qué hay impreso detrás, así que su imagen
+     * es una foto de cielo propia (components/metal-env.webp). Con su propio alfa, la
+     * cobertura se resuelve DENTRO del mapa: donde no hay entorno el reflejo simplemente no
+     * entra, sin perillas extra ni casos especiales.
+     */
+    vec4 env = texture2D(uMetalEnvMap, espejo);
+    /**
+     * PESO DEL REFLEJO: la fuerza del metal por la cobertura del entorno.
+     *
+     * OJO CON EL ÁMBITO (defecto real, dos veces): este peso se calculó leyendo
+     * layer1..layer5, que son locales de main() — el programa NO compilaba (glError 1282,
+     * carta entera en negro) sin un solo error en tsc, en los tests ni en check-shaders. Y
+     * la lectura del entorno tiene que ir ANTES del peso porque el peso usa su alfa; al
+     * revés el error es 'env : undeclared identifier'. Los dos fallos se ven SOLO al
+     * compilar el GLSL de verdad, que es exactamente para lo que está el harness.
+     */
+    peso = clamp(cobertura * uMetalReflect * env.a, 0.0, 1.0);
+    /**
+     * EL REFLEJO SE NORMALIZA POR EL GRIS MEDIO DEL ENTORNO.
+     *
+     * POR QUÉ (fallo medido, muy visible)
+     * ----------------------------------
+     * Multiplicar el metal por el cielo tal cual lo ACLARA en vez de modularlo: la imagen del
+     * entorno es muy clara (gris medio 0.826, medido: 210.6/255), así que el metal hereda ese
+     * blanco y la superficie se lava. Se veía en la placa del título, que pasaba de 146 a 183
+     * de luminancia al encender el reflejo — más clara, pero con menos color del metal.
+     *
+     * Dividiendo por su propio gris medio, el entorno pasa a modular EN TORNO a la luminancia
+     * del metal: las zonas claras del cielo suben un poco, las oscuras bajan, y el gris queda
+     * igual. Eso es lo que diferencia un REFLEJO de un BAÑO DE LUZ, y hace que el reflejo
+     * funcione con cualquier imagen de entorno, clara u oscura.
+     */
+    vec3 gris = vec3(${f(CFG.METAL_REFLECT.envMean)});
+    return env.rgb / max(gris, vec3(0.05));
+  }
+
+  /**
+   * COMPRESIÓN DEL CANAL DE LUZ (el rolloff del brillo).
+   *
+   * POR QUÉ SE COMPRIME LA LUZ SOLA Y NO EL COLOR SUMADO (fallo medido)
+   * ------------------------------------------------------------------
+   * La primera versión comprimía el color ya compuesto con un codo alto. Sobre un fondo
+   * oscuro se veía bien, pero con una imagen CLARA el arte cae por encima del codo y la
+   * compresión se lo come: medido con un cielo de nubes (arte ~212), un codo en 0.45
+   * dejaba el cielo en 206 y uno en 0.25 en 186 — el HDR OSCURECÍA la imagen en lugar de
+   * darle brillo, y el efecto era invisible justo en el caso que se quería lucir.
+   *
+   * Aquí la luz se comprime en su PROPIO canal: entra empezando en 0, así que no hay zona
+   * de identidad que respetar y el ARTE no se toca nunca (por claro que sea). El rolloff
+   * es suave y se acerca al techo sin llegar a recortarse, que es lo que da el aspecto de
+   * luz con rango en vez de mancha plana.
+   */
+  vec3 hdrLuz(vec3 luz) {
+    float techo = max(uHdrCeiling, 0.05);
+    vec3 x = max(luz, 0.0) / techo;
+    return techo * (x / (1.0 + x * ${f(1 / CFG.HDR.headroom)}));
   }
 
   /**
@@ -864,9 +953,30 @@ ${FACTION_SIZES}
     // Solo las capas de metal: el título (3) y el wordmark (6).
     float sheenMask = clamp(max(layer3.a, layer6.a), 0.0, 1.0);
     // El barrido del metal ES luz: entra en el canal de luz para que el HDR lo lleve por
-    // encima de blanco y el codo le devuelva el degradado (si se sumara al pigmento se
+    // encima de blanco y su rolloff le devuelva el degradado (si se sumara al pigmento se
     // recortaría en una mancha blanca plana).
-    luzExtra += sheenAmount * sheenMask;
+    float sheenNucleo = sheenAmount * sheenMask;
+    luzExtra += sheenNucleo;
+
+    /**
+     * EL HALO DEL REFLEJO SE ELIMINÓ (petición del usuario: "borra el halo de reflejo").
+     *
+     * POR QUÉ SE FUE Y QUÉ DEJÓ APRENDIDO
+     * ----------------------------------
+     * Se había añadido para que la luz "sangrara" fuera del metal, porque un brillo
+     * encerrado en su silueta no lee como luz de cámara. Pero el barrido es una coordenada
+     * 1-D: "estar cerca del reflejo" define una LÍNEA diagonal sobre toda la carta, no un
+     * punto, así que el halo iluminaba esa línea entera. Peor: al dilatarse leyendo la
+     * textura del metal en puntos DESPLAZADOS, pintaba copias desplazadas del texto — el
+     * wordmark "VTUBERDEX" salía TRIPLICADO (con la capa apagada, o con el barrido a 0,
+     * desaparecía: el culpable era el halo, no el texto).
+     *
+     * La lección queda escrita porque es la trampa de esta carta: cualquier efecto que
+     * muestree una capa de TEXTO en una coordenada desplazada REPLICA ese texto. El brillo
+     * especular de verdad (que sí sangra) se resuelve abajo con la reflexión de entorno,
+     * donde el desplazamiento es de una perturbación de NORMAL sobre el metal, no una copia
+     * de la textura.
+     */
 
     /**
      * CAPA 0: el FONDO del VTuber, por DEBAJO del personaje.
@@ -1076,6 +1186,37 @@ ${FACTION_SIZES}
     // Barrido extra, más brillante, para el destello del metal.
     luzExtra += plateado * bandaBorde * filoMetal * ${f(CFG.METAL_BORDER.sparkleWeight)} * sinLogo;
 
+    /**
+     * REFLEJO DE ESPEJO DEL METAL (petición: "reflejo tipo espejo con la imagen que te
+     * adjunté"). El cielo se refleja DENTRO del acero: se perturba la normal con el ruido
+     * de superficie, se refleja la dirección de vista y se lee el entorno — que es la
+     * imagen del fondo, ya enlazada.
+     *
+     * Va al canal de LUZ y no al pigmento: es un reflejo especular, no pintura. Y por eso
+     * pasa por el HDR, que es lo que le da el rango (núcleo brillante con caída) en vez de
+     * una mancha blanca plana.
+     *
+     * La cobertura es la máscara del metal (título y wordmark): el reflejo NO puede caer
+     * sobre el personaje. Y como la perturbación es de NORMAL, no un desplazamiento de
+     * textura, esto NO replica el texto (que fue el defecto del halo eliminado).
+     */
+    float pesoEspejo = 0.0;
+    vec3 entorno = metalReflejo(vUv, sheenMask, pesoEspejo);
+    /**
+     * El metal se MODULA con el entorno: su color multiplicado por lo que refleja. Es la
+     * diferencia entre un espejo y un baño de blanco.
+     *
+     * Medido: sumarlo a la luz subía la media de la placa (182 -> 226) pero BAJABA su
+     * desviación (63 -> 33), o sea que la aplanaba — un metal más claro pero con menos
+     * estructura, que es justo lo contrario de un reflejo. Multiplicando el pigmento, la
+     * placa conserva su contraste y hereda la estructura del cielo: nubes claras y huecos
+     * oscuros dentro del acero.
+     *
+     * El refuerzo devuelve el brillo que se come la exposición del entorno, para que el
+     * reflejo se vea sin lavar el color del metal.
+     */
+    lit = mix(lit, lit * entorno * uMetalGain, pesoEspejo);
+
     // Viñeta suave: solo un poco de caída en las esquinas. Antes bajaba muy por
     // debajo de 1 y oscurecía los bordes del arte; el suelo de VIGNETTE mantiene el
     // foco sin apagar la imagen.
@@ -1085,19 +1226,21 @@ ${FACTION_SIZES}
       distance(vUv, vec2(0.5))
     );
     /**
-     * COMPOSICIÓN HDR: se suma la luz AMPLIFICADA y se comprime después.
+     * COMPOSICIÓN HDR: el arte intacto, la luz AMPLIFICADA y comprimida en su canal.
      *
-     * El ORDEN es lo que importa: primero se amplifica y se suma (los reflejos llegan a
-     * pasar de 1.0), y solo entonces se comprime con el codo. Si se recortara al sumar,
-     * el brillo perdería su degradado y volvería a ser la mancha plana de antes.
+     * El ORDEN es lo que importa:
+     *   1. se amplifica el canal de luz (los reflejos pasan de 1.0),
+     *   2. se comprime ESE canal con su rolloff (no el color ya sumado),
+     *   3. y solo entonces se suma sobre el arte.
      *
-     * La viñeta se aplica al pigmento y la luz por separado y ANTES del codo, para que el
-     * oscurecimiento de las esquinas no se cuele en la compresión (si no, la esquina
-     * oscura se comprimiría como si fuera una luz).
+     * Comprimir después de sumar era el fallo de la primera versión: con un fondo claro el
+     * arte cae por encima del codo y la compresión lo oscurecía. Comprimiendo la luz por
+     * separado, el arte no se toca NUNCA y el brillo conserva su degradado.
+     *
+     * La viñeta va al final, sobre el resultado: es atenuación de la carta, no luz.
      */
-    float vin = mix(${f(CFG.VIGNETTE.floor)}, ${f(CFG.VIGNETTE.ceiling)}, vignette);
-    vec3 color = lit * vin + luzExtra * vin * uHdrBoost;
-    color = hdrComprimir(color);
+    vec3 luzFinal = hdrLuz(max(luzExtra, 0.0) * uHdrBoost);
+    vec3 color = (lit + luzFinal) * mix(${f(CFG.VIGNETTE.floor)}, ${f(CFG.VIGNETTE.ceiling)}, vignette);
 
     /**
      * El brillo de marca NO se pinta aquí.

@@ -171,9 +171,19 @@ const LITERALES_LEGITIMOS = [
   // interpolación (estructura matemática), no una intensidad ajustable.
   { valor: '3.0', en: /f\s*\*\s*f\s*\*\s*\(\s*3\.0\s*-\s*2\.0\s*\*\s*f\s*\)/ },
   { valor: '2.0', en: /f\s*\*\s*f\s*\*\s*\(\s*3\.0\s*-\s*2\.0\s*\*\s*f\s*\)/ },
-  // COTA del codo HDR: evita que un knee en 0 deje el rango en cero (división por cero) o
-  // que en 1 no quede margen para comprimir. Es protección del cálculo, no un ajuste.
-  { valor: '0.05', en: /clamp\(\s*uHdrKnee,\s*0\.05,\s*1\.0\s*\)|max\(\s*1\.0\s*-\s*clamp\([^)]*\),\s*0\.05\s*\)/ },
+  // COTA del techo HDR: evita dividir por cero si el techo llega a 0. Es protección del
+  // cálculo, no un ajuste (el techo real vive en HDR.lightCeiling).
+  { valor: '0.05', en: /max\(\s*uHdrCeiling,\s*0\.05\s*\)/ },
+  // SUELO del ruido al usarlo como perturbación de normal del espejo: evita dividir por
+  // cero cuando la textura de superficie está apagada. Protección, no ajuste.
+  { valor: '0.05', en: /max\(\s*uBgNoiseStrength,\s*0\.05\s*\)/ },
+  // SUELO del gris medio del entorno al normalizar el reflejo: evita dividir por cero si la
+  // imagen de entorno fuese negra. Protección del cálculo, no un ajuste (el gris real vive
+  // en METAL_REFLECT.envMean).
+  { valor: '0.05', en: /max\(\s*gris,\s*vec3\(\s*0\.05\s*\)\)/ },
+  // CENTRO del UV: la proyección de esfera del reflejo se pivota en el medio de la carta.
+  // Es geometría, no una intensidad (y la fuerza del reflejo va por uMetalReflect).
+  { valor: '0.5', en: /uv\s*-\s*vec2\(\s*0\.5\s*\)|0\.5\s*\+\s*dir/ },
 ];
 
 const problemas = [];

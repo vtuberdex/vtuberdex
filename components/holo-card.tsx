@@ -21,6 +21,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import type { VtuberCard } from '@/lib/types';
+import metalEnvUrl from './metal-env.webp';
 import { cardPalette } from '@/lib/color';
 import * as CFG from '@/components/card3d-config';
 import { live, tocada } from '@/components/card3d-live';
@@ -116,6 +117,8 @@ function CardMesh({
     edge: THREE.CanvasTexture;
     logoMask: THREE.CanvasTexture;
     logoSticker: THREE.CanvasTexture;
+    /** Mapa de entorno del reflejo de espejo del metal (puede faltar). */
+    envMap: THREE.CanvasTexture | null;
   } | null>(null);
   const palette = useMemo(() => cardPalette(card.themeColor, card.secondaryColor), [card.themeColor, card.secondaryColor]);
 
@@ -153,11 +156,18 @@ function CardMesh({
   useEffect(() => {
     let cancelled = false;
     const artSrc = card.images.character ?? card.images.card ?? '';
+    /**
+     * El MAPA DE ENTORNO del reflejo de espejo se carga en el MISMO Promise.all que las
+     * capas. Va aparte del fondo a propósito: el reflejo describe dónde está el metal, no
+     * qué hay impreso detrás (ver METAL_REFLECT). Se pide el arte del personaje como
+     * respaldo para que el conjunto no se rechace si el entorno no está.
+     */
     Promise.all([
       loadImage(artSrc),
       loadImage(card.images.logo ?? ''),
       loadImage(card.images.background ?? ''),
-    ]).then(([art, logo, background]) => {
+      loadImage(metalEnvUrl as unknown as string).catch(() => null),
+    ]).then(([art, logo, background, envMap]) => {
       if (cancelled) return;
       const width = textureWidth ?? CARD_TEXTURE_FULL_WIDTH;
 
@@ -218,11 +228,22 @@ function CardMesh({
         logoBox && logo ? logoSticker(logo, logoBox, width, flatCanvas.height) : emptyCanvas,
       );
 
+      const envTexture = envMap
+        ? (() => {
+            const t = new THREE.CanvasTexture(envMap);
+            t.colorSpace = THREE.SRGBColorSpace;
+            t.anisotropy = 8;
+            t.needsUpdate = true;
+            return t;
+          })()
+        : null;
+
       setTextures({
         layers,
         edge: edgeTexture,
         logoMask: logoMaskTexture,
         logoSticker: logoStickerTexture,
+        envMap: envTexture,
       });
     });
     return () => {
@@ -309,18 +330,24 @@ function CardMesh({
       uBgTiltFactor: { value: CFG.BACKGROUND.tiltFactor as number },
       uBgArtFloor: { value: CFG.BACKGROUND.artFloor as number },
       /**
-       * HDR: codo y ganancia de luces. Van como uniforms (no como literales del shader)
-       * para poder medirlos y ajustarlos en vivo: el codo es la perilla que decide cuánto
-       * se comprimen los reflejos, y sin poder moverla no habría forma de calibrarla.
+       * HDR: ganancia de luces y techo del canal de luz. Van como uniforms (no como
+       * literales del shader) para poder medirlos y ajustarlos en vivo: el techo decide
+       * cuánta luz puede llegar a sumarse sobre el arte, y sin poder moverlo no habría
+       * forma de calibrarlo.
        */
       uHdrBoost: { value: CFG.HDR.highlightBoost as number },
-      uHdrKnee: { value: CFG.HDR.knee as number },
+      uHdrCeiling: { value: CFG.HDR.lightCeiling as number },
       /**
        * Textura de micro-superficie del fondo. Es un uniform y no una constante del
        * shader por la misma razón: con 0 el fondo vuelve a ser la lámina lisa, que es la
        * comparación exacta para medir cuánto aporta el ruido.
        */
       uBgNoiseStrength: { value: CFG.BG_NOISE.normalStrength as number },
+      uMetalReflect: { value: CFG.METAL_REFLECT.strength as number },
+      uMetalBump: { value: CFG.METAL_REFLECT.bump as number },
+      uMetalBumpScale: { value: CFG.METAL_REFLECT.bumpScale as number },
+      uMetalEnvMap: { value: null as THREE.Texture | null },
+      uMetalGain: { value: CFG.METAL_REFLECT.gain as number },
       uLogoParallax: { value: CFG.LOGO.parallax as number },
       uParallaxFactors: { value: new Float32Array(CFG.LAYER_PARALLAX_FACTORS) },
     };
@@ -349,6 +376,7 @@ function CardMesh({
     uniforms.front.uEdgeMap.value = textures.edge;
     uniforms.front.uLogoMask.value = textures.logoMask;
     uniforms.front.uLogoSticker.value = textures.logoSticker;
+    uniforms.front.uMetalEnvMap.value = textures.envMap;
   }, [textures, uniforms]);
 
   useEffect(() => {
@@ -392,8 +420,9 @@ function CardMesh({
     uniforms.front.uBgGlareStrength.value = live.bgGlareStrength;
     uniforms.front.uBgArtFloor.value = live.bgArtFloor;
     uniforms.front.uBgNoiseStrength.value = live.bgNoise;
+    uniforms.front.uMetalReflect.value = live.metalReflect;
     uniforms.front.uHdrBoost.value = live.hdrBoost;
-    uniforms.front.uHdrKnee.value = live.hdrKnee;
+    uniforms.front.uHdrCeiling.value = live.hdrCeiling;
     uniforms.front.uLogoParallax.value = live.logoParallax;
     uniforms.front.uGlossSelf.value = live.glossSelf;
     uniforms.front.uHoloSelf.value = live.holoSelf;
