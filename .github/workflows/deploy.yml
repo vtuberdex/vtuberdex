@@ -46,9 +46,9 @@ jobs:
   gates:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           # Node 24 en CI, que es lo que corre en Vercel. El `node:sqlite` que usa
           # `server/src/db/index.mjs` exige Node >= 22 y en 24 ya es estable.
@@ -105,9 +105,9 @@ jobs:
       VERCEL_ORG_ID: team_fKn351AbkXqpfkgftAQT44OI
       VERCEL_PROJECT_ID: prj_mwKD7oLVWwERnmIWiH9lNBFMhLQy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
 
