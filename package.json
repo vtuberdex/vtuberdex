@@ -17,6 +17,8 @@
     "typecheck": "tsc --noEmit",
     "check:shaders": "node scripts/check-shaders.mjs",
     "verify": "node scripts/verify-vercel-bundle.mjs",
+    "probe:timings": "node scripts/probe-timings.mjs",
+    "bench:ediciones": "node scripts/bench-ediciones.mjs",
     "build:data": "node scripts/build-db.mjs",
     "publish:images": "node scripts/publish-images.mjs",
     "admin:hash": "node scripts/admin-hash.mjs",
