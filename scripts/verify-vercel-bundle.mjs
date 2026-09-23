@@ -269,12 +269,21 @@ async function main() {
     `skills=${detailJson.skills?.length} stats=${detailJson.stats?.length} assets=${detailJson.assets?.length}`,
   );
 
-  const meta = await request(port, '/api/meta');
-  const metaJson = JSON.parse(meta.body || '{}');
+  /*
+   * Las facetas se comprueban en la lista, NO en `/api/meta`.
+   *
+   * Ese endpoint se retiró (no lo consumía nadie: el panel se llena con las `facets` de
+   * esta misma respuesta, pedida con `facet=all`). La comprobación se movió aquí en vez de
+   * borrarse, porque "31 países" es un dato del catálogo que sí conviene vigilar: si la
+   * consulta de facetas se rompiera, el panel de filtros saldría vacío y ningún otro check
+   * lo notaría — `/api/vtubers` respondería 200 con la lista intacta.
+   */
+  const facet = await request(port, '/api/vtubers?facet=all&perPage=3');
+  const facetJson = JSON.parse(facet.body || '{}');
   check(
     'facetas calculadas en la base (31 países)',
-    meta.status === 200 && metaJson.countries?.length === 31,
-    `países=${metaJson.countries?.length}`,
+    facet.status === 200 && facetJson.facets?.countries?.length === 31,
+    `países=${facetJson.facets?.countries?.length}`,
   );
 
   const filtered = await request(port, '/api/vtubers?countries=chile&sort=power&perPage=2');

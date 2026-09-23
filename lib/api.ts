@@ -4,7 +4,6 @@
  */
 import type {
   ApiListResponse,
-  ApiMetaResponse,
   Neighbors,
   UploadKind,
   VtuberDetail,
@@ -63,13 +62,10 @@ export const api = {
   detail(slug: string, signal?: AbortSignal): Promise<VtuberDetail & { neighbors: Neighbors }> {
     return request(`/api/vtubers/${encodeURIComponent(slug)}`, { signal });
   },
-  meta(params: { language?: string | null; q?: string } = {}, signal?: AbortSignal) {
-    const query = new URLSearchParams();
-    if (params.language) query.set('language', params.language);
-    if (params.q) query.set('q', params.q);
-    const suffix = query.toString() ? `?${query}` : '';
-    return request<ApiMetaResponse>(`/api/meta${suffix}`, { signal });
-  },
+  /**
+   * `GET /api/meta` se retiró (ver `app/api/health/route.js`): las facetas viajan en
+   * `api.list()` con `facet=all`, que es lo que el panel de filtros consume de verdad.
+   */
   login(username: string, password: string) {
     return request<{ token: string; user: { username: string; role: string } }>('/api/admin/login', {
       method: 'POST',
@@ -130,5 +126,3 @@ export const api = {
     }>('/api/admin/audit', { headers: { authorization: `Bearer ${token}` } });
   },
 };
-
-export { BASE as API_BASE };

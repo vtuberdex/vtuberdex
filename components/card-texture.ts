@@ -710,10 +710,6 @@ export function drawCardFront(input: CardDrawInfo): HTMLCanvasElement {
   return canvas;
 }
 
-export function canvasToTextureSource(canvas: HTMLCanvasElement): HTMLCanvasElement {
-  return canvas;
-}
-
 export function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     if (!src) {
@@ -826,22 +822,5 @@ export function logoSticker(logo: CanvasImageSource, box: { x: number; y: number
   if (!ctx) return canvas;
   ctx.scale(width / CARD_TEXTURE_WIDTH, width / CARD_TEXTURE_WIDTH);
   ctx.drawImage(logo, box.x, box.y, box.w, box.h);
-  return canvas;
-}
-
-export function backlightGlow(color: string, size = 256): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return canvas;
-  const half = size / 2;
-  const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
-  gradient.addColorStop(0, rgba(color, 0.85));
-  gradient.addColorStop(0.35, rgba(color, 0.4));
-  gradient.addColorStop(0.68, rgba(color, 0.12));
-  gradient.addColorStop(1, rgba(color, 0));
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
   return canvas;
 }

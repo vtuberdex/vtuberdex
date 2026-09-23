@@ -177,10 +177,3 @@ export function observeCard(element: Element, listener: Listener): () => void {
     if (granted.delete(entry)) rebalance();
   };
 }
-
-/** Para los tests: limpia el estado del reparto entre casos. */
-export function __resetCardVisibility(): void {
-  for (const element of entries.keys()) observer?.unobserve(element);
-  entries.clear();
-  granted.clear();
-}

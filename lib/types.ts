@@ -165,10 +165,6 @@ export interface ApiListResponse {
   facets: Facets | null;
 }
 
-export interface ApiMetaResponse extends Facets {
-  generatedAt: string | null;
-}
-
 export interface Neighbors {
   /** Vecinos de dex para navegar sin volver al catálogo. */
   prev: { dexNumber: number; slug: string; name: string } | null;

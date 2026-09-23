@@ -54,19 +54,3 @@ export function createSessionStore({ ttlMs = SESSION_TTL_MS } = {}) {
     },
   };
 }
-
-/** Middleware de Express: exige sesión válida en rutas de escritura. */
-export function requireSession(sessions) {
-  return (req, res, next) => {
-    const header = req.get('authorization') ?? '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-    const user = token ? sessions.read(token) : null;
-    if (!user) {
-      res.status(401).json({ error: 'no_autenticado' });
-      return;
-    }
-    req.user = user;
-    req.sessionToken = token;
-    next();
-  };
-}

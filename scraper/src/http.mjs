@@ -16,14 +16,6 @@ export function toAbsolute(relative) {
   return new URL(relative.replace(/^\.?\//, ''), BASE_URL).toString();
 }
 
-/** URL-encodea solo los caracteres peligrosos, preservando el nombre original. */
-export function encodePath(relative) {
-  return relative
-    .split('/')
-    .map((segment) => encodeURIComponent(decodeURIComponent(segment)))
-    .join('/');
-}
-
 export function isSoft404(html) {
   return html.length === INDEX_HTML_SIZE && html.includes(INDEX_HTML_MARKER);
 }

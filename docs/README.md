@@ -129,7 +129,6 @@ Si la IP del host cambia, el script la detecta solo (contenedor en `--network ho
 | GET | `/api/health` | Estado y conteos publicados |
 | GET | `/api/vtubers` | Búsqueda paginada (`q`, `countries`, `languages`, `groups`, `artists`, `factions`, `sort`, `page`, `perPage`, `facet`) |
 | GET | `/api/vtubers/:slug` | Detalle + vecinos de dex |
-| GET | `/api/meta` | Facetas globales y fecha del dataset |
 | POST | `/api/admin/login` | Sesión del mantenedor |
 | PATCH | `/api/admin/vtubers/:id` | Edición (nombre, color, visibilidad, relaciones) |
 | POST | `/api/admin/vtubers/bulk-status` | Visibilidad en lote |

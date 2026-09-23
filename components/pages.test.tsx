@@ -72,7 +72,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api')>();
   return {
     ...original,
-    api: { list: vi.fn(), detail: vi.fn(), meta: vi.fn() },
+    api: { list: vi.fn(), detail: vi.fn() },
   };
 });
 

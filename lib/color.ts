@@ -90,8 +90,3 @@ export function cardPalette(themeColor: string | null, secondaryColor: string | 
 export function gradientCss(accent: string, secondary: string, angle = 135): string {
   return `linear-gradient(${angle}deg, ${accent} 0%, ${secondary} 100%)`;
 }
-
-/** Versión RGBA de un color con alpha variable (halos y sombras). */
-export function glowShadow(accent: string, strength = 0.35, blur = 32): string {
-  return `0 0 ${blur}px ${rgba(accent, strength)}`;
-}

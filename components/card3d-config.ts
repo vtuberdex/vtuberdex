@@ -1051,19 +1051,8 @@ export const PARALLAX_LAYERS = [
 ] as const;
 
 export type LayerName = typeof PARALLAX_LAYERS[number]['name'];
-export const LAYER_COUNT = PARALLAX_LAYERS.length;
 export const LAYER_UNIFORM_NAMES: string[] = PARALLAX_LAYERS.map((l) => `uLayer${l.index}`);
 export const LAYER_PARALLAX_FACTORS: number[] = PARALLAX_LAYERS.map((l) => l.factor);
-export const LAYER_SCALES: number[] = PARALLAX_LAYERS.map((l) => l.scale);
-export const LAYER_LABELS: Record<LayerName, string> = {
-  background: 'Fondo',
-  character: 'Personaje',
-  logo: 'Logo',
-  title: 'Título',
-  texts: 'Textos',
-  tags: 'Tags',
-  wordmark: 'VTUBERDEX',
-};
 
 /**
  * Resplandor de marca ALREDEDOR de la carta (plano aparte, aditivo).
