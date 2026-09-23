@@ -167,40 +167,14 @@ export function DetailPage({ slug }: { slug: string }) {
               </div>
             </div>
 
-            {data.images.logo && (
-              /**
-               * Logo del header de la ficha: ALTO FIJO, ANCHO relativo.
-               *
-               * Reglas (medidas, no estimadas):
-               *   - El bloque de texto del header mide 118px en desktop/laptop y
-               *     103px en móvil, así que el tope de "2x el header" es ~236px.
-               *   - El ALTO se fija ahí con un valor fluido que respeta el tope:
-               *     `clamp(96px, 22vw, 236px)`. Usar `em` no servía: el logo vive
-               *     dentro de un `flex`, donde su tamaño relativo no lo marca el
-               *     texto del header.
-               *   - El ANCHO es libre (`w-auto`), con un tope del 100% del
-               *     contenedor para que no desborde en móvil. Así un logo
-               *     apaisado crece a lo ancho y uno cuadrado se queda en 236.
-               *   - `object-contain` evita cualquier deformación.
-               * Antes era `h-auto w-full`: el alto lo decidía la proporción del
-               * archivo y llegaba a 251px, por encima del límite pedido.
-               *
-               * Va en su PROPIA fila, centrado bajo el bloque de número+nombre,
-               * no como tercer elemento del `flex` del header: ahí competía por
-               * el ancho con el texto (que es `flex-1`) y quedaba pegado al
-               * borde derecho de la tarjeta. Al ser un bloque de ancho completo,
-               * `justify-center` lo centra respecto de TODO el header, no
-               * respecto del hueco que le dejaba el nombre.
-               */
-              <div className="mt-4 flex justify-center">
-                <img
-                  src={data.images.logo}
-                  alt={`Logo de ${data.name}`}
-                  style={{ height: 'clamp(96px, 22vw, 236px)' }}
-                  className="w-auto max-w-full object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.6)]"
-                />
-              </div>
-            )}
+            {/*
+              Aquí iba el LOGO del header de la ficha, como `<img>` suelto en su propia
+              fila centrada. Se retiró: la marca ya se dibuja DENTRO de la carta 3D
+              (capa 2 + sticker, con su paralaje, su metal y sus efectos), así que la
+              ficha mostraba el MISMO logo dos veces en la misma pantalla — el de la
+              carta y este. Queda uno solo, el de la carta, que es el que lleva el
+              acabado de la pieza; este era un duplicado plano sin tratamiento.
+            */}
 
             {data.phrase && <p className="mt-4 max-w-3xl text-sm leading-relaxed text-dex-ink/90">{data.phrase}</p>}
 

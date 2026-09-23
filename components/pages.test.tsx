@@ -228,26 +228,44 @@ describe('DetailPage', () => {
     });
     renderDetail();
 
-    const logo = await screen.findByAltText('Logo de GKuro Monochrome');
-    expect(logo.getAttribute('src')?.startsWith('/images/')).toBe(true);
+    /**
+     * El ARTE del personaje es el que tiene que llevar ruta absoluta: va al `<img>`
+     * de la carta, y una ruta relativa se rompería en `/v/:slug`. Antes esta prueba
+     * miraba el logo del header, que ya no existe (se retiró por duplicar la marca
+     * que la carta 3D ya dibuja).
+     */
+    const arte = await screen.findByAltText('GKuro Monochrome');
+    expect(arte.getAttribute('src')?.startsWith('/images/')).toBe(true);
     // El radar ya no se renderiza como imagen: sus datos los dibuja `StatBars`.
     expect(screen.queryByAltText('Radar de GKuro Monochrome')).not.toBeInTheDocument();
     expect(screen.getByTestId('stat-bars')).toBeInTheDocument();
   });
 
-  it('el logo va en su propia fila centrada, no como hermano del título', async () => {
+  it('NO repite el logo: la marca solo va dentro de la carta 3D', async () => {
     mockedApi.detail.mockResolvedValue({ ...makeDetail(), neighbors: { prev: null, next: null } });
     renderDetail();
 
-    const logo = await screen.findByAltText('Logo de GKuro Monochrome');
-    const heading = screen.getByRole('heading', { level: 1 });
-    const wrapper = logo.parentElement!;
+    /**
+     * El logo se dibuja en la textura de la carta (capa 2 + sticker). Tenerlo ADEMÁS
+     * como `<img>` en el header mostraba la misma marca dos veces en la misma
+     * pantalla, que es lo que reportaba el usuario.
+     */
+    expect(screen.queryByAltText('Logo de GKuro Monochrome')).not.toBeInTheDocument();
+  });
 
-    // El header NO debe contener el logo en la MISMA fila que el texto: ahí el
-    // bloque de texto (`flex-1`) se quedaba con el ancho sobrante y empujaba el
-    // logo al borde derecho de la tarjeta en vez de centrarlo bajo el nombre.
-    expect(wrapper.contains(heading)).toBe(false);
-    expect(wrapper.className).toContain('justify-center');
+  it('el header no mete la marca en la fila del título', async () => {
+    mockedApi.detail.mockResolvedValue({ ...makeDetail(), neighbors: { prev: null, next: null } });
+    renderDetail();
+
+    /**
+     * Este caso existía para comprobar que el logo del header iba en su propia fila
+     * centrada y no como hermano del `<h1>` (en el `flex` del header competía por el
+     * ancho con el texto `flex-1` y acababa pegado al borde derecho). El `<img>` se
+     * retiró porque duplicaba la marca de la carta, así que lo que se conserva es la
+     * garantía que sigue viva: la fila del título no aloja la marca.
+     */
+    const heading = await screen.findByRole('heading', { level: 1 });
+    expect(heading.parentElement?.querySelector('img')).toBeNull();
   });
 
   it('usa las intensidades fijas (sin sliders en la UI)', async () => {
