@@ -1,0 +1,120 @@
+# CI del repositorio: lint + gates + verificación del artefacto desplegable.
+#
+# POR QUÉ ESTE WORKFLOW EXISTE APARTE DEL DE DEPLOY
+# -------------------------------------------------
+# El repo es PRIVADO y de una organización en plan Hobby, así que Vercel no lo
+# conecta por integración Git y el deploy necesita un token (`.github/workflows/
+# deploy.yml`). Pero el CI tiene dos trabajos distintos y conviene no mezclarlos:
+#
+#   · Este (`ci.yml`) VALIDA. Corre en cada push —a cualquier rama— y en cada
+#     pull request, no necesita ningún secreto y su único resultado es verde o
+#     rojo. Es lo que se mira antes de mezclar trabajo.
+#   · `deploy.yml` PUBLICA. Solo en `master`, y con el token de Vercel.
+#
+# Antes de este archivo no había NINGÚN gate automático: `npm run lint` estaba
+# roto (ESLint 9 exige config plana y el repo no tenía ninguna), así que errores
+# que no ve ni `tsc` ni los tests —un `useEffect` mal formado, un import que no
+# resuelve, un `<img>` donde no toca— llegaban a `master` sin que nada avisara.
+#
+# QUÉ SE CORRE Y POR QUÉ ESE ORDEN
+# --------------------------------
+# De más barato a más caro, para que el fallo se vea en el paso más informativo:
+#
+#   1. `lint`          — segundos. Estilo, hooks de React, imports muertos.
+#   2. `typecheck`     — `tsc --noEmit` sobre todo el árbol TS/TSX.
+#   3. `check:shaders` — el guard de uniforms de GLSL. Ninguno de los otros dos
+#                        mira el shader (tsc lo lee como una cadena y los tests
+#                        corren sin WebGL a propósito), y el único síntoma de un
+#                        sampler de más es la carta NEGRA en el navegador.
+#   4. tests (3 suites)— vitest en la raíz; `node --test` en server y scraper.
+#                        Corren sin red y contra SQLite temporal.
+#   5. `build`         — `next build` real, con la base empaquetada.
+#   6. `verify`        — 32 comprobaciones sobre un `next start` real: catálogo,
+#                        FTS5, imágenes publicadas, base saneada, mantenedor
+#                        cerrado. El artefacto de datos se reutiliza de
+#                        `deploy/` porque `data/` no se versiona (ver
+#                        `scripts/verify-vercel-bundle.mjs`).
+#
+# Los tres paquetes npm tienen lockfile propio y los tres se instalan: los tests
+# de `server/` y `scraper/` no pueden correr sin su `node_modules`. El `lint` de
+# la raíz, en cambio, cubre los cuatro árboles de una sola pasada (incluidos
+# `server/` y `scraper/`), así que no hay un paso de lint por paquete.
+
+name: ci
+
+on:
+  # Todo push, en CUALQUIER rama: el sentido del CI es ver el rojo ANTES de
+  # mezclar, no después. El deploy se encarga aparte de publicar solo `master`.
+  #
+  # Sin filtro `branches:` a propósito. Un patrón glob mal escrito ahí es un fallo
+  # SILENCIOSO (el workflow no se dispara nunca y el repo parece "sin CI"), y no
+  # hay nada que ganar: este workflow no despliega nada.
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# Un CI por rama. `cancel-in-progress: true` al revés que en el deploy: aquí sí
+# conviene matar la corrida anterior si se empuja de nuevo, porque solo interesa
+# el resultado del último commit. Los deploys, en cambio, no se cancelan.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Node 24, el mismo que corre en Vercel. El `node:sqlite` que usa
+          # `server/src/db/index.mjs` exige >= 22 y en 24 ya es estable.
+          node-version: '24'
+          cache: npm
+          # Tres paquetes, tres lockfiles: sin declararlos la caché solo cubriría
+          # el de la raíz.
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            scraper/package-lock.json
+
+      # `npm ci` y no `npm install`: respeta el lockfile al pie de la letra, que
+      # es lo que hace reproducible el resultado. Falla si el lock y el
+      # package.json se desincronizan, que es justo lo que hay que detectar.
+      - name: Instalar dependencias (raíz)
+        run: npm ci
+
+      - name: Instalar dependencias (server y scraper)
+        run: |
+          npm ci --prefix server
+          npm ci --prefix scraper
+
+      - name: lint
+        run: npm run lint
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: check:shaders
+        run: npm run check:shaders
+
+      - name: tests (web)
+        run: npm test
+
+      - name: tests (server)
+        run: npm test --prefix server
+
+      - name: tests (scraper)
+        run: npm test --prefix scraper
+
+      - name: build
+        run: npm run build
+
+      # El paso más caro y el único que pide rutas por HTTP a un servidor real.
+      # Va al final: si algo anterior falla, no se paga el build completo.
+      - name: verify (escenario de producción)
+        run: npm run verify

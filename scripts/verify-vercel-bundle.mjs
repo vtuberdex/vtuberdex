@@ -154,8 +154,33 @@ const request = (port, pathname) =>
 
 async function main() {
   // 1. El artefacto de datos.
-  const built = spawnSync(process.execPath, [path.join(HERE, 'build-db.mjs')], { cwd: ROOT, encoding: 'utf8' });
-  check('artefacto de datos construido (base saneada + manifiesto)', built.status === 0, (built.stderr ?? '').slice(0, 200));
+  /**
+   * `--if-missing` SOLO cuando no hay base de desarrollo.
+   *
+   * Sin la bandera, `build-db.mjs` regenera `deploy/` a partir de
+   * `data/vtuberdex.db` —que es lo que se quiere en local tras un scrape o una
+   * edición en el mantenedor—, pero esa base NO está versionada (está en
+   * `.gitignore`: pesa 60 MB y es reproducible). En el CI no existe, así que sin
+   * esto el verificador moría en el primer paso con "falta la base de origen" y
+   * el gate completo del deploy quedaba fuera del CI.
+   *
+   * Con la bandera se reutilizan los artefactos que SÍ viajan en el repo
+   * (`deploy/data/vtuberdex.db` + `images.json`), que es exactamente lo que hace
+   * el build de Vercel. Lo que este verificador comprueba después —base saneada,
+   * 785 fichas, FTS5, rutas de imagen— es sobre ese artefacto, así que sigue
+   * siendo válido: no se salta ninguna comprobación.
+   */
+  const hayBaseDeDesarrollo = fs.existsSync(path.join(ROOT, 'data', 'vtuberdex.db'));
+  const argsBuild = hayBaseDeDesarrollo ? [] : ['--if-missing'];
+  const built = spawnSync(process.execPath, [path.join(HERE, 'build-db.mjs'), ...argsBuild], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+  check(
+    'artefacto de datos construido (base saneada + manifiesto)',
+    built.status === 0,
+    hayBaseDeDesarrollo ? '' : 'sin base de desarrollo: se reutiliza deploy/ (igual que Vercel)',
+  );
   if (built.status !== 0) return finish();
   auditArtifact();
 
