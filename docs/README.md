@@ -135,16 +135,24 @@ Si la IP del host cambia, el script la detecta solo (contenedor en `--network ho
 | POST | `/api/admin/vtubers/bulk-status` | Visibilidad en lote |
 | GET | `/api/admin/stats`, `/api/admin/audit` | Métricas y auditoría |
 
-## Tests
+## Tests y lint
 
 ```bash
-cd scraper && npm test      # 15 tests: parsers y normalización
-cd server  && npm test      # 32 tests: búsqueda, facetas, API HTTP y mantenedor
-cd web     && npm test      # 57 tests: utilidades, componentes, páginas y carta 3D
+npm test                   # 100 tests (vitest): utilidades, componentes, páginas y carta 3D
+npm run lint               # eslint . — cubre también server/ y scraper/
+npm run typecheck          # tsc --noEmit
+npm run check:shaders      # guard de uniforms de GLSL (ni tsc ni los tests lo ven)
+cd scraper && npm test     # 25 tests: parsers y normalización
+cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP y mantenedor
 ```
 
 Los tests del servidor corren contra una base SQLite temporal sembrada con un
 dataset de ejemplo: no tocan la base real ni la red.
+
+Todo esto —más `npm run build` y las 32 comprobaciones de `npm run verify`— lo
+corre GitHub Actions en cada push y cada PR (`.github/workflows/ci.yml`), sin
+necesitar ningún secreto. El deploy a producción es otro workflow (`deploy.yml`,
+solo `master`).
 
 ## Decisiones de diseño
 

@@ -14,10 +14,11 @@
 # el árbol. El workflow falla con un mensaje explícito si no está, en vez de dejar un
 # deploy a medias sin decir por qué.
 #
-# OJO CON LOS GATES: no se despliega si el repo no está verde. `typecheck` + `test` +
-# `check:shaders` son los tres gates que `tsc`, los tests y el build NO cubren entre sí
-# (el límite de samplers de GLSL, por ejemplo, no lo ve ninguno: solo la carta negra en
-# el navegador). Es más barato fallar aquí que publicar una carta rota.
+# OJO CON LOS GATES: no se despliega si el repo no está verde. `lint` + `typecheck`
+# + `test` + `check:shaders` son los gates que NO se cubren entre sí (el límite de
+# samplers de GLSL, por ejemplo, no lo ve ninguno: solo la carta negra en el
+# navegador; el lint es el único que mira los hooks de React y los imports muertos).
+# Es más barato fallar aquí que publicar una carta rota.
 
 name: deploy
 
@@ -69,6 +70,9 @@ jobs:
         run: |
           npm ci --prefix server
           npm ci --prefix scraper
+
+      - name: lint
+        run: npm run lint
 
       - name: typecheck
         run: npm run typecheck

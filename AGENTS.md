@@ -35,12 +35,16 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 99 tests (vitest): utilidades, componentes, páginas
+npm test                   # 100 tests (vitest): utilidades, componentes, páginas
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
+# Linter (raíz; cubre también server/ y scraper/)
+npm run lint               # eslint . — falla con cualquier error
+npm run lint:fix           # corrige lo corregible
+
 # Gate real antes de dar algo por terminado
-npm run typecheck && npm run build
+npm run lint && npm run typecheck && npm run build
 
 # Puesta en marcha
 cd scraper && npm install && npm run scrape      # reanudable: cachea el HTML
@@ -59,7 +63,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` cita 15/32/57 tests: son cifras **viejas**. Las reales son
-**25/59/99** (medidas). Si añades tests, actualiza aquí.
+**25/59/100** (medidas; el CI corre las tres). Si añades tests, actualiza aquí.
 
 ## Arquitectura: las reglas que no se negocian
 
@@ -203,9 +207,20 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
   texturas, capturas). Las sondas y `screenshots.mjs` esperan un Chrome en
   `CHROME_PATH` (`/opt/data/cache/chrome/...`), que **en este contenedor no
   existe**: `npm run shots` falla aquí hasta que se baje el binario.
-- **`npm run lint` está roto**: ESLint 9 exige `eslint.config.js` y no hay
-  ninguno en el repo. Los gates reales del front son `typecheck` + `build` +
-  `test`. Si arreglas el lint, quita esta nota.
+- **`npm run lint` YA FUNCIONA** (dejó de estar roto): ESLint 9 con config
+  plana en `eslint.config.mjs`, porque Next 16 **eliminó `next lint`** y la
+  config tiene que ser nuestra (ver
+  `node_modules/next/dist/docs/01-app/03-api-reference/05-config/03-eslint.md`).
+  Un solo `npx eslint .` cubre los CUATRO árboles del repo (front TS/TSX,
+  `scripts/`, `server/` y `scraper/`), así que no hay un lint por paquete.
+  Tres reglas de `react-hooks` v7 están **apagadas a propósito** — con el motivo
+  escrito en la config — porque marcan como error cómo funciona three.js
+  (`immutability` sobre los uniforms en `useFrame`), el patrón "latest callback
+  ref" del debounce de `SearchBar` (`refs`) y la carga de datos por `useEffect`
+  de todo el front (`set-state-in-effect`). `@next/next/no-img-element` también
+  va apagada: `next.config.mjs` tiene `images: { unoptimized: true }` porque las
+  imágenes salen de `/images/*` (Turso o disco), no de un dominio optimizable.
+  Si algún día se apaga el modo `unoptimized`, esa regla debería volver.
 - **`npm run palette` (scraper) apunta a `src/palette.mjs`, que no existe.**
 - **`server/src/seed.mjs` documenta un `--keep-edits` que no está
   implementado.** Los flags reales son `--reset`, `--dataset`, `--db`; por
@@ -302,6 +317,39 @@ npx vercel deploy --prod         # publica
    conecta repos de organizaciones en ese plan (limitación de plataforma). Se
    despliega con `vercel deploy`, o con un GitHub Action con token.
 
+### CI en GitHub Actions
+
+El repositorio es **privado y de una organización en plan Hobby**, así que Vercel
+no lo conecta por integración Git. Eso NO impide tener CI: `deploy.yml` ya
+publicaba con un token, y **`ci.yml` valida sin necesitar ningún secreto**.
+
+Dos workflows con trabajos distintos, a propósito:
+
+| Workflow | Cuándo | Qué hace |
+|---|---|---|
+| `ci.yml` | todo push (cualquier rama) y cada PR | lint, typecheck, check:shaders, las 3 suites, build y `verify` |
+| `deploy.yml` | solo `master` | los mismos gates + `vercel deploy --prod` con el secret `VERCEL_TOKEN` |
+
+```bash
+npm run lint      # eslint . — cubre front, scripts, server y scraper
+npm run verify    # 32 comprobaciones sobre next start real
+```
+
+Tres cosas del CI que no son obvias:
+
+1. **Los tres paquetes se instalan** (`npm ci` en la raíz, en `server/` y en
+   `scraper/`): los tests de server y scraper no corren sin su `node_modules`.
+   El `lint` de la raíz sí los cubre a los tres en una sola pasada.
+2. **`verify` funciona sin `data/`**, que no se versiona. `build-db.mjs` recibe
+   `--if-missing` cuando no hay base de desarrollo y reutiliza el artefacto de
+   `deploy/` —exactamente lo que hace el build de Vercel—, así que las 32
+   comprobaciones se corren igual sobre la base que se despliega. Antes moría en
+   el primer paso con "falta la base de origen".
+3. **`next build` en CI y `next dev` en local no comparten `.next/`** (ver la
+   trampa equivalente en «Desarrollo local»): en el runner son máquinas
+   distintas, así que no hay conflicto, pero **aquí no lances `npm run build`
+   con el dev server vivo** o la app se ve negra sin ningún error en los logs.
+
 ### Verificación del deploy
 
 `npm run verify` monta un escenario **sin los datos crudos de desarrollo**, arranca
@@ -343,7 +391,7 @@ añadirla a `USED_FOLDERS` de `scripts/build-db.mjs` y republicar.
 
 ## Verificación antes de decir "listo"
 
-1. `npm run typecheck && npm run build` (el build es el gate real).
+1. `npm run lint && npm run typecheck && npm run build` (el build es el gate real).
 2. `npm test` en el paquete que tocaste; si cambiaste el esquema o la búsqueda,
    corre también `server` y, si aplica, `scraper`.
 3. Si tocaste la carta 3D o el shader, **no basta con que compile**: mira la
