@@ -308,6 +308,19 @@ function CardMesh({
       uBgBaseMask: { value: CFG.BACKGROUND.baseMask as number },
       uBgTiltFactor: { value: CFG.BACKGROUND.tiltFactor as number },
       uBgArtFloor: { value: CFG.BACKGROUND.artFloor as number },
+      /**
+       * HDR: codo y ganancia de luces. Van como uniforms (no como literales del shader)
+       * para poder medirlos y ajustarlos en vivo: el codo es la perilla que decide cuánto
+       * se comprimen los reflejos, y sin poder moverla no habría forma de calibrarla.
+       */
+      uHdrBoost: { value: CFG.HDR.highlightBoost as number },
+      uHdrKnee: { value: CFG.HDR.knee as number },
+      /**
+       * Textura de micro-superficie del fondo. Es un uniform y no una constante del
+       * shader por la misma razón: con 0 el fondo vuelve a ser la lámina lisa, que es la
+       * comparación exacta para medir cuánto aporta el ruido.
+       */
+      uBgNoiseStrength: { value: CFG.BG_NOISE.normalStrength as number },
       uLogoParallax: { value: CFG.LOGO.parallax as number },
       uParallaxFactors: { value: new Float32Array(CFG.LAYER_PARALLAX_FACTORS) },
     };
@@ -378,6 +391,9 @@ function CardMesh({
     uniforms.front.uBgTiltFactor.value = live.bgTiltFactor;
     uniforms.front.uBgGlareStrength.value = live.bgGlareStrength;
     uniforms.front.uBgArtFloor.value = live.bgArtFloor;
+    uniforms.front.uBgNoiseStrength.value = live.bgNoise;
+    uniforms.front.uHdrBoost.value = live.hdrBoost;
+    uniforms.front.uHdrKnee.value = live.hdrKnee;
     uniforms.front.uLogoParallax.value = live.logoParallax;
     uniforms.front.uGlossSelf.value = live.glossSelf;
     uniforms.front.uHoloSelf.value = live.holoSelf;

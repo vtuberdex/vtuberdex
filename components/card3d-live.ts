@@ -108,6 +108,10 @@ export const KNOBS: readonly Knob[] = [
   { key: 'bgGlareStrength', label: 'Barrido del puntero', hint: 'El brillo del fondo que sigue al cursor', min: 0, max: 2, step: 0.01, config: 'BACKGROUND.glareStrength', grupo: 'fondo' },
   { key: 'bgParallax', label: 'Paralaje', hint: 'Cuánto se desplaza la capa de fondo; negativo va al contrario que el frente', min: -0.15, max: 0.15, step: 0.005, config: 'PARALLAX_LAYERS[0].factor', grupo: 'fondo' },
   { key: 'bgArtFloor', label: 'Brillo base del arte', hint: 'Subirlo aclara el fondo; bajarlo lo deja más apagado', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.artFloor', grupo: 'fondo' },
+  { key: 'bgNoise', label: 'Textura de la superficie', hint: 'Micro-relieve del fondo: 0 = lámina lisa, 0.07 = grano visible, ~0.13 el espectro empieza a plegarse', min: 0, max: 0.15, step: 0.005, config: 'BG_NOISE.normalStrength', grupo: 'fondo' },
+  // --- columna ACABADO (HDR) ----------------------------------------------
+  { key: 'hdrBoost', label: 'Intensidad de los reflejos', hint: 'Cuánto se pasan de blanco las LUCES (metal, canto, holograma). No toca el arte: subirlo hace los brillos más fogosos', min: 0, max: 4, step: 0.05, config: 'HDR.highlightBoost', grupo: 'frente' },
+  { key: 'hdrKnee', label: 'Codo del brillo', hint: 'Desde dónde empieza a comprimirse la luz. Bajarlo da un blanco más amplio y suave tipo foto; subirlo reserva el efecto al núcleo', min: 0.2, max: 0.98, step: 0.01, config: 'HDR.knee', grupo: 'frente' },
 ];
 
 /** Valores que se leen en cada frame. Las claves son las de `KNOBS`. */
@@ -134,6 +138,11 @@ export interface LiveKnobs {
   bgGlareStrength: number;
   bgParallax: number;
   bgArtFloor: number;
+  /** Textura de micro-superficie del fondo. */
+  bgNoise: number;
+  /** HDR: ganancia de luces y codo de compresión. */
+  hdrBoost: number;
+  hdrKnee: number;
   /** Paralaje del LOGO: el plano de delante, el que más se desplaza. */
   logoParallax: number;
 }
@@ -164,6 +173,9 @@ export const DEFAULTS: LiveKnobs = {
   bgGlareStrength: CFG.BACKGROUND.glareStrength,
   bgParallax: CFG.BACKGROUND.parallax,
   bgArtFloor: CFG.BACKGROUND.artFloor,
+  bgNoise: CFG.BG_NOISE.normalStrength,
+  hdrBoost: CFG.HDR.highlightBoost,
+  hdrKnee: CFG.HDR.knee,
   logoParallax: CFG.LOGO.parallax,
 };
 

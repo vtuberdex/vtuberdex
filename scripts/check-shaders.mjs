@@ -161,6 +161,19 @@ const LITERALES_LEGITIMOS = [
   { valor: '0.97', en: /vec3\(1\.0,\s*0\.99,\s*0\.97\)/ },
   // Umbral de "hay capa que evaluar": evita calcular una máscara vacía.
   { valor: '0.001', en: />\s*0\.001/ },
+  // CONSTANTES DEL HASH (hash21): son la definición del generador de ruido, no perillas.
+  // Los números irracionales grandes decorrelacionan celdas vecinas; sin ellos la
+  // interpolación dibuja una rejilla visible. Cambiarlos NO ajusta el efecto: lo rompe.
+  { valor: '123.34', en: /fract\(\s*p\s*\*\s*vec2\(\s*123\.34,\s*456\.21\s*\)\s*\)/ },
+  { valor: '456.21', en: /fract\(\s*p\s*\*\s*vec2\(\s*123\.34,\s*456\.21\s*\)\s*\)/ },
+  { valor: '45.32', en: /dot\(\s*p,\s*p\s*\+\s*45\.32\s*\)/ },
+  // Suavizado polinómico estándar entre celdas del ruido: f*f*(3-2f). Es la curva de
+  // interpolación (estructura matemática), no una intensidad ajustable.
+  { valor: '3.0', en: /f\s*\*\s*f\s*\*\s*\(\s*3\.0\s*-\s*2\.0\s*\*\s*f\s*\)/ },
+  { valor: '2.0', en: /f\s*\*\s*f\s*\*\s*\(\s*3\.0\s*-\s*2\.0\s*\*\s*f\s*\)/ },
+  // COTA del codo HDR: evita que un knee en 0 deje el rango en cero (división por cero) o
+  // que en 1 no quede margen para comprimir. Es protección del cálculo, no un ajuste.
+  { valor: '0.05', en: /clamp\(\s*uHdrKnee,\s*0\.05,\s*1\.0\s*\)|max\(\s*1\.0\s*-\s*clamp\([^)]*\),\s*0\.05\s*\)/ },
 ];
 
 const problemas = [];
@@ -207,16 +220,23 @@ for (const { cuerpo, linea } of bloques) {
    * Números de la config interpolados a pelo. El `.0` de un `12.0` no sobrevive al
    * template literal, y GLSL ES 3.0 no promociona int a float: `exp(-dist * 12)` no
    * compila y la carta sale negra (solo se ve en el navegador). Todo valor de la config
-   * que entra al GLSL tiene que pasar por `f()` o por `vec3()`, que garantizan el `.0`.
+   * que entre al GLSL tiene que pasar por `f()` o por `vec3()`, que garantizan el `.0`.
+   *
+   * EXCEPCIÓN: la COTA DE UN BUCLE. `for (int i = 0; i < N; i++)` compara int contra int,
+   * así que ahí el `.0` de f() es justo lo que ROMPE el shader ("no operation '<' exists
+   * that takes a left-hand operand of type highp int and a right operand of type const
+   * float"). Es la misma trampa en sentido contrario, y el único sitio donde un entero
+   * sin decimal es lo correcto. Se detecta por el contexto del encabezado del for.
    */
   for (const interp of cuerpo.matchAll(/\$\{\s*(?!f\(|vec3\()([^}]*)\}/g)) {
-    if (/\bCFG\.|slots?\[/.test(interp[1])) {
-      problemas.push(
-        `interpolación sin f()/vec3() en el shader que empieza en la línea ${linea}: ` +
-          `\${${interp[1]}} — un entero sale sin el .0 y GLSL ES 3.0 no lo promociona ` +
-          '(la carta sale negra en el navegador)',
-      );
-    }
+    if (!/\bCFG\.|slots?\[/.test(interp[1])) continue;
+    const antes = cuerpo.slice(Math.max(0, interp.index - 60), interp.index);
+    if (/for\s*\(\s*int\s+\w+\s*=[^;]*;[^;]*<\s*$/.test(antes)) continue;
+    problemas.push(
+      `interpolación sin f()/vec3() en el shader que empieza en la línea ${linea}: ` +
+        `\${${interp[1]}} — un entero sale sin el .0 y GLSL ES 3.0 no lo promociona ` +
+        '(la carta sale negra en el navegador)',
+    );
   }
 
   /**

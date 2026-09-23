@@ -223,6 +223,14 @@ export const cardFragmentShader = /* glsl */ `
   uniform float uBgTiltFactor;
   /** Suelo de luminancia del arte del fondo: se ajusta en vivo. */
   uniform float uBgArtFloor;
+  /**
+   * HDR: codo (dónde empieza la compresión) y ganancia de las luces. Son uniforms, no
+   * constantes, para poder medir el efecto con ellos a 0/1 y ajustarlos en vivo.
+   */
+  uniform float uHdrBoost;
+  uniform float uHdrKnee;
+  /** Fuerza de la textura de micro-superficie del fondo (0 = lámina lisa). */
+  uniform float uBgNoiseStrength;
 
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -278,6 +286,132 @@ export const cardFragmentShader = /* glsl */ `
      */
     float aa = max(fwidth(d) * ${f(CFG.SILHOUETTE.aaPixels)}, uCardSize.y * ${f(CFG.SILHOUETTE.aaMinRatio)});
     return 1.0 - smoothstep(-aa, aa, d);
+  }
+
+  /**
+   * RUIDO: la base de la textura de micro-superficie del fondo.
+   *
+   * POR QUÉ PROCEDURAL Y NO UN MAPA DE NORMALES
+   * -------------------------------------------
+   * Un mapa de normales costaría un sampler más, y el shader va por 14 de los 16 que el
+   * driver admite. El ruido con hash cuesta unas pocas operaciones y no gasta presupuesto.
+   *
+   * hash21 es el generador: convierte una celda en un número pseudoaleatorio estable. Se
+   * multiplica por dos constantes irracionales y se mezcla el resultado consigo mismo
+   * (dot) para que celdas vecinas no den valores correlacionados — sin ese mezclado, la
+   * interpolación posterior dibuja una rejilla visible.
+   */
+  float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+  }
+
+  /**
+   * ALTURA del ruido en un punto: un fractal de varias octavas de ruido de valor.
+   *
+   * Cada octava duplica la frecuencia y reduce la amplitud, así que el resultado tiene
+   * detalle en varias escalas — que es lo que hace que una superficie parezca material y
+   * no una mancha. El suavizado con la curva f*f*(3-2f) (smoothstep) evita que se vean
+   * los escalones de la interpolación lineal entre celdas.
+   *
+   * Devuelve una ALTURA, no una normal: el gradiente se saca fuera, por diferencias
+   * finitas sobre esta misma función.
+   */
+  float bgNoiseHeight(vec2 uv) {
+    // La deriva temporal va aquí: la textura se mueve despacio, así que no está
+    // congelada, pero tan lento que no se lee como una animación.
+    vec2 p = uv * ${f(CFG.BG_NOISE.scale)} + uTime * ${f(CFG.BG_NOISE.drift)};
+    float suma = 0.0;
+    float amp = ${f(CFG.BG_NOISE.ampStart)};
+    float norma = 0.0;
+    float freq = 1.0;
+    // OJO: la cota del bucle va como ENTERO LITERAL, no por f(). f() añade el .0 que
+    // necesita un float, pero un for de GLSL ES 3.0 compara int i < int, así que con
+    // 6.0 el shader NO compila ("no operation '<' exists that takes a left-hand operand
+    // of type highp int and a right operand of type const float") y la carta sale negra.
+    // Es la trampa de f() en sentido contrario y solo se ve al compilar el GLSL de verdad.
+    for (int i = 0; i < ${CFG.BG_NOISE.maxOctaves}; i++) {
+      if (float(i) >= ${f(CFG.BG_NOISE.octaves)}) break;
+      vec2 celda = floor(p * freq);
+      vec2 f = fract(p * freq);
+      vec2 w = f * f * (3.0 - 2.0 * f);
+      float n00 = hash21(celda);
+      float n10 = hash21(celda + vec2(1.0, 0.0));
+      float n01 = hash21(celda + vec2(0.0, 1.0));
+      float n11 = hash21(celda + vec2(1.0, 1.0));
+      suma += mix(mix(n00, n10, w.x), mix(n01, n11, w.x), w.y) * amp;
+      norma += amp;
+      amp *= ${f(CFG.BG_NOISE.persistence)};
+      freq *= ${f(CFG.BG_NOISE.lacunarity)};
+    }
+    // El suelo evita que una norma diminuta dispare el resultado al dividir.
+    return suma / max(norma, ${f(CFG.BG_NOISE.normFloor)});
+  }
+
+  /**
+   * NORMAL de la micro-superficie, por gradiente de la altura.
+   *
+   * Se muestrea la altura en el punto y en dos vecinos a un paso mínimo; la DIFERENCIA es
+   * cuánto sube o baja la superficie en cada eje, o sea su inclinación local. Eso es la
+   * normal, en 2D: sirve para romper la uniformidad de la lámina, no para iluminar un
+   * objeto real.
+   *
+   * Es la pieza que convierte "ruido" en "textura": sin la inclinación, el ruido solo
+   * aclara y oscurece; con ella, cada punto refleja con un ángulo ligeramente distinto y
+   * el holograma se rompe en facetas.
+   */
+  vec2 bgNoiseNormal(vec2 uv) {
+    float paso = ${f(CFG.BG_NOISE.gradientStep)};
+    float h = bgNoiseHeight(uv);
+    float hx = bgNoiseHeight(uv + vec2(paso, 0.0));
+    float hy = bgNoiseHeight(uv + vec2(0.0, paso));
+    /**
+     * SE DIVIDE POR EL PASO, y eso NO es un detalle: una diferencia finita solo es la
+     * DERIVADA si se divide por la distancia a la que se tomó. Sin división el resultado
+     * no es la inclinación de la superficie sino "cuánto cambió la altura en 0,004 UV",
+     * un número diminuto que no depende de la escala del ruido. Medido: sin dividir, el
+     * efecto daba 0,16 de diferencia frente a 22,65 del HDR — invisible.
+     *
+     * PERO DIVIDIR LA DISPARA (segundo fallo, medido). Con la escala y el paso de la
+     * config el gradiente sale del orden de CIENTOS, y multiplicado por la fuerza de la
+     * perilla la fase del espectro se envolvía decenas de veces: el fondo dejó de tener
+     * textura y se convirtió en un mapa de curvas de nivel psicodélico.
+     *
+     * La solución no es bajar el número a ojo —eso solo esconde el problema y lo deja
+     * dependiendo de la escala del ruido— sino ACOTAR la magnitud. La compresión suave
+     * g/(1+|g|) deja el resultado en (-1, 1) y, con ello, la perilla pasa a ser
+     * LITERALMENTE la perturbación máxima de la fase en unidades de UV: predecible, e
+     * independiente de la escala del ruido y del paso del muestreo.
+     */
+    vec2 g = vec2((h - hx) / paso, (h - hy) / paso);
+    return (g / (1.0 + length(g))) * uBgNoiseStrength;
+  }
+
+  /**
+   * COMPRESIÓN HDR (codo suave).
+   *
+   * POR QUÉ HACE FALTA
+   * ------------------
+   * El framebuffer es RGBA8: todo lo que pase de 1.0 se RECORTA al mismo blanco. Un
+   * reflejo así no tiene centro ni degradado — la zona brillante entera es igual de
+   * blanca y se lee como una mancha de pintura. En una foto real las luces tienen rango:
+   * el núcleo llega a blanco y alrededor BAJA conservando el color.
+   *
+   * CÓMO
+   * ----
+   * Por debajo del codo la señal sale INTACTA (identidad exacta, sin aproximación): por
+   * eso el arte de la carta y los tonos medios no cambian en nada. Solo lo que pasa del
+   * codo se comprime, con una exponencial que se acerca al blanco sin llegar nunca a
+   * recortarse — así el degradado del brillo sobrevive.
+   */
+  vec3 hdrComprimir(vec3 c) {
+    // El codo sale del uniform (y no de una constante generada): así el tuner lo mueve en
+    // vivo y se puede medir con él a distintos valores sin recompilar el material.
+    vec3 codo = vec3(clamp(uHdrKnee, 0.05, 1.0));
+    vec3 sobre = max(c - codo, 0.0);
+    vec3 rango = vec3(max(1.0 - clamp(uHdrKnee, 0.05, 1.0), 0.05) * ${f(CFG.HDR.headroom)});
+    return min(c, codo) + (1.0 - codo) * (1.0 - exp(-sobre / rango));
   }
 
   /**
@@ -677,11 +811,27 @@ ${FACTION_SIZES}
     holoLayer *= zone * sinLogo;
     edgeLayer *= zone;
 
-    vec3 lit = base
-      + base * (glossLayer + holoLayer)
+    /**
+     * COMPOSICIÓN EN DOS CANALES: PIGMENTO y LUZ.
+     *
+     * POR QUÉ SE SEPARAN (esto es lo que hace posible el HDR sin estropear la carta)
+     * ------------------------------------------------------------------------------
+     * Antes había una sola variable: todo el efecto se sumaba sobre lit y se recortaba
+     * al final. Con un solo canal no se puede subir la luz sin subir también el ARTE, así
+     * que cualquier intento de "más brillo en los reflejos" acababa lavando al personaje.
+     *
+     * Reparto:
+     *   · lit = PIGMENTO: el arte y los tonos medios. NO se toca (el codo HDR lo deja
+     *     intacto por construcción, así que la carta sigue siendo la que se subió).
+     *   · luzExtra = LUZ: reflejos, barniz, destellos, holograma. Es lo que se multiplica
+     *     para el HDR y lo que después se comprime en el codo, porque es lo que en una foto
+     *     real tiene rango y "quema" con degradado.
+     */
+    vec3 luzExtra = base * (glossLayer + holoLayer)
       + glossLayer * uGlossSelf
-      + holoLayer * uHoloSelf;
-    lit += edgeLayer;
+      + holoLayer * uHoloSelf
+      + edgeLayer;
+    vec3 lit = base;
 
     /**
      * REFLEJO VIVO DEL METAL (título y wordmark).
@@ -713,7 +863,10 @@ ${FACTION_SIZES}
     float sheenAmount = (sheenWide + sheenCore) * uSheenStrength;
     // Solo las capas de metal: el título (3) y el wordmark (6).
     float sheenMask = clamp(max(layer3.a, layer6.a), 0.0, 1.0);
-    lit += sheenAmount * sheenMask;
+    // El barrido del metal ES luz: entra en el canal de luz para que el HDR lo lleve por
+    // encima de blanco y el codo le devuelva el degradado (si se sumara al pigmento se
+    // recortaría en una mancha blanca plana).
+    luzExtra += sheenAmount * sheenMask;
 
     /**
      * CAPA 0: el FONDO del VTuber, por DEBAJO del personaje.
@@ -791,17 +944,41 @@ ${FACTION_SIZES}
        * capa de detrás no late con la de delante.
        */
       vec2 bgUv = vUv + uPointer * uParallaxFactors[0];
+      /**
+       * TEXTURA DE MICRO-SUPERFICIE del fondo.
+       *
+       * Hasta aquí el holograma del fondo se deslizaba UNIFORME por toda la lámina: la
+       * superficie era matemáticamente lisa, así que reflejaba igual en cada punto y se
+       * leía como plástico pulido. Un material real tiene micro-relieve: cada punto
+       * refleja con un ángulo ligeramente distinto y eso rompe el reflejo en facetas.
+       *
+       * Aquí se genera ese relieve (ruido fractal, sin gastar sampler) y su gradiente se
+       * usa como INCLINACIÓN local. La inclinación desplaza las FASES de abajo, así que
+       * las bandas de color ya no avanzan en paralelo: se ondulan siguiendo la textura.
+       *
+       * ORDEN (fallo medido): el ruido tiene que calcularse ANTES de derivar los colores
+       * del espectro. La primera versión perturbaba las fases DESPUÉS de haber calculado
+       * bgFilm y bgEdgeSpectrum, así que la perturbación no llegaba a leerse — el efecto
+       * medía exactamente 0 píxeles de diferencia y parecía que el ruido no servía.
+       * Se calcula primero la faceta, después se pliegan las fases, y solo entonces se
+       * convierten a color.
+       */
+      vec2 bgNormal = bgNoiseNormal(bgUv);
+      float bgFaceta = bgNormal.x + bgNormal.y;
       float bgPhase = fract(
         bgUv.x * ${f(CFG.HOLOGRAM.surfaceX)} + bgUv.y * ${f(CFG.HOLOGRAM.surfaceY)}
           + uTilt.y * ${f(CFG.BACKGROUND.tiltShift)} + uTime * ${f(CFG.BACKGROUND.timeShift)}
+          + bgFaceta * ${f(CFG.BG_NOISE.phaseFromNormal)}
       );
-      vec3 bgFilm = wavelengthToRgb(fract(cosView * ${f(CFG.HOLOGRAM.viewAngleWeight)} + bgPhase));
       /**
        * Fase PROPIA del canto: va atada al giro (uTilt) y no al puntero, para que las
        * bandas del borde no viajen sincronizadas con las del resto de la lámina. Si
        * compartieran fase, el efecto se leería como una sola textura deslizándose.
        */
-      float bgEdgePhase = uTilt.x * ${f(CFG.HOLOGRAM.viewAngleWeight)} + uTime * ${f(CFG.BACKGROUND.timeShift)};
+      float bgEdgePhase = uTilt.x * ${f(CFG.HOLOGRAM.viewAngleWeight)}
+        + uTime * ${f(CFG.BACKGROUND.timeShift)}
+        + bgFaceta * ${f(CFG.BG_NOISE.phaseFromNormal)};
+      vec3 bgFilm = wavelengthToRgb(fract(cosView * ${f(CFG.HOLOGRAM.viewAngleWeight)} + bgPhase));
       /**
        * Desaturación y suelo metálico con perillas PROPIAS, más generosas que las del
        * frente: BACKGROUND.metalFloorMix pesa más que HOLOGRAM.metalFloorMix, así que
@@ -852,13 +1029,10 @@ ${FACTION_SIZES}
        * que leerse aunque el holograma de superficie esté bajo (o en 0). Se multiplica por
        * bgCover igual que el resto para que no se derrame sobre el personaje.
        */
-      vec3 bgEdgeLit = bgArtLevel + bgArtLevel * bgLayer + bgLayer * uBgLayerWeight;
-      bgEdgeLit += bgEdgeTint * (bgArtLevel + ${f(CFG.BACKGROUND.edgeTintFloor)}) * uBgLayerWeight;
-      lit = mix(
-        lit,
-        bgEdgeLit,
-        bgCover
-      );
+      vec3 bgLuz = bgArtLevel * bgLayer + bgLayer * uBgLayerWeight;
+      bgLuz += bgEdgeTint * (bgArtLevel + ${f(CFG.BACKGROUND.edgeTintFloor)}) * uBgLayerWeight;
+      lit = mix(lit, bgArtLevel, bgCover);
+      luzExtra = mix(luzExtra, bgLuz, bgCover);
     }
 
     // Colores de marca del VTuber como tinte del borde.
@@ -897,9 +1071,10 @@ ${FACTION_SIZES}
     vec3 luzBorde = metalBorde * (${f(CFG.METAL_BORDER.lightBase)} + bandaBorde * ${f(CFG.METAL_BORDER.lightSweep)});
     // Se mezcla con el color de marca para que la carta conserve su identidad.
     vec3 bordeFinal = mix(mix(uAccent, uSecondary, vUv.y), luzBorde, ${f(CFG.METAL_BORDER.brandMix)});
-    lit += bordeFinal * filoMetal * ${f(CFG.METAL_BORDER.edgeWeight)};
+    // El canto metálico y su destello son luz: al canal de luz, para el HDR.
+    luzExtra += bordeFinal * filoMetal * ${f(CFG.METAL_BORDER.edgeWeight)};
     // Barrido extra, más brillante, para el destello del metal.
-    lit += plateado * bandaBorde * filoMetal * ${f(CFG.METAL_BORDER.sparkleWeight)} * sinLogo;
+    luzExtra += plateado * bandaBorde * filoMetal * ${f(CFG.METAL_BORDER.sparkleWeight)} * sinLogo;
 
     // Viñeta suave: solo un poco de caída en las esquinas. Antes bajaba muy por
     // debajo de 1 y oscurecía los bordes del arte; el suelo de VIGNETTE mantiene el
@@ -909,7 +1084,20 @@ ${FACTION_SIZES}
       ${f(CFG.VIGNETTE.inner)},
       distance(vUv, vec2(0.5))
     );
-    vec3 color = lit * mix(${f(CFG.VIGNETTE.floor)}, ${f(CFG.VIGNETTE.ceiling)}, vignette);
+    /**
+     * COMPOSICIÓN HDR: se suma la luz AMPLIFICADA y se comprime después.
+     *
+     * El ORDEN es lo que importa: primero se amplifica y se suma (los reflejos llegan a
+     * pasar de 1.0), y solo entonces se comprime con el codo. Si se recortara al sumar,
+     * el brillo perdería su degradado y volvería a ser la mancha plana de antes.
+     *
+     * La viñeta se aplica al pigmento y la luz por separado y ANTES del codo, para que el
+     * oscurecimiento de las esquinas no se cuele en la compresión (si no, la esquina
+     * oscura se comprimiría como si fuera una luz).
+     */
+    float vin = mix(${f(CFG.VIGNETTE.floor)}, ${f(CFG.VIGNETTE.ceiling)}, vignette);
+    vec3 color = lit * vin + luzExtra * vin * uHdrBoost;
+    color = hdrComprimir(color);
 
     /**
      * El brillo de marca NO se pinta aquí.

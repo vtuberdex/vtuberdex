@@ -362,6 +362,140 @@ export const BACKGROUND = {
 } as const;
 
 /**
+ * HDR: reflejos que PASAN de blanco y se comprimen, en vez de recortarse en plano.
+ *
+ * EL PROBLEMA QUE RESUELVE
+ * ------------------------
+ * Un framebuffer RGBA8 no guarda nada por encima de 1.0: cualquier valor mayor se
+ * RECORTA al mismo blanco puro. Eso es justo lo que hace que un reflejo parezca
+ * pintura: la luz tiene un techo duro, así que el brillo no tiene "centro" — toda la
+ * zona brillante es exactamente igual de blanca y se lee como una mancha plana. En una
+ * foto de verdad (nubes a contraluz, un canto metálico) las luces tienen rango: el
+ * núcleo llega a blanco puro y alrededor BAJA de forma gradual, conservando el color.
+ *
+ * CÓMO SE HACE SIN CAMBIAR EL FONDO DE CANVAS
+ * -------------------------------------------
+ * Se calcula en HDR (los términos de LUZ pueden pasar de 1.0) y se comprime al final con
+ * un codo suave, todo dentro del shader. No hace falta framebuffer flotante: lo que da
+ * el aspecto es que la compresión ocurra DESPUÉS de sumar la luz, no que la suma se
+ * recorte.
+ *
+ * `knee` es la clave de que esto no estropee la carta: por debajo de ese valor el color
+ * sale IDÉNTICO, sin tocar. Solo lo que pasa del codo se comprime. Es decir, el arte y
+ * los tonos medios se quedan como estaban y lo único que cambia son las luces — que es
+ * exactamente lo que se pidió.
+ */
+export const HDR = {
+  /**
+   * Cuánto se multiplican SOLO los términos de luz (reflejo del metal, destello del
+   * canto, barniz y holograma). Es lo que lleva los reflejos por encima de 1.0 para que
+   * el codo tenga algo que comprimir. Con 1.0 no hay HDR: todo queda por debajo del codo
+   * y la imagen es la de antes.
+   */
+  highlightBoost: 1.9,
+  /**
+   * Codo: hasta aquí la señal es lineal e intacta. Por encima empieza la compresión.
+   * Bajarlo comprime más zona (aspecto más suave y "fotográfico"); subirlo reserva el
+   * efecto a las luces más fuertes. 0.75 deja intacto el arte de la carta.
+   */
+  knee: 0.75,
+  /**
+   * Rango del hombro: cuánto sobrante se necesita para llegar a la mitad del margen que
+   * queda. BAJARLO hace que las luces se aplasten antes (blanco más agresivo, más
+   * "quemado"); subirlo las conserva más tiempo con color.
+   */
+  headroom: 1.6,
+} as const;
+
+/**
+ * TEXTURA DE RUIDO DEL FONDO: la superficie del fondo deja de ser una lámina lisa.
+ *
+ * POR QUÉ RUIDO PROCEDURAL Y NO UNA TEXTURA DE RUIDO
+ * --------------------------------------------------
+ * Una textura de ruido costaría un sampler más, y el shader va por 14 de los 16 que
+ * admite el driver: no hay margen que gastar en algo que se calcula con cuatro
+ * operaciones. El ruido se genera con un hash, así que el presupuesto no se toca.
+ *
+ * CÓMO SE CONVIERTE EN "NORMAL"
+ * -----------------------------
+ * El ruido se trata como una ALTURA y se le saca el gradiente por diferencias finitas
+ * (la altura en el píxel y en dos vecinos). Ese gradiente es la inclinación local de la
+ * micro-superficie, o sea la normal. Sirve para lo que se ve en una lámina real: el
+ * holograma deja de deslizarse uniforme y se rompe en facetas diminutas, porque cada
+ * punto refleja con un ángulo ligeramente distinto. Es lo que quita el aspecto de
+ * plástico pulido.
+ */
+export const BG_NOISE = {
+  /**
+   * Frecuencia del ruido. Bajo = manchas grandes y suaves; alto = grano fino. Sobre una
+   * carta de ~400 px en pantalla, por debajo de ~4 se ven borrones y por encima de ~30
+   * se convierte en sémola que parpadea al mover la carta.
+   */
+  scale: 11.0,
+  /**
+   * Octavas del fractal. Cada octava suma un detalle más fino: con 1 queda un ruido
+   * blando y aburrido; con 4+ el detalle fino aliasea en movimiento (cuesta 4x por
+   * píxel). 3 es el punto donde se ve textura sin hervir.
+   */
+  octaves: 3,
+  /** Amplitud de la primera octava y cuánto decae cada siguiente. */
+  ampStart: 0.5,
+  persistence: 0.5,
+  /** Cuánto se multiplica la frecuencia en cada octava (lacunaridad). */
+  lacunarity: 2.0,
+  /**
+   * Tope de octavas del bucle. GLSL ES 1.00 exige que un `for` tenga una cota COMPARABLE
+   * CON UNA CONSTANTE (un literal o una constante de compilación): con una condición
+   * dinámica el shader NO compila. Por eso el bucle corre hasta este tope y dentro se
+   * sale con un `break` cuando se alcanzan las octavas pedidas — la cota literal satisface
+   * al compilador y el break da el comportamiento variable. Si subes `octaves` por encima
+   * de este número, las octavas de más no se calculan.
+   */
+  maxOctaves: 6,
+  /**
+   * Suelo de la normalización del fractal. Evita dividir por un número diminuto (que
+   * dispararía el resultado) cuando las amplitudes se anulan.
+   */
+  normFloor: 0.001,
+  /**
+   * Perturbación MÁXIMA de la fase del holograma, en unidades de UV.
+   *
+   * OJO: esta perilla NO es un multiplicador arbitrario. El gradiente del ruido se acota
+   * a (-1,1) con una compresión suave, así que este número es literalmente cuánto puede
+   * desplazarse la fase del espectro — predecible e independiente de la escala del ruido.
+   *
+   * Medido (barrido sobre el render real, con el fondo y el personaje como testigos):
+   *
+   *   fuerza   cambio en el FONDO   cambio en el PERSONAJE
+   *   0.02     0.64                 0
+   *   0.035    1.07                 0
+   *   0.06     1.84                 0
+   *   0.09     2.74                 0
+   *   0.13     3.89                 0
+   *
+   * El personaje queda en 0 en TODOS los valores: el ruido no lo toca nunca, que es lo
+   * que se pedía (textura en el fondo, no en la carta). Se elige 0.07 por estar en la
+   * zona donde la textura ya se ve sin que el espectro empiece a plegarse: con 0.55
+   * (cuando esta perilla multiplicaba un gradiente SIN acotar) el fondo se convertía en
+   * un mapa de curvas de nivel psicodélico.
+   */
+  normalStrength: 0.07,
+  /**
+   * Paso de las diferencias finitas para el gradiente. Más fino = más detalle pero más
+   * sensible al aliasing; más grueso = facetas más amplias.
+   */
+  gradientStep: 0.004,
+  /**
+   * Peso del relieve dentro de la fase. Se deja en 1 porque la magnitud ya la fija
+   * normalStrength: tener dos multiplicadores para lo mismo solo hace imposible saber
+   * cuál manda. Existe para poder apagar el efecto desde un solo sitio si hiciera falta.
+   */
+  phaseFromNormal: 1.0,
+  /** Deriva temporal: el ruido se mueve despacio, así que la textura no está congelada. */
+  drift: 0.02,
+} as const;
+
+/**
  * ACABADO DEL TEXTO de la carta: la placa metálica del título, la palabra del pie y
  * el realce de las letras.
  *
