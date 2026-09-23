@@ -357,11 +357,24 @@ export function drawTitleLayer({ card, width }: { card: VtuberCard; width: numbe
   metalBevel(ctx, badgeX, badgeY, badgeW, badgeH, badgeRadius);
 
   const badgeFont = `800 44px ${FONT}`;
+  /**
+   * El número va en BLANCO (petición del usuario).
+   *
+   * Antes era casi negro (#0a0c11) sobre la placa de acero del badge. Al pasar a blanco, el
+   * grabado que llevaba debajo queda inútil: es una sombra blanca al 42% pensada para hundir
+   * una letra oscura en el metal, y sobre texto blanco no se ve —o peor, lo engorda. Se
+   * conserva pero como un CONTORNO OSCURO, que es lo que hace legible una letra blanca
+   * sobre una placa clara: el mismo problema que resolvió `fillShadowedText` en el resto de
+   * la carta.
+   */
   drawEngrave(ctx, badge, pad + 100, headerTop + 59, badgeFont, 'center');
   ctx.font = badgeFont;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#0a0c11';
+  ctx.lineWidth = TEXT_FINISH.badgeOutlineWidth;
+  ctx.strokeStyle = rgba(TEXT_FINISH.badgeOutlineColor, TEXT_FINISH.badgeOutlineAlpha);
+  ctx.strokeText(badge, pad + 100, headerTop + 59);
+  ctx.fillStyle = TEXT_FINISH.badgeColor;
   ctx.fillText(badge, pad + 100, headerTop + 59);
 
   // Nombre: reserva el ancho del país para que nunca se solapen.

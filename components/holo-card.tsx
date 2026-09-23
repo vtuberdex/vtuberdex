@@ -37,6 +37,7 @@ import {
   loadImage,
 } from '@/components/card-texture';
 import { cardFragmentShader, cardVertexShader, glowFragmentShader, glowVertexShader } from '@/components/shaders';
+import { buildCardBodyGeometry } from '@/components/card3d-geometry';
 import { LAYER_UNIFORM_NAMES } from '@/components/card3d-config';
 
 /** Proporción real de una carta coleccionable (5x7 pulgadas -> 1.4). */
@@ -111,7 +112,7 @@ function CardMesh({
   const group = useRef<THREE.Group>(null);
   const pointer = usePointerTilt(group);
 
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
   const [textures, setTextures] = useState<{
     layers: THREE.CanvasTexture[];
     edge: THREE.CanvasTexture;
@@ -122,36 +123,34 @@ function CardMesh({
   } | null>(null);
   const palette = useMemo(() => cardPalette(card.themeColor, card.secondaryColor), [card.themeColor, card.secondaryColor]);
 
-  const bodyGeometry = useMemo(() => {
-    const bevelSize = CFG.GEOMETRY.cardDepth * CFG.GEOMETRY.bevelRatio;
-    const r = CFG.GEOMETRY.cornerRadius - bevelSize;
-    const ancho = CARD_W - bevelSize * 2;
-    const alto = CARD_H - bevelSize * 2;
-    const x0 = -ancho / 2;
-    const y0 = -alto / 2;
+  const bodyGeometry = useMemo(() => buildCardBodyGeometry(), []);
 
-    const shape = new THREE.Shape();
-    shape.moveTo(x0 + r, y0);
-    shape.lineTo(x0 + ancho - r, y0);
-    shape.absarc(x0 + ancho - r, y0 + r, r, -Math.PI / 2, 0, false);
-    shape.lineTo(x0 + ancho, y0 + alto - r);
-    shape.absarc(x0 + ancho - r, y0 + alto - r, r, 0, Math.PI / 2, false);
-    shape.lineTo(x0 + r, y0 + alto);
-    shape.absarc(x0 + r, y0 + alto - r, r, Math.PI / 2, Math.PI, false);
-    shape.lineTo(x0, y0 + r);
-    shape.absarc(x0 + r, y0 + r, r, Math.PI, Math.PI * 1.5, false);
-
-    const geometry = new THREE.ExtrudeGeometry(shape, {
-      depth: CFG.GEOMETRY.cardDepth,
-      bevelEnabled: true,
-      bevelThickness: bevelSize,
-      bevelSize,
-      bevelSegments: CFG.GEOMETRY.bevelSegments,
-      curveSegments: CFG.GEOMETRY.curveSegments,
-    });
-    geometry.translate(0, 0, -(CFG.GEOMETRY.cardDepth / 2 + bevelSize));
-    return geometry;
-  }, []);
+  /**
+   * ENTORNO DEL CANTO por PMREM.
+   *
+   * POR QUE NO BASTA PASAR EL WEBP COMO `envMap`
+   * --------------------------------------------
+   * Medido: con `envMap={textura}` el render salia BYTE-IDENTICO al caso sin entorno
+   * (maxdiff 0 en 1,4 M de bytes). La causa esta en three.js: un MeshStandardMaterial solo
+   * usa el mapa de entorno por la via IBL del shader
+   * (envmap_physical_pars_fragment), y ahi `getIBLRadiance`/`getIBLIrradiance` devuelven
+   * vec3(0.0) salvo que la textura sea CubeUV:
+   *
+   *   #ifdef ENVMAP_TYPE_CUBE_UV  ...  #else  return vec3( 0.0 );  #endif
+   *
+   * Una textura equirect de imagen normal NO tiene ese tipo, asi que no aporta NADA. Hay que
+   * prefiltrarla con PMREMGenerator para obtener el CubeUV (y de paso le da los mips que
+   * necesita el desenfoque por rugosidad). Con el PMREM: maxdiff 204, 12062 px cambiados y el
+   * canto pasa de 129.4 a 169.6 de luminancia — se ve el bisel en vez de una pared negra.
+   */
+  const bodyEnvMap = useMemo(() => {
+    const base = textures?.envMap;
+    if (!base) return null;
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const prefiltrada = pmrem.fromEquirectangular(base).texture;
+    pmrem.dispose();
+    return prefiltrada;
+  }, [textures?.envMap, gl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -257,6 +256,7 @@ function CardMesh({
       textures?.edge.dispose();
       textures?.logoMask.dispose();
       textures?.logoSticker.dispose();
+      textures?.envMap?.dispose();
     },
     [textures],
   );
@@ -494,10 +494,24 @@ function CardMesh({
         <planeGeometry args={[CARD_W * CFG.GEOMETRY.glowSpread, CARD_H * CFG.GEOMETRY.glowSpread]} />
       </mesh>
       <mesh geometry={bodyGeometry}>
+        {/*
+          El canto es METAL (metalness 0.92) y ahora recibe su propio entorno.
+
+          POR QUE: un material metálico casi puro no tiene difusa que reflejar — toda su
+          apariencia es el reflejo del entorno. Sin `envMap`, three.js lo resuelve a negro
+          (medido en el harness: el canto salía a luminancia 12-13 sobre un fondo claro), y
+          el bisel que ya existía en la geometría (`bevelRatio`, 4 segmentos) era INVISIBLE:
+          no se puede ver un chaflán que no recibe luz ni refleja nada. Ése era el motivo de
+          que la carta pareciera un slab de canto recto.
+
+          Se le pasa el MISMO cielo que usa el reflejo de espejo de la cara
+          (`components/metal-env.webp`), que es lo coherente: es el entorno de la escena.
+        */}
         <meshStandardMaterial
           color={CFG.BODY.color}
           roughness={CFG.BODY.roughness}
           metalness={CFG.BODY.metalness}
+          envMap={bodyEnvMap}
           envMapIntensity={CFG.BODY.envMapIntensity}
         />
       </mesh>

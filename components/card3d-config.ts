@@ -84,12 +84,22 @@ export const GEOMETRY = {
   /** Ancho de la carta. El alto sale de la proporción real de la textura (1.4). */
   cardWidth: 2.2,
   /**
+   * Proporción alto/ancho de la cara (1411/1008). Vive aquí —y no como un literal en
+   * `holo-card.tsx`— porque el CUERPO 3D también la necesita para insetar el bisel, y el
+   * harness construye la misma geometría que el componente: una copia divergente haría que
+   * la medición del canto no valiera.
+   */
+  aspect: 1411 / 1008,
+  /**
    * Grosor del cuerpo: es lo que da el CANTO.
    *
    * 0.035 era una lámina casi plana (1.6% del ancho) y al inclinarla no se veía
    * canto alguno; 0.075 le da presencia de objeto sin volverla un ladrillo.
+   *
+   * Subido a 0.11 (petición del usuario: "dale un borde biselado"): con 0.075 y el bisel
+   * anterior la arista medía 3.1 px en pantalla y no se distinguía de un slab recto.
    */
-  cardDepth: 0.075,
+  cardDepth: 0.11,
   /**
    * Radio de las esquinas. Lo comparten la máscara del shader (que recorta la
    * textura) y la geometría del cuerpo: si divergieran, el canto asomaría por las
@@ -104,8 +114,12 @@ export const GEOMETRY = {
    * geometría hacia fuera: a tamaño completo el cuerpo medía 2.2270x3.1066 contra
    * una cara de 2.2000x3.0796 (1,30 px de canto asomando por lado en la grilla y
    * 2,02 px en la ficha), y ese sobrante es geometría, no antialiasing.
+   *
+   * 0.18 daba una arista de 0.0135 unidades = 3.1 px en pantalla (medido), que NO se
+   * distingue de un canto recto: por eso el bisel existía en la geometría y no se veía.
+   * 0.38 lo lleva a 0.0418 u = 9.6 px, ya legible como chaflán con su degradado.
    */
-  bevelRatio: 0.18,
+  bevelRatio: 0.38,
   /** Segmentos del bisel: con 1 es un chaflán plano con arista visible. */
   bevelSegments: 4,
   /**
@@ -662,6 +676,20 @@ export const TEXT_FINISH = {
    * (la luz viene de arriba) y es corto: con más de 2 px la letra se ve borrosa.
    */
   engrave: { color: '#ffffff', alpha: 0.42, offsetY: 1.4, blur: 1.2 },
+  /**
+   * Número de dex en BLANCO (petición del usuario). Iba en casi negro (#0a0c11).
+   *
+   * Sobre la placa de acero del badge una letra blanca necesita contorno oscuro para no
+   * desaparecer: la placa tiene paradas claras (#a3adbd) y blancas donde el blanco puro no
+   * contrasta. El grabado (`engrave`) ya no sirve aquí —hundía una letra oscura—, así que la
+   * legibilidad la da este contorno, con el mismo criterio que el sombreado del resto de la
+   * carta. El contorno es fino (1.6 px a 1008 de ancho) para que no se lea como una letra
+   * "hinchada".
+   */
+  badgeColor: '#ffffff',
+  badgeOutlineColor: '#0a0c11',
+  badgeOutlineAlpha: 0.5,
+  badgeOutlineWidth: 1.6,
   /**
    * Placa del número de dex: acero más oscuro que la cabecera, para que el `#002`
    * se lea como una pieza distinta y no como parte del mismo bloque.
