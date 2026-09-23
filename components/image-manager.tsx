@@ -160,6 +160,22 @@ function human(bytes: number | undefined): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
+/**
+ * Añade la versión de la vista previa a una ruta, sin duplicar el parámetro.
+ *
+ * La ruta que llega del servidor YA viene versionada cuando el tipo tiene un reemplazo
+ * (`?v=<marca de la subida>`, ver `aplicarImagenesDelMantenedor`), así que concatenar a
+ * ciegas dejaba `…?v=<servidor>&v=<local>`: el navegador usa el PRIMERO y el segundo
+ * sobraba. Aquí se reescribe el parámetro, así que la marca más reciente —la del cliente,
+ * que acaba de recibir los bytes— es la que manda.
+ */
+function conVersion(path: string, version: number | undefined): string {
+  const [base, query = ''] = path.split('?');
+  const parametros = new URLSearchParams(query);
+  parametros.set('v', String(version ?? 0));
+  return `${base}?${parametros.toString()}`;
+}
+
 export function ImageManager({ token, detail, onUpdated }: Props) {
   const [busy, setBusy] = useState<ManagedKind | null>(null);
   /** Marca de tiempo por tipo para forzar la recarga de la vista previa. */
@@ -289,7 +305,7 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
                 >
                   {info.path ? (
                     <img
-                      src={`${info.path}${info.path.includes('?') ? '&' : '?'}v=${version ?? '0'}`}
+                      src={conVersion(info.path, version)}
                       alt={label}
                       className="max-h-full max-w-full object-contain"
                       data-testid={`admin-image-${kind}`}

@@ -120,6 +120,19 @@ describe('consultas por página', () => {
     expect(consultasDeDatos()[0].sql).not.toMatch(/bytes/i);
   });
 
+  test('pide la marca de la subida: sin ella la URL no se puede versionar', async () => {
+    const { reemplazosDePagina } = await moduloLimpio();
+    await reemplazosDePagina(['a']);
+
+    /**
+     * `actualizado` es lo que versiona la URL (`?v=`) y alimenta el `ETag`. Si dejar de
+     * seleccionarla no rompiera nada aquí, la imagen reemplazada volvería a servirse desde
+     * la caché del navegador sin que ningún test lo notara — que es exactamente el fallo
+     * que este campo arregla.
+     */
+    expect(consultasDeDatos()[0].sql).toMatch(/actualizado/);
+  });
+
   test('una página vacía no consulta nada', async () => {
     const { reemplazosDePagina } = await moduloLimpio();
     expect(await reemplazosDePagina([])).toEqual({});
@@ -131,9 +144,9 @@ describe('consultas por página', () => {
 describe('resultado de la consulta por página', () => {
   test('compone la ruta canónica de cada tipo con su extensión', async () => {
     filasAResponder = [
-      { slug: 'yeicokp-harv', kind: 'character', width: 720, height: 1008, size: 90000 },
-      { slug: 'yeicokp-harv', kind: 'logo', width: 720, height: 1008, size: 12000 },
-      { slug: 'otra', kind: 'background', width: null, height: null, size: 5 },
+      { slug: 'yeicokp-harv', kind: 'character', width: 720, height: 1008, size: 90000, actualizado: '2026-09-23T15:23:32.277Z' },
+      { slug: 'yeicokp-harv', kind: 'logo', width: 720, height: 1008, size: 12000, actualizado: null },
+      { slug: 'otra', kind: 'background', width: null, height: null, size: 5, actualizado: null },
     ];
     const { reemplazosDePagina } = await moduloLimpio();
     const salida = await reemplazosDePagina(['yeicokp-harv', 'otra']);
@@ -143,10 +156,14 @@ describe('resultado de la consulta por página', () => {
       width: 720,
       height: 1008,
       bytes: 90000,
+      // La marca de la subida viaja con el reemplazo: es lo que versiona la URL.
+      actualizado: '2026-09-23T15:23:32.277Z',
     });
     expect(salida['yeicokp-harv'].logo.path).toBe('images/logo/yeicokp-harv.webp');
     // Medidas nulas siguen siendo `null`, no `undefined` ni `NaN`: el gestor las pinta.
     expect(salida.otra.background.width).toBeNull();
+    // Una fila antigua sin marca no inventa una versión.
+    expect(salida['yeicokp-harv'].logo.actualizado).toBeNull();
   });
 
   test('una ficha es el caso N=1 y devuelve la MISMA forma que la consulta múltiple', async () => {

@@ -256,14 +256,33 @@ for (const perPage of [24, 48, 100]) {
 const muestra = searchVtubers(dbCatalogo, { perPage: 24, page: 1 }).items;
 const a = await viejo.aplicarReemplazosALista(muestra.map((c) => ({ ...c })));
 const b = await nuevo.aplicarReemplazosALista(muestra.map((c) => ({ ...c })));
+
+/**
+ * La equivalencia se mide sobre la RUTA, ignorando la versión.
+ *
+ * `aplicarReemplazosALista` cambió a propósito: ahora la URL de un reemplazo lleva `?v=`
+ * (ver `lib/ediciones.mjs`), porque la ruta canónica no cambia al reemplazar y sin la
+ * versión el navegador seguía sirviendo la copia anterior. Comparar las cadenas enteras
+ * marcaría esa mejora como si fuera una diferencia de comportamiento, que es justo lo que
+ * no es. Así que se compara el recurso (la ruta) y se cuenta aparte cuántas fichas quedaron
+ * versionadas: ese contador ES el cambio, y verlo a 0 delataría que la versión se perdió.
+ */
+const sinVersion = (images) =>
+  Object.fromEntries(Object.entries(images).map(([k, v]) => [k, typeof v === 'string' ? v.split('?')[0] : v]));
+
 let iguales = 0;
+let versionadas = 0;
 for (let i = 0; i < a.length; i += 1) {
-  const mismaImagen = JSON.stringify(a[i].images) === JSON.stringify(b[i].images);
+  const mismaImagen = JSON.stringify(sinVersion(a[i].images)) === JSON.stringify(sinVersion(b[i].images));
   const mismosAssets = JSON.stringify(a[i].assets) === JSON.stringify(b[i].assets);
   if (mismaImagen && mismosAssets) iguales += 1;
   else console.log(`  ✖ difiere ${a[i].slug}`);
+  if (JSON.stringify(b[i].images).includes('?v=') && !JSON.stringify(a[i].images).includes('?v=')) {
+    versionadas += 1;
+  }
 }
-console.log(`\nequivalencia: ${iguales}/${a.length} fichas idénticas (images + assets) entre viejo y nuevo`);
+console.log(`\nequivalencia: ${iguales}/${a.length} fichas idénticas (rutas de imagen + assets) entre viejo y nuevo`);
+console.log(`fichas con la URL versionada (?v=) solo en el nuevo: ${versionadas}`);
 
 const aplicadas = b.filter((c) => c.assets?.some((x) => x.bytes === 90000));
 console.log(`fichas de la muestra con reemplazo aplicado: ${aplicadas.length}`);

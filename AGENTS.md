@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 127 tests (vitest): utilidades, componentes, páginas
+npm test                   # 133 tests (vitest): utilidades, componentes, páginas
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -266,6 +266,26 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   en la MISMA fila `(slug, kind)`, así que subir una imagen **destruía la única copia
   del original** y borrarla dejaba el hueco sin vuelta atrás (no era caché: la imagen
   ya no existía en ningún sitio). Si tocas esa tabla, mantén la clave de tres columnas.
+- **La URL de una imagen reemplazada lleva la VERSIÓN (`?v=`); sin eso el navegador
+  sigue mostrando la vieja.** La ruta es canónica por diseño (`/images/<kind>/<slug>.webp`:
+  el scraper y el mantenedor escriben el MISMO archivo), así que reemplazar no cambia la
+  URL y nadie vuelve a pedirla: el navegador y el CDN sirven su copia. El `?v` sale de
+  `actualizado` (`lib/ediciones.mjs`, `marcaDeVersion`) y viaja en `images[kind]`
+  (`aplicarImagenesDelMantenedor`), así que **todas** las vistas se invalidan solas: la
+  carta 3D, el listado y la ficha. Antes el gestor de imágenes tenía su propio `?v` local
+  y por eso el fallo parecía resuelto mientras el resto seguía mostrando la anterior.
+  - **`actualizado` se escribe con MILISEGUNDOS desde JS** (`ahoraConMilisegundos`), no con
+    `datetime('now')`: esa función tiene resolución de un segundo y dos reemplazos seguidos
+    daban la MISMA versión, así que el segundo salía invisible. Las filas antiguas conservan
+    el formato viejo: la marca se reduce a dígitos, así que los dos se toleran.
+  - **Bajar el `max-age` NO arregla esto** (la copia vieja vive hasta que expire, y el
+    usuario mira justo en ese hueco) y quitarlo castiga a las 1.593 imágenes del catálogo,
+    que no cambian nunca. La versión en el query invalida al instante sin tocar las demás.
+  - **En local (`data/images/`) la rama de disco revalida con `ETag`** (mtime + tamaño) y
+    sirve `no-cache`: ahí el mantenedor reescribe el archivo y con `max-age=3600` el búfer
+    viejo duraba una hora. El 304 responde sin cuerpo.
+  - **Republicar NO reescribe las filas del catálogo**: `publish-images.mjs` solo sube lo
+    que cambió de tamaño, así que las URLs versionadas del catálogo no rotan en cada pasada.
 - **`VTUBERDEX_ADMIN_PASSWORD_HASH` no va marcado *sensitive*.** El panel y
   `npx vercel env add` lo ofrecen por defecto, y Vercel guarda esos valores en un
   **formato ilegible para siempre**: ni el CLI, ni `vercel env pull`, ni la API con

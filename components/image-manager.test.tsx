@@ -214,4 +214,24 @@ describe('ImageManager', () => {
     expect(img.src).toContain('images/logo/gkuro-monochrome.webp');
     expect(img.src).toMatch(/[?&]v=/);
   });
+
+  test('la versión del servidor no se duplica con la del cliente', () => {
+    /**
+     * El servidor YA devuelve la ruta versionada (`?v=<marca de la subida>`) cuando el tipo
+     * tiene un reemplazo. Concatenar el `?v` local a ciegas dejaba el parámetro DOS veces:
+     * el navegador usa el primero, así que la marca del cliente —la que acaba de recibir los
+     * bytes nuevos— quedaba ignorada y la vista previa podía seguir mostrando la anterior.
+     */
+    const detail = detailWithAssets();
+    detail.images = {
+      ...detail.images,
+      logo: '/images/logo/gkuro-monochrome.webp?v=20260923152332277',
+    };
+    render(<ImageManager token="t" detail={detail} onUpdated={() => {}} />);
+
+    const img = screen.getByTestId('admin-image-logo') as HTMLImageElement;
+    // Una sola vez el parámetro, y con la marca del cliente al montar (`0`).
+    expect(img.src.match(/[?&]v=/g)).toHaveLength(1);
+    expect(img.src).toContain('v=0');
+  });
 });

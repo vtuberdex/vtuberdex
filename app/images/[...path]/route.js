@@ -18,7 +18,7 @@
  *   · El **301** de producción es seguro porque la ruta pública es estable: si
  *     cambia el contenido, el scraper reescribe el MISMO archivo canónico por slug.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 import { resolveImageUrl, usesLocalImages } from '../../../lib/db.mjs';
@@ -53,8 +53,49 @@ function isInsideRoot(filePath) {
   return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
 }
 
+/**
+ * `ETag` de un archivo local, derivado de su mtime + tamaño.
+ *
+ * POR QUÉ HACE FALTA (y por qué no basta con un `max-age` bajo)
+ * ------------------------------------------------------------
+ * En local el disco es la fuente de verdad y el mantenedor (Express) reescribe el MISMO
+ * archivo canónico al reemplazar una imagen. Con `max-age=3600` el navegador se quedaba
+ * con el búfer anterior una HORA: la imagen nueva estaba en disco y la vista seguía
+ * pintando la vieja — exactamente el síntoma de "subo una imagen y no se actualiza".
+ *
+ * Bajar el `max-age` a 60 no arregla el problema, solo lo acorta, y quitar la caché sin
+ * más obligaría a transferir cada imagen en cada visita. Revalidar SÍ lo arregla: el
+ * navegador vuelve a preguntar y el servidor responde 304 (sin cuerpo) mientras el
+ * archivo no cambie. El `ETag` sale del `mtime` y el tamaño, que es lo que cambia cuando
+ * el mantenedor reescribe el archivo.
+ */
+function etagDeArchivo(absolute, bytes) {
+  try {
+    const { mtimeMs, size } = statSync(absolute);
+    return `"${Math.round(mtimeMs).toString(36)}-${size.toString(36)}"`;
+  } catch {
+    // Sin `stat` (carrera con un borrado) se cae al tamaño, que sigue siendo un validador
+    // útil: el archivo que se acaba de escribir casi nunca mide lo mismo que el anterior.
+    return `"${bytes.byteLength.toString(36)}"`;
+  }
+}
+
+/**
+ * `Last-Modified` a partir de la marca guardada en la fila.
+ *
+ * Acepta los dos formatos que conviven en la tabla: el ISO con milisegundos que escribe la
+ * subida desde hoy y el `datetime('now')` (`2026-09-23 15:23:32`, sin zona) de las filas
+ * antiguas. Devuelve `null` si no se puede interpretar: una cabecera inválida rompería la
+ * respuesta entera, y `Last-Modified` es un extra, no un requisito.
+ */
+function fechaDeMarca(marca) {
+  const normalizada = String(marca ?? '').includes('T') ? String(marca) : `${String(marca).replace(' ', 'T')}Z`;
+  const fecha = new Date(normalizada);
+  return Number.isNaN(fecha.getTime()) ? null : fecha.toUTCString();
+}
+
 /** Lee la imagen de `data/images/`; `null` si no existe o la ruta es sospechosa. */
-function serveLocal(key) {
+function serveLocal(key, etagPedido) {
   const absolute = path.join(LOCAL_IMAGE_ROOT, key.replace(/^images\//, ''));
   if (!isInsideRoot(absolute)) return null;
 
@@ -65,21 +106,47 @@ function serveLocal(key) {
     return null;
   }
   const type = CONTENT_TYPES[path.extname(absolute).toLowerCase()] ?? 'application/octet-stream';
+  const etag = etagDeArchivo(absolute, bytes);
+  /**
+   * El 304 tiene que responder ANTES de mandar los bytes: si el navegador ya tiene esa
+   * versión, enviarla de nuevo es el coste que la revalidación existe para evitar.
+   */
+  if (etagPedido && etagPedido === etag) {
+    return new Response(null, {
+      status: 304,
+      headers: { etag, 'cache-control': 'no-cache' },
+    });
+  }
   return new Response(bytes, {
     status: 200,
     headers: {
       'content-type': type,
-      // El nombre del asset es canónico por slug, así que el contenido de una
-      // ruta no cambia de forma silenciosa.
-      'cache-control': 'public, max-age=3600',
+      etag,
+      /**
+       * `no-cache` NO significa "no guardes": significa "guarda, pero revalida antes de
+       * usarlo". Es lo correcto aquí porque el archivo de disco SÍ puede cambiar entre dos
+       * peticiones (lo reescribe el mantenedor) y la revalidación es un 304 barato sin
+       * cuerpo. En producción la rama de Turso sigue con caché larga: allí las URLs van
+       * versionadas por la subida (ver `aplicarImagenesDelMantenedor`).
+       */
+      'cache-control': 'no-cache',
       'content-length': String(bytes.byteLength),
     },
   });
 }
 
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
   const { path: segments } = await params;
   const key = `images/${Array.isArray(segments) ? segments.join('/') : segments}`;
+  /**
+   * El validador que manda el cliente, si lo manda.
+   *
+   * Se lee de la petición y no del `query`: la versión `?v=` de la URL identifica la
+   * REVISIÓN del recurso, mientras que `If-None-Match` es lo que el navegador usa para
+   * preguntar "¿sigue valiendo lo que tengo?". Son dos cosas distintas y la segunda es la
+   * que convierte una revalidación en un 304 sin cuerpo.
+   */
+  const etagPedido = request.headers.get('if-none-match');
 
   /**
    * El manifiesto decide qué se sirve, pero solo para las carpetas PUBLICADAS.
@@ -117,10 +184,21 @@ export async function GET(_request, { params }) {
   if (tursoConfigurado()) {
     const remoto = await leerAssetRemoto(key);
     if (remoto) {
+      /**
+       * El `ETag` sale de la marca de la fila (`actualizado`), que es la MISMA que versiona
+       * la URL del catálogo: si el navegador manda `If-None-Match` con la versión que ya
+       * tiene, la respuesta correcta es un 304 sin cuerpo — ni la imagen viaja, ni el CDN
+       * se llena de copias nuevas solo porque cambió el query.
+       */
+      const etag = remoto.actualizado ? `"${String(remoto.actualizado).replace(/[^0-9]/g, '')}"` : null;
+      if (etag && etagPedido === etag) {
+        return new Response(null, { status: 304, headers: { etag } });
+      }
       return new Response(remoto.bytes, {
         status: 200,
         headers: {
           'content-type': remoto.mime,
+          ...(etag ? { etag, 'last-modified': fechaDeMarca(remoto.actualizado) } : {}),
           /**
            * Caché CORTA a propósito. El mantenedor puede reemplazar esta imagen y, al
            * restaurarla, la copia antigua sigue viva en el CDN de Vercel: con
@@ -167,7 +245,7 @@ export async function GET(_request, { params }) {
      * producción seguirían dando 404. Se acepta a cambio de que el ciclo
      * subir -> ver funcione, que es el propósito de este script.
      */
-    const local = serveLocal(key);
+    const local = serveLocal(key, etagPedido);
     if (local) return local;
     return Response.json({ error: 'imagen_no_publicada', path: key }, { status: 404 });
   }

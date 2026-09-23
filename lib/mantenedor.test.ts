@@ -91,6 +91,77 @@ describe('aplicarImagenesDelMantenedor', () => {
   });
 });
 
+/**
+ * LA INVALIDACIÓN DE CACHÉ DE LA IMAGEN REEMPLAZADA.
+ *
+ * POR QUÉ ESTE BLOQUE EXISTE
+ * --------------------------
+ * Subir una imagen desde el mantenedor guardaba los bytes y actualizaba el catálogo, y el
+ * sitio seguía mostrando la ANTERIOR. La causa no era el guardado: la ruta es canónica
+ * (`/images/<kind>/<slug>.webp`), no cambia al reemplazar, y el navegador y el CDN ya la
+ * tenían cacheada, así que nadie volvía a pedirla. El gestor de imágenes lo tapaba con un
+ * `?v=<timestamp>` en su PROPIA vista previa (`image-manager.tsx`), y por eso el fallo
+ * parecía resuelto mientras la carta 3D, la grilla y la ficha seguían mostrando la vieja.
+ *
+ * Ningún gate lo veía: la API devolvía la ruta correcta y el archivo correcto estaba en la
+ * base. Lo que faltaba era que la URL CAMBIARA. Aquí se fija eso — que la versión viaja en
+ * la URL y que cambia cuando cambia la subida.
+ */
+describe('la URL de una imagen reemplazada se versiona (invalida la caché)', () => {
+  test('la URL lleva la versión de la subida, no solo la ruta canónica', () => {
+    const out = aplicarImagenesDelMantenedor(detalle(), {
+      character: {
+        path: 'images/character/yeicokp-harv.webp',
+        width: 720,
+        height: 1008,
+        bytes: 90000,
+        actualizado: '2026-09-23T15:23:32.277Z',
+      },
+    });
+    // La ruta sigue siendo canónica (regla del repo) PERO con la versión: es lo que hace
+    // que el navegador no reutilice el búfer anterior.
+    expect(out.images.character).toBe('/images/character/yeicokp-harv.webp?v=20260923152332277');
+    expect(out.images.character).toContain('?v=');
+  });
+
+  test('dos subidas distintas dan dos URLs distintas (la segunda se ve)', () => {
+    const base = { path: 'images/character/yeicokp-harv.webp', width: 720, height: 1008, bytes: 1 };
+    const primera = aplicarImagenesDelMantenedor(detalle(), {
+      character: { ...base, actualizado: '2026-09-23T15:23:32.277Z' },
+    });
+    const segunda = aplicarImagenesDelMantenedor(detalle(), {
+      character: { ...base, actualizado: '2026-09-23T15:23:33.001Z' },
+    });
+    // Este es el caso que rompía en silencio: mismo path, misma ficha, segundo reemplazo.
+    expect(segunda.images.character).not.toBe(primera.images.character);
+  });
+
+  test('una fila antigua sin marca sigue dando la ruta canónica, sin query inventado', () => {
+    // `actualizado` es `null` en las filas antiguas: no se puede versionar lo que no tiene
+    // marca, y un `?v=undefined` sería una versión falsa que además se cachearía.
+    const out = aplicarImagenesDelMantenedor(detalle(), {
+      logo: { path: 'images/logo/yeicokp-harv.webp', width: 10, height: 10, bytes: 1, actualizado: null },
+    });
+    expect(out.images.logo).toBe('/images/logo/yeicokp-harv.webp');
+    expect(out.images.logo).not.toContain('v=');
+  });
+
+  test('la URL sigue siendo absoluta al versionarla (no se rompe en /v/:slug)', () => {
+    // La regla del repo es que las rutas de assets empiezan por `/`: una relativa pediría
+    // `/v/images/...` en la ficha. El `?v=` no puede cambiar eso.
+    const out = aplicarImagenesDelMantenedor(detalle(), {
+      background: {
+        path: 'images/background/yeicokp-harv.webp',
+        width: 720,
+        height: 1008,
+        bytes: 1,
+        actualizado: '2026-09-23T15:23:32.277Z',
+      },
+    });
+    expect(out.images.background?.startsWith('/images/')).toBe(true);
+  });
+});
+
 describe('carpetas compartidas', () => {
   test('las carpetas gestionables son un subconjunto de las publicadas', () => {
     // Si divergieran, el mantenedor ofrecería un tipo que el manifiesto no publica (o al revés)
