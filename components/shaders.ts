@@ -642,6 +642,13 @@ ${SPECTRUM_FN}
     vec3 base = themeGradient;
     base = mix(base, layer0.rgb, layer0.a);
     base = mix(base, layer1.rgb, layer1.a);
+    /**
+     * layer2 es la ranura del LOGO y llega VACÍA a propósito: la marca la dibuja el
+     * STICKER final (más abajo), que es el único que lleva el brillo metálico. Esta
+     * línea se conserva porque el slot sigue existiendo (no se puede renumerar
+     * uLayer3..6 sin mover las posiciones de PARALLAX_LAYERS) y con alfa 0 el mix no
+     * cambia nada. Ver el comentario de drawCardLayers en card-texture.ts.
+     */
     base = mix(base, layer2.rgb, layer2.a);
     base = mix(base, layer3.rgb, layer3.a);
     base = mix(base, layer4.rgb, layer4.a);

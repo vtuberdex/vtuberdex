@@ -81,6 +81,21 @@ function createLayer(width: number): { canvas: HTMLCanvasElement; ctx: CanvasRen
   return { canvas, ctx, scale, W: CARD_TEXTURE_WIDTH, H: CARD_TEXTURE_HEIGHT };
 }
 
+/**
+ * Capa VACÍA de 1x1, para ocupar un slot de `uLayerN` sin coste.
+ *
+ * Un canvas transparente del tamaño de la carta ocupa ~5,7 MB de textura en la GPU por
+ * carta (1008x1411x4) y el muestreo devuelve lo mismo que el de 1x1: alfa 0 en todo el
+ * UV. Se usa cuando una capa se retira pero su índice no puede cambiar, porque
+ * renumerar movería las posiciones de PARALLAX_LAYERS y el resto de uniformes.
+ */
+function emptyLayer(): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+  return canvas;
+}
+
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
@@ -301,18 +316,6 @@ export function drawCharacterLayer({ art, width }: { art: HTMLImageElement | nul
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(200,200,200,0.5)';
     ctx.fillText('SIN IMAGEN', W / 2, H / 2);
-  }
-  return canvas;
-}
-
-/** Capa 2: logo en su caja. */
-export function drawLogoLayer({ logo, box, width }: { logo: HTMLImageElement | null; box: { x: number; y: number; w: number; h: number } | null; width: number }): HTMLCanvasElement {
-  const { canvas, ctx } = createLayer(width);
-  if (!ctx) return canvas;
-  if (logo && box) {
-    const scale = width / CARD_TEXTURE_WIDTH;
-    ctx.scale(scale, scale);
-    ctx.drawImage(logo, box.x, box.y, box.w, box.h);
   }
   return canvas;
 }
@@ -661,7 +664,29 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
   return {
     background: drawBackgroundLayer({ background, width }),
     character: drawCharacterLayer({ art, width }),
-    logo: drawLogoLayer({ logo, box: logoBox, width }),
+    /**
+     * La capa del logo se sirve VACÍA a propósito.
+     *
+     * POR QUÉ: el logo se dibuja DOS veces en la carta — esta capa (el arte de la marca
+     * compuesto en la pila, con `mix()` sobre `base`, SIN el bloque de metal) y el
+     * STICKER final (`logoSticker`, recompuesto encima con el brillo metálico, el
+     * barrido, el contraste y el tinte frío/cálido). El usuario veía las dos: "una
+     * tiene brillo metálico y la otra no", y la que no lo tiene es ésta.
+     *
+     * La marca la dibuja el sticker, que es el que lleva el acabado de la pieza; esta
+     * capa solo aportaba una copia plana encima. Se deja el slot para no renumerar las
+     * capas (`uLayer2` sigue existiendo y las posiciones de PARALLAX_LAYERS no cambian),
+     * pero sin arte.
+     *
+     * OJO: `logoBox` sigue publicándose en `info` y se calcula más arriba, porque el
+     * sticker y su máscara lo necesitan para saber DÓNDE va la marca.
+     *
+     * Se usa un canvas de 1x1 y no uno del tamaño de la carta: una capa VACÍA a
+     * 1008x1411 ocupa ~5,7 MB de textura en la GPU por carta y no aporta nada. Al
+     * muestrearla su alfa es 0 en todo el UV, que es justo lo que se busca. El slot
+     * existe para no renumerar `uLayer2` ni las posiciones de PARALLAX_LAYERS.
+     */
+    logo: emptyLayer(),
     title: drawTitleLayer({ card, width }),
     texts: drawTextsLayer({ card, width, info }),
     tags: drawTagsLayer({ card, width, info }),
@@ -678,7 +703,7 @@ export function drawCardFront(input: CardDrawInfo): HTMLCanvasElement {
   const layers = drawCardLayers({ ...input, width });
   ctx.drawImage(layers.background, 0, 0, W, H);
   ctx.drawImage(layers.character, 0, 0, W, H);
-  ctx.drawImage(layers.logo, 0, 0, W, H);
+  // (la capa `logo` se omite: va vacía; la marca la pinta el sticker del shader)
   ctx.drawImage(layers.title, 0, 0, W, H);
   ctx.drawImage(layers.texts, 0, 0, W, H);
   ctx.drawImage(layers.tags, 0, 0, W, H);
