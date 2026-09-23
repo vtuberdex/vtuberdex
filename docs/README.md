@@ -85,12 +85,13 @@ sistema de archivos de Vercel es de solo lectura. En producción esa ruta devuel
 ## Despliegue
 
 Todo el catálogo corre en Vercel: las rutas de `app/api/*` consultan una copia
-**saneada** de SQLite empaquetada en la función, y `/images/*` redirige a Vercel
-Blob. No hay base de datos externa ni servicio aparte.
+**saneada** de SQLite empaquetada en la función, y `/images/*` sirve las imágenes
+desde **Turso** (los bytes viven en un BLOB de la tabla `asset_remoto`), con el disco
+local como respaldo en desarrollo. Las ediciones del mantenedor también viven allí.
 
 ```bash
 npm run build:data               # regenera deploy/ desde data/ (tras scrape o edición)
-npm run publish:images           # sube las imágenes a Vercel Blob (reanudable)
+npm run publish:images           # sube las imágenes a Turso (reanudable)
 npm run verify                   # 32 comprobaciones sobre un escenario de producción
 npx vercel deploy --prod         # publica
 ```
@@ -137,12 +138,20 @@ Si la IP del host cambia, el script la detecta solo (contenedor en `--network ho
 ## Tests y lint
 
 ```bash
-npm test                   # 100 tests (vitest): utilidades, componentes, páginas y carta 3D
+npm test                   # 127 tests (vitest): utilidades, componentes, páginas y carta 3D
 npm run lint               # eslint . — cubre también server/ y scraper/
 npm run typecheck          # tsc --noEmit
 npm run check:shaders      # guard de uniforms de GLSL (ni tsc ni los tests lo ven)
 cd scraper && npm test     # 25 tests: parsers y normalización
 cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP y mantenedor
+```
+
+Para medir en vez de suponer (ninguno modifica nada):
+
+```bash
+npm run probe:timings      # piso de SQLite local, sin red
+npm run bench:ediciones    # A/B del camino de Turso contra el de HEAD (stub, sin credenciales)
+npm run sweep:dead-code    # exports sin consumidores
 ```
 
 Los tests del servidor corren contra una base SQLite temporal sembrada con un

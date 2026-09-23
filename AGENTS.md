@@ -2,7 +2,10 @@
 
 Reconstrucción de `vtuberdex.com` (una "pokédex" plana de 785 fichas en un solo
 HTML, sin backend) como aplicación propia: scrape único → SQLite → API → React
-con carta holográfica 3D. Sin dependencias nativas, sin servicios externos.
+con carta holográfica 3D. **Sin dependencias nativas** (nada que compilar:
+`node:sqlite` viene con Node) y con **un servicio externo: Turso**, donde viven
+las ediciones del mantenedor y las imágenes publicadas (ver «Lecturas externas»).
+El catálogo no depende de él: si Turso no está, la app sirve el bundle igual.
 
 El README humano es `docs/README.md` (arquitectura, cifras del scrape, API y
 capturas). **Este archivo es el contrato operativo**: cómo correr, qué no romper
@@ -28,14 +31,15 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
                                                                                     │
                                                         scripts/build-db.mjs ──▶ deploy/data/ (al repo)
                                                                                     │
-                                          app/ (rutas Next) ──▶ SQLite empaquetada + Vercel Blob
+                                          app/ (rutas Next) ──▶ SQLite empaquetada
+                                                             └─▶ Turso (ediciones + imágenes)
 ```
 
 ## Comandos
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 100 tests (vitest): utilidades, componentes, páginas
+npm test                   # 127 tests (vitest): utilidades, componentes, páginas
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -44,7 +48,12 @@ npm run lint               # eslint . — falla con cualquier error
 npm run lint:fix           # corrige lo corregible
 
 # Gate real antes de dar algo por terminado
-npm run lint && npm run typecheck && npm run build
+npm run lint && npm run typecheck && npm run check:shaders && npm run build
+
+# Medición (informan; no tocan nada)
+npm run probe:timings      # piso de SQLite local, sin red — el "cuánto debería costar"
+npm run bench:ediciones    # A/B del camino de Turso contra el de HEAD (stub, sin credenciales)
+npm run sweep:dead-code    # exports sin consumidores (informa, no borra)
 
 # Puesta en marcha
 cd scraper && npm install && npm run scrape      # reanudable: cachea el HTML
@@ -62,8 +71,9 @@ npm run publish:images       # sube las imágenes a Vercel Blob (reanudable)
 npm run verify               # 32 comprobaciones sobre un escenario de producción
 ```
 
-`docs/README.md` cita 15/32/57 tests: son cifras **viejas**. Las reales son
-**25/59/100** (medidas; el CI corre las tres). Si añades tests, actualiza aquí.
+`docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
+las reales son **25/59/127** (medidas; el CI corre las tres) y las imágenes viven en
+Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
 
@@ -91,6 +101,48 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
    detalle.
 8. **El color del dato manda.** `THEME` de cada ficha alimenta la paleta
    (acento, secundario, fondo, tinta) de cartas, chips y bordes.
+
+## Lecturas externas: Turso (ediciones e imágenes)
+
+`lib/ediciones.mjs` es la ÚNICA parte asíncrona del camino de lectura: el catálogo
+sigue saliendo de SQLite síncrono (`search.mjs`, sin `await`) y las ediciones del
+mantenedor se aplican ENCIMA. Sin `TURSO_DATABASE_URL` todo devuelve vacío y la app
+se comporta como antes (es lo que hace que local y CI no necesiten cuenta ni red).
+
+- **Nada de `await` dentro de un bucle POR ELEMENTO.** Medido: preguntar tipo por
+  tipo para cada carta (3 viajes) más el DDL en cada lectura daba **292 peticiones**
+  a Turso para pintar una página de 24 cartas, y 1.204 con 100. El síntoma que lo
+  delata es que la latencia escalaba LINEAL (~14 ms por carta) mientras el catálogo
+  local resuelve esas 24 fichas en **2,2 ms** (`npm run probe:timings`). Si una
+  consulta local es de milisegundos y la ruta tarda cientos, el coste viaja por la red.
+- **Una consulta para toda la página**, no una por carta:
+  `WHERE origen = ? AND slug IN (?,...) AND kind IN (...)` (placeholders: un slug
+  llega de la URL) y **sin la columna `bytes`** — cada fila de asset lleva una
+  imagen entera y aquí solo se quieren metadatos. El camino de UNA ficha es el caso
+  N=1 de la misma función, así que la consulta y el mapeo de filas tienen una sola
+  definición (`reemplazosDePagina` / `aplicarReemplazosALista`).
+- **El DDL se memoiza como PROMESA a nivel de módulo** (`asegurarTablas`), no como
+  resultado: dos peticiones concurrentes en una instancia fría comparten el trabajo.
+  Y **si falla se suelta el memo** — cachear el rechazo dejaría todas las lecturas
+  siguientes rotas hasta reciclar la instancia.
+- **Este coste no lo ve ningún gate.** `lint`, `typecheck`, `build` y las 127
+  pruebas pasaban con las 292 consultas: el comportamiento era CORRECTO, solo
+  multiplicado por 146. `lib/lecturas-turso.test.ts` fija el **NÚMERO de consultas**
+  con un cliente falso (la suite corre en CI sin credenciales), no la forma de la
+  respuesta.
+- **Las credenciales de producción NO se pueden releer para medir.** Marcadas
+  *sensitive* en Vercel devuelven vacío incluso con `decrypt=true` (comprobado con la
+  API; las de *development* sí salen, pero su valor puede ser un JWT y no la URL del
+  servicio). Plan B que sí mide, y es el que usa `npm run bench:ediciones`: un **stub
+  del protocolo** —`@libsql/client` habla Hrana v2 en `/v2/pipeline` con JSON—
+  respaldado por SQLite, comparando el módulo actual contra `git show HEAD:lib/ediciones.mjs`
+  en un temporal con el mismo cliente. Con `--delay N` por petición se reproduce la
+  latencia de red: el modelo cuadró con producción (292 × 2,8 ms ≈ 817 ms frente a
+  los 824 ms medidos).
+
+Resultado del arreglo, medido en producción tras desplegar: `perPage=1/24/48/100` →
+**0,33 s planos** (antes 0,417 / 0,824 / 1,138 / 1,854 s). El detalle completo, con
+la tabla de antes y después, está en `docs/optimizacion-turso.md`.
 
 ## Base de datos y migraciones
 
@@ -168,9 +220,12 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
   uniforms creados en CPU que ningún shader consume — ninguno de los tres lo ve
   `tsc`. **Nada de backticks en los comentarios GLSL**: cierran el template
   literal y dejan el archivo con un error que `tsc` reporta en la línea SIGUIENTE.
-- **Vite 7 rechaza un `Host` que no sea IP** (DNS rebinding): abrir la app por
-  nombre de máquina da "Blocked request". Se resuelve con `allowedHosts` +
-  `VTUBERDEX_ALLOWED_HOSTS` (`web/vite.config.ts`).
+- **Para entrar a `next dev` por nombre/IP desde otro equipo: `allowedDevOrigins`.**
+  El antiguo `web/vite.config.ts` (y su `VTUBERDEX_ALLOWED_HOSTS`) desapareció con la
+  migración a Next: hoy `next.config.mjs` lista las IPs/hostnames permitidos
+  (`192.168.100.90`, `fuchikoma`, `*.local`, IP de Tailscale). Sin la entrada, Next 16
+  bloquea HMR y chunks al navegar desde fuera y los módulos `ssr:false` no hidratan.
+  Al cambiar de red, añade la IP ahí.
 - **Combinar headers en el cliente de API, no reemplazarlos.**
   `fetch(headers: { authorization })` borraba el `content-type: application/json`
   y el PATCH fallaba con "expected object, received undefined".
@@ -194,19 +249,41 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
   la función reciba el valor actualizado. `npm run admin:verificar` comprueba el resultado
   (login real + sesión en Turso) y, si hay 401, distingue "hash mal pegado" de "contraseña
   equivocada" leyendo el diagnóstico de FORMA que ahora devuelve el 401.
-- **No marques `VTUBERDEX_ADMIN_PASSWORD_HASH` como *sensitive*.** El panel y
-  `npx vercel env add` ofrecen *Sensitive*/**Secret** por defecto, y Vercel guarda esos valores
-  en un **formato ilegible para siempre**: ni el CLI, ni `vercel env pull`, ni la API con
+- **El mantenedor escribe en TURSO, no en Blob, y Blob ya no se usa.** La primera
+  versión subía las imágenes a Vercel Blob y el store quedó **bloqueado** (los 2.000
+  "Advanced Operations" del plan Hobby se agotaron con 1.625 `put`; el bloqueo dura
+  30 días). Turso resuelve las dos cosas con un servicio: las EDICIONES son filas de
+  `edicion` y las IMÁGENES filas de `asset_remoto` con los bytes en un BLOB (73 MB =
+  1,5% de los 5 GB gratuitos). `app/images/[...path]/route.js` **consulta Turso
+  PRIMERO**; el 301 a Blob sigue en el código pero es la rama muerta (por eso
+  `npm run verify` aún comprueba "301 a Blob": prueba esa rama con `VTUBERDEX_BLOB_BASE`
+  definida). El fallo que causó: `usesLocalImages()` decide "modo local" mirando esa
+  variable, y **en Vercel NO está definida**, así que la ruta se creía en local,
+  buscaba en `data/images/` (que no viaja al deploy) y devolvía 404 a las 1.593
+  imágenes que sí estaban subidas — con el catálogo funcionando y las imágenes no.
+- **`asset_remoto` distingue `origen` (`catalogo` vs `mantenedor`), y borrar un
+  reemplazo NO puede tocar el original.** La primera versión guardaba las dos cosas
+  en la MISMA fila `(slug, kind)`, así que subir una imagen **destruía la única copia
+  del original** y borrarla dejaba el hueco sin vuelta atrás (no era caché: la imagen
+  ya no existía en ningún sitio). Si tocas esa tabla, mantén la clave de tres columnas.
+- **`VTUBERDEX_ADMIN_PASSWORD_HASH` no va marcado *sensitive*.** El panel y
+  `npx vercel env add` lo ofrecen por defecto, y Vercel guarda esos valores en un
+  **formato ilegible para siempre**: ni el CLI, ni `vercel env pull`, ni la API con
   `decrypt=true` dejan volver a leerlos (devuelven un placeholder o un sobre cifrado;
-  comprobado). Un hash `scrypt` no es un secreto reutilizable —es irreversible y salado—, así
-  que guárdalo como *encrypted*/**Config** (`--no-sensitive`): se puede releer para comparar y
-  el fallo deja de ser indepurable. `formatoDeHash` (`lib/admin-auth.mjs`) solo puede
-  describir la FORMA, nunca recuperar el valor.
-- **`scripts/` no es `web/scripts/`**: `scripts/*.sh` es infraestructura del
-  repo; `web/scripts/*.mjs` son sondas de desarrollo (medir tinte, volcar
-  texturas, capturas). Las sondas y `screenshots.mjs` esperan un Chrome en
-  `CHROME_PATH` (`/opt/data/cache/chrome/...`), que **en este contenedor no
-  existe**: `npm run shots` falla aquí hasta que se baje el binario.
+  comprobado). Un hash `scrypt` no es un secreto reutilizable —es irreversible y
+  salado—, así que se guarda como *encrypted*/**Config** (`--no-sensitive`) y se puede
+  releer para comparar. `formatoDeHash` (`lib/admin-auth.mjs`) solo describe la FORMA.
+  **Lo mismo vale para `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN`**: hoy están como
+  *sensitive* en producción y por eso `npm run bench:ediciones` mide con un stub en vez
+  de contra el servicio real.
+- **`scripts/` no tiene subcarpeta de sondas.** `scripts/*.sh` es infraestructura del
+  repo (`dev-up.sh`, `dev-docker.sh`, `refresh.sh`) y `scripts/*.mjs` son utilidades
+  (`build-db`, `verify-vercel-bundle`, `check-shaders`, `probe-timings`,
+  `bench-ediciones`, `sweep-dead-code`, `admin-*`). Las sondas de desarrollo que
+  vivían en `web/scripts/*.mjs` (medir tinte, volcar texturas, capturas) **se fueron
+  con el árbol `web/`**: hoy no hay script `shots`. Para una captura suelta, el
+  `chrome-headless-shell` de `~/.hermes/cache/chrome/chrome-headless-shell-linux64/`
+  funciona (`--headless --screenshot=... --virtual-time-budget=9000` sobre la URL).
 - **`npm run lint` YA FUNCIONA** (dejó de estar roto): ESLint 9 con config
   plana en `eslint.config.mjs`, porque Next 16 **eliminó `next lint`** y la
   config tiene que ser nuestra (ver
@@ -261,14 +338,15 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ## Despliegue en Vercel
 
 La app es **Next.js con App Router** (Vercel la detecta como framework nativo). El
-catálogo corre como funciones con SQLite empaquetada y las imágenes en Vercel
-Blob. El mantenedor **no** existe en producción.
+catálogo corre como funciones con SQLite empaquetada; las imágenes y las ediciones del
+mantenedor viven en **Turso** (Blob quedó atrás, ver «Trampas conocidas»). El
+mantenedor **sí responde en producción** (`/api/admin/*`, login real contra Turso).
 
 ```
 GitHub vtuberdex/vtuberdex ─▶ vercel build ─▶ app/ (Next)
                                                ├─ app/api/*              → SQLite (readOnly, del bundle)
-                                               ├─ app/images/[...path]   → 301 a Vercel Blob
-                                               ├─ app/api/admin/[...path]→ 404 en prod (solo local)
+                                               ├─ app/images/[...path]   → Turso (BLOB) o disco local
+                                               ├─ app/api/admin/[...path]→ Turso (401 sin sesión) o Express local
                                                └─ app/(dex)/*            → catálogo + detalle
 ```
 
@@ -276,10 +354,13 @@ GitHub vtuberdex/vtuberdex ─▶ vercel build ─▶ app/ (Next)
 npm install                      # deps del proyecto (root)
 npm run build                    # next build (usa deploy/ ya construido)
 npm run build:data               # regenera deploy/ desde data/ (local, tras scrape o edición)
-npm run publish:images           # sube las imágenes a Blob (reanudable)
 npm run verify                   # 32 comprobaciones sobre un escenario de producción
-npx vercel deploy --prod         # publica
+npx vercel deploy --prod         # publica (o push a master, lo hace deploy.yml)
 ```
+
+`npm run publish:images` sube las imágenes a **Turso** (`asset_remoto`), no a Blob; es
+idempotente y reanudable. Para el mantenedor en producción están `admin:publicar`
+(alta del usuario admin) y `admin:verificar` (login real de punta a punta).
 
 ### Las reglas del deploy
 
@@ -306,13 +387,18 @@ npx vercel deploy --prod         # publica
 6. **La base NO puede quedar en `public/`** — sería descargable por HTTP. El
    verificador lo comprueba mirando el **contenido** de la respuesta, no el status:
    un `status === 404` da falso positivo porque el fallback responde el index.
-7. **La URL de Blob se resuelve en runtime** (`VTUBERDEX_BLOB_BASE`); el
-   manifiesto guarda rutas canónicas, no URLs, para que cambiar de store no obligue
-   a recompilar.
-8. **El mantenedor devuelve 404 en producción** (`app/api/admin/[...path]`). No es
-   una degradación silenciosa: en Vercel el catálogo es de solo lectura, así que
-   arrastrar `sharp` y subidas de 12 MB a una función que no puede escribir no
-   aportaría nada. En local se reenvía al Express con `VTUBERDEX_ADMIN_URL`.
+7. **Las imágenes se resuelven en runtime por dos ramas, y Turso es la primera.**
+   `app/images/[...path]/route.js` consulta `asset_remoto` en Turso y, si `origen` es
+   `mantenedor`, sirve ese BLOB; si no hay Turso, cae a `data/images/` en local. La
+   rama del 301 a Blob sigue en el código pero **no se alcanza en producción** (no hay
+   `VTUBERDEX_BLOB_BASE`): `npm run verify` la prueba a propósito poniendo esa variable.
+   El manifiesto guarda rutas canónicas, no URLs. Cachea `public, max-age=60` +
+   `s-maxage=300`; el borde respeta 300 s (medido: `x-vercel-cache: MISS` a los 305 s).
+8. **El mantenedor SÍ existe en producción** (`app/api/admin/[...path]`), con Turso
+   configurado: login real (401 sin sesión, verificado en producción) y escritura de
+   ediciones e imágenes contra Turso. Solo devuelve 404 cuando **no** hay ni Turso ni
+   proxy local — el 404 explícito que comprueba `npm run verify`. En local se reenvía
+   al Express con `VTUBERDEX_ADMIN_URL`.
 9. **El deploy NO puede ser por integración Git**: el team es **Hobby** y Vercel no
    conecta repos de organizaciones en ese plan (limitación de plataforma). Se
    despliega con `vercel deploy`, o con un GitHub Action con token.
@@ -354,9 +440,9 @@ Tres cosas del CI que no son obvias:
 
 `npm run verify` monta un escenario **sin los datos crudos de desarrollo**, arranca
 un `next start` real y pide rutas por HTTP. Son **32 comprobaciones**: catálogo (785
-fichas, FTS5, facetas, detalle, validación 400), imágenes (301 a Blob, 404 en lo no
-publicado, **carpetas retiradas**), seguridad (base saneada, no descargable,
-mantenedor en 404) y front.
+fichas, FTS5, facetas, detalle, validación 400), imágenes (rama de Blob con la variable
+puesta, 404 en lo no publicado, **carpetas retiradas**), seguridad (base saneada, no
+descargable, mantenedor en 404 **cuando no hay Turso**) y front.
 
 Trampas que ese script ya encontró y conviene no reintroducir:
 `res.sendFile` **falla en un FS de solo lectura** (daba 500 en rutas profundas del
@@ -373,16 +459,17 @@ uso real verificado en el front, no por lo que exista en disco:
 | `character` | ✅ publicado | La imagen fuente del VTuber |
 | `logo` | ✅ publicado | Capa superior de la carta |
 | `faction` | ✅ publicado | Emblema que la carta superpone como holograma |
-| `background` | ✅ publicado (vacía) | Capa POR DETRÁS del personaje, con holograma y paralaje propios. **El scraper NO la produce**: solo se llena si alguien sube una desde el mantenedor |
+| `background` | ✅ publicado (1 objeto) | Capa POR DETRÁS del personaje, con holograma y paralaje propios. **El scraper NO la produce**: solo se llena si alguien sube una desde el mantenedor (hoy hay 1) |
 | `thumb` | ❌ eliminado | Ninguna vista la pedía (18 MB) |
 | `avatar` | ❌ eliminado | Duplicado legacy de `character` (13 MB) |
 | `ficha` | ❌ eliminado | Respaldo de `character`; hoy los 785 lo tienen (33 MB) |
 | `radar` | ❌ eliminado | Gráfico de atributos **dibujado desde los datos** por `StatBars` en la misma página (8 MB) |
 | `card` | ❌ eliminada | Vacía desde siempre |
 
-`data/images/` pasó de **143 MB a 73 MB**; el manifiesto publica **1593** objetos
-(785 + 785 + 23) mientras nadie suba un fondo. Las rutas de las carpetas retiradas
-responden **404 explícito**, comprobado en `npm run verify`.
+`data/images/` pasó de **143 MB a ~74 MB**; el manifiesto publica **1594** objetos
+(785 `character` + 785 `logo` + 23 `faction` + 1 `background`), y `count` del
+manifiesto cuadra con la suma. Las rutas de las carpetas retiradas responden
+**404 explícito**, comprobado en `npm run verify`.
 
 **Ojo:** los tipos `card`/`thumb`/`radar` siguen en el contrato de la API y en el
 esquema de la base (el `seed` los sigue escribiendo); lo que se retiró es su
@@ -391,7 +478,7 @@ añadirla a `USED_FOLDERS` de `scripts/build-db.mjs` y republicar.
 
 ## Verificación antes de decir "listo"
 
-1. `npm run lint && npm run typecheck && npm run build` (el build es el gate real).
+1. `npm run lint && npm run typecheck && npm run check:shaders && npm run build` (el build es el gate real).
 2. `npm test` en el paquete que tocaste; si cambiaste el esquema o la búsqueda,
    corre también `server` y, si aplica, `scraper`.
 3. Si tocaste la carta 3D o el shader, **no basta con que compile**: mira la
@@ -413,8 +500,9 @@ añadirla a `USED_FOLDERS` de `scripts/build-db.mjs` y republicar.
 | 4000 | `server/src/index.mjs` (Express) | el mantenedor: es el ÚNICO que escribe |
 
 Next reenvía `/api/admin/*` al Express con `VTUBERDEX_ADMIN_URL`. Si esa variable
-no está, la página `/admin` carga pero cada llamada da **404** — el mismo
-comportamiento que en producción, y lo que comprueba `npm run verify`.
+no está y tampoco hay Turso, la página `/admin` carga pero cada llamada da **404**
+(el 404 explícito que comprueba `npm run verify`). En producción no pasa: allí el
+mantenedor atiende con Turso.
 
 Cuatro trampas concretas de trabajar en local:
 
@@ -430,8 +518,9 @@ Cuatro trampas concretas de trabajar en local:
    saneada (`admin_user` y `audit_log` VACÍOS a propósito, para no publicar el
    hash) y está versionada, así que el login sería imposible y cada subida
    ensuciaría el repo con un binario de ~60 MB.
-2. **Sin `VTUBERDEX_BLOB_BASE`, las imágenes se sirven de `data/images/`**
-   (rama local de `app/images/[...path]/route.js`). Antes esa ruta devolvía
+2. **Sin Turso y sin `VTUBERDEX_BLOB_BASE`, las imágenes se sirven de
+   `data/images/`** (rama local de `app/images/[...path]/route.js`; si hay Turso,
+   Turso va PRIMERO y el disco es solo el respaldo). Antes esa ruta devolvía
    `null` y la app entera salía sin una sola imagen, difícil de diagnosticar.
    En local el **disco es la fuente de verdad** (sin exigir que el archivo esté
    en el manifiesto, que solo se regenera con `npm run build:data`): sin eso, una
