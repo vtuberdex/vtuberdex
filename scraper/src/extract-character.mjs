@@ -19,12 +19,6 @@ import sharp from 'sharp';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
-/**
- * Las fichas APAISADAS del sitio, que son la fuente del recorte. Viven en
- * `ficha/`: antes se leían de `card/`, pero esa carpeta pasó a ser la de la carta
- * compuesta y luego quedó vacía, así que el extractor se quedaba sin entrada.
- */
-const CARDS = path.join(ROOT, 'data', 'images', 'ficha');
 const OUTDIR = path.join(ROOT, 'data', 'images', 'character');
 /** Lienzo de carta coleccionable (proporción 1.4 de alto/ancho). */
 const CARD_W = 720;

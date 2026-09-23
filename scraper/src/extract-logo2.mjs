@@ -37,8 +37,6 @@ const value = (name, fallback) => {
 };
 const SAMPLE = Number(value('sample', '0')) || 0;
 const CONCURRENCY = Number(value('concurrency', '6'));
-/** Desplazamientos a probar alrededor de la posición calibrada. */
-const NUDGE = 0.04;
 
 /**
  * Banda de búsqueda del logo, derivada de la calibración.

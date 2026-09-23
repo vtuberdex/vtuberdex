@@ -9,7 +9,6 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
 import { DEFAULT_DB_PATH, getMeta, openDatabase, setMeta, transaction } from './db/index.mjs';

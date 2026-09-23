@@ -82,7 +82,14 @@ const APORTADOS = new Set([
   'vUv', 'vNormal', 'vViewPosition', 'vWorldPosition',
 ]);
 
-/** Bloque de GLSL con su línea de inicio, usando la marca /* glsl *​/ de esta base. */
+/**
+ * Bloques GLSL del fuente, cada uno con su línea de inicio.
+ *
+ * La marca que los delimita es un comentario de bloque `glsl` seguido de un
+ * template literal; se cita SIN escribir el cierre literal porque eso cerraría
+ * este mismo comentario (era lo que obligaba a meter un espacio invisible de
+ * ancho cero en el texto, que `no-irregular-whitespace` marca con razón).
+ */
 const bloques = [...fuente.matchAll(/\/\*\s*glsl\s*\*\/\s*`([\s\S]*?)`/g)].map((m) => ({
   cuerpo: m[1],
   linea: fuente.slice(0, m.index).split('\n').length,

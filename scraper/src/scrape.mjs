@@ -101,9 +101,9 @@ async function loadDetail(entry) {
   return null;
 }
 
-const EXT_BY_FORMAT = { jpeg: 'jpg', png: 'png', webp: 'webp', avif: 'avif', gif: 'gif' };
-
-/** Convierte un data URI (base64 embebido en la ficha) en Buffer. */
+/**
+ * Convierte un data URI (base64 embebido en la ficha) en Buffer.
+ */
 function bufferFromDataUri(src) {
   const match = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(src);
   if (!match) return null;

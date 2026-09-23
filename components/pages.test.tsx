@@ -9,7 +9,7 @@
  * fallarían por un motivo que no es el del componente. El doble guarda el
  * querystring y notifica a los suscriptores, como haría el router real.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 

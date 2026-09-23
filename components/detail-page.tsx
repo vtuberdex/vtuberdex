@@ -15,7 +15,6 @@ import { api } from '@/lib/api';
 import { cardPalette, gradientCss, mixHex, rgba } from '@/lib/color';
 import type { VtuberDetail, Neighbors } from '@/lib/types';
 import { HoloCard } from '@/components/holo-card';
-import dynamic from 'next/dynamic';
 import { INTENSITY } from '@/components/card3d-config';
 import { SkillList } from '@/components/skill-list';
 import { StatBars } from '@/components/stat-bars';

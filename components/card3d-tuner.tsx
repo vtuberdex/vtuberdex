@@ -33,8 +33,13 @@ import { GRUPOS, KNOBS, type Grupo, type LiveKnobs, cambios, live, resetLive, se
 
 export function Card3dTuner() {
   const [abierto, setAbierto] = useState(true);
-  /** Se guarda un contador para forzar el repintado de los sliders tras "reiniciar". */
-  const [version, setVersion] = useState(0);
+  /**
+   * Contador que NO se lee: existe solo para forzar el repintado de los sliders
+   * tras "reiniciar" y al mover una perilla. Los valores viven fuera de React
+   * (`card3d-live`), así que sin un cambio de estado el panel mostraría números
+   * viejos. Se marca con `_` para que el linter no lo lea como descuido.
+   */
+  const [_version, setVersion] = useState(0);
 
   const mover = useCallback((clave: keyof LiveKnobs, valor: number) => {
     setKnob(clave, valor);

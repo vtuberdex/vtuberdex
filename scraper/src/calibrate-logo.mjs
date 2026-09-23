@@ -19,8 +19,6 @@ import sharp from 'sharp';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
-const CARDS = path.join(ROOT, 'data', 'images', 'card');
-const LOGOS = path.join(ROOT, 'data', 'images', 'logo');
 const DATASET = path.join(HERE, '..', 'out', 'dataset.json');
 const REPORT = path.join(HERE, '..', 'out', 'logo-calibration.json');
 

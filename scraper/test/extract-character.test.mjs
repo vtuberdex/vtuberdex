@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PANEL, FLAG_ZONE, FLAG_BOX, hasFlag, extractCharacterFromCard } from '../src/extract-character.mjs';
+import { PANEL, FLAG_BOX, hasFlag, extractCharacterFromCard } from '../src/extract-character.mjs';
 
 import sharp from 'sharp';
 import fs from 'node:fs';

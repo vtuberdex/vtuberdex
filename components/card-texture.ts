@@ -322,7 +322,7 @@ export function drawCharacterLayer({ art, width }: { art: HTMLImageElement | nul
 
 /** Capa 3: título — cabecera, número de dex, nombre y país. TEXTO PLANO. */
 export function drawTitleLayer({ card, width }: { card: VtuberCard; width: number }): HTMLCanvasElement {
-  const { canvas, ctx, W, H } = createLayer(width);
+  const { canvas, ctx, W } = createLayer(width);
   if (!ctx) return canvas;
   const pad = 46;
   const headerTop = 44;
@@ -581,7 +581,6 @@ export function drawWordmarkLayer({ card, width }: { card: VtuberCard; width: nu
 
 /** Genera todas las capas y la información de layout medida. */
 export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTURE_WIDTH }: CardDrawInfo): CardLayers {
-  const scale = width / CARD_TEXTURE_WIDTH;
   const W = CARD_TEXTURE_WIDTH;
   const H = CARD_TEXTURE_HEIGHT;
   const pad = 46;

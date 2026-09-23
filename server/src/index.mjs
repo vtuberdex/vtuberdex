@@ -47,8 +47,13 @@ export function createApp({ dbPath, imageRoot = path.join(ROOT, 'data', 'images'
     });
   }
 
-  // eslint-disable-next-line no-unused-vars -- Express necesita 4 argumentos
-  app.use((error, req, res, next) => {
+  /**
+   * Manejador de errores de Express: la firma de CUATRO argumentos es
+   * obligatoria para que Express lo reconozca como tal (`next` no se usa, pero
+   * quitarlo lo convertiría en un middleware normal). Se marca con `_` en vez de
+   * una directiva de eslint para no depender de la posición del comentario.
+   */
+  app.use((error, req, res, _next) => {
     console.error('[api] error no controlado', error);
     res.status(500).json({ error: 'error_interno', detail: error.message });
   });
