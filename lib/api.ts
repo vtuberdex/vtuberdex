@@ -92,12 +92,18 @@ export const api = {
    * Sube o reemplaza una imagen de un VTuber. El archivo va como binario crudo
    * (el servidor lo valida por contenido y lo convierte a WebP optimizado), así
    * que NO se usa FormData: el `Content-Type` se deja genérico a propósito.
+   *
+   * La respuesta trae `vtuber`, el detalle ACTUALIZADO: el mantenedor lo usa como
+   * ficha seleccionada (`setSelected(result.vtuber)`), así que si faltara la página
+   * se quedaría con los datos del catálogo y volvería a pintar "sin imagen" sobre
+   * la imagen recién subida. Los dos backends (Express y la ruta de producción)
+   * devuelven esta misma forma.
    */
   uploadImage(token: string, id: number, kind: UploadKind, file: Blob) {
     return request<{
       ok: true;
       kind: UploadKind;
-      asset: { path: string; width: number; height: number; bytes: number; format: string; hasAlpha: boolean; alphaLost: boolean };
+      asset: { path: string; width: number | null; height: number | null; bytes: number; format: string; hasAlpha: boolean; alphaLost: boolean };
       vtuber: VtuberDetail;
     }>(`/api/admin/vtubers/${id}/image/${kind}`, {
       method: 'POST',
@@ -106,7 +112,7 @@ export const api = {
     });
   },
   deleteImage(token: string, id: number, kind: UploadKind) {
-    return request<{ ok: true; kind: UploadKind; vtuber: VtuberDetail }>(
+    return request<{ ok: true; kind: UploadKind; slug: string; restaurado: string; vtuber: VtuberDetail }>(
       `/api/admin/vtubers/${id}/image/${kind}`,
       { method: 'DELETE', headers: { authorization: `Bearer ${token}` } },
     );

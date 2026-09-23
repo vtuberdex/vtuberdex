@@ -113,8 +113,8 @@ describe('ImageManager', () => {
     expect(uploadImage.mock.calls[0][2]).toBe('logo');
     expect(uploadImage.mock.calls[0][3]).toBe(file);
     await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(updated));
-    // Y se informa del resultado al usuario.
-    expect(await screen.findByTestId('admin-images-message')).toBeTruthy();
+    // Y se informa del resultado al usuario vía toast.
+    expect(await screen.findByTestId('toast-ok')).toBeTruthy();
     expect(screen.getByText(/500×200/), 'informa las dimensiones nuevas').toBeTruthy();
   });
 
@@ -139,15 +139,17 @@ describe('ImageManager', () => {
     await waitFor(() => expect(uploadImage).toHaveBeenCalledTimes(1));
     expect(uploadImage.mock.calls[0][2]).toBe('background');
     expect(await screen.findByText(/720×1008/), 'informa el lienzo de carta').toBeTruthy();
+    // El toast de éxito aparece.
+    expect(await screen.findByTestId('toast-ok')).toBeTruthy();
   });
 
-  test('un error de subida se muestra, no se traga', async () => {
+  test('un error de subida se muestra en un toast, no se traga', async () => {
     uploadImage.mockRejectedValue(new Error('no_es_imagen'));
     render(<ImageManager token="tok" detail={detailWithAssets()} onUpdated={() => {}} />);
     fireEvent.change(screen.getByTestId('admin-input-character'), {
       target: { files: [new File(['x'], 'falso.png', { type: 'image/png' })] },
     });
-    const msg = await screen.findByTestId('admin-images-message');
+    const msg = await screen.findByTestId('toast-error');
     expect(msg.textContent).toContain('no_es_imagen');
   });
 
@@ -162,6 +164,41 @@ describe('ImageManager', () => {
     await waitFor(() => expect(deleteImage).toHaveBeenCalled());
     expect(deleteImage.mock.calls[0][2]).toBe('character');
     await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(updated));
+  });
+
+  /**
+   * ESTE ES EL TEST QUE FALTABA, y su ausencia dejó pasar el fallo de producción.
+   *
+   * La ruta de producción devolvía `{ok, slug, kind, size}` en vez de `{ok, kind, asset,
+   * vtuber}`. El componente hacía `onUpdated(undefined)`, la página se quedaba sin ficha y el
+   * usuario veía "no puedo subir imágenes" — sin ningún error en consola ni en los tests, porque
+   * el cliente de la API estaba mockeado y el mock devolvía la forma CORRECTA. Se comprueba el
+   * comportamiento que el contrato protege: una respuesta incompleta NO debe vaciar la pantalla.
+   */
+  test('una respuesta sin `vtuber` no deja la pantalla en blanco: avisa en vez de pisar la ficha', async () => {
+    // La forma EXACTA que devolvía la ruta de producción antes del arreglo.
+    uploadImage.mockResolvedValue({ ok: true, slug: 'gkuro-monochrome', kind: 'character', size: 42 });
+    const onUpdated = vi.fn();
+    render(<ImageManager token="tok" detail={detailWithAssets()} onUpdated={onUpdated} />);
+
+    fireEvent.change(screen.getByTestId('admin-input-character'), {
+      target: { files: [new File(['x'], 'p.png', { type: 'image/png' })] },
+    });
+
+    const msg = await screen.findByTestId('toast-error');
+    expect(msg.textContent, 'avisa de la respuesta incompleta').toMatch(/no devolvió la ficha/i);
+    expect(onUpdated, 'no se propaga un undefined a la ficha seleccionada').not.toHaveBeenCalled();
+  });
+
+  test('lo mismo al borrar: sin detalle en la respuesta no se pisa la ficha', async () => {
+    deleteImage.mockResolvedValue({ ok: true, slug: 'gkuro-monochrome', kind: 'logo', restaurado: 'catalogo' });
+    const onUpdated = vi.fn();
+    render(<ImageManager token="tok" detail={detailWithAssets()} onUpdated={onUpdated} />);
+
+    fireEvent.click(screen.getAllByText('Quitar')[0]);
+    const msg = await screen.findByTestId('toast-error');
+    expect(msg.textContent).toMatch(/no devolvió la ficha/i);
+    expect(onUpdated).not.toHaveBeenCalled();
   });
 
   test('el input acepta cualquier imagen (la conversión la hace el servidor)', () => {

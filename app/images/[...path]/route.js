@@ -23,6 +23,7 @@ import path from 'node:path';
 
 import { resolveImageUrl, usesLocalImages } from '../../../lib/db.mjs';
 import { leerAssetRemoto, tursoConfigurado } from '../../../lib/ediciones.mjs';
+import { CARPETAS_PUBLICADAS } from '../../../lib/carpetas.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,9 +81,24 @@ export async function GET(_request, { params }) {
   const { path: segments } = await params;
   const key = `images/${Array.isArray(segments) ? segments.join('/') : segments}`;
 
-  // El manifiesto se consulta en los DOS modos: así una carpeta retirada
-  // (`radar`, `thumb`, `ficha`, `avatar`) da 404 también en local aunque sus
-  // archivos siguieran en disco.
+  /**
+   * El manifiesto decide qué se sirve, pero solo para las carpetas PUBLICADAS.
+   *
+   * Antes esto era `published = Boolean(resolveImageUrl(key))` a secas, y ahí estaba el
+   * segundo fallo de la subida en producción: el manifiesto lo genera `npm run build:data` a
+   * partir de las filas `asset` de la base, así que **una imagen recién subida no está en él**.
+   * Al condicionar la consulta a Turso a `published`, el fondo que alguien acababa de subir
+   * daba 404 con sus bytes ya guardados y visibles en el gestor.
+   *
+   * El propósito del manifiesto es que una CARPETA RETIRADA (`radar`, `thumb`, `ficha`,
+   * `avatar`) responda 404 aunque su archivo siga existiendo. Eso se conserva tal cual: si la
+   * carpeta no es una de las publicadas, se corta aquí. Dentro de una carpeta publicada, la
+   * fila de Turso manda: es donde el mantenedor escribe.
+   */
+  const carpeta = key.split('/')[1];
+  if (!CARPETAS_PUBLICADAS.includes(carpeta)) {
+    return Response.json({ error: 'imagen_no_publicada', path: key }, { status: 404 });
+  }
   const published = Boolean(resolveImageUrl(key));
 
   /**
@@ -99,7 +115,7 @@ export async function GET(_request, { params }) {
    * ningún almacén externo configurado (el `npm run dev` de siempre).
    */
   if (tursoConfigurado()) {
-    const remoto = published ? await leerAssetRemoto(key) : null;
+    const remoto = await leerAssetRemoto(key);
     if (remoto) {
       return new Response(remoto.bytes, {
         status: 200,

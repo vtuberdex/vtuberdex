@@ -27,13 +27,18 @@
 import { NextResponse } from 'next/server';
 
 import {
+  aplicarEdiciones,
+  aplicarImagenesDelMantenedor,
   borrarAssetDelMantenedor,
   guardarAssetDelMantenedor,
   guardarEdicion,
   guardarEdicionMasiva,
+  leerAssetDelMantenedor,
   leerEdiciones,
+  reemplazosDelMantenedor,
   tursoConfigurado,
 } from '../../../../lib/ediciones.mjs';
+import { KINDS_GESTIONABLES, EXTENSION_DE_CARPETA } from '../../../../lib/carpetas.mjs';
 import {
   cerrarSesion,
   credencialesConfiguradas,
@@ -45,6 +50,8 @@ import {
   usuarioEsperado,
 } from '../../../../lib/admin-auth.mjs';
 import { vtuberUpdateSchema, formatIssues } from '../../../../server/src/validation.mjs';
+import { getVtuberBySlug } from '../../../../server/src/search.mjs';
+import { readWebpSize } from '../../../../server/src/seed.mjs';
 import { getDb } from '../../../../lib/db.mjs';
 
 export const dynamic = 'force-dynamic';
@@ -70,6 +77,46 @@ async function exigirSesion(request) {
   const user = await leerSesion(token);
   if (!user) return [null, noAutenticado()];
   return [user, null];
+}
+
+/**
+ * El detalle de una ficha tal como lo ve el mantenedor, listo para devolverlo.
+ *
+ * POR QUÉ DEVOLVER EL DETALLE Y NO `{ok:true}`
+ * -------------------------------------------
+ * El cliente hace `setSelected(respuesta)` con el resultado de cada escritura y vuelve a
+ * dibujar la página desde ese objeto (`components/admin-page.tsx`, `onUpdated`). Devolver un
+ * acuse —`{ok, slug, kind, size}`— no da error, pero deja la ficha con los campos del
+ * catálogo: al subir una imagen, `images[kind]` sigue en `null` y el mantenedor pinta "sin
+ * imagen" con la imagen YA guardada. Medido en producción: era el síntoma de "no puedo subir
+ * imágenes". El Express devuelve el detalle desde siempre (`res.json({ok, kind, asset,
+ * vtuber})`), así que este es el contrato al que hay que igualarse, no uno nuevo.
+ *
+ * Se aplican las ediciones de Turso por la misma razón por la que las aplica la lectura:
+ * `getVtuberBySlug` lee el CATÁLOGO, y sin volver a pasar las ediciones una ficha editada en
+ * el mantenedor volvería a mostrar los valores del scrape tras guardar.
+ *
+ * `includeHidden: true` porque el mantenedor trabaja con fichas despublicadas: sin esto,
+ * guardar en una ficha en borrador la haría desaparecer de la pantalla.
+ */
+async function detalleActualizado(db, slug) {
+  const detalle = getVtuberBySlug(db, slug, { includeHidden: true });
+  if (!detalle) return null;
+  const ediciones = await leerEdiciones();
+  return aplicarEdiciones(detalle, ediciones);
+}
+
+/**
+ * El detalle con los reemplazos de imagen del mantenedor visibles.
+ *
+ * Se consulta Turso por tipo (solo hay reemplazo si alguien subió una imagen a mano) y se
+ * compone con `aplicarImagenesDelMantenedor`. La extensión de cada carpeta sale del módulo
+ * compartido: los emblemas de facción son PNG y suponer `.webp` los dejaría fuera.
+ */
+async function detalleConReemplazos(db, slug) {
+  const detalle = await detalleActualizado(db, slug);
+  if (!detalle) return null;
+  return aplicarImagenesDelMantenedor(detalle, await reemplazosDelMantenedor(slug));
 }
 
 /** Reenvía al Express local (comportamiento de siempre, sin cambios). */
@@ -280,7 +327,17 @@ async function editarVtuber(request, id) {
   if (!guardado) {
     return NextResponse.json({ error: 'sin_cambios', slug: actual.slug }, { status: 400 });
   }
-  return NextResponse.json({ ok: true, slug: actual.slug, editado: Object.keys(parsed.data) });
+  /**
+   * El detalle COMPLETO, no un acuse.
+   *
+   * El cliente hace `setSelected(await api.updateVtuber(...))` (`admin-page.tsx`). Al devolver
+   * `{ok, slug, editado}`, ese objeto pasaba a ser la ficha seleccionada: sin `name`, sin
+   * `assets`, sin `images` — con los campos en `undefined`, el formulario aparecía vacío
+   * después de guardar. El Express devuelve `res.json(updated)` desde siempre, así que este es
+   * el contrato correcto y el que el tipo `VtuberDetail` del cliente declara.
+   */
+  const detalle = await detalleConReemplazos(db, actual.slug);
+  return NextResponse.json(detalle);
 }
 
 /**
@@ -293,9 +350,16 @@ async function editarVtuber(request, id) {
  * binario nativo que no queremos arrastrar a la función.
  */
 async function subirImagen(request, id, kind) {
-  const KINDS = new Set(['character', 'logo', 'faction', 'background']);
-  if (!KINDS.has(kind)) {
-    return NextResponse.json({ error: 'kind_invalido', detail: `use: ${[...KINDS].join(', ')}` }, { status: 400 });
+  /**
+   * Los tipos se validan contra la MISMA lista que usa el cliente (`lib/carpetas.mjs`): si
+   * divergieran, el mantenedor ofrecería un tipo que el servidor rechaza (o al revés) y el
+   * usuario vería un 400 sin haber hecho nada raro.
+   */
+  if (!KINDS_GESTIONABLES.includes(kind)) {
+    return NextResponse.json(
+      { error: 'kind_invalido', detail: `use: ${KINDS_GESTIONABLES.join(', ')}` },
+      { status: 400 },
+    );
   }
   const db = getDb();
   const actual = db.prepare('SELECT slug FROM vtuber WHERE id = ?').get(Number(id));
@@ -303,7 +367,7 @@ async function subirImagen(request, id, kind) {
 
   const bytes = Buffer.from(await request.arrayBuffer());
   // Firma de WebP: "RIFF" + 4 bytes de tamaño + "WEBP". Es el contenedor que usan las
-  // tres carpetas publicadas, así que no hace falta aceptar nada más.
+  // carpetas publicadas, así que no hace falta aceptar nada más.
   const esWebp =
     bytes.length > 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
   if (!esWebp) {
@@ -315,9 +379,40 @@ async function subirImagen(request, id, kind) {
    * catálogo. Antes esto escribía sobre la misma fila `(slug, kind)` que el publicador,
    * así que subir una imagen DESTRUÍA la única copia del original y ya no había forma de
    * volver a ella. Ver `lib/ediciones.mjs`.
+   *
+   * Las dimensiones se leen de la CABECERA del WebP (`readWebpSize`, ya existente en
+   * `server/src/seed.mjs`, JS puro). Aquí no se puede usar `sharp` —binario nativo que no viaja
+   * a la función— y sin dimensiones el gestor las lee como `null` y pinta "sin imagen" sobre
+   * una imagen que sí está guardada: el síntoma que confundía al mantenedor.
    */
-  await guardarAssetDelMantenedor(actual.slug, kind, bytes, 'image/webp');
-  return NextResponse.json({ ok: true, slug: actual.slug, kind, size: bytes.length });
+  const medidas = readWebpSize(bytes);
+  await guardarAssetDelMantenedor(actual.slug, kind, bytes, 'image/webp', medidas);
+
+  /**
+   * Se devuelve el MISMO contrato que el Express: `{ok, kind, asset, vtuber}`.
+   *
+   * El cliente (`lib/api.ts`) desestructura `result.asset` —para el aviso "reemplazado por un
+   * WebP de WxH"— y `result.vtuber`, que pasa a ser la ficha seleccionada. Devolver solo
+   * `{ok, slug, kind, size}` dejaba `result.vtuber` en `undefined` y el `setSelected(undefined)`
+   * siguiente rompía el renderizado: la página se quedaba en blanco justo al subir la imagen.
+   *
+   * Las dimensiones salen de la fila que se acaba de escribir, no de decodificar los bytes:
+   * esta función no lleva `sharp` (es un binario nativo que no viaja a la función) y el
+   * cliente ya normaliza el encuadre antes de mandar el archivo.
+   */
+  const fila = await leerAssetDelMantenedor(actual.slug, kind);
+  const ext = EXTENSION_DE_CARPETA[kind] ?? 'webp';
+  const asset = {
+    path: `images/${kind}/${actual.slug}.${ext}`,
+    width: fila?.width ?? null,
+    height: fila?.height ?? null,
+    bytes: bytes.length,
+    format: 'webp',
+    hasAlpha: false,
+    alphaLost: false,
+  };
+  const vtuber = await detalleConReemplazos(db, actual.slug);
+  return NextResponse.json({ ok: true, kind, asset, vtuber });
 }
 
 /** `DELETE /api/admin/vtubers/:id/image/:kind` — vuelve a la imagen del catálogo. */
@@ -325,13 +420,26 @@ async function borrarImagen(id, kind) {
   const db = getDb();
   const actual = db.prepare('SELECT slug FROM vtuber WHERE id = ?').get(Number(id));
   if (!actual) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+  if (!KINDS_GESTIONABLES.includes(kind)) {
+    return NextResponse.json(
+      { error: 'kind_invalido', detail: `use: ${KINDS_GESTIONABLES.join(', ')}` },
+      { status: 400 },
+    );
+  }
   // Solo se borra el reemplazo del mantenedor; el asset del catálogo no se toca nunca.
   const habia = await borrarAssetDelMantenedor(actual.slug, kind);
+  /**
+   * El detalle actualizado, igual que en la subida: el cliente hace `setSelected(result.vtuber)`.
+   * Tras borrar, el tipo vuelve a mostrar la imagen del catálogo —o "sin imagen" si el tipo no
+   * existía—, y eso solo se ve si la respuesta trae el detalle ya recalculado.
+   */
+  const vtuber = await detalleConReemplazos(db, actual.slug);
   return NextResponse.json({
     ok: true,
     slug: actual.slug,
     kind,
     restaurado: habia ? 'catalogo' : 'no_habia_reemplazo',
+    vtuber,
   });
 }
 

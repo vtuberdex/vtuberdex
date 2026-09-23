@@ -141,7 +141,16 @@ export function AdminPage() {
     setError(null);
     try {
       const updated = await api.updateVtuber(token, selected.id, patch);
-      setSelected(updated);
+      /**
+       * Solo se reemplaza la ficha seleccionada si la respuesta la trae entera.
+       *
+       * `save` hacía `setSelected(updated)` sin comprobar nada, y la ruta de producción
+       * devolvía `{ok, slug, editado}` en vez del detalle: el resultado era la ficha vacía
+       * después de guardar (sin nombre, sin campos, sin imágenes) porque el objeto seleccionado
+       * pasaba a tener esos campos en `undefined`. La ruta ya devuelve el detalle, y esta guarda
+       * evita que un despliegue anterior repita el síntoma en silencio.
+       */
+      if (updated?.slug) setSelected(updated);
       setSavedAt(new Date().toISOString());
       await loadAdmin();
     } catch (cause) {
@@ -338,9 +347,9 @@ export function AdminPage() {
                   detail={selected}
                   onUpdated={(vtuber) => {
                     // Se conserva el editor abierto: reemplazar una imagen no debe
-                    // sacarte de la ficha en la que estás trabajando.
+                    // sacarte de la ficha en la que estás trabajando. Solo se
+                    // actualiza el detalle; no se toca la búsqueda ni el scroll.
                     setSelected(vtuber);
-                    void loadAdmin();
                   }}
                 />
               )}

@@ -22,6 +22,8 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
+import { CARPETAS_PUBLICADAS } from '../lib/carpetas.mjs';
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 
@@ -77,7 +79,7 @@ const CREDENTIAL_TABLES = ['admin_user', 'audit_log'];
  *                redundante (8 MB).
  *   · `card`   — vacía desde siempre.
  */
-const USED_FOLDERS = ['character', 'logo', 'faction', 'background'];
+const USED_FOLDERS = CARPETAS_PUBLICADAS;
 
 function stripCredentials(db) {
   const removed = {};

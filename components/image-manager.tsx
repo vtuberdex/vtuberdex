@@ -7,14 +7,28 @@
  * convierte a WebP optimizado, así que desde aquí se acepta cualquier imagen
  * (PNG, JPEG, WebP, GIF, AVIF, TIFF, SVG) sin filtrar por extensión.
  *
- * La vista previa se pide con un parámetro de caché porque la ruta del archivo no
- * cambia al reemplazarlo (es canónica por slug): sin eso el navegador seguiría
- * mostrando la imagen vieja.
+ * POR QUÉ NO BASTA CON `onUpdated` DESDE EL PADRE
+ * -----------------------------------------------
+ * El componente padre (`admin-page.tsx`) hace `setSelected(vtuber)` cuando
+ * `ImageManager` avisa, así que el detalle se actualiza. Pero la vista previa de
+ * cada imagen usa una ruta CANÓNICA (`/images/<kind>/<slug>.webp`) que no cambia
+ * al reemplazar el archivo. El navegador cachea esa URL, así que aunque el padre
+ * reciba `images.character` actualizado, el <img> seguiría mostrando el buffer
+ * viejo. Por eso se fuerza un parámetro `?v=<timestamp>` por tipo cada vez que
+ * se completa una subida o un borrado.
+ *
+ * POR QUÉ NO RECARGAMOS LA PÁGINA
+ * -------------------------------
+ * Subir una imagen es una edición más del mantenedor. Recargar o desmontar el
+ * editor haría perder el scroll, el foco y cualquier cambio no guardado del
+ * formulario. El padre recibe el detalle nuevo, el gestor actualiza su propio
+ * timestamp de caché y la imagen se redibuja sin salir de la ficha.
  */
 import { useRef, useState, type ChangeEvent } from 'react';
 
 import { api } from '@/lib/api';
 import type { UploadKind, VtuberDetail } from '@/lib/types';
+import { ToastContainer, useToasts } from '@/components/toast';
 
 /**
  * Imágenes que el mantenedor puede gestionar.
@@ -148,10 +162,10 @@ function human(bytes: number | undefined): string {
 
 export function ImageManager({ token, detail, onUpdated }: Props) {
   const [busy, setBusy] = useState<ManagedKind | null>(null);
-  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   /** Marca de tiempo por tipo para forzar la recarga de la vista previa. */
   const [versions, setVersions] = useState<Partial<Record<ManagedKind, number>>>({});
   const inputs = useRef<Partial<Record<ManagedKind, HTMLInputElement | null>>>({});
+  const { toasts, add: addToast, remove: removeToast } = useToasts();
 
   /**
    * Estado de un tipo de imagen. La fila de `asset` es la fuente principal, pero
@@ -174,19 +188,28 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
 
   const upload = async (kind: ManagedKind, file: File) => {
     setBusy(kind);
-    setMessage(null);
     try {
       const result = await api.uploadImage(token, detail.id, kind, await preparar(file, kind));
+      /**
+       * `onUpdated` solo se llama si la respuesta trae el detalle.
+       *
+       * El contrato de los dos backends lo incluye, pero si un despliegue antiguo devolviera
+       * `{ok, slug, kind, size}` —la forma que tenía la ruta de producción— pasar `undefined`
+       * a `setSelected` borraba la ficha entera (la página se quedaba sin campos ni imágenes).
+       * Preferimos un aviso visible a que la pantalla se vacíe: el fallo se ve y se puede
+       * diagnosticar en vez de parecer que el dato desapareció.
+       */
+      if (!result?.vtuber) {
+        addToast('error', `${kind}: el servidor no devolvió la ficha actualizada (respuesta incompleta). Recarga la página.`);
+        return;
+      }
       onUpdated(result.vtuber);
       setVersions((v) => ({ ...v, [kind]: Date.now() }));
       const a = result.asset;
-      const aviso = a.alphaLost ? ' (el original no tenía transparencia)' : '';
-      setMessage({
-        kind: 'ok',
-        text: `${kind}: reemplazado por un WebP de ${a.width}×${a.height} — ${human(a.bytes)}${aviso}`,
-      });
+      const aviso = a?.alphaLost ? ' (el original no tenía transparencia)' : '';
+      addToast('ok', `${kind}: reemplazado por un WebP de ${a?.width ?? '?'}×${a?.height ?? '?'} — ${human(a?.bytes)}${aviso}`);
     } catch (error) {
-      setMessage({ kind: 'error', text: `${kind}: ${error instanceof Error ? error.message : 'error al subir'}` });
+      addToast('error', `${kind}: ${error instanceof Error ? error.message : 'error al subir'}`);
     } finally {
       setBusy(null);
     }
@@ -194,14 +217,17 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
 
   const remove = async (kind: ManagedKind) => {
     setBusy(kind);
-    setMessage(null);
     try {
       const result = await api.deleteImage(token, detail.id, kind);
+      if (!result?.vtuber) {
+        addToast('error', `${kind}: el servidor no devolvió la ficha actualizada (respuesta incompleta). Recarga la página.`);
+        return;
+      }
       onUpdated(result.vtuber);
       setVersions((v) => ({ ...v, [kind]: Date.now() }));
-      setMessage({ kind: 'ok', text: `${kind}: imagen eliminada` });
+      addToast('ok', `${kind}: imagen eliminada`);
     } catch (error) {
-      setMessage({ kind: 'error', text: `${kind}: ${error instanceof Error ? error.message : 'error al borrar'}` });
+      addToast('error', `${kind}: ${error instanceof Error ? error.message : 'error al borrar'}`);
     } finally {
       setBusy(null);
     }
@@ -216,24 +242,13 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
 
   return (
     <section className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/60 p-5" data-testid="admin-images">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-bold uppercase tracking-wide text-dex-text">Imágenes</h3>
         <p className="text-xs text-dex-muted">
           Cualquier formato se convierte a WebP optimizado; se conserva la transparencia.
         </p>
       </header>
-
-      {message && (
-        <p
-          role="status"
-          data-testid="admin-images-message"
-          className={`rounded-lg px-3 py-2 text-xs ${
-            message.kind === 'ok' ? 'bg-teal-500/15 text-teal-200' : 'bg-red-500/15 text-red-200'
-          }`}
-        >
-          {message.text}
-        </p>
-      )}
 
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {KINDS.map(({ kind, label, hint }) => {

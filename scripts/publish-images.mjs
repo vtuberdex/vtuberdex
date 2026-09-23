@@ -45,6 +45,8 @@ import { fileURLToPath } from 'node:url';
 
 import { createClient } from '@libsql/client/node';
 
+import { CARPETAS_PUBLICADAS } from '../lib/carpetas.mjs';
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 
@@ -67,7 +69,7 @@ const MANIFEST = path.resolve(ROOT, 'deploy/data/images.json');
  * NO: sus archivos siguen en disco pero ninguna vista los pide, y publicarlas era lo que
  * inflaba el manifiesto y el número de operaciones.
  */
-const USED_FOLDERS = new Set(['character', 'logo', 'faction', 'background']);
+const USED_FOLDERS = new Set(CARPETAS_PUBLICADAS);
 
 const URL_TURSO = value('turso-url', process.env.TURSO_DATABASE_URL ?? '');
 const AUTH = value('turso-token', process.env.TURSO_AUTH_TOKEN ?? '');

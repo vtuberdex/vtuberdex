@@ -15,7 +15,7 @@
  * puede mostrar una página con una carta menos.
  */
 import { getDb } from '../../../lib/db.mjs';
-import { aplicarEdicionesLista, leerEdiciones } from '../../../lib/ediciones.mjs';
+import { aplicarEdicionesLista, aplicarReemplazosALista, leerEdiciones } from '../../../lib/ediciones.mjs';
 import { facetCounts, searchVtubers } from '../../../server/src/search.mjs';
 import { formatIssues, listQuerySchema } from '../../../server/src/validation.mjs';
 
@@ -69,5 +69,13 @@ export async function GET(request) {
    * conoce, así que el único sitio donde se ven los dos juntos es aquí.
    */
   const visibles = editadas.filter((carta) => carta.status === 'published');
-  return Response.json({ ...result, items: visibles, facets });
+  /**
+   * Las imágenes del mantenedor, al final y SOLO sobre las cartas visibles.
+   *
+   * Después del filtro a propósito: no se paga una consulta a Turso por una carta que no se va a
+   * devolver. El orden respecto a las ediciones tampoco importa para las imágenes (son campos
+   * distintos), pero mantener las imágenes al final deja una sola ruta de composición.
+   */
+  const conImagenes = await aplicarReemplazosALista(visibles);
+  return Response.json({ ...result, items: conImagenes, facets });
 }
