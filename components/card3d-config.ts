@@ -157,8 +157,8 @@ export const GEOMETRY = {
  * `EDGE.strength`, NO `holo`.
  */
 export const INTENSITY = {
-  holo: { default: 0, tile: 0, detail: 0, noThemeFloor: 0.45 },
-  gloss: { default: 0.8, tile: 0.8, detail: 0.8 },
+  holo: { default: 0.3, tile: 0.3, detail: 0.3, noThemeFloor: 0.45 },
+  gloss: { default: 0.3, tile: 0.3, detail: 0.3 },
 } as const;
 
 /** Capa holográfica: interferencia de película delgada. */
@@ -168,7 +168,7 @@ export const HOLOGRAM = {
    * la cabecera): 0.12 -> 0.06 -> 0.03 razonando, y 0.15 al ajustar en vivo, que es
    * donde la lámina tiene color sin velar el arte.
    */
-  layerWeight: 0.15,
+  layerWeight: 0.1,
   /** Fracción del espectro que se desplaza según el ángulo de visión. */
   viewAngleWeight: 1.5,
   /** Variación ESPACIAL del espesor: es lo que reparte las franjas por la lámina. */
@@ -404,7 +404,7 @@ export const HDR = {
    * el límite tenga algo que comprimir. Con 1.0 no hay HDR: los reflejos quedan como
    * antes.
    */
-  highlightBoost: 1.5,
+  highlightBoost: 2.5,
   /**
    * TECHO DE LA LUZ: lo máximo que puede sumar el canal de luz sobre el arte.
    *
@@ -738,7 +738,7 @@ export const LIVE_SHEEN = {
    * carta, único cambio el barrido). Sin este conmutador, cualquier A/B queda contaminado
    * porque uPointer también mueve el paralaje de las 7 capas y el glare del holograma.
    */
-  strength: 1.0,
+  strength: 0.25,
   /**
    * Centro del recorrido, en la coordenada del barrido.
    *
@@ -823,7 +823,7 @@ export const GLOSS = {
    * las zonas claras del personaje son buena parte de la carta, y ahí el barniz es
    * donde más se notaba el aspecto lechoso.
    */
-  highlightWeight: 0.7,
+  highlightWeight: 0.6,
 } as const;
 
 /** Emblemas de facción, superpuestos como holograma. */
@@ -883,7 +883,7 @@ export const FACTION = {
  * se enciende sin aclarar el arte, que es el efecto que se buscaba.
  */
 export const EDGE = {
-  strength: 0.15,
+  strength: 0.09,
 
   /** El ángulo se desplaza: en el borde el corrimiento espectral es mayor. */
   angleOffset: 0.35,
@@ -912,7 +912,7 @@ export const COMPOSITE = {
    * bajó de 0.35 a 0.1 en el ajuste en vivo, la mitad del arreglo del aspecto lavado.
    */
   glossSelf: 0.1,
-  holoSelf: 0.7,
+  holoSelf: 1,
 } as const;
 
 /** Borde metálico: barrido direccional con contraste y espectro. */
@@ -1044,7 +1044,7 @@ export const LAYER_LABELS: Record<LayerName, string> = {
  * y al bajar el brillo de la propia carta el halo tenía que subir para compensar.
  */
 export const GLOW = {
-  strength: 0.91,
+  strength: 1.14,
   /** Caída exponencial desde el canto, que es como decae la luz. */
   falloffRate: 12.0,
   falloffWeight: 0.6,
