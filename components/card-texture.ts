@@ -13,7 +13,7 @@
  */
 import type { VtuberCard } from '@/lib/types';
 import { cardPalette, mixHex, rgba } from '@/lib/color';
-import { TEXT_FINISH } from './card3d-config';
+import { BACKGROUND, TEXT_FINISH } from './card3d-config';
 
 export const CARD_TEXTURE_WIDTH = 1008;
 export const CARD_TEXTURE_HEIGHT = 1411;
@@ -263,8 +263,15 @@ export function drawBackgroundLayer({ background, width }: { background: HTMLIma
   const { canvas, ctx, W, H } = createLayer(width);
   if (!ctx) return canvas;
   if (background) {
-    // +10% para paralaje: escala por el lado más pequeño que cubra todo el canvas.
-    const cover = 1.10;
+    /**
+     * ESCALA del fondo dentro de la carta.
+     *
+     * 1.10 daba el margen justo para el paralaje, y el usuario pidió el fondo un 10% MÁS
+     * GRANDE: 1.10 * 1.10 = 1.21. Como el encuadre ya venía escalado al lado más pequeño que
+     * cubre el canvas, ese 10% extra se come margen del arte y deja ver menos borde de la
+     * imagen — que es exactamente el efecto buscado (el fondo llena más la carta).
+     */
+    const cover = BACKGROUND.cover;
     const scaleToWidth = (W * cover) / background.width;
     const scaleToHeight = (H * cover) / background.height;
     const s = Math.max(scaleToWidth, scaleToHeight);

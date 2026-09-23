@@ -267,6 +267,18 @@ export const BACKGROUND = {
    * esta capa: apagarla deja el fondo con su arte intacto y sin holograma.
    */
   holo: 0.76,
+  /**
+   * ESCALA del fondo dentro de la carta (cuánto se agranda el arte del fondo).
+   *
+   * 1.10 era el margen justo para que el paralaje no descubriera el borde del lienzo. El
+   * usuario pidió el fondo un 10% MÁS GRANDE, así que 1.10 * 1.10 = 1.21: el encuadre se
+   * calcula por el lado más pequeño que cubre el canvas, de modo que subirlo recorta más la
+   * imagen y el fondo llena la carta con menos borde visible.
+   *
+   * OJO si lo subes mucho: el paralaje desplaza la capa, así que necesitas margen o el
+   * borde del fondo entrará en cuadro.
+   */
+  cover: 1.21,
   /** Peso del color espectral que se SUMA al arte del fondo (su saturación). */
   layerWeight: 0.42,
   /**

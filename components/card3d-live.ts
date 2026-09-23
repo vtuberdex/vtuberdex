@@ -106,6 +106,7 @@ export const KNOBS: readonly Knob[] = [
   { key: 'bgBaseMask', label: 'Piso del holograma', hint: 'Efecto visible con la carta quieta', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.baseMask', grupo: 'fondo' },
   { key: 'bgTiltFactor', label: 'Arcoíris al inclinar', hint: 'Cuánto sube el efecto del fondo con el tilt', min: 0, max: 6, step: 0.05, config: 'BACKGROUND.tiltFactor', grupo: 'fondo' },
   { key: 'bgGlareStrength', label: 'Barrido del puntero', hint: 'El brillo del fondo que sigue al cursor', min: 0, max: 2, step: 0.01, config: 'BACKGROUND.glareStrength', grupo: 'fondo' },
+  { key: 'bgCover', label: 'Tamano del fondo', hint: 'Cuanto se agranda el arte del fondo dentro de la carta (mas = mas zoom, menos borde visible). Ojo: el paralaje necesita margen', min: 1, max: 1.6, step: 0.01, config: 'BACKGROUND.cover', grupo: 'fondo' },
   { key: 'bgParallax', label: 'Paralaje', hint: 'Cuánto se desplaza la capa de fondo; negativo va al contrario que el frente', min: -0.15, max: 0.15, step: 0.005, config: 'PARALLAX_LAYERS[0].factor', grupo: 'fondo' },
   { key: 'bgArtFloor', label: 'Brillo base del arte', hint: 'Subirlo aclara el fondo; bajarlo lo deja más apagado', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.artFloor', grupo: 'fondo' },
   { key: 'bgNoise', label: 'Textura de la superficie', hint: 'Micro-relieve de la superficie: 0 = lisa, 0.1 = grano visible. Tambien controla el abollado del reflejo', min: 0, max: 0.15, step: 0.01, config: 'BG_NOISE.normalStrength', grupo: 'fondo' },
@@ -141,6 +142,8 @@ export interface LiveKnobs {
   bgArtFloor: number;
   /** Textura de micro-superficie del fondo. */
   bgNoise: number;
+  /** Escala del arte del fondo dentro de la carta. */
+  bgCover: number;
   /** HDR: ganancia de luces y codo de compresión. */
   hdrBoost: number;
   hdrCeiling: number;
@@ -177,6 +180,7 @@ export const DEFAULTS: LiveKnobs = {
   bgParallax: CFG.BACKGROUND.parallax,
   bgArtFloor: CFG.BACKGROUND.artFloor,
   bgNoise: CFG.BG_NOISE.normalStrength,
+  bgCover: CFG.BACKGROUND.cover,
   hdrBoost: CFG.HDR.highlightBoost,
   hdrCeiling: CFG.HDR.lightCeiling,
   metalReflect: CFG.METAL_REFLECT.strength,
