@@ -47,9 +47,38 @@ const CONTENT_TYPES = {
  */
 const LOCAL_IMAGE_ROOT = path.join(process.cwd(), 'data', 'images');
 
-/** Comprueba que la ruta resuelta no se escape de `data/images/` (`../`). */
-function isInsideRoot(filePath) {
-  const rel = path.relative(LOCAL_IMAGE_ROOT, filePath);
+/**
+ * Raíz de los reemplazos del mantenedor bajados de Turso (`npm run download:images`).
+ *
+ * POR QUÉ ESTÁ APARTE DE `data/images/` Y NO ENCIMA
+ * -------------------------------------------------
+ * Las dos fuentes escriben el mismo nombre canónico, así que dejarlas en el mismo árbol mezcla
+ * el contenido del mantenedor con el del catálogo. Lo que rompe no es esta ruta: es
+ * `scripts/build-db.mjs`, que arma el MANIFIESTO desde las filas `asset` de la base local, y el
+ * manifiesto es la lista de lo que sube `publish-images.mjs`. Con los bytes del mantenedor en
+ * `data/images/` el manifiesto pasó de 1594 a 1625 objetos, y una corrida del publicador habría
+ * subido ese contenido **como `origen = 'catalogo'`**, destruyendo la imagen original del
+ * catálogo en Turso (una sola fila por `(slug, kind, origen)`, sin copia de debajo).
+ *
+ * Con la carpeta separada esa contaminación es IMPOSIBLE por construcción, y aquí solo hay que
+ * decidir la precedencia en la LECTURA: gana el reemplazo, porque así sirve la API cuando hay
+ * Turso (`leerAssetRemoto` hace ganar a `origen = 'mantenedor'`). Si esta carpeta no existe, la
+ * app se comporta exactamente como antes: sirve el catálogo y nada más.
+ *
+ * Escrita literal por la misma razón que `LOCAL_IMAGE_ROOT`: componerla dinámicamente hace que
+ * Turbopack trace el proyecto entero dentro de cada función.
+ */
+const REEMPLAZOS_IMAGE_ROOT = path.join(process.cwd(), 'data', 'mantenedor');
+
+/**
+ * Comprueba que la ruta resuelta no se escape de su raíz (`../`).
+ *
+ * Recibe la raíz porque ahora hay DOS árboles locales: el del catálogo y el de los reemplazos
+ * del mantenedor. Con la raíz fija de antes, servir un reemplazo habría dado `no_encontrado`
+ * sin ningún error visible.
+ */
+function isInsideRoot(filePath, raiz = LOCAL_IMAGE_ROOT) {
+  const rel = path.relative(raiz, filePath);
   return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
 }
 
@@ -94,10 +123,10 @@ function fechaDeMarca(marca) {
   return Number.isNaN(fecha.getTime()) ? null : fecha.toUTCString();
 }
 
-/** Lee la imagen de `data/images/`; `null` si no existe o la ruta es sospechosa. */
-function serveLocal(key, etagPedido) {
-  const absolute = path.join(LOCAL_IMAGE_ROOT, key.replace(/^images\//, ''));
-  if (!isInsideRoot(absolute)) return null;
+/** Lee la imagen de un árbol local; `null` si no existe o la ruta es sospechosa. */
+function serveLocal(key, etagPedido, raiz = LOCAL_IMAGE_ROOT) {
+  const absolute = path.join(raiz, key.replace(/^images\//, ''));
+  if (!isInsideRoot(absolute, raiz)) return null;
 
   let bytes;
   try {
@@ -223,28 +252,28 @@ export async function GET(request, { params }) {
 
   if (usesLocalImages()) {
     /**
-     * MODO LOCAL: se sirve el archivo de `data/images/` DIRECTAMENTE, sin exigir que
-     * esté en el manifiesto.
+     * MODO LOCAL: primero el REEMPLAZO del mantenedor, después el catálogo de `data/images/`.
      *
-     * POR QUÉ (fallo medido): antes esta rama era `published ? serveLocal(key) : null`,
-     * es decir, la lectura de disco estaba CONDICIONADA al manifiesto. El manifiesto lo
-     * genera `npm run build:data` a partir de las filas `asset` de la base, así que una
-     * imagen recién subida desde el mantenedor no está en él hasta que se regenera. El
-     * resultado era un 404 para el archivo que el usuario acababa de subir, con el
-     * archivo presente en disco: el síntoma exacto "subo una imagen y no se actualiza".
+     * PRECEDENCIA: es la misma que sirve la API cuando hay Turso (`leerAssetRemoto` ordena
+     * `origen = 'mantenedor'` primero), así que la vista local y la de producción muestran la
+     * MISMA imagen. Si esta rama fuera al revés, bajar los reemplazos no serviría de nada: se
+     * seguiría viendo el catálogo.
      *
-     * En LOCAL el disco es la fuente de verdad —lo que hay en `data/images/` es lo que
-     * se acaba de subir—, y `isInsideRoot` sigue impidiendo salir de la carpeta.
+     * POR QUÉ LOS REEMPLAZOS NO ESTÁN EN `data/images/`
+     * ------------------------------------------------
+     * Porque ese árbol es la fuente del MANIFIESTO (`scripts/build-db.mjs` lo arma desde las filas
+     * `asset` de la base local) y el manifiesto es la lista de lo que publica
+     * `publish-images.mjs`. Tener ahí los bytes del mantenedor hacía que el publicador pudiera
+     * subirlos **como `origen = 'catalogo'`**, destruyendo la imagen original del catálogo en
+     * Turso. Aparte quedan dos cosas separadas y la contaminación es imposible, no improbable.
      *
-     * En PRODUCCIÓN el manifiesto sigue mandando y la carpeta retirada sigue dando 404:
-     * de eso se encargan las dos ramas de arriba, que se evalúan antes y son las que
-     * cubre `npm run verify` (`sirve solo lo publicado` + `carpeta retirada -> 404`).
-     *
-     * Lo que NO se pierde: la carpeta retirada que EXISTA en disco. Si algún día
-     * reaparece un `data/images/radar/`, sus archivos se servirían en local; en
-     * producción seguirían dando 404. Se acepta a cambio de que el ciclo
-     * subir -> ver funcione, que es el propósito de este script.
+     * Ninguna de las dos ramas exige estar en el manifiesto: en LOCAL el disco es la fuente de
+     * verdad —lo que hay es lo que se acaba de subir— y `isInsideRoot` sigue impidiendo salir de
+     * su carpeta. En PRODUCCIÓN el manifiesto sigue mandando y la carpeta retirada sigue dando
+     * 404: de eso se encargan las ramas de arriba, que se evalúan antes.
      */
+    const reemplazo = serveLocal(key, etagPedido, REEMPLAZOS_IMAGE_ROOT);
+    if (reemplazo) return reemplazo;
     const local = serveLocal(key, etagPedido);
     if (local) return local;
     return Response.json({ error: 'imagen_no_publicada', path: key }, { status: 404 });

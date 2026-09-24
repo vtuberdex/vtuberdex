@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 141 tests (vitest): utilidades, componentes, páginas, carta 3D
+npm test                   # 153 tests (vitest): utilidades, componentes, páginas, carta 3D
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -68,12 +68,12 @@ cd .. && npm install && npm run dev               # http://localhost:3000
 # Despliegue
 npm run build:data           # regenera deploy/ (base saneada + manifiesto)
 npm run publish:images       # sube las imágenes a Turso (reanudable)
-npm run download:images      # BAJA a data/images/ lo que solo está en Turso (respaldo + local)
+npm run download:images      # BAJA lo que solo está en Turso a data/mantenedor/ (respaldo + local)
 npm run verify               # 32 comprobaciones sobre un escenario de producción
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/59/141** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/59/153** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -259,14 +259,16 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   filas `origen = 'mantenedor'`, **cero** coincidían con el disco y 30 de los 31 fondos no
   existían allí. `npm run download:images` (ver «Publicar y bajar imágenes») es el camino de
   vuelta; los bytes de Turso **son** el respaldo del mantenedor, no hay otro.
-  - **Bajar con los DOS orígenes a la vez exige aplicar la precedencia, no solo listar
-    filas.** `catalogo` y `mantenedor` escriben el MISMO archivo canónico
+  - **Los reemplazos se bajan a `data/mantenedor/`, nunca a `data/images/`.** Antes
+    `download:images` escribía sobre el MISMO archivo canónico
     (`data/images/<carpeta>/<slug>.webp`), así que con `--origen todos` el orden de la
-    consulta decide qué queda en disco. Medido: sin la poda, el `catalogo` **pisó 58
-    reemplazos** del mantenedor y el script no lo dijo. Gana `mantenedor`, que es la misma
-    precedencia que sirve la API (`leerAssetRemoto`), y como los dos orígenes son filas
-    distintas de `asset_remoto`, la versión publicada sigue intacta en Turso para volver a
-    bajarla si hiciera falta.
+    consulta decidía qué quedaba en disco: medido, el `catalogo` **pisó 58 reemplazos** del
+    mantenedor y el script no lo dijo. Un solo camino de escritura por imagen es la regla del
+    repo, y aquí el camino bueno es la carpeta aparte. Los reemplazos van a `data/mantenedor/`
+    (ignorada por git), la app local los sirve ENCIMA del catálogo —misma precedencia que
+    `leerAssetRemoto`— y `publish:images` **se niega a subir** si encuentra reemplazos dentro
+    de `data/images/`, porque subirlos los guardaría como `origen = catalogo` y perdería la
+    imagen pública original (que es la única copia que existe).
   - **La fila local `asset.path` lleva el prefijo `images/`, el archivo está en
     `data/images/`.** La fila no guarda la ruta del archivo: guarda la clave pública que
     `mapCard` convierte en `/images/...`, que es la única URL que atiende
@@ -438,19 +440,31 @@ porque la mitad del contenido del mantenedor NO está en el disco de nadie más 
    un `status === 404` da falso positivo porque el fallback responde el index.
 7. **Las imágenes se resuelven en runtime por dos ramas, y Turso es la primera.**
    `app/images/[...path]/route.js` consulta `asset_remoto` en Turso y, si `origen` es
-   `mantenedor`, sirve ese BLOB; si no hay Turso, cae a `data/images/` en local. La
+   `mantenedor`, sirve ese BLOB; si no hay Turso, cae al disco en DOS raíces y por este
+   orden: `data/mantenedor/` (los reemplazos bajados con `download:images`) primero y
+   `data/images/` (el catálogo) después. La
    rama del 301 a Blob sigue en el código pero **no se alcanza en producción** (no hay
    `VTUBERDEX_BLOB_BASE`): `npm run verify` la prueba a propósito poniendo esa variable.
    El manifiesto guarda rutas canónicas, no URLs. Cachea `public, max-age=60` +
    `s-maxage=300`; el borde respeta 300 s (medido: `x-vercel-cache: MISS` a los 305 s).
-8. **El mantenedor SÍ existe en producción** (`app/api/admin/[...path]`), con Turso
+8. **El deploy NO publica ni pisa las imágenes de producción.** `vercel deploy` sube la
+   app y `deploy/data/` (base saneada + manifiesto) y nada más: los bytes de las imágenes
+   viven en `asset_remoto` de Turso y **el repo no los toca**. Con Turso configurado la
+   ruta sirve el BLOB remoto e ignora el manifiesto, así que desplegar no reescribe lo
+   que ya está publicado. Por eso `deploy/` se revierte a HEAD antes de desplegar si un
+   `build:data` de prueba lo movió (un `generatedAt` distinto basta para ensuciar el diff)
+   y por eso `publish:images` es el ÚNICO camino de subida y **se niega a subir** si
+   encuentra un reemplazo del mantenedor dentro de `data/images/` (ver «Publicar y bajar
+   imágenes»). Para subir contenido nuevo de forma deliberada está `npm run publish:images`,
+   nunca el deploy.
+9. **El mantenedor SÍ existe en producción** (`app/api/admin/[...path]`), con Turso
    configurado: login real (401 sin sesión, verificado en producción) y escritura de
    ediciones e imágenes contra Turso. Solo devuelve 404 cuando **no** hay ni Turso ni
    proxy local — el 404 explícito que comprueba `npm run verify`. En local se reenvía
    al Express con `VTUBERDEX_ADMIN_URL`.
-9. **El deploy NO puede ser por integración Git**: el team es **Hobby** y Vercel no
-   conecta repos de organizaciones en ese plan (limitación de plataforma). Se
-   despliega con `vercel deploy`, o con un GitHub Action con token.
+10. **El deploy NO puede ser por integración Git**: el team es **Hobby** y Vercel no
+    conecta repos de organizaciones en ese plan (limitación de plataforma). Se
+    despliega con `vercel deploy`, o con un GitHub Action con token.
 
 ### CI en GitHub Actions
 
@@ -533,17 +547,31 @@ hay un script por sentido y **tienen reglas que no pueden divergir**:
 | Script | Sentido | Qué compara | Fuente de la verdad |
 |---|---|---|---|
 | `npm run publish:images` | disco → Turso (`origen = catalogo`) | tamaño | el MANIFIESTO (`deploy/data/images.json`) |
-| `npm run download:images` | Turso → disco | tamaño | Turso |
+| `npm run download:images` | Turso → `data/mantenedor/` | tamaño | Turso |
 
 - **Los dos comparan TAMAÑO, no presencia**, y por la misma razón: el nombre canónico
   (`<carpeta>/<slug>.<ext>`) no cambia aunque cambie el contenido, así que sin mirar el peso
   una imagen regenerada se queda con la versión vieja para siempre en el lado que no se
   revisó. Un archivo que falla no se da por hecho, así que volver a correr reintenta solo lo
   que falta: los dos son reanudables.
-- **`download:images` baja a `data/images/`, que es lo que la app sirve en local.** Sirve para
-  las dos cosas que pide tener Turso a mano: **respaldo** (los bytes de ahí no están en ningún
-  otro sitio) y **probar en local** (`dev-up.sh` corre sin Turso, así que la rama de disco es
-  la única que se usa y sin bajar nada se ven las imágenes del scrape, no las del mantenedor).
+- **`download:images` baja a `data/mantenedor/`, NO a `data/images/`.** Es `data/mantenedor/`
+  el que está en `.gitignore`, así que los reemplazos que solo viven en Turso (backup) quedan
+  en disco **sin ensuciar el repo**. `data/images/` se queda prístino: sigue siendo el
+  artefacto del scrape, y el manifiesto sigue declarando 1594 objetos. Sirve para las dos
+  cosas que pide tener Turso a mano: **respaldo** (los bytes de ahí no están en ningún otro
+  sitio) y **probar en local** (`dev-up.sh` corre sin Turso, así que la rama de disco es la
+  única que se usa y sin bajar nada se ven las imágenes del scrape, no las del mantenedor).
+- **La app local sirve `data/mantenedor/` ENCIMA de `data/images/`.** Es la misma precedencia
+  que sirve la API con Turso (`leerAssetRemoto`): el reemplazo del mantenedor gana al catálogo
+  en modo local. Por eso `app/images/[...path]/route.js` prueba primero la raíz de reemplazos
+  (`data/mantenedor/`) y solo después la del catálogo (`data/images/`).
+- **`publish:images` se NIEGA a subir si `data/images/` está contaminado.** Antes de subir
+  compara los archivos de `data/images/` contra los tamaños de las filas
+  `origen = 'mantenedor'` de Turso: si alguno coincide, sale con código 1 y no sube nada.
+  Por qué existe esa guarda: subirlos los guardaría como `origen = 'catalogo'` y **destruiría
+  la imagen pública original**, que es el único sitio donde vive. Es el blindaje de la regla
+  «no pisar lo que ya está en producción»: el camino bueno es `download:images` (a
+  `data/mantenedor/`) y nunca copiar reemplazos a mano dentro de `data/images/`.
 - **También vuelca las EDICIONES de texto** a `data/mantenedor-ediciones.json` — se pierden
   igual de fácil que las imágenes y no hay otro sitio donde estén.
 - **Con los dos orígenes a la vez (`--origen todos`) gana `mantenedor`**, porque las dos filas
@@ -598,9 +626,13 @@ Cuatro trampas concretas de trabajar en local:
    saneada (`admin_user` y `audit_log` VACÍOS a propósito, para no publicar el
    hash) y está versionada, así que el login sería imposible y cada subida
    ensuciaría el repo con un binario de ~60 MB.
-2. **Sin Turso y sin `VTUBERDEX_BLOB_BASE`, las imágenes se sirven de
-   `data/images/`** (rama local de `app/images/[...path]/route.js`; si hay Turso,
-   Turso va PRIMERO y el disco es solo el respaldo). Antes esa ruta devolvía
+2. **Sin Turso y sin `VTUBERDEX_BLOB_BASE`, las imágenes se sirven de disco, en DOS
+   raíces y por este orden: `data/mantenedor/` primero y `data/images/` después**
+   (rama local de `app/images/[...path]/route.js`; si hay Turso, Turso va PRIMERO y el
+   disco es solo el respaldo). La primera raíz son los reemplazos que el mantenedor
+   guardó en Turso y que `npm run download:images` bajó a `data/mantenedor/` (ignorada
+   por git); la segunda es el catálogo del scrape. Ese orden es la precedencia de la
+   API (`leerAssetRemoto`): el reemplazo gana. Antes esa ruta devolvía
    `null` y la app entera salía sin una sola imagen, difícil de diagnosticar.
    En local el **disco es la fuente de verdad** (sin exigir que el archivo esté
    en el manifiesto, que solo se regenera con `npm run build:data`): sin eso, una
@@ -608,7 +640,8 @@ Cuatro trampas concretas de trabajar en local:
    en PRODUCCIÓN, que es la rama que cubre `npm run verify`.
    **Y el disco solo tiene lo que alguien haya bajado**: lo que sube el mantenedor
    vive en Turso y no vuelve solo, así que antes de fiarse de lo que se ve en local
-   hay que correr `npm run download:images` (ver «Publicar y bajar imágenes»).
+   hay que correr `npm run download:images` (ver «Publicar y bajar imágenes»), que deja
+   los reemplazos en `data/mantenedor/` sin tocar `data/images/`.
 3. **Nada de `window`/`localStorage` durante el render.** Un componente
    `'use client'` se renderiza igualmente en el servidor: acceder ahí daba
    `ReferenceError: window is not defined` y la página respondía **500**. El

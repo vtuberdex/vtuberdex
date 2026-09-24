@@ -9,6 +9,29 @@ data/*.db-wal
 scraper/cache/
 scraper/out/
 
+# Volcado de las ediciones del mantenedor (`npm run download:images`), que vive en Turso.
+#
+# A diferencia del resto de `data/`, esto NO es reproducible: son correcciones hechas a mano
+# desde el panel y no salen del scrape. Se ignora igual porque es un ARTEFACTO de respaldo
+# (una copia legible de lo que ya está en Turso), no una fuente del build: lo que la app
+# sirve sale de Turso, y el catálogo desplegado de `deploy/`. Versionarlo daría un archivo
+# que se reescribe entero en cada bajada y un conflicto en cada `pull`.
+data/mantenedor-ediciones.json
+
+# CARPETA TEMPORAL de los reemplazos del mantenedor, bajados de Turso.
+#
+# Los bytes de las imágenes que sube una persona NO están en ningún otro disco (viven en el
+# BLOB de `asset_remoto`), así que `npm run download:images` los baja aquí. Van a una carpeta
+# APARTE de `data/images/` a propósito: esa ruta es la fuente del MANIFIESTO (`build-db.mjs`
+# lo arma desde las filas `asset` de la base local) y con los reemplazos dentro, el manifiesto
+# se contaminaba y `publish:images` podía subirlos como `origen = 'catalogo'`, destruyendo la
+# imagen original del catálogo en Turso. Separadas, eso es imposible por construcción.
+#
+# Es desechable: borrarla no pierde nada — Turso tiene los originales y volver a correr el
+# script la reconstruye. Se ignora igual que el resto de `data/` para que no pueda acabar
+# versionada por descuido (son ~10 MB de binarios que se reescriben en cada bajada).
+data/mantenedor/
+
 # Builds
 .next/
 out/

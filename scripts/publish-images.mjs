@@ -41,7 +41,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { createClient } from '@libsql/client/node';
 
@@ -105,6 +105,37 @@ function pendientesDelManifiesto(manifest) {
   return lista;
 }
 
+/**
+ * Se niega a publicar si `data/images/` contiene un REEMPLAZO del mantenedor.
+ *
+ * POR QUÉ ESTA GUARDA EXISTE (y por qué es un fallo que se paga caro)
+ * -----------------------------------------------------------------
+ * Este script sube con `origen = 'catalogo'` y compara TAMAÑO de disco contra lo que ya hay en
+ * Turso. Si en `data/images/` hubiera quedado el contenido de un reemplazo del mantenedor —lo
+ * que pasaba cuando `download:images` bajaba a ese árbol—, el manifiesto lo declararía como
+ * catálogo y esta corrida lo subiría **encima de la imagen pública**, con `origen = 'catalogo'`.
+ * La clave primaria es `(slug, kind, origen)`, así que la imagen original del catálogo se
+ * PIERDE: no hay copia de debajo que restaurar. Y en el sentido contrario, la poda de residuos
+ * borraría las filas del catálogo que el manifiesto ya no declara.
+ *
+ * El diseño ya lo impide por construcción (`download:images` escribe en `data/mantenedor/`),
+ * pero esto es el punto de NO RETORNO —una escritura sobre el almacén compartido que sirve
+ * producción—, así que se comprueba en vez de confiar. Se mira el `size`, que es lo que decide
+ * la subida, contra las filas del mantenedor: si varios coinciden, es que el árbol está
+ * contaminado.
+ *
+ * @param {import('@libsql/client').Client} db
+ * @param {Array<{slug: string, kind: string, bytes: number}>} todos
+ * @returns {Promise<Array<string>>} claves sospechosas
+ */
+export async function reemplazosEnElArbolDelCatalogo(db, todos) {
+  const { rows } = await db.execute("SELECT slug, kind, size FROM asset_remoto WHERE origen = 'mantenedor'");
+  const porClave = new Map(rows.map((r) => [`${r.kind}/${r.slug}`, Number(r.size)]));
+  return todos
+    .filter((a) => porClave.get(`${a.kind}/${a.slug}`) === a.bytes)
+    .map((a) => a.rel);
+}
+
 async function main() {
   if (!fs.existsSync(MANIFEST)) {
     console.error(`✖ falta el manifiesto: ${MANIFEST} (corre antes: node scripts/build-db.mjs)`);
@@ -154,6 +185,22 @@ async function main() {
   const { rows } = await db.execute("SELECT slug, kind, size FROM asset_remoto WHERE origen = 'catalogo'");
   const yaEstan = new Map(rows.map((r) => [`${r.kind}/${r.slug}`, Number(r.size)]));
   console.log(`[publish] ya en Turso: ${yaEstan.size}`);
+
+  /**
+   * El punto de no retorno: se comprueba ANTES de escribir nada. Si el árbol del catálogo tiene
+   * los bytes de un reemplazo del mantenedor, subirlos los guardaría con `origen = 'catalogo'` y
+   * la imagen pública original se perdería (clave `(slug, kind, origen)`, sin copia de debajo).
+   */
+  const contaminados = await reemplazosEnElArbolDelCatalogo(db, todos);
+  if (contaminados.length > 0) {
+    console.error(`✖ ${contaminados.length} archivo(s) de data/images/ coinciden con un REEMPLAZO del mantenedor.`);
+    console.error('  Subirlos los guardaría como origen=catalogo y perdería la imagen pública original.');
+    console.error('  Causa habitual: los reemplazos se bajaron a data/images/ en vez de a data/mantenedor/.');
+    console.error(`  Arréglalo con: rm -rf data/images && npm run download:images, y regenera con npm run build:data`);
+    for (const rel of contaminados.slice(0, 10)) console.error(`   · ${rel}`);
+    await db.close();
+    process.exit(1);
+  }
 
   // Se compara TAMAÑO además de presencia: si el scraper regeneró una imagen, el nombre
   // canónico es el mismo pero el contenido cambió, y sin esta comprobación la versión
@@ -261,7 +308,16 @@ async function main() {
   await db.close();
 }
 
-main().catch((error) => {
-  console.error('[publish] ERROR', error.message);
-  process.exit(1);
-});
+/**
+ * Solo se ejecuta como programa, no al importarlo.
+ *
+ * Hace falta porque `lib/publicar-imagenes.test.ts` importa la guarda
+ * (`reemplazosEnElArbolDelCatalogo`) para probarla sin Turso: sin esta comprobación, importarla
+ * dispararía el script entero —y con él una escritura real— durante la suite.
+ */
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main().catch((error) => {
+    console.error('[publish] ERROR', error.message);
+    process.exit(1);
+  });
+}

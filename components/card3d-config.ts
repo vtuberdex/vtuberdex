@@ -172,7 +172,7 @@ export const GEOMETRY = {
  */
 export const INTENSITY = {
   holo: { default: 0.3, tile: 0.3, detail: 0.3, noThemeFloor: 0.45 },
-  gloss: { default: 0.3, tile: 0.3, detail: 0.3 },
+  gloss: { default: 0.5, tile: 0.5, detail: 0.5 },
 } as const;
 
 /** Capa holográfica: interferencia de película delgada. */
@@ -290,7 +290,7 @@ export const BACKGROUND = {
    * arcoiris global no se marca, asi que esta es la perilla que le da presencia propia.
    * 0.9 con `baseMask` 1.8 y `tiltFactor` 4.0 satura la mascara en casi toda la carta.
    */
-  holo: 0.05,
+  holo: 0,
   /**
    * Cuanto de la lamina espectral se SUMA al canal de luz.
    *
@@ -414,7 +414,7 @@ export const HDR = {
    * el límite tenga algo que comprimir. Con 1.0 no hay HDR: los reflejos quedan como
    * antes.
    */
-  highlightBoost: 0.75,
+  highlightBoost: 0.8,
   /**
    * TECHO DE LA LUZ: lo máximo que puede sumar el canal de luz sobre el arte.
    *
@@ -433,7 +433,7 @@ export const HDR = {
    *   · las luces siguen teniendo un rolloff suave en vez de recortarse en plano.
    * Es lo que hace el HDR de verdad: comprime el rango de LUZ sobre un soporte intacto.
    */
-  lightCeiling: 1.5,
+  lightCeiling: 3.0,
   /**
    * Rango del rolloff. Con el techo en el denominador, un valor de 1 mantiene la parte
    * baja CASI lineal (la luz pequeña pasa tal cual) y lleva el resto al techo. Subirlo
@@ -847,7 +847,7 @@ export const GLOSS = {
    * las zonas claras del personaje son buena parte de la carta, y ahí el barniz es
    * donde más se notaba el aspecto lechoso.
    */
-  highlightWeight: 0.6,
+  highlightWeight: 0.4,
 } as const;
 
 /** Emblemas de facción, superpuestos como holograma. */
@@ -913,7 +913,7 @@ export const FACTION = {
  * que admite mucha más intensidad que antes.
  */
 export const EDGE = {
-  strength: 0.4,
+  strength: 0.5,
 
   /** El ángulo se desplaza: en el borde el corrimiento espectral es mayor. */
   angleOffset: 0.35,
@@ -941,7 +941,7 @@ export const COMPOSITE = {
    * se ve como un VELO sobre los colores (no la que da brillo, que va multiplicada):
    * bajó de 0.35 a 0.1 en el ajuste en vivo, la mitad del arreglo del aspecto lavado.
    */
-  glossSelf: 0.1,
+  glossSelf: 0.15,
   holoSelf: 1,
 } as const;
 
@@ -976,7 +976,7 @@ export const METAL_BORDER = {
 export const VIGNETTE = {
   inner: 0.35,
   outer: 1.15,
-  floor: 0.92,
+  floor: 1.0,
   ceiling: 1.04,
 } as const;
 

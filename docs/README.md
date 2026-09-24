@@ -92,9 +92,17 @@ local como respaldo en desarrollo. Las ediciones del mantenedor también viven a
 ```bash
 npm run build:data               # regenera deploy/ desde data/ (tras scrape o edición)
 npm run publish:images           # sube las imágenes a Turso (reanudable)
+npm run download:images          # BAJA lo que solo está en Turso a data/mantenedor/ (respaldo + local)
 npm run verify                   # 32 comprobaciones sobre un escenario de producción
 npx vercel deploy --prod         # publica
 ```
+
+`npm run download:images` baja a `data/mantenedor/` (ignorada por git), no a
+`data/images/`: los reemplazos del mantenedor solo viven en Turso, y así se respaldan
+sin ensuciar el catálogo ni el manifiesto. La app local sirve esa carpeta **encima** de
+`data/images/`, la misma precedencia que usa la API con Turso. Y `publish:images`
+**se niega a subir** si encuentra un reemplazo dentro de `data/images/`: subirlo lo
+guardaría como `origen = catalogo` y perdería la imagen pública original.
 
 `AGENTS.md` documenta las reglas del deploy y las trampas ya pagadas (FS de solo
 lectura, base empaquetada vía `outputFileTracingIncludes`, saneado con `VACUUM`).
@@ -138,7 +146,7 @@ Si la IP del host cambia, el script la detecta solo (contenedor en `--network ho
 ## Tests y lint
 
 ```bash
-npm test                   # 133 tests (vitest): utilidades, componentes, páginas y carta 3D
+npm test                   # 153 tests (vitest): utilidades, componentes, páginas y carta 3D
 npm run lint               # eslint . — cubre también server/ y scraper/
 npm run typecheck          # tsc --noEmit
 npm run check:shaders      # guard de uniforms de GLSL (ni tsc ni los tests lo ven)

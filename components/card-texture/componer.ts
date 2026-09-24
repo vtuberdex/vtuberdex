@@ -21,19 +21,11 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
 
   // Pre-medir logo.
   /**
-   * LOGO: ESQUINA INFERIOR DERECHA, AL DOBLE DE TAMAÑO (petición del usuario).
-   *
-   * Antes el logo se colocaba ARRIBA del bloque de chips de tipo (`logosBase - typesHeight
-   * - dh - 70`), así que su posición dependía de cuántos chips hubiera. Con los textos y los
-   * tags retirados de la carta 3D ese bloque ya no existe, y el sitio que queda libre es la
-   * esquina inferior derecha — que es donde el usuario lo quiere.
-   *
-   * EL DOBLE DE TAMAÑO: el área se multiplica por 4, no el lado. La escala se calcula con
-   * `sqrt(area / (w*h))`, así que un área 4× da un lado 2×, que es lo pedido. Multiplicar
-   * el lado por 2 a mano daría un área 4× igual, pero por el camino equivocado: el área es
-   * la magnitud que se mantiene constante entre logos de proporciones distintas.
+   * LOGO: ESQUINA INFERIOR DERECHA. El área base (4.9% de la carta) se escala por
+   * `LOGO_SCALE_FACTOR`. Originalmente estaba al doble (factor 2); se redujo a 4/3
+   * (2/3 del tamaño anterior) para que no compita con el personaje.
    */
-  const LOGO_SCALE_FACTOR = 2;
+  const LOGO_SCALE_FACTOR = 4 / 3;
   let logoBox: { x: number; y: number; w: number; h: number } | null = null;
   const LOGO_AREA = W * H * 0.049 * LOGO_SCALE_FACTOR * LOGO_SCALE_FACTOR;
   const typesList = [...card.factions, ...card.groups].slice(0, 4);
