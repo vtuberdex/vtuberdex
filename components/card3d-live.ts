@@ -71,7 +71,7 @@ export type Grupo = 'frente' | 'fondo';
 /** Título de cada columna, para el panel. */
 export const GRUPOS: ReadonlyArray<{ id: Grupo; titulo: string; nota: string }> = [
   { id: 'frente', titulo: 'Personaje y carta', nota: 'El frente: barniz, tinta, lámina, emblemas y paralaje del logo.' },
-  { id: 'fondo', titulo: 'Fondo', nota: 'La capa de detrás. Independiente del frente y más marcada a propósito.' },
+  { id: 'fondo', titulo: 'Superficie', nota: 'El arte de la carta: su encuadre, su brillo y su micro-relieve. Ya no es una capa aparte.' },
 ];
 
 /**
@@ -87,7 +87,7 @@ export const GRUPOS: ReadonlyArray<{ id: Grupo; titulo: string; nota: string }> 
  */
 export const KNOBS: readonly Knob[] = [
   { key: 'gloss', label: 'Barniz (gloss)', hint: 'El que más lava: +40% de luz medido', min: 0, max: 1, step: 0.01, config: 'INTENSITY.gloss', grupo: 'frente' },
-  { key: 'edge', label: 'Tinta y piel (edge)', hint: 'Realce de contornos: +25% de luz', min: 0, max: 1, step: 0.01, config: 'EDGE.strength', grupo: 'frente' },
+  { key: 'edge', label: 'Realce de contornos del fondo', hint: 'Enciende la tinta del arte del fondo. Solo actúa sobre el fondo, nunca sobre el personaje', min: 0, max: 1, step: 0.01, config: 'EDGE.strength', grupo: 'fondo' },
   { key: 'holo', label: 'Lámina (holo)', hint: 'Arcoíris: apenas +0.8% de luz', min: 0, max: 1, step: 0.01, config: 'INTENSITY.holo', grupo: 'frente' },
   { key: 'faction', label: 'Emblemas de facción', hint: 'Opacidad de los emblemas superpuestos', min: 0, max: 1, step: 0.01, config: 'FACTION.strength', grupo: 'frente' },
   { key: 'glow', label: 'Resplandor exterior', hint: 'Aro de luz alrededor de la carta', min: 0, max: 1.5, step: 0.01, config: 'GLOW.strength', grupo: 'frente' },
@@ -100,20 +100,29 @@ export const KNOBS: readonly Knob[] = [
   { key: 'tiltFactor', label: 'Arcoíris al inclinar', hint: 'Cuánto sube el efecto con el tilt', min: 0, max: 5, step: 0.05, config: 'HOLOGRAM.tiltFactor', grupo: 'frente' },
   { key: 'baseMask', label: 'Piso del holograma', hint: 'Efecto visible con la carta quieta', min: 0, max: 1, step: 0.01, config: 'HOLOGRAM.baseMask', grupo: 'frente' },
   { key: 'logoParallax', label: 'Paralaje del logo', hint: 'El plano de DELANTE: al inclinar, la marca se despega del personaje', min: -0.2, max: 0.2, step: 0.005, config: 'LOGO.parallax', grupo: 'frente' },
-  // --- columna FONDO -------------------------------------------------------
-  { key: 'bgHolo', label: 'Intensidad', hint: 'Holograma de la capa de fondo (más fuerte que el del personaje)', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.holo', grupo: 'fondo' },
-  { key: 'bgLayerWeight', label: 'Saturación', hint: 'Cuánto arcoíris se SUMA al fondo', min: 0, max: 1, step: 0.01, config: 'BACKGROUND.layerWeight', grupo: 'fondo' },
-  { key: 'bgBaseMask', label: 'Piso del holograma', hint: 'Efecto visible con la carta quieta', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.baseMask', grupo: 'fondo' },
-  { key: 'bgTiltFactor', label: 'Arcoíris al inclinar', hint: 'Cuánto sube el efecto del fondo con el tilt', min: 0, max: 6, step: 0.05, config: 'BACKGROUND.tiltFactor', grupo: 'fondo' },
-  { key: 'bgGlareStrength', label: 'Barrido del puntero', hint: 'El brillo del fondo que sigue al cursor', min: 0, max: 2, step: 0.01, config: 'BACKGROUND.glareStrength', grupo: 'fondo' },
-  { key: 'bgCover', label: 'Tamano del fondo', hint: 'Cuanto se agranda el arte del fondo dentro de la carta (mas = mas zoom, menos borde visible). Ojo: el paralaje necesita margen', min: 1, max: 1.6, step: 0.01, config: 'BACKGROUND.cover', grupo: 'fondo' },
-  { key: 'bgParallax', label: 'Paralaje', hint: 'Cuánto se desplaza la capa de fondo; negativo va al contrario que el frente', min: -0.15, max: 0.15, step: 0.005, config: 'PARALLAX_LAYERS[0].factor', grupo: 'fondo' },
-  { key: 'bgArtFloor', label: 'Brillo base del arte', hint: 'Subirlo aclara el fondo; bajarlo lo deja más apagado', min: 0, max: 1.5, step: 0.01, config: 'BACKGROUND.artFloor', grupo: 'fondo' },
-  { key: 'bgNoise', label: 'Textura de la superficie', hint: 'Micro-relieve de la superficie: 0 = lisa, 0.1 = grano visible. Tambien controla el abollado del reflejo', min: 0, max: 0.15, step: 0.01, config: 'BG_NOISE.normalStrength', grupo: 'fondo' },
+  // --- columna SUPERFICIE --------------------------------------------------
+  /**
+   * Perillas que gobiernan el ARTE y el refuerzo local del holograma SOBRE LA CAPA 0.
+   * No son un acabado propio del fondo: el fondo ES la superficie y recibe el mismo barniz,
+   * la misma lamina y el mismo tinte de canto que todo el mesh. Pero una imagen suave
+   * (acuario) no tiene metal para que la holografia se marque, asi que hay un refuerzo
+   * local de la tinta espectral que solo afecta a donde hay fondo.
+   */
+  { key: 'bgCover', label: 'Tamaño del arte', hint: 'Cuánto se agranda la imagen dentro de la carta (más = más zoom, menos borde visible)', min: 1, max: 1.6, step: 0.01, config: 'BACKGROUND.cover', grupo: 'fondo' },
+  { key: 'bgHolo', label: 'Holografía del fondo', hint: 'Intensidad de la lámina SOBRE la capa 0: 0 = solo acabado base, 1 = igual que el personaje', min: 0, max: 1, step: 0.01, config: 'BACKGROUND.holo', grupo: 'fondo' },
+  { key: 'bgLayerWeight', label: 'Peso de la lámina del fondo', hint: 'Cuánto de la lámina espectral se SUMA al arte del fondo (modulación, no luz)', min: 0, max: 1, step: 0.01, config: 'BACKGROUND.layerWeight', grupo: 'fondo' },
+  { key: 'bgBaseMask', label: 'Piso del holograma del fondo', hint: 'Efecto holográfico del fondo visible con la carta quieta', min: 0, max: 3, step: 0.01, config: 'BACKGROUND.baseMask', grupo: 'fondo' },
+  { key: 'bgTiltFactor', label: 'Arcoíris del fondo al inclinar', hint: 'Cuánto responde el holograma del fondo al tilt', min: 0, max: 6, step: 0.05, config: 'BACKGROUND.tiltFactor', grupo: 'fondo' },
+  { key: 'bgArtFloor', label: 'Suelo del arte del fondo', hint: 'Cuánto del color original del fondo se conserva bajo la tinta (1 = imagen intacta)', min: 0, max: 1, step: 0.01, config: 'BACKGROUND.artFloor', grupo: 'fondo' },
+  { key: 'bgFoilX', label: 'Foil del fondo: frecuencia X', hint: 'Cuántas franjas del grabado caben en horizontal. Más = patrón más denso', min: 0, max: 8, step: 0.1, config: 'BACKGROUND.foilX', grupo: 'fondo' },
+  { key: 'bgFoilY', label: 'Foil del fondo: frecuencia Y', hint: 'Cuántas franjas del grabado caben en vertical', min: 0, max: 8, step: 0.1, config: 'BACKGROUND.foilY', grupo: 'fondo' },
+  { key: 'bgFoilViewAngle', label: 'Foil del fondo: respuesta al ángulo', hint: 'Cuánto recorre el arcoíris al inclinar la carta. Más = más vivo', min: 0, max: 6, step: 0.1, config: 'BACKGROUND.foilViewAngle', grupo: 'fondo' },
+  { key: 'bgFoilDesaturation', label: 'Foil del fondo: saturación', hint: '0 = arcoíris puro, 1 = gris metálico sin color', min: 0, max: 1, step: 0.01, config: 'BACKGROUND.foilDesaturation', grupo: 'fondo' },
+  { key: 'bgNoise', label: 'Textura de la superficie', hint: 'Micro-relieve de la superficie: 0 = lisa, 0.1 = grano visible. También controla el abollado del reflejo', min: 0, max: 0.15, step: 0.01, config: 'BG_NOISE.normalStrength', grupo: 'fondo' },
   // --- columna ACABADO (HDR) ----------------------------------------------
   { key: 'hdrBoost', label: 'Intensidad de los reflejos', hint: 'Cuánto se pasan de blanco las LUCES (metal, canto, holograma). No toca el arte: subirlo hace los brillos más fogosos', min: 0, max: 4, step: 0.05, config: 'HDR.highlightBoost', grupo: 'frente' },
-  { key: 'metalReflect', label: 'Reflejo de espejo', hint: 'Cuanto refleja el metal la imagen de entorno (0 = mate, 1 = espejo pleno). Afecta solo al titulo y al wordmark', min: 0, max: 1.5, step: 0.02, config: 'METAL_REFLECT.strength', grupo: 'frente' },
-  { key: 'hdrCeiling', label: 'Techo del brillo', hint: 'Cuanta luz puede sumarse sobre la imagen. Subirlo da reflejos mas luminosos; es lo que se sube para un look mas fogoso', min: 0.1, max: 1.5, step: 0.02, config: 'HDR.lightCeiling', grupo: 'frente' },
+  { key: 'metalReflect', label: 'Reflejo de espejo', hint: 'Cuánto refleja el metal la imagen de entorno (0 = mate, 1 = espejo pleno). Afecta solo al título y al wordmark', min: 0, max: 1.5, step: 0.02, config: 'METAL_REFLECT.strength', grupo: 'frente' },
+  { key: 'hdrCeiling', label: 'Techo del brillo', hint: 'Cuánta luz puede sumarse sobre la imagen. Subirlo da reflejos más luminosos; es lo que se sube para un look más fogoso', min: 0.1, max: 1.5, step: 0.02, config: 'HDR.lightCeiling', grupo: 'frente' },
 ];
 
 /** Valores que se leen en cada frame. Las claves son las de `KNOBS`. */
@@ -132,18 +141,28 @@ export interface LiveKnobs {
   sheenStrength: number;
   tiltFactor: number;
   baseMask: number;
-  /** Holograma de la capa de FONDO: se ajusta aparte del del personaje. */
-  bgHolo: number;
-  bgLayerWeight: number;
-  bgBaseMask: number;
-  bgTiltFactor: number;
-  bgGlareStrength: number;
-  bgParallax: number;
-  bgArtFloor: number;
-  /** Textura de micro-superficie del fondo. */
+
+  /** Textura de micro-superficie de la lámina. */
   bgNoise: number;
-  /** Escala del arte del fondo dentro de la carta. */
+  /** Escala del arte dentro de la carta. */
   bgCover: number;
+  /** Refuerzo local de la lámina holográfica SOBRE la capa 0. */
+  bgHolo: number;
+  /** Cuánto de esa lámina se SUMA al arte del fondo. */
+  bgLayerWeight: number;
+  /** Piso de la holografía local del fondo (carta quieta). */
+  bgBaseMask: number;
+  /** Cuánto responde la holografía local del fondo al tilt. */
+  bgTiltFactor: number;
+  /** Cuánto del color original del fondo se conserva bajo la tinta. */
+  bgArtFloor: number;
+  /** Ganancia de la modulación de la lámina por la luminancia del arte. */
+  bgArtGain: number;
+  /** Foil del fondo: frecuencia del grabado por eje, respuesta al ángulo y saturación. */
+  bgFoilX: number;
+  bgFoilY: number;
+  bgFoilViewAngle: number;
+  bgFoilDesaturation: number;
   /** HDR: ganancia de luces y codo de compresión. */
   hdrBoost: number;
   hdrCeiling: number;
@@ -172,15 +191,18 @@ export const DEFAULTS: LiveKnobs = {
   sheenStrength: CFG.LIVE_SHEEN.strength,
   tiltFactor: CFG.HOLOGRAM.tiltFactor,
   baseMask: CFG.HOLOGRAM.baseMask,
+  bgNoise: CFG.BG_NOISE.normalStrength,
+  bgCover: CFG.BACKGROUND.cover,
   bgHolo: CFG.BACKGROUND.holo,
   bgLayerWeight: CFG.BACKGROUND.layerWeight,
   bgBaseMask: CFG.BACKGROUND.baseMask,
   bgTiltFactor: CFG.BACKGROUND.tiltFactor,
-  bgGlareStrength: CFG.BACKGROUND.glareStrength,
-  bgParallax: CFG.BACKGROUND.parallax,
   bgArtFloor: CFG.BACKGROUND.artFloor,
-  bgNoise: CFG.BG_NOISE.normalStrength,
-  bgCover: CFG.BACKGROUND.cover,
+  bgArtGain: CFG.BACKGROUND.artGain,
+  bgFoilX: CFG.BACKGROUND.foilX,
+  bgFoilY: CFG.BACKGROUND.foilY,
+  bgFoilViewAngle: CFG.BACKGROUND.foilViewAngle,
+  bgFoilDesaturation: CFG.BACKGROUND.foilDesaturation,
   hdrBoost: CFG.HDR.highlightBoost,
   hdrCeiling: CFG.HDR.lightCeiling,
   metalReflect: CFG.METAL_REFLECT.strength,

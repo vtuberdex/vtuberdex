@@ -323,12 +323,6 @@ function CardMesh({
       uGlossSelf: { value: CFG.COMPOSITE.glossSelf as number },
       uHoloSelf: { value: CFG.COMPOSITE.holoSelf as number },
       uHighlightWeight: { value: CFG.GLOSS.highlightWeight as number },
-      uBgHolo: { value: CFG.BACKGROUND.holo as number },
-      uBgLayerWeight: { value: CFG.BACKGROUND.layerWeight as number },
-      uBgGlareStrength: { value: CFG.BACKGROUND.glareStrength as number },
-      uBgBaseMask: { value: CFG.BACKGROUND.baseMask as number },
-      uBgTiltFactor: { value: CFG.BACKGROUND.tiltFactor as number },
-      uBgArtFloor: { value: CFG.BACKGROUND.artFloor as number },
       /**
        * HDR: ganancia de luces y techo del canal de luz. Van como uniforms (no como
        * literales del shader) para poder medirlos y ajustarlos en vivo: el techo decide
@@ -350,6 +344,16 @@ function CardMesh({
       uMetalGain: { value: CFG.METAL_REFLECT.gain as number },
       uLogoParallax: { value: CFG.LOGO.parallax as number },
       uParallaxFactors: { value: new Float32Array(CFG.LAYER_PARALLAX_FACTORS) },
+      uBgHolo: { value: CFG.BACKGROUND.holo as number },
+      uBgLayerWeight: { value: CFG.BACKGROUND.layerWeight as number },
+      uBgBaseMask: { value: CFG.BACKGROUND.baseMask as number },
+      uBgTiltFactor: { value: CFG.BACKGROUND.tiltFactor as number },
+      uBgArtFloor: { value: CFG.BACKGROUND.artFloor as number },
+      uBgArtGain: { value: CFG.BACKGROUND.artGain as number },
+      uBgFoilX: { value: CFG.BACKGROUND.foilX as number },
+      uBgFoilY: { value: CFG.BACKGROUND.foilY as number },
+      uBgFoilViewAngle: { value: CFG.BACKGROUND.foilViewAngle as number },
+      uBgFoilDesaturation: { value: CFG.BACKGROUND.foilDesaturation as number },
     };
 
     // Generar uniforms de capas desde la config.
@@ -361,9 +365,18 @@ function CardMesh({
       front,
       glow: {
         uGlowColor: { value: accent.clone() },
+        uSecondary: { value: secondary.clone() },
         uGlowStrength: { value: CFG.GLOW.strength as number },
         uCardRect: { value: new THREE.Vector2(1 / CFG.GEOMETRY.glowSpread, 1 / CFG.GEOMETRY.glowSpread) },
         uCardRadius: { value: CFG.GEOMETRY.cornerRadius / CFG.GEOMETRY.glowSpread },
+        uTime: { value: 0 },
+        uSmokeScale: { value: CFG.GLOW.smokeScale as number },
+        uSmokeSpeed: { value: CFG.GLOW.smokeSpeed as number },
+        uSmokeAmp: { value: CFG.GLOW.smokeAmp as number },
+        uSmokeOctaves: { value: CFG.GLOW.smokeOctaves as number },
+        uSpectralScale: { value: CFG.GLOW.spectralScale as number },
+        uSpectralSpeed: { value: CFG.GLOW.spectralSpeed as number },
+        uSpectralMix: { value: CFG.GLOW.spectralMix as number },
       },
     };
   }, [palette.accent, palette.secondary, holo, gloss, card.themeColor]);
@@ -413,12 +426,6 @@ function CardMesh({
     uniforms.front.uSheenStrength.value = live.sheenStrength;
     uniforms.front.uTiltFactor.value = live.tiltFactor;
     uniforms.front.uBaseMask.value = live.baseMask;
-    uniforms.front.uBgHolo.value = live.bgHolo;
-    uniforms.front.uBgLayerWeight.value = live.bgLayerWeight;
-    uniforms.front.uBgBaseMask.value = live.bgBaseMask;
-    uniforms.front.uBgTiltFactor.value = live.bgTiltFactor;
-    uniforms.front.uBgGlareStrength.value = live.bgGlareStrength;
-    uniforms.front.uBgArtFloor.value = live.bgArtFloor;
     uniforms.front.uBgNoiseStrength.value = live.bgNoise;
     uniforms.front.uMetalReflect.value = live.metalReflect;
     uniforms.front.uHdrBoost.value = live.hdrBoost;
@@ -427,6 +434,16 @@ function CardMesh({
     uniforms.front.uGlossSelf.value = live.glossSelf;
     uniforms.front.uHoloSelf.value = live.holoSelf;
     uniforms.front.uHighlightWeight.value = live.highlightWeight;
+    uniforms.front.uBgHolo.value = live.bgHolo;
+    uniforms.front.uBgLayerWeight.value = live.bgLayerWeight;
+    uniforms.front.uBgBaseMask.value = live.bgBaseMask;
+    uniforms.front.uBgTiltFactor.value = live.bgTiltFactor;
+    uniforms.front.uBgArtFloor.value = live.bgArtFloor;
+    uniforms.front.uBgArtGain.value = live.bgArtGain;
+    uniforms.front.uBgFoilX.value = live.bgFoilX;
+    uniforms.front.uBgFoilY.value = live.bgFoilY;
+    uniforms.front.uBgFoilViewAngle.value = live.bgFoilViewAngle;
+    uniforms.front.uBgFoilDesaturation.value = live.bgFoilDesaturation;
     if (tocada('holo')) uniforms.front.uHolo.value = live.holo;
     if (tocada('gloss')) uniforms.front.uGloss.value = live.gloss;
     uniforms.front.uEdgeStrength.value = live.edge;
@@ -436,12 +453,18 @@ function CardMesh({
     const py = pointer.current.y;
     (uniforms.front.uPointer.value as THREE.Vector2).set(px, py);
     /**
-     * El paralaje del FONDO sale del factor de la capa 0, que es la que lleva su arte.
-     * Antes el shader tenía un uniforme propio (uBgParallax) con una textura de fondo
-     * aparte; al pasarse a 7 capas, el fondo ES la capa 0 y su desplazamiento lo fija
-     * uParallaxFactors[0]. El slider escribe ahí para que siga mandando en vivo.
+     * LA CAPA 0 NO SE DESPLAZA: ES LA SUPERFICIE DE LA CARTA.
+     *
+     * Aquí se escribía `live.bgParallax` en uParallaxFactors[0] en cada frame, y ese valor
+     * (0.06) era el paralaje MÁS GRANDE de la carta — doce veces el del personaje. Era el
+     * diseño de "capa de fondo lejana", y es justo lo que hay que quitar: el arte del fondo
+     * ya se pinta en la capa 0 opaca (`drawSurfaceLayer`), así que desplazarlo haría que la
+     * TEXTURA DEL MESH se despegara de su propia geometría.
+     *
+     * El factor 0 lo pone PARALLAX_LAYERS[0] al construir el uniforme, y aquí no se toca.
+     * Lo que conserva la profundidad son las otras capas (personaje, logo, textos), que sí
+     * son planos distintos del sustrato.
      */
-    (uniforms.front.uParallaxFactors.value as Float32Array)[0] = live.bgParallax;
     /**
      * El LOGO se dibuja DOS veces: la capa 2 (el arte de la marca en su caja) y el
      * STICKER final (sus píxeles originales, sin efectos, recompuestos encima). Cada

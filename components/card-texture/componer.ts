@@ -4,11 +4,9 @@
 import { CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT, FONT } from './dimensiones';
 import type { CardDrawInfo, CardLayers } from './tipos';
 import { createLayer, emptyLayer } from './lienzo';
-import { drawBackgroundLayer } from './capa-fondo';
+import { drawSurfaceLayer } from './capa-superficie';
 import { drawCharacterLayer } from './capa-personaje';
 import { drawTitleLayer } from './capa-titulo';
-import { drawTextsLayer } from './capa-textos';
-import { drawTagsLayer } from './capa-tags';
 import { drawWordmarkLayer } from './capa-wordmark';
 
 /** Genera todas las capas y la información de layout medida. */
@@ -22,9 +20,22 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
   const barY = H - 140;
 
   // Pre-medir logo.
+  /**
+   * LOGO: ESQUINA INFERIOR DERECHA, AL DOBLE DE TAMAÑO (petición del usuario).
+   *
+   * Antes el logo se colocaba ARRIBA del bloque de chips de tipo (`logosBase - typesHeight
+   * - dh - 70`), así que su posición dependía de cuántos chips hubiera. Con los textos y los
+   * tags retirados de la carta 3D ese bloque ya no existe, y el sitio que queda libre es la
+   * esquina inferior derecha — que es donde el usuario lo quiere.
+   *
+   * EL DOBLE DE TAMAÑO: el área se multiplica por 4, no el lado. La escala se calcula con
+   * `sqrt(area / (w*h))`, así que un área 4× da un lado 2×, que es lo pedido. Multiplicar
+   * el lado por 2 a mano daría un área 4× igual, pero por el camino equivocado: el área es
+   * la magnitud que se mantiene constante entre logos de proporciones distintas.
+   */
+  const LOGO_SCALE_FACTOR = 2;
   let logoBox: { x: number; y: number; w: number; h: number } | null = null;
-  const LOGO_AREA = W * H * 0.049;
-  const logosBase = H - 140 - 22;
+  const LOGO_AREA = W * H * 0.049 * LOGO_SCALE_FACTOR * LOGO_SCALE_FACTOR;
   const typesList = [...card.factions, ...card.groups].slice(0, 4);
   const chipFont = `700 24px ${FONT}`;
   const chipRows: string[][] = [];
@@ -51,7 +62,7 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
     const dw = logo.width * scaleLogo;
     const dh = logo.height * scaleLogo;
     const lx = W - pad - dw;
-    const ly = logosBase - typesHeight - dh - 70;
+    const ly = H - pad - dh;
     logoBox = { x: lx, y: ly, w: dw, h: dh };
   }
 
@@ -93,7 +104,16 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
   };
 
   return {
-    background: drawBackgroundLayer({ background, width }),
+    /**
+     * CAPA 0: la SUPERFICIE de la carta, no una capa sobre ella.
+     *
+     * Antes esta capa era una imagen OPCIONAL que el shader componía encima de un degradado
+     * de tema calculado en GLSL, y por eso el fondo se leía como una foto pegada: solo
+     * actuaba donde `bgCover` (la cobertura calculada en el shader) la dejaba, y el material
+     * de la carta seguía siendo el degradado del shader. Ahora el degradado y el arte viven
+     * AQUÍ, en el mismo canvas opaco, y el shader los trata como el sustrato de la carta.
+     */
+    background: drawSurfaceLayer({ card, background, width }),
     character: drawCharacterLayer({ art, width }),
     /**
      * La capa del logo se sirve VACÍA a propósito.
@@ -119,8 +139,26 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
      */
     logo: emptyLayer(),
     title: drawTitleLayer({ card, width }),
-    texts: drawTextsLayer({ card, width, info }),
-    tags: drawTagsLayer({ card, width, info }),
+    /**
+     * CAPAS 4 y 5 VACÍAS: los textos y los tags SALIERON de la carta 3D.
+     *
+     * Petición del usuario: "se deben eliminar todos los textos en blanco y las lineas y
+     * tags, no se van a utilizar en el card 3d". Se van la frase, el pie, los chips de
+     * estado (NIV / PODER / FICHA COMPLETA), los chips de facción y grupo y la barra de
+     * stats.
+     *
+     * POR QUÉ VACÍAS Y NO ELIMINADAS: los índices no se pueden renumerar. `uLayer4` y
+     * `uLayer5` existen en el shader y `PARALLAX_LAYERS` tiene sus posiciones; quitar los
+     * slots desplazaría el wordmark de la capa 6 a la 4 y rompería el shader entero. Se
+     * sirve un canvas de 1x1 (alfa 0 en todo el UV, ~nada de VRAM) y los `mix()` de esas dos
+     * capas quedan inertes por construcción.
+     *
+     * Los archivos `capa-textos.ts` y `capa-tags.ts` se conservan y se siguen exportando
+     * desde `index.ts`: el trabajo está hecho y probado, y si algún día se quiere la carta
+     * "completa" para otra vista (la 2D, un export, una miniatura) se recupera llamándolas.
+     */
+    texts: emptyLayer(),
+    tags: emptyLayer(),
     wordmark: drawWordmarkLayer({ card, width }),
     info,
   };
@@ -136,8 +174,7 @@ export function drawCardFront(input: CardDrawInfo): HTMLCanvasElement {
   ctx.drawImage(layers.character, 0, 0, W, H);
   // (la capa `logo` se omite: va vacía; la marca la pinta el sticker del shader)
   ctx.drawImage(layers.title, 0, 0, W, H);
-  ctx.drawImage(layers.texts, 0, 0, W, H);
-  ctx.drawImage(layers.tags, 0, 0, W, H);
+  // (las capas `texts` y `tags` se omiten: salieron de la carta 3D, van vacías)
   ctx.drawImage(layers.wordmark, 0, 0, W, H);
   return canvas;
 }

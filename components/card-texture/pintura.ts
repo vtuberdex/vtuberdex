@@ -157,11 +157,19 @@ export function fillShadowedText(
  * pinta el texto tres veces para que lea como una pieza recortada y no como una
  * tipografía con color. Copia oscura desplazada ABAJO, copia clara desplazada ARRIBA y
  * encima el gradiente. Lo que asoma por los lados de esa última es el bisel.
+ *
+ * ALINEACIÓN A LA IZQUIERDA (petición del usuario: "el texto que dice VTUBERDEX debe
+ * quedar alineado a la izquierda de la carta"). El parámetro se llamaba `right` y era la
+ * coordenada del borde derecho con `textAlign: 'right'`; ahora es `left` con
+ * `textAlign: 'left'`. El gradiente del metal invierte su recorrido con él: antes iba de
+ * `right - ancho` a `right` y ahora de `left` a `left + ancho`, así que la luz del bisel
+ * sigue entrando por el mismo lado físico (izquierda-arriba) y la pieza no cambia de
+ * aspecto, solo de sitio.
  */
 export function drawMetalWordmark(
   ctx: CanvasRenderingContext2D,
   text: string,
-  right: number,
+  left: number,
   y: number,
   font: string,
   brand: string,
@@ -169,15 +177,16 @@ export function drawMetalWordmark(
   const { wordmark } = TEXT_FINISH;
   ctx.save();
   ctx.font = font;
-  ctx.textAlign = 'right';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = rgba('#05060a', wordmark.bevelDarkAlpha);
-  ctx.fillText(text, right, y + wordmark.bevelDarkOffset);
+  ctx.fillText(text, left, y + wordmark.bevelDarkOffset);
   ctx.fillStyle = rgba('#ffffff', wordmark.bevelLightAlpha);
-  ctx.fillText(text, right, y + wordmark.bevelLightOffset);
-  const g = ctx.createLinearGradient(right - ctx.measureText(text).width, y - 16, right, y + 16);
+  ctx.fillText(text, left, y + wordmark.bevelLightOffset);
+  const width = ctx.measureText(text).width;
+  const g = ctx.createLinearGradient(left, y - 16, left + width, y + 16);
   for (const s of wordmark.stops) g.addColorStop(s.at, mixHex(s.color, brand, wordmark.brandTint));
   ctx.fillStyle = g;
-  ctx.fillText(text, right, y);
+  ctx.fillText(text, left, y);
   ctx.restore();
 }

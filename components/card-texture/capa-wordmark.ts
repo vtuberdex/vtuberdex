@@ -15,10 +15,17 @@ import { drawMetalWordmark } from './pintura';
  * recortada. Ver `drawMetalWordmark` y `TEXT_FINISH.wordmark`.
  */
 export function drawWordmarkLayer({ card, width }: { card: VtuberCard; width: number }): HTMLCanvasElement {
-  const { canvas, ctx, W, H } = createLayer(width);
+  const { canvas, ctx, H } = createLayer(width);
   if (!ctx) return canvas;
   const pad = 46;
   const { accent } = cardPalette(card.themeColor, card.secondaryColor);
-  drawMetalWordmark(ctx, 'VTUBERDEX', W - pad, H - 86, `800 28px ${FONT}`, accent);
+  /**
+   * IZQUIERDA, no derecha (petición del usuario).
+   *
+   * Se dibujaba en `W - pad` con alineación derecha, es decir en el ángulo inferior
+   * DERECHO. Ese rincón lo ocupa ahora el LOGO, que el usuario ha movido allí y al doble
+   * de tamaño; si la palabra se quedara, los dos se solaparían.
+   */
+  drawMetalWordmark(ctx, 'VTUBERDEX', pad, H - 86, `800 28px ${FONT}`, accent);
   return canvas;
 }

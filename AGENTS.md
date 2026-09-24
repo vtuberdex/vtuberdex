@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 133 tests (vitest): utilidades, componentes, páginas
+npm test                   # 141 tests (vitest): utilidades, componentes, páginas, carta 3D
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -67,12 +67,13 @@ cd .. && npm install && npm run dev               # http://localhost:3000
 
 # Despliegue
 npm run build:data           # regenera deploy/ (base saneada + manifiesto)
-npm run publish:images       # sube las imágenes a Vercel Blob (reanudable)
+npm run publish:images       # sube las imágenes a Turso (reanudable)
+npm run download:images      # BAJA a data/images/ lo que solo está en Turso (respaldo + local)
 npm run verify               # 32 comprobaciones sobre un escenario de producción
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/59/127** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/59/141** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -249,6 +250,32 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   la función reciba el valor actualizado. `npm run admin:verificar` comprueba el resultado
   (login real + sesión en Turso) y, si hay 401, distingue "hash mal pegado" de "contraseña
   equivocada" leyendo el diagnóstico de FORMA que ahora devuelve el 401.
+- **El mantenedor escribe en TURSO, y por eso hay contenido que SOLO existe ahí.** Las
+  ediciones de texto y los reemplazos de imagen del mantenedor son filas de Turso: no pasan
+  por `data/images/` ni por la base local, y **no vuelven solas**. `data/images/` es un
+  artefacto del scrape, así que sin bajar nada el disco se queda con la versión del día del
+  scrape y probar en local (`dev-up.sh`, que corre SIN Turso) pinta las imágenes VIEJAS
+  mientras producción pinta las nuevas. Medido cuando se escribió `download:images`: de 84-90
+  filas `origen = 'mantenedor'`, **cero** coincidían con el disco y 30 de los 31 fondos no
+  existían allí. `npm run download:images` (ver «Publicar y bajar imágenes») es el camino de
+  vuelta; los bytes de Turso **son** el respaldo del mantenedor, no hay otro.
+  - **Bajar con los DOS orígenes a la vez exige aplicar la precedencia, no solo listar
+    filas.** `catalogo` y `mantenedor` escriben el MISMO archivo canónico
+    (`data/images/<carpeta>/<slug>.webp`), así que con `--origen todos` el orden de la
+    consulta decide qué queda en disco. Medido: sin la poda, el `catalogo` **pisó 58
+    reemplazos** del mantenedor y el script no lo dijo. Gana `mantenedor`, que es la misma
+    precedencia que sirve la API (`leerAssetRemoto`), y como los dos orígenes son filas
+    distintas de `asset_remoto`, la versión publicada sigue intacta en Turso para volver a
+    bajarla si hiciera falta.
+  - **La fila local `asset.path` lleva el prefijo `images/`, el archivo está en
+    `data/images/`.** La fila no guarda la ruta del archivo: guarda la clave pública que
+    `mapCard` convierte en `/images/...`, que es la única URL que atiende
+    `app/images/[...path]`. Escribir ahí la ruta de disco (lo natural, y el primer error de
+    `download:images`) devuelve `/background/<slug>.webp` en vez de
+    `/images/background/<slug>.webp`: la imagen queda escrita en disco, la API responde 404 y
+    **no hay ningún error en los logs** — el mismo síntoma mudo que el resto de esta sección.
+    `download:images` normaliza la fila de todo lo que esté bien en disco, así que correrlo
+    otra vez repara una base escrita por la versión con el fallo.
 - **El mantenedor escribe en TURSO, no en Blob, y Blob ya no se usa.** La primera
   versión subía las imágenes a Vercel Blob y el store quedó **bloqueado** (los 2.000
   "Advanced Operations" del plan Hobby se agotaron con 1.625 `put`; el bloqueo dura
@@ -379,8 +406,10 @@ npx vercel deploy --prod         # publica (o push a master, lo hace deploy.yml)
 ```
 
 `npm run publish:images` sube las imágenes a **Turso** (`asset_remoto`), no a Blob; es
-idempotente y reanudable. Para el mantenedor en producción están `admin:publicar`
-(alta del usuario admin) y `admin:verificar` (login real de punta a punta).
+idempotente y reanudable. **`npm run download:images` es el sentido contrario** y existe
+porque la mitad del contenido del mantenedor NO está en el disco de nadie más que en Turso
+(ver «El mantenedor escribe en Turso»). Para el mantenedor en producción están
+`admin:publicar` (alta del usuario admin) y `admin:verificar` (login real de punta a punta).
 
 ### Las reglas del deploy
 
@@ -496,6 +525,37 @@ esquema de la base (el `seed` los sigue escribiendo); lo que se retiró es su
 publicación. Si vuelves a necesitarlos, hay que reponer la carpeta en disco,
 añadirla a `USED_FOLDERS` de `scripts/build-db.mjs` y republicar.
 
+## Publicar y bajar imágenes: los dos sentidos de Turso
+
+`asset_remoto` es el único sitio donde vive la mitad del contenido del mantenedor, así que
+hay un script por sentido y **tienen reglas que no pueden divergir**:
+
+| Script | Sentido | Qué compara | Fuente de la verdad |
+|---|---|---|---|
+| `npm run publish:images` | disco → Turso (`origen = catalogo`) | tamaño | el MANIFIESTO (`deploy/data/images.json`) |
+| `npm run download:images` | Turso → disco | tamaño | Turso |
+
+- **Los dos comparan TAMAÑO, no presencia**, y por la misma razón: el nombre canónico
+  (`<carpeta>/<slug>.<ext>`) no cambia aunque cambie el contenido, así que sin mirar el peso
+  una imagen regenerada se queda con la versión vieja para siempre en el lado que no se
+  revisó. Un archivo que falla no se da por hecho, así que volver a correr reintenta solo lo
+  que falta: los dos son reanudables.
+- **`download:images` baja a `data/images/`, que es lo que la app sirve en local.** Sirve para
+  las dos cosas que pide tener Turso a mano: **respaldo** (los bytes de ahí no están en ningún
+  otro sitio) y **probar en local** (`dev-up.sh` corre sin Turso, así que la rama de disco es
+  la única que se usa y sin bajar nada se ven las imágenes del scrape, no las del mantenedor).
+- **También vuelca las EDICIONES de texto** a `data/mantenedor-ediciones.json` — se pierden
+  igual de fácil que las imágenes y no hay otro sitio donde estén.
+- **Con los dos orígenes a la vez (`--origen todos`) gana `mantenedor`**, porque las dos filas
+  escriben el mismo archivo y el orden de la consulta no puede decidir el resultado. Es la
+  misma precedencia que sirve la API. Sin la poda, el catálogo pisó 58 reemplazos (ver
+  «Trampas conocidas»).
+- **Credenciales:** acepta `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` del entorno, o `--turso-url`
+  / `--turso-token`, o las lee de un `.env` (`--env-file`, por defecto `.env.dev.local`, lo que
+  deja `npx vercel env pull --environment=development`). Las de **producción** están marcadas
+  *sensitive* en Vercel y no se pueden releer; las de *development* apuntan a la MISMA base, así
+  que sirven igual.
+
 ## Verificación antes de decir "listo"
 
 1. `npm run lint && npm run typecheck && npm run check:shaders && npm run build` (el build es el gate real).
@@ -546,6 +606,9 @@ Cuatro trampas concretas de trabajar en local:
    en el manifiesto, que solo se regenera con `npm run build:data`): sin eso, una
    imagen recién subida daba 404 con el archivo ya en disco. El manifiesto manda
    en PRODUCCIÓN, que es la rama que cubre `npm run verify`.
+   **Y el disco solo tiene lo que alguien haya bajado**: lo que sube el mantenedor
+   vive en Turso y no vuelve solo, así que antes de fiarse de lo que se ve en local
+   hay que correr `npm run download:images` (ver «Publicar y bajar imágenes»).
 3. **Nada de `window`/`localStorage` durante el render.** Un componente
    `'use client'` se renderiza igualmente en el servidor: acceder ahí daba
    `ReferenceError: window is not defined` y la página respondía **500**. El

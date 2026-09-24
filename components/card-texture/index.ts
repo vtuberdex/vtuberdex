@@ -14,7 +14,7 @@
 
 export { CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT, CARD_TEXTURE_TILE_WIDTH, CARD_TEXTURE_FULL_WIDTH } from './dimensiones';
 export type { CardDrawInfo, CardLayers } from './tipos';
-export { drawBackgroundLayer } from './capa-fondo';
+export { drawSurfaceLayer } from './capa-superficie';
 export { drawCharacterLayer } from './capa-personaje';
 export { drawTitleLayer } from './capa-titulo';
 export { drawTextsLayer } from './capa-textos';

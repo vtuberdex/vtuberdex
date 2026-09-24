@@ -235,157 +235,153 @@ export const ART_ZONE = {
 } as const;
 
 /**
- * FONDO de la carta: una capa PROPIA detrás del personaje.
+ * SUPERFICIE de la carta: la imagen de fondo ES el material del mesh.
  *
- * Es una cuarta imagen fuente (`asset.kind = 'background'` →
- * `data/images/background/<slug>.webp`) que se dibuja en la ventana de arte, POR
- * DEBAJO del personaje, y que lleva su propio holograma —más intenso que el del
- * personaje— para que las dos capas se lean a distinta profundidad. Con las
- * cuatro imágenes (fondo, personaje, logo y facción) la carta tiene planos
- * separados y el paralaje se percibe.
+ * CAMBIO DE ARQUITECTURA (petición del usuario: "el background tiene que ser la textura del
+ * mesh de la carta, y no una capa sobre la carta")
+ * ---------------------------------------------------------------------------------------
+ * Esto se llamaba `BACKGROUND` y describía una CAPA: una imagen opcional dibujada por
+ * debajo del personaje, con su propio holograma más marcado que el del frente y su propio
+ * paralaje, para leerse como un plano a distinta profundidad. Ese diseño era justo el
+ * defecto: por bien que se integrara el arte, mientras el fondo tuviera ACABADO PROPIO
+ * seguía siendo una capa encima de la carta, y eso se ve.
  *
- * IMPORTANTE — el fondo no sustituye a nada
- * ------------------------------------------
- * El fondo que la carta pinta SIEMPRE primero es el degradado del color de tema
- * de `card-texture.ts`. Este es una capa OPCIONAL encima de ese degradado y
- * debajo del personaje: sin imagen subida no cambia nada de lo que se ve hoy.
+ * Ahora la imagen se pinta en la capa 0 —la que el shader usa como SUSTRATO de la carta— y
+ * no existe ningún pase de composición para el fondo: recibe el MISMO barniz, la MISMA
+ * lámina, el MISMO tinte de canto y el MISMO filo que todo lo demás, porque el acabado se
+ * aplica una sola vez sobre la carta ya armada. Una placa, un material, un juego de
+ * perillas (las de `HOLOGRAM`, `INTENSITY`, `GLOSS`...).
  *
- * POR QUÉ SU HOLOGRAMA ES MÁS FUERTE
- * ----------------------------------
- * El personaje es opaco (medido: 684 de 785 fichas cubren ≥98% del alto), así que
- * el fondo se ve poco y en los bordes. Si su efecto fuera tan sutil como el del
- * personaje apenas se notaría; aquí interesa justo lo contrario, que las dos capas
- * se distingan. Todos los pesos van por encima de los equivalentes de `HOLOGRAM`:
- *   · `layerWeight` 0.42 contra 0.15 del personaje (2,8×).
- *   · `baseMask` y `tiltFactor` por encima de los de `HOLOGRAM`, para que el efecto
- *     se vea también con la carta quieta.
- *   · `edgeStrength`, que es la perilla de TINTA Y PIEL solo para esta capa.
+ * LO QUE SE ELIMINÓ CON LA CAPA, Y DÓNDE ESTÁ AHORA
+ * -------------------------------------------------
+ *   · holo, layerWeight, glareStrength, glareRadius, tiltShift, timeShift, baseMask,
+ *     tiltFactor, spectrumDesaturation, metalFloorMix, artFloor, artLumGain, edgeTint,
+ *     edgeTintPower, edgeTintCycles, edgeTintFloor, parallax, overscanFactor, edgeStrength
+ *     -> el acabado propio del fondo. Lo que se conserva de esa lista es solo lo que
+ *     gobierna el ARTE (su encuadre y su relación con el color de tema), porque el efecto
+ *     ya es el de la carta: perillas como "holograma del fondo" o "paralaje del fondo" no
+ *     tienen sentido si el fondo es la superficie — un material no refleja ni se desplaza
+ *     distinto según la imagen que tenga impresa.
+ *   · Los uniforms uBgHolo, uBgLayerWeight, uBgGlareStrength, uBgBaseMask, uBgTiltFactor y
+ *     uBgArtFloor se retiraron del shader, junto con el bloque `{...}` que los consumía.
  *
- * LO QUE *NO* CAMBIA, Y POR QUÉ (fallo medido)
- * --------------------------------------------
- * El PATRÓN espacial del arcoíris es EXACTAMENTE el del personaje: los mismos
- * `HOLOGRAM.surfaceX/surfaceY` y el mismo `viewAngleWeight`. Antes esta capa sumaba
- * su propio `bgFoil` de 5 ciclos (contra 1,6 del frente) y usaba frecuencias de
- * superficie distintas (2,1/1,2 contra 1,1/0,8), así que las franjas del fondo tenían
- * otra escala que las del personaje: las dos capas se leían como dos láminas
- * holográficas distintas pegadas una sobre otra, y el efecto se veía falso. Un
- * holograma es una propiedad de la SUPERFICIE que se mira, no de la imagen que hay
- * debajo, así que la franja tiene que tener el mismo tamaño en las dos capas.
- *
- * Lo que distingue al fondo es entonces la INTENSIDAD y el CROMA, no la frecuencia:
- * por eso se sube `holo`/`layerWeight` y se deja el patrón compartido.
+ * `BG_NOISE` NO se toca: es la micro-superficie de TODA la lámina (la comparten el fondo,
+ * el metal del título y el pulido del filo), así que no pertenecía a esta capa.
  */
 export const BACKGROUND = {
   /**
-   * Intensidad global del efecto del fondo. Como `INTENSITY.holo` pero SOLO para
-   * esta capa: apagarla deja el fondo con su arte intacto y sin holograma.
+   * ESCALA del arte dentro de la carta (cuanto se agranda la imagen).
+   *
+   * CON PARALAJE HACE FALTA MARGEN, y por eso sube de 1 a 1.25.
+   *
+   * La capa 0 vuelve a desplazarse con el puntero (`PARALLAX_LAYERS[0].factor`), y ese
+   * desplazamiento ocurre en UV: si la textura cubriera la carta JUSTA (cover 1), al mover
+   * el puntero el muestreo se saldria de [0,1] y ClampToEdge estiraria el borde en una
+   * banda visible. El margen de 1.25 deja un 12,5% por lado, de sobra para un
+   * desplazamiento del 4% (0.04 en UV con el puntero a tope).
+   *
+   * De paso, el arte llega mas a sangre en los bordes de la carta (recorta mas la imagen).
    */
-  holo: 0.76,
+  cover: 1.25,
   /**
-   * ESCALA del fondo dentro de la carta (cuánto se agranda el arte del fondo).
+   * Intensidad de la lamina holografica SOBRE LA CAPA 0.
    *
-   * 1.10 era el margen justo para que el paralaje no descubriera el borde del lienzo. El
-   * usuario pidió el fondo un 10% MÁS GRANDE, así que 1.10 * 1.10 = 1.21: el encuadre se
-   * calcula por el lado más pequeño que cubre el canvas, de modo que subirlo recorta más la
-   * imagen y el fondo llena la carta con menos borde visible.
-   *
-   * OJO si lo subes mucho: el paralaje desplaza la capa, así que necesitas margen o el
-   * borde del fondo entrará en cuadro.
+   * El usuario pidio el fondo "holografico y FUERTE": con una imagen suave (un acuario) el
+   * arcoiris global no se marca, asi que esta es la perilla que le da presencia propia.
+   * 0.9 con `baseMask` 1.8 y `tiltFactor` 4.0 satura la mascara en casi toda la carta.
    */
-  cover: 1.21,
-  /** Peso del color espectral que se SUMA al arte del fondo (su saturación). */
-  layerWeight: 0.42,
+  holo: 0.05,
   /**
-   * FUERZA de TINTA Y PIEL solo para el fondo.
+   * Cuanto de la lamina espectral se SUMA al canal de luz.
    *
-   * El frente tiene la suya (`EDGE.strength`) y el fondo no tenía ninguna: el realce
-   * de contornos del personaje se aplicaba a la carta entera por la zona de arte, sin
-   * forma de ajustarlo por capa. La máscara es la MISMA para las dos (`inkAndSkinMask`
-   * se calcula sobre la imagen del fondo en el mismo encuadre), lo que cambia es el
-   * peso con el que cada capa la usa.
-   *
-   * Va por encima de `EDGE.strength` (0.1) con el mismo criterio que el resto de esta
-   * capa: el fondo se ve menos, así que sus efectos van más marcados para que las dos
-   * se distingan.
-   *
-   * AJUSTADO EN VIVO a 0.75: con 0.28 el realce casi no se notaba sobre el fondo.
+   * Es el peso del pase local del fondo. Va aparte de `HOLOGRAM.layerWeight` (el global)
+   * porque el fondo necesita MAS lamina que el resto: es la superficie grande de la carta
+   * y el unico sitio donde el arcoiris tiene espacio para leerse.
    */
-  edgeStrength: 0.75,
-  /** El barrido que sigue al puntero y el desplazamiento por inclinación. */
-  glareStrength: 1.15,
-  glareRadius: 0.7,
-  tiltShift: 2.6,
-  /** Desfase temporal propio: el fondo no cambia de color al unísono con el personaje. */
-  timeShift: 0.085,
-  /** Piso del efecto con la carta quieta, y cuánto sube al inclinarla. */
-  baseMask: 0.85,
-  tiltFactor: 3.6,
-  /** Desaturación del espectro y suelo metálico (menos gris = más color visible). */
-  spectrumDesaturation: 0.3,
-  metalFloorMix: 0.72,
+  layerWeight: 0.75,
   /**
-   * Paralaje del fondo respecto del personaje. El valor es una FRACCIÓN DEL ANCHO
-   * DE CARTA: con 0.06 el fondo recorre un 6% del ancho en el recorrido completo del
-   * puntero. Se multiplica por `uPointer`, que va de -1 a 1, no por `uTilt` (esa es
-   * una rotación en radianes y llega a 0.38, así que con ella el desplazamiento real
-   * se quedaba en el 2,3% del ancho y no se percibía por más que se subiera el valor).
-   *
-   * El SIGNO se aplica en el shader (se resta el puntero): el fondo va al CONTRARIO
-   * que el frente, que es lo que se lee como estar más lejos.
+   * Piso de la holografia del fondo: el efecto se ve con la carta QUIETA, no solo al
+   * inclinarla. 1.8 mantiene la mascara alta en reposo.
    */
-  parallax: 0.06,
+  baseMask: 1.8,
   /**
-   * MARGEN del fondo para que el paralaje no lo saque del lienzo.
-   *
-   * POR QUÉ (fallo medido): el paralaje desplaza el muestreo, así que en los bordes
-   * la lectura se sale de [0,1]. La textura está clampeada, así que ese sobrante NO
-   * se envuelve: se ESTIRA el píxel del borde y el fondo sale con bandas deformadas
-   * justo al inclinar, que es cuando se mira.
-   *
-   * El recorrido máximo es `parallax` (0.06 del ancho), así que hace falta más de un
-   * 3% de margen por lado. Con 1.14 el fondo se amplía un 14% y sobran 7% por lado:
-   * cubre el recorrido y deja holgura sin que la imagen parezca mal escalada.
+   * Cuanto responde el holograma del fondo a la inclinacion. Alto (4.0) porque el acuario
+   * no aporta metal propio y sin el tilt el arcoiris quedaria plano.
    */
-  overscanFactor: 1.14,
+  tiltFactor: 4.0,
   /**
-   * Nivel base del arte del fondo y cuánto lo realza su propia claridad.
+   * CUANTO RESPETA EL ARTE la lamina del fondo.
    *
-   * Un fondo oscuro NO puede encenderse como uno claro, o dejaría de parecer la
-   * imagen que se subió: el arte se escala por su luminancia (`artFloor` es el
-   * suelo, `artLumGain` lo que aporta lo claro). Subir el suelo hace el fondo más
-   * luminoso y plano; subir la ganancia conserva el contraste original.
+   * EN 0: la lámina cae UNIFORME sobre todo el fondo, sin mirar la imagen.
+   *
+   * ESTO ES LO QUE ARREGLA EL "SOLO SE VE EN UN PEDAZO". Estaba en 1, y con 1 la lámina se
+   * multiplicaba por la luminancia del arte (`clamp(artLum * artGain)`). En una imagen con
+   * zonas oscuras —un acuario, con el agua en sombra— eso apaga el holograma justo donde el
+   * arte es oscuro, o sea en la mayor parte del fondo, y solo lo enciende en los parches
+   * claros. Se veía como manchas de brillo, no como una lámina.
+   *
+   * El foil de una carta holográfica real (una Pokémon) NO depende del dibujo: es un grabado
+   * que cubre la superficie entera y se ve igual sobre las zonas claras y las oscuras. Por
+   * eso 0: la lámina se reparte por todo el fondo y el arte queda debajo, intacto.
+   *
+   * La imagen se conserva INTACTA de todos modos: el arte vive en el canal de pigmento y la
+   * lámina se SUMA en el canal de luz. Nunca se multiplican. Subir esta perilla vuelve al
+   * comportamiento modulado (útil si algún día el fondo es una foto muy plana), pero para
+   * una lámina tipo carta holográfica el valor es 0.
    */
-  artFloor: 0.55,
-  artLumGain: 0.9,
+  artFloor: 0,
   /**
-   * TINTE HOLOGRÁFICO DEL BORDE del fondo.
+   * GANANCIA de esa modulación por luminancia.
    *
-   * POR QUÉ (petición concreta): el fondo llevaba el holograma repartido por igual por
-   * toda su superficie, así que en el centro se veía tenue y el efecto no se leía. En una
-   * lámina de verdad el ángulo rasante del borde es el que más desplaza el color, y esa
-   * concentración es lo que hace el borde visiblemente iridiscente. El frente ya tenía su
-   * Fresnel; el fondo no, y por eso su canto quedaba apagado.
-   *
-   * `edgeTint` pesa cuánto se AÑADE el espectro en el contorno (0 lo deja como estaba).
-   * El exponente lo concentra: cuanto más alto, más pegado al filo queda el color.
+   * Solo tiene efecto si `artFloor` > 0 (con 0 el mix devuelve 1 y esta ganancia no entra).
+   * Se conserva viva en vez de retirarla porque es la otra mitad de la misma perilla.
    */
-  edgeTint: 0.85,
-  edgeTintPower: 2.4,
+  artGain: 1.6,
+  /* --- FOIL DEL FONDO: el grabado arcoíris tipo carta holográfica --- */
   /**
-   * Ciclos del espectro en el borde. Más alto = bandas de color más finas recorriendo el
-   * contorno; con muy pocos se ve un borde de un solo color.
-   */
-  edgeTintCycles: 2.2,
-  /**
-   * Suelo del arte sobre el que se suma el tinte del canto.
+   * FRECUENCIA del patrón del foil por eje del UV. Es lo que hace que el arcoíris se lea
+   * como franjas repartidas y no como un color plano.
    *
-   * POR QUÉ HACE FALTA: el tinte se multiplica por la luminancia del arte para no
-   * encender un fondo oscuro como si fuera claro. Pero en un fondo MUY oscuro ese
-   * producto tiende a 0 y el canto desaparecía justo cuando más se nota. Este suelo
-   * garantiza que el borde tenga siempre sobre qué sumarse.
+   * CONTRASTE CON EL GLOBAL: `SPECTRUM.foil.cycles` está en 1.6 a propósito (que el arcoíris
+   * no se vea por toda la carta). El fondo necesita lo contrario —el patrón ES el efecto—,
+   * así que aquí la frecuencia es alta: 3.2 + 2.6 dan unas cinco franjas diagonales sobre la
+   * carta, que es la densidad a la que un foil se lee como grabado y no como un degradado.
    */
-  edgeTintFloor: 0.15,
+  foilX: 3.2,
+  foilY: 2.6,
+  /**
+   * Ciclos del espectro por ángulo de visión: al inclinar la carta, el arcoíris recorre el
+   * patrón. Es la mitad "viva" del foil, la que responde al movimiento.
+   */
+  foilViewAngle: 2.4,
+  /**
+   * Desaturación del espectro del fondo.
+   *
+   * Un foil real no muestra color puro: es metal pálido con el matiz por encima. 0.35 baja el
+   * croma sin apagar el arcoíris (el global usa 0.42, más gris, porque allí el color tenía
+   * que ser casi testimonial).
+   */
+  foilDesaturation: 0.35,
 } as const;
+
+/**
+ * NO HAY PERILLAS DE BRILLO DEL ARTE, Y ES DELIBERADO.
+ *
+ * Aquí vivían `artFloor` y `artLumGain`, que modulaban el efecto del fondo por la
+ * luminancia del arte ("un fondo oscuro no puede encenderse como uno claro"). Con el fondo
+ * como superficie esa modulación desapareció —el acabado es el de la carta, no el suyo— y
+ * las dos claves quedaron sin ningún lector: el shader no las consumía y el canvas de la
+ * superficie solo necesita el encuadre.
+ *
+ * Se BORRAN en vez de dejarlas documentadas porque una perilla que nadie lee es peor que
+ * ninguna: invita a moverla, no hace nada y hace dudar de si el efecto está roto. (El repo
+ * ya tiene un caso así, `BACKGROUND.edgeStrength`, que se dejó con una nota larga
+ * explicando por qué no servía.)
+ *
+ * Si algún día hace falta ajustar el brillo del arte, el sitio es `drawSurfaceLayer`, donde
+ * se pinta: ahí se puede aplicar en CPU sobre el canvas, que es lo que el shader ya no ve.
+ */
+
 
 /**
  * HDR: reflejos que PASAN de blanco y se comprimen, en vez de recortarse en plano.
@@ -418,7 +414,7 @@ export const HDR = {
    * el límite tenga algo que comprimir. Con 1.0 no hay HDR: los reflejos quedan como
    * antes.
    */
-  highlightBoost: 2.5,
+  highlightBoost: 0.75,
   /**
    * TECHO DE LA LUZ: lo máximo que puede sumar el canal de luz sobre el arte.
    *
@@ -473,7 +469,7 @@ export const HDR = {
  */
 export const METAL_REFLECT = {
   /** Fuerza del reflejo sobre el metal (0 = metal mate, 1 = espejo pleno). */
-  strength: 1.0,
+  strength: 0.1,
   /**
    * Abollado de la superficie: cuánto se desvía la normal antes de reflejar. Es lo que da
    * el aspecto de acero cepillado/pulido con micro-facetas en vez de un espejo de baño.
@@ -766,7 +762,7 @@ export const LIVE_SHEEN = {
    * carta, único cambio el barrido). Sin este conmutador, cualquier A/B queda contaminado
    * porque uPointer también mueve el paralaje de las 7 capas y el glare del holograma.
    */
-  strength: 0.25,
+  strength: 0.17,
   /**
    * Centro del recorrido, en la coordenada del barrido.
    *
@@ -901,17 +897,23 @@ export const FACTION = {
 /**
  * Tinta y piel: el lineart y los tonos de piel encendidos como holograma.
  *
- * ESTA ES LA CAPA QUE MÁS SE COME EL ARTE, y se midió antes de tocarla: con la carta
- * en reposo aporta Δmedio 14.26 y cambia el 35.7% de los píxeles, más que el barniz
- * (12.10 / 29.3%) y muchísimo más que la lámina iridiscente (2.75 / 4.6%). Es también
- * la que más sube la LUMINANCIA del arte (+25%), que es lo que se percibe como velo.
+ * ALCANCE (cambio de arquitectura, petición del usuario): este realce va SOLO sobre el
+ * fondo, NO sobre el personaje. La máscara es `edgeTex.a` invertida por la cobertura de
+ * primer plano, así que en los píxeles del personaje el valor es 0 y allí no llega nada.
  *
- * Recorrido: 0.6 -> 0.3 razonando (la mitad), y 0.1 al ajustar en vivo. A 0.3 el realce
- * de contornos todavía se notaba sobre las zonas claras del personaje; a 0.1 el lineart
- * se enciende sin aclarar el arte, que es el efecto que se buscaba.
+ * POR QUÉ ANTES SÍ CAÍA EN EL PERSONAJE
+ * -------------------------------------
+ * `uEdgeMap` es la máscara de tinta y piel calculada en CPU (ver inkAndSkinMask): su ALFA es
+ * la silueta del personaje y su RGB la intensidad del lineart. Multiplicar por ese alfa, como
+ * se hacía, encendía el realce EXACTAMENTE sobre el personaje — lo contrario de lo pedido.
+ *
+ * Recorrido del valor: 0.6 -> 0.3 razonando (la mitad), y 0.1 al ajustar en vivo, cuando el
+ * realce caía sobre el personaje y cualquier subida se leía como velo. Con el alcance
+ * corregido al fondo, el usuario pidió 0.4: sobre el arte del fondo no lava al personaje, así
+ * que admite mucha más intensidad que antes.
  */
 export const EDGE = {
-  strength: 0.09,
+  strength: 0.4,
 
   /** El ángulo se desplaza: en el borde el corrimiento espectral es mayor. */
   angleOffset: 0.35,
@@ -1030,24 +1032,42 @@ export const LOGO = {
  * Signo positivo = se mueve con el puntero; negativo = en contra (más cerca del
  * cristal).
  *
- *   0 background   -> capa más lejana, movimiento opuesto al frente, escala 1.10
- *   1 character    -> el personaje, anclado a la carta (casi sin paralaje)
+ *   0 surface      -> la SUPERFICIE de la carta (el arte del fondo vive aquí)
+ *   1 character    -> el personaje, ligeramente por delante de la superficie
  *   2 logo         -> marca, desplazamiento medio
  *   3 title        -> placa metálica del título
- *   4 texts        -> frase, pie, estado (texto blanco con sombra)
- *   5 tags         -> chips de tipo
+ *   4 texts        -> VACÍA (el usuario retiró los textos de la carta 3D)
+ *   5 tags         -> VACÍA (el usuario retiró los tags de la carta 3D)
  *   6 wordmark     -> "VTUBERDEX"
  *
- * El background se escala en CPU (overscan 1.10) para no ver bordes al inclinar.
+ * LA CAPA 0 SE MUEVE CON PARALAJE (petición del usuario, dos vueltas después)
+ * --------------------------------------------------------------------------
+ * Esta capa llegó a tener factor 0, y el motivo era bueno: se razonó que un material no
+ * se desplaza respecto del mesh que lo lleva, y que un fondo desplazado se leía como una
+ * CAPA en vez de como la superficie de la carta.
+ *
+ * El usuario ha pedido lo contrario y es su decisión: quiere que la textura del mesh se
+ * mueva con paralaje. Se le da, pero el desplazamiento es PEQUEÑO (0.04 contra los 0.06
+ * que llegó a llevar el "fondo lejano") y `BACKGROUND.cover` sube a 1.25 para que el
+ * muestreo no se salga de la textura. Así conserva la profundidad que pide sin volver a
+ * separar el arte del mesh: la imagen sigue siendo el sustrato —recibe el mismo acabado
+ * que todo— y solo se desliza un poco por debajo del personaje.
+ *
+ * NOTA sobre cobertura y desplazamiento: son dos cosas y viven en sitios distintos.
+ * `factor` es cuánto se desplaza la capa con el puntero (esta tabla). La ESCALA con la que
+ * se dibuja el canvas de la capa 0 NO está aquí: sale de `BACKGROUND.cover`, que es lo que
+ * usa `drawSurfaceLayer` al encajar el arte. Esta tabla llegó a tener un campo `scale` por
+ * fila que no leía nadie; se retiró, porque una perilla muerta se toca, no hace nada y
+ * hace dudar de si el efecto está roto.
  */
 export const PARALLAX_LAYERS = [
-  { name: 'background', index: 0, factor: -0.06, scale: 1.10 },
-  { name: 'character', index: 1, factor: 0.005, scale: 1.0 },
-  { name: 'logo', index: 2, factor: -0.03, scale: 1.0 },
-  { name: 'title', index: 3, factor: 0.015, scale: 1.0 },
-  { name: 'texts', index: 4, factor: 0.012, scale: 1.0 },
-  { name: 'tags', index: 5, factor: 0.018, scale: 1.0 },
-  { name: 'wordmark', index: 6, factor: 0.01, scale: 1.0 },
+  { name: 'surface', index: 0, factor: 0.04 },
+  { name: 'character', index: 1, factor: 0.005 },
+  { name: 'logo', index: 2, factor: -0.03 },
+  { name: 'title', index: 3, factor: 0.015 },
+  { name: 'texts', index: 4, factor: 0.012 },
+  { name: 'tags', index: 5, factor: 0.018 },
+  { name: 'wordmark', index: 6, factor: 0.01 },
 ] as const;
 
 export type LayerName = typeof PARALLAX_LAYERS[number]['name'];
@@ -1073,6 +1093,29 @@ export const GLOW = {
   aaMin: 0.002,
   /** Apagado en el borde del propio plano, para que no se vea el rectángulo. */
   edgeFadeFrom: 0.82,
+  /**
+   * HUMO ESPECTRAL: el resplandor exterior deja de ser un anillo estático y se
+   * convierte en una nube iridiscente que respira alrededor de la carta.
+   *
+   * El efecto se calcula en el fragment shader del glow SIN añadir samplers: es
+   * ruido procedural de valor (hash + octavas) que perturba la distancia al borde
+   * de la carta, más un tinte espectral que recorre el arcoíris a lo largo de esa
+   * distancia. Así el brillo no es un halo uniforme sino una neblina animada que
+   * cambia de color según la posición y el tiempo.
+   *
+   * `smokeScale` frecuencia del ruido; `smokeSpeed` velocidad de la deriva;
+   * `smokeAmp` cuánto deforma el borde; `smokeOctaves` detalle del fractal.
+   * `spectralScale` densidad de franjas de color; `spectralSpeed` velocidad con
+   * la que el arcoíris viaja por el humo; `spectralMix` peso del tinte respecto
+   * al color de marca (`uGlowColor`).
+   */
+  smokeScale: 3.5,
+  smokeSpeed: 0.35,
+  smokeAmp: 0.28,
+  smokeOctaves: 3,
+  spectralScale: 2.4,
+  spectralSpeed: 0.18,
+  spectralMix: 0.55,
 } as const;
 
 /** Recorte de la silueta en el shader de la cara. */
@@ -1087,34 +1130,6 @@ export const SILHOUETTE = {
   aaMinRatio: 0.0012,
   /** Alfa por debajo del cual se descarta el fragmento. */
   alphaCutoff: 0.02,
-} as const;
-
-/**
- * CAPAS PARALLAX de la carta, de abajo arriba.
- *
- * El usuario pidió 7 capas separadas con paralaje propio. Cada valor es la
- * FRACCIÓN DEL ANCHO de carta que se desplaza con el puntero (que va de -1 a 1).
- * Signo positivo = se mueve con el puntero; negativo = en contra (más cerca del
- * cristal).
- *
- *   0 background   -> capa más lejana, movimiento opuesto al frente
- *   1 character    -> el personaje, anclado a la carta (casi sin paralaje)
- *   2 logo         -> marca, desplazamiento medio
- *   3 title        -> placa metálica del título
- *   4 texts        -> frase, pie, estado (texto blanco con sombra)
- *   5 tags         -> chips de tipo
- *   6 wordmark     -> "VTUBERDEX"
- *
- * El background es 10% más grande en CPU para no ver bordes al inclinar.
- */
-export const PARALLAX = {
-  background: -0.06,
-  character: 0.005,
-  logo: -0.03,
-  title: 0.015,
-  texts: 0.012,
-  tags: 0.018,
-  wordmark: 0.01,
 } as const;
 
 /** Movimiento de la carta: inclinación por puntero y flotación. */

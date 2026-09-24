@@ -204,25 +204,42 @@ export const cardFragmentShader = /* glsl */ `
   /** Máscara de la silueta del logo (1 sobre la marca): define dónde va el sticker. */
   uniform sampler2D uLogoMask;
   /**
-   * Paralaje del fondo, como FRACCIÓN DEL ANCHO DE CARTA (se multiplica por el
-   * puntero, que va de -1 a 1). El signo se aplica en el shader para que el fondo
-   * vaya al CONTRARIO que el frente: por eso el mismo valor positivo aquí produce
-   * los dos sentidos y no hay que alternar el signo de la constante.
+   * Paralaje del LOGO, como FRACCIÓN DEL ANCHO DE CARTA (se multiplica por el puntero,
+   * que va de -1 a 1). Negativo = va al contrario que el frente, que es lo que se lee
+   * como estar más cerca del cristal.
    */
   uniform float uLogoParallax;
   uniform float uCardRadius;
   /**
-   * El holograma del fondo es su PROPIO juego de perillas. Sus valores son más
-   * altos que los del personaje a propósito: el fondo es una superficie lejana y
-   * en penumbra, y con el peso del personaje apenas se notaría.
+   * HOLOGRAMA LOCAL sobre la capa 0 (el fondo como superficie).
+   *
+   * Estos uniforms NO son el viejo pase aparte del fondo: no hay acabado propio
+   * del fondo, sino un refuerzo LOCAL de la lámina holográfica SOBRE la capa 0,
+   * para que una imagen suave (acuario) brille tanto como el personaje sin teñirlo.
    */
   uniform float uBgHolo;
   uniform float uBgLayerWeight;
-  uniform float uBgGlareStrength;
   uniform float uBgBaseMask;
   uniform float uBgTiltFactor;
-  /** Suelo de luminancia del arte del fondo: se ajusta en vivo. */
   uniform float uBgArtFloor;
+  /**
+   * GANANCIA de la modulación de la lámina del fondo por la luminancia del arte.
+   * No es una perilla viva: se ajusta en config y se cambia poco.
+   */
+  uniform float uBgArtGain;
+  /**
+   * FOIL DEL FONDO: el grabado arcoíris tipo carta holográfica.
+   *
+   * Frecuencia del patrón por eje del UV, ciclos del espectro por ángulo de visión y
+   * desaturación del arcoíris. Son perillas propias —no las del foil global— porque el fondo
+   * necesita el patrón VISIBLE (es el efecto) mientras que en el resto de la carta el
+   * arcoíris va casi testimonial.
+   */
+  uniform float uBgFoilX;
+  uniform float uBgFoilY;
+  uniform float uBgFoilViewAngle;
+  uniform float uBgFoilDesaturation;
+
   /**
    * HDR: techo del canal de luz (rolloff del brillo) y ganancia de las luces. Son
    * uniforms, no constantes, para poder medir el efecto y ajustarlo en vivo.
@@ -637,10 +654,21 @@ ${SPECTRUM_FN}
     vec4 layer5 = texture2D(uLayer5, vUv + parallax * uParallaxFactors[5]);
     vec4 layer6 = texture2D(uLayer6, vUv + parallax * uParallaxFactors[6]);
 
-    // Degradado de marca cuando el fondo no cubre un píxel.
+    /**
+     * EL SUSTRATO ES LA CAPA 0 (la superficie de la carta), no este degradado.
+     *
+     * drawSurfaceLayer construye la capa 0 OPACA y ya con el degradado del color de tema
+     * dentro, así que layer0.a es 1 en toda la carta y esta primera mezcla SUSTITUYE el
+     * degradado del shader por el de la textura. Da igual cuál de los dos esté aquí mientras
+     * los dos degradados coincidan: el de CPU existe precisamente para que el arte del fondo
+     * comparta material con el resto de la carta en vez de ser una ventana sobre él.
+     *
+     * El degradado del shader se queda como RED DE SEGURIDAD para una capa 0 sin alfa (una
+     * carta sin contexto 2D que devuelva un canvas transparente): sin él, esos píxeles caerían
+     * a negro en vez de a un color de marca.
+     */
     vec3 themeGradient = mix(uSecondary, mix(uAccent, vec3(0.031, 0.035, 0.063), vUv.y), 0.55);
-    vec3 base = themeGradient;
-    base = mix(base, layer0.rgb, layer0.a);
+    vec3 base = mix(themeGradient, layer0.rgb, layer0.a);
     base = mix(base, layer1.rgb, layer1.a);
     /**
      * layer2 es la ranura del LOGO y llega VACÍA a propósito: la marca la dibuja el
@@ -749,6 +777,98 @@ ${SPECTRUM_FN}
     vec3 metalGround = mix(${vec3(CFG.HOLOGRAM.metalGround)}, filmColor, ${f(CFG.HOLOGRAM.metalFloorMix)});
     vec3 foil = metalGround * holoMask * uHolo;
 
+    // --- CAPA 0B: lamina holografica del FONDO --------------------------------
+    /**
+     * EL FONDO ES HOLOGRÁFICO Y FUERTE, Y EL ARTE NO SE TOCA.
+     *
+     * El arte del fondo vive en base (canal de PIGMENTO, ver lit = base más abajo) y
+     * aquí no se multiplica ni se mezcla: lo único que se calcula es la LÁMINA, que se SUMA
+     * al canal de LUZ. Eso es lo que conserva intactos el detalle, el brillo y el contraste
+     * de la imagen — una lamina holografica real no oscurece lo que hay debajo, lo cubre de
+     * reflejos.
+     *
+     * El error que esto corrige: la version anterior MEZCLABA el arte con la lamina
+     * (mix del arte multiplicado por el foil). Con el foil por debajo de 1 eso oscurece la
+     * imagen justo donde el holograma es mas intenso: el fondo se veia sucio y apagado en
+     * vez de brillante.
+     *
+     * BACKGROUND.artFloor modula la lámina con la luminancia del arte (una zona clara
+     * refleja más, como el metal de verdad); NO atenúa el arte.
+     */
+    /**
+     * COBERTURA DE PRIMER PLANO: personaje + UI. La lámina del fondo solo se suma donde
+     * NADA de eso la tapa, que es exactamente donde el espectador ve el arte del fondo.
+     *
+     * Se calcula aquí y no se reutiliza más abajo porque el bloque de surfaceZone
+     * necesita el valor de UI SOLO, y mezclar los dos usos en una variable
+     * fue justo lo que rompió la primera versión de este cambio.
+     */
+    float fgCover = max(max(layer1.a, layer3.a), max(max(layer4.a, layer5.a), layer6.a));
+    float bgVisible = clamp(1.0 - fgCover, 0.0, 1.0);
+
+    float artLum = dot(layer0.rgb, vec3(0.2126, 0.7152, 0.0722));
+    // artFloor = 0 -> lámina uniforme (ignora la imagen); 1 -> modulada por su luminancia.
+    /**
+     * LA LÁMINA DEL FONDO: sus perillas propias, aplicadas SOLO donde se ve el arte.
+     *
+     * bgHolo, bgBaseMask y bgTiltFactor son las tres piezas de la máscara (intensidad,
+     * piso en reposo y respuesta al tilt) y existen aquí, no en el pase global, porque el
+     * fondo necesita un holograma FUERTE en una imagen suave: el arcoíris global sobre un
+     * acuario apenas se marca.
+     */
+    float bgHoloMask = clamp(
+      uBgHolo * (uBgBaseMask + tiltAmount * uBgTiltFactor + glare),
+      0.0,
+      1.0
+    );
+    /**
+     * EL FOIL DEL FONDO: grabado arcoíris, no un metal gris.
+     *
+     * POR QUÉ NO SE REUTILIZA metalGround
+     * -----------------------------------
+     * metalGround sale del filmColor GLOBAL, que está desaturado al 42% y mezclado con un
+     * suelo metálico al 45%: el resultado es un gris pálido con apenas un matiz. Sobre el
+     * fondo eso se lee como "un brillo", no como una holografía de carta de Pokémon — que es
+     * justo lo que se pidió.
+     *
+     * Aquí se recalcula el espectro con los parámetros del FOIL DEL FONDO, y la diferencia no
+     * es solo de valores:
+     *
+     *   · FRECUENCIA ESPACIAL ALTA (foilX/foilY). El patrón reparte el arcoíris en franjas
+     *     diagonales por toda la superficie. SPECTRUM.foil.cycles está en 1.6 a propósito
+     *     para que el arcoíris NO se vea por toda la carta en el pase global; aquí hace falta
+     *     lo contrario, porque el patrón ES el efecto.
+     *   · ÁNGULO DE VISIÓN (foilViewAngle). Al inclinar la carta el arcoíris recorre las
+     *     franjas: es la parte viva del foil, la que responde al movimiento.
+     *   · MENOS DESATURACIÓN (foilDesaturation). Un foil real es metal pálido TEÑIDO de
+     *     arcoíris; con la desaturación del global el color desaparece.
+     *
+     * SOBRE EL UV: se usa vUv, la MISMA coordenada que el arte de debajo, para que el grabado
+     * quede anclado a la superficie de la carta. El UV desplazado por paralaje de cada capa
+     * es cosa de las capas; el foil pertenece a la placa.
+     *
+     * NOTA SOBRE EL COSTE: esto NO añade ningún sampler ni textura. Son unas pocas
+     * operaciones sobre el espectro que ya está en el shader (wavelengthToRgb), que es la
+     * razón de que se pueda hacer sin acercarse al límite de 16 samplers del driver.
+     */
+    float bgFoilPhase = vUv.x * uBgFoilX + vUv.y * uBgFoilY
+      + cosView * uBgFoilViewAngle
+      + uTilt.y * ${f(CFG.HOLOGRAM.tiltShift)} + uTime * ${f(CFG.HOLOGRAM.timeShift)};
+    vec3 bgSpectrum = wavelengthToRgb(fract(bgFoilPhase));
+    float bgLum = dot(bgSpectrum, vec3(0.2126, 0.7152, 0.0722));
+    bgSpectrum = mix(bgSpectrum, vec3(bgLum), uBgFoilDesaturation);
+    vec3 bgFoil = bgSpectrum * bgHoloMask
+      * mix(vec3(1.0), vec3(clamp(artLum * uBgArtGain, 0.0, 1.0)), uBgArtFloor);
+    /**
+     * La lamina del fondo entra en el canal de LUZ. Se suma UNA sola vez (aquí).
+     *
+     * Antes se multiplicaba TAMBIÉN en la linea de luzExtra de mas abajo, con el mismo
+     * uBgLayerWeight en las dos: el peso se aplicaba al cuadrado (0.75 daba 0.5625 real) y
+     * el fondo salia mas apagado de lo que decia la config, ademas de que ajustar la perilla
+     * tenia un efecto cuadratico que no se explica en ningun sitio.
+     */
+    vec3 bgLit = bgFoil * bgVisible * uBgLayerWeight;
+
   // --- CAPA 1: barniz realista (reflejo especular) ---------------------------
     // Se aplica como luz SUPERPUESTA (aditiva y ponderada por la luminancia del
     // arte), no como sustituto del color: ilumina sin manchar ni lavar la carta.
@@ -766,7 +886,7 @@ ${SPECTRUM_FN}
 
     // --- CAPA 2: holografía (interferencia) -----------------------------------
     // Se mezcla DESPUÉS del barniz y con peso propio, en modo luz, para que
-    // ambas capas convivan sin taparse una a la otra.
+    // ambas capas convivan sin taparse una a otra.
     /**
      * PESO de la capa holográfica sobre el arte: HOLOGRAM.layerWeight (venía de
      * 0.42, 0.22, 0.12, 0.06).
@@ -883,9 +1003,27 @@ ${FACTION_SIZES}
         uTime * ${f(CFG.EDGE.timeShift)} + vUv.x * ${f(CFG.EDGE.surfaceShift)}
       );
       vec3 edgeTint = wavelengthToRgb(edgeFilm);
-      // El realce sube con la inclinación y el puntero, y nunca baja del piso de la
-      // config: el efecto tiene que verse también con la carta quieta.
-      float edgeMask = edgeTex.a * clamp(
+      /**
+       * REALCE DE CONTORNOS: SOLO EN EL FONDO, NUNCA SOBRE EL PERSONAJE.
+       *
+       * OJO: esto NO es la holografía del fondo. Son dos efectos distintos y conviene no
+       * confundirlos:
+       *
+       *   · ESTE pase (edgeLayer) enciende la TINTA del arte — el lineart y la piel que
+       *     detecta uEdgeMap (maxCh < 92, ver inkAndSkinMask). Es un realce de detalle.
+       *   · La HOLOGRÁFICA del fondo es el FOIL (bgSpectrum, más arriba): un grabado arcoíris
+       *     calculado, que cubre toda la superficie por igual, como el de una carta de
+       *     Pokémon.
+       *
+       * Por qué la máscara es bgVisible y no edgeTex.a: se pidió que este realce NO cayera
+       * sobre el personaje, y edgeTex.a por sí solo sí lo hace — su señal más fuerte es
+       * justamente el lineart y la piel del personaje. bgVisible vale 0 en todo el personaje
+       * (y en la UI y el logo), así que aquí solo queda su tinta.
+       *
+       * El realce sube con la inclinación y el puntero, y nunca baja del piso de config: el
+       * efecto se ve también con la carta quieta.
+       */
+      float edgeMask = bgVisible * clamp(
         ${f(CFG.EDGE.maskBase)} + tiltAmount * ${f(CFG.EDGE.maskTilt)} + glare * ${f(CFG.EDGE.maskGlare)},
         0.0,
         ${f(CFG.EDGE.maskCeiling)}
@@ -896,16 +1034,60 @@ ${FACTION_SIZES}
     // Las tres capas se escalan por zone: fuera de la imagen no aportan nada, así
     // que la cabecera, los chips, la frase y el pie quedan con su color plano.
     /**
-     * Alcance de cada capa:
-     *   - zone limita todo a la IMAGEN (los items de la carta quedan limpios).
-     *   - sinLogo SUPRIME EL HOLOGRAMA sobre la silueta del logotipo: es una
-     *     marca plana y el arcoíris la vuelve ilegible.
-     *   - El BARNIZ se mantiene sobre el logo: en una carta real el reflejo pasa
-     *     por encima de la marca impresa.
+     * Alcance del efecto: toda la SUPERFICIE de la carta, excepto los items de UI.
+     *
+     * Antes esto era la banda de arte (zone), porque fuera de ella no había sustrato:
+     * la cabecera, los chips, la frase y el pie eran color plano sobre el degradado.
+     * Ahora la capa 0 (drawSurfaceLayer) cubre TODA la carta con el arte del fondo,
+     * así que el acabado de superficie —barniz, lámina, tinte de canto— tiene que
+     * llegar también a la cabecera y al pie. Si no, el fondo se lee plano mientras el
+     * personaje brilla, y la carta vuelve a parecer dos capas.
+     *
+     * La UI (título, frase, chips, wordmark) sigue sin recibir holograma ni tinte de
+     * canto: son impresiones planas que no deben iridiscer. El barniz SÍ pasa por
+     * encima, como en una carta real laminada.
      */
-    glossLayer *= zone;
-    holoLayer *= zone * sinLogo;
-    edgeLayer *= zone;
+    /**
+     * EL PERSONAJE SE VE SÓLIDO: el holograma NO cae dentro de su silueta.
+     *
+     * Petición del usuario: "el personaje solo debe tener efecto holográfico en los edges
+     * pero muy poco, debe notarse el brillo contraste y color del personaje sólido sin
+     * transparencia".
+     *
+     * El problema que esto corrige: holoLayer se sumaba sobre TODO lo que no fuera UI, y
+     * el personaje es la pieza más grande de la carta. El arcoíris se le sumaba encima y le
+     * lavaba el color — el personaje se veía velado, no sólido.
+     *
+     * CÓMO SE MIDE "DENTRO DEL PERSONAJE"
+     * -----------------------------------
+     * uEdgeMap es la máscara de lineart y piel calculada en CPU (ver inkAndSkinMask), y su
+     * CANAL ALFA es la silueta del arte recortado: vale ~1 en todo el personaje y 0 fuera.
+     * Su RGB es la intensidad del lineart (1 en las líneas, 0.55 en la piel, 0 en las zonas
+     * planas). O sea que la máscara que pide el usuario ya está calculada:
+     *
+     *   charSilhouette = edgeTex.a          -> dónde HAY personaje
+     *   charEdge       = edgeLum            -> dónde están sus BORDES/lineart
+     *   charInterior   = a * (1 - edgeLum)  -> el relleno macizo, que NO debe iridiscer
+     *
+     * El realce de contornos (edgeLayer) ya NO entra en esta cuenta: su alcance es el fondo
+     * y se resuelve con bgVisible, más arriba. Aquí solo se decide dónde el holograma global
+     * pierde fuerza, que es dentro del relleno macizo del personaje.
+     */
+    float charSilhouette = edgeTex.a;
+    float charEdgeMask = clamp(edgeTex.rgb.r, 0.0, 1.0);
+    float charInterior = charSilhouette * (1.0 - charEdgeMask);
+
+    float uiCover = max(max(max(layer3.a, layer4.a), layer5.a), layer6.a);
+    float surfaceZone = 1.0 - uiCover;
+
+    glossLayer *= surfaceZone;
+    /**
+     * El holograma global se apaga dentro del personaje (charInterior) y dentro de la UI
+     * (uiCover). Lo que queda encendido es el fondo y los bordes del personaje.
+     */
+    float holoZone = surfaceZone * (1.0 - charInterior);
+    holoLayer *= holoZone * sinLogo;
+    edgeLayer *= surfaceZone * sinLogo;
 
     /**
      * COMPOSICIÓN EN DOS CANALES: PIGMENTO y LUZ.
@@ -926,7 +1108,8 @@ ${FACTION_SIZES}
     vec3 luzExtra = base * (glossLayer + holoLayer)
       + glossLayer * uGlossSelf
       + holoLayer * uHoloSelf
-      + edgeLayer;
+      + edgeLayer
+      + bgLit;
     vec3 lit = base;
 
     /**
@@ -986,171 +1169,41 @@ ${FACTION_SIZES}
      */
 
     /**
-     * CAPA 0: el FONDO del VTuber, por DEBAJO del personaje.
+     * EL FONDO TIENE LÁMINA PROPIA, PERO NO ES "UNA CAPA SOBRE LA CARTA".
      *
-     * POR QUÉ SE COMPONE AQUÍ Y NO AL PRINCIPIO
-     * -----------------------------------------
-     * El sitio natural parecería el arranque del shader, donde se arma base, pero
-     * ahí el fondo todavía recibiría encima el barniz, la interferencia, los emblemas
-     * y la tinta del frente: TODAS las capas del personaje se aplican sobre base, de
-     * modo que el fondo saldría teñido con el efecto del frente y sus perillas
-     * propias —lo que se pide— quedarían diluidas en las del personaje. Compuesto
-     * después, cada capa conserva su carácter: el frente con su holograma suave y el
-     * fondo con el suyo, más marcado.
+     * Historia de este bloque, porque tuvo tres estados y el actual es el tercero:
      *
-     * POR QUÉ NO HAY SAMPLERS PROPIOS (fallo medido)
-     * ----------------------------------------------
-     * Esta capa llegó a leer uBackgroundMap, uBackgroundMask y uBgEdgeMap: TRES
-     * samplers más que, sumados a los siete de las capas, llevaban el shader a 18
-     * samplers contra un límite de 16 del driver. El material NO compilaba
-     * ("Implementation limit of 16 active fragment shader samplers exceeded") y la
-     * carta salía NEGRA, sin un error en tsc, en los tests ni en el build — los tres
-     * corren sin WebGL.
+     *   1. Había un bloque entero que REEMPLAZABA los dos canales bajo la cobertura del
+     *      fondo (mix de lit y luzExtra con bgCover). Eso sí era una capa: el acabado de la
+     *      carta desaparecía en los píxeles del fondo.
+     *   2. Se eliminó, y el fondo pasó a recibir solo la lámina global. Con una imagen suave
+     *      (el acuario) el arcoíris apenas se marcaba, y el usuario pidió "holográfico y
+     *      FUERTE".
+     *   3. Ahora hay un pase propio (bloque CAPA 0B, más arriba) que SUMA lámina sobre el
+     *      fondo con SUS perillas, para darle la presencia que se pidió.
      *
-     * Ahora el fondo se compone con lo que YA está muestreado:
-     *   · El ART es layer0, que es la capa 0 y trae su propio paralaje.
-     *   · La COBERTURA (dónde el personaje no tapa) sale del ALFA de layer1, la capa
-     *     del personaje: esa capa se dibuja aislada y transparente, así que su alfa
-     *     es exactamente 1 donde hay personaje y 0 donde no. Antes esa cobertura
-     *     viajaba como textura aparte (characterAlphaMask) sólo porque la carta era
-     *     una imagen única y opaca; con las capas separadas, el dato ya está aquí.
+     * POR QUÉ ESO NO VUELVE A SER "UNA CAPA"
+     * --------------------------------------
+     * La diferencia está en lo que se suma y dónde:
+     *
+     *   · El ARTE no se toca NUNCA. Vive en el canal de pigmento (lit) y el pase del fondo
+     *     solo aporta LUZ (luzExtra). El detalle, el brillo y el contraste de la imagen
+     *     quedan intactos — es lo que pidió el usuario.
+     *   · No REEMPLAZA el acabado: se acumula con el barniz, el filo y la lámina global.
+     *     La primera versión sustituía; esta suma.
+     *   · La cobertura es de primer plano (personaje y UI), no "los píxeles que sobran":
+     *     se apaga donde hay algo que mirar delante.
+     *
+     * CUIDADO CON LOS SAMPLERS (fallo medido, sigue vigente)
+     * ------------------------------------------------------
+     * Un intento anterior de este mismo bloque leia uBackgroundMap, uBackgroundMask y
+     * uBgEdgeMap: TRES samplers mas que, sumados a los siete de las capas, llevaban el
+     * shader a 18 contra un limite de 16 del driver. El material no compilaba
+     * ("Implementation limit of 16 active fragment shader samplers exceeded") y la carta
+     * salia NEGRA sin un solo error en tsc, en los tests ni en el build: los tres corren
+     * sin WebGL. Aqui no se anade ningun sampler: la lamina reutiliza metalGround y la
+     * silueta del personaje sale de uEdgeMap, que ya existia.
      */
-    {
-      /**
-       * El contenido se muestrea con el desplazamiento que ya tiene layer0; la
-       * cobertura se lee del alfa de layer1.
-       *
-       * Ese reparto es lo que produce la sensación de profundidad: el agujero de la
-       * silueta se queda donde está —es parte del personaje, del plano de delante— y
-       * lo que se desliza por detrás es la escena.
-       */
-      vec3 bgArt = layer0.rgb;
-      /**
-       * COBERTURA: el fondo solo pinta donde NO hay nada más encima.
-       *
-       * Antes era 1.0 - layer1.a, es decir "todo donde no esté el personaje". Eso
-       * incluía el título, los textos, los tags y el wordmark (capas 2..6), que en esas
-       * zonas quedaban REEMPLAZADOS por el arte del fondo: el bloque de abajo hacía una
-       * mezcla sobre un lit que YA llevaba esas capas compuestas. En una carta con
-       * fondo, los textos desaparecían.
-       *
-       * Ahora la cobertura descuenta también el alfa de las capas superiores, así que el
-       * fondo solo actúa en los píxeles que nadie más reclama. La capa 0 sigue por
-       * DEBAJO porque base ya la compone antes que las capas 1..6.
-       */
-      float upperCover = max(max(max(layer2.a, layer3.a), max(layer4.a, layer5.a)), layer6.a);
-      float bgCover = 1.0 - max(layer1.a, upperCover);
-
-      /**
-       * Interferencia del fondo: MISMO modelo de película delgada que el frente, mismos
-       * pesos de HOLOGRAM y —esto es lo que se corrigió— MISMAS frecuencias espaciales
-       * (HOLOGRAM surfaceX y surfaceY), no las suyas propias.
-       *
-       * POR QUÉ (fallo medido): antes esta capa sumaba un patrón propio de 5 ciclos
-       * (BACKGROUND.foilCycles, contra 1.6 del frente) y frecuencias de superficie
-       * distintas (2.1/1.2 contra 1.1/0.8), así que las franjas del fondo tenían otra
-       * ESCALA que las del personaje. El resultado eran dos tramas holográficas
-       * desalineadas sobre la misma carta: el efecto se leía falso, como una calcomanía
-       * pegada encima. Un holograma es una propiedad de la SUPERFICIE que se mira, no de
-       * la imagen que hay debajo: la franja tiene que medir lo mismo en las dos capas.
-       *
-       * Lo que sí distingue al fondo es la INTENSIDAD y el CROMA (uBgHolo,
-       * uBgLayerWeight), no la frecuencia. La ANIMACIÓN temporal se conserva con su
-       * propio ritmo (BACKGROUND timeShift), que es un desfase deliberado: el fondo no
-       * cambia de color al unísono con el personaje, igual que en una lámina real la
-       * capa de detrás no late con la de delante.
-       */
-      vec2 bgUv = vUv + uPointer * uParallaxFactors[0];
-      /**
-       * TEXTURA DE MICRO-SUPERFICIE del fondo.
-       *
-       * Hasta aquí el holograma del fondo se deslizaba UNIFORME por toda la lámina: la
-       * superficie era matemáticamente lisa, así que reflejaba igual en cada punto y se
-       * leía como plástico pulido. Un material real tiene micro-relieve: cada punto
-       * refleja con un ángulo ligeramente distinto y eso rompe el reflejo en facetas.
-       *
-       * Aquí se genera ese relieve (ruido fractal, sin gastar sampler) y su gradiente se
-       * usa como INCLINACIÓN local. La inclinación desplaza las FASES de abajo, así que
-       * las bandas de color ya no avanzan en paralelo: se ondulan siguiendo la textura.
-       *
-       * ORDEN (fallo medido): el ruido tiene que calcularse ANTES de derivar los colores
-       * del espectro. La primera versión perturbaba las fases DESPUÉS de haber calculado
-       * bgFilm y bgEdgeSpectrum, así que la perturbación no llegaba a leerse — el efecto
-       * medía exactamente 0 píxeles de diferencia y parecía que el ruido no servía.
-       * Se calcula primero la faceta, después se pliegan las fases, y solo entonces se
-       * convierten a color.
-       */
-      vec2 bgNormal = bgNoiseNormal(bgUv);
-      float bgFaceta = bgNormal.x + bgNormal.y;
-      float bgPhase = fract(
-        bgUv.x * ${f(CFG.HOLOGRAM.surfaceX)} + bgUv.y * ${f(CFG.HOLOGRAM.surfaceY)}
-          + uTilt.y * ${f(CFG.BACKGROUND.tiltShift)} + uTime * ${f(CFG.BACKGROUND.timeShift)}
-          + bgFaceta * ${f(CFG.BG_NOISE.phaseFromNormal)}
-      );
-      /**
-       * Fase PROPIA del canto: va atada al giro (uTilt) y no al puntero, para que las
-       * bandas del borde no viajen sincronizadas con las del resto de la lámina. Si
-       * compartieran fase, el efecto se leería como una sola textura deslizándose.
-       */
-      float bgEdgePhase = uTilt.x * ${f(CFG.HOLOGRAM.viewAngleWeight)}
-        + uTime * ${f(CFG.BACKGROUND.timeShift)}
-        + bgFaceta * ${f(CFG.BG_NOISE.phaseFromNormal)};
-      vec3 bgFilm = wavelengthToRgb(fract(cosView * ${f(CFG.HOLOGRAM.viewAngleWeight)} + bgPhase));
-      /**
-       * Desaturación y suelo metálico con perillas PROPIAS, más generosas que las del
-       * frente: BACKGROUND.metalFloorMix pesa más que HOLOGRAM.metalFloorMix, así que
-       * el matiz domina sobre el gris y el fondo se lee como una lámina teñida en vez
-       * de un metal apagado.
-       */
-      float bgFilmLum = dot(bgFilm, vec3(0.2126, 0.7152, 0.0722));
-      bgFilm = mix(bgFilm, vec3(bgFilmLum), ${f(CFG.BACKGROUND.spectrumDesaturation)});
-      vec3 bgFoilColor = mix(${vec3(CFG.HOLOGRAM.metalGround)}, bgFilm, ${f(CFG.BACKGROUND.metalFloorMix)});
-
-      // Barrido del puntero propio: mismo gesto que el del frente, otra caída y otro radio.
-      float bgGlare = smoothstep(
-        ${f(CFG.BACKGROUND.glareRadius)}, 0.0, distance(vUv, pointerUv)
-      ) * uBgGlareStrength;
-      float bgMask = clamp(
-        uBgBaseMask + tiltAmount * uBgTiltFactor + bgGlare, 0.0, 1.0
-      ) * uBgHolo;
-
-      /**
-       * TINTE HOLOGRÁFICO DEL BORDE.
-       *
-       * El holograma del fondo iba repartido por igual, así que su canto quedaba apagado:
-       * en una lámina real el ángulo rasante del borde es el que más desplaza el color.
-       * El frente ya tenía su Fresnel; al fondo le faltaba.
-       *
-       * Se AÑADE al bgMask en lugar de sustituirlo, para que el holograma de superficie
-       * que ya había no se pierda: lo que cambia es que ahora el contorno tiene más.
-       * El espectro del borde usa una fase propia (bgEdgePhase, atada al giro) para que
-       * las bandas del canto no vayan sincronizadas con las del resto de la lámina.
-       */
-      float bgEdgeFresnel = pow(fresnel, ${f(CFG.BACKGROUND.edgeTintPower)});
-      vec3 bgEdgeSpectrum = wavelengthToRgb(
-        fract(bgEdgePhase + bgEdgeFresnel * ${f(CFG.BACKGROUND.edgeTintCycles)})
-      );
-      vec3 bgEdgeTint = bgEdgeSpectrum * bgEdgeFresnel * ${f(CFG.BACKGROUND.edgeTint)};
-
-      /**
-       * Composición sobre el arte del fondo. Se respeta su LUMINANCIA (un fondo oscuro
-       * no puede encenderse como uno claro, o dejaría de parecer la imagen que se
-       * subió: el arte se escala por su propia claridad) y el color espectral se SUMA,
-       * que es lo que hace que el efecto se note aunque el fondo sea oscuro.
-       */
-      float bgLum = dot(bgArt, vec3(0.2126, 0.7152, 0.0722));
-      vec3 bgArtLevel = bgArt * (uBgArtFloor + bgLum * ${f(CFG.BACKGROUND.artLumGain)});
-      vec3 bgLayer = bgFoilColor * bgMask * uBgLayerWeight;
-      /**
-       * El tinte del canto entra SUMADO al arte, no dentro de bgLayer: el contorno tiene
-       * que leerse aunque el holograma de superficie esté bajo (o en 0). Se multiplica por
-       * bgCover igual que el resto para que no se derrame sobre el personaje.
-       */
-      vec3 bgLuz = bgArtLevel * bgLayer + bgLayer * uBgLayerWeight;
-      bgLuz += bgEdgeTint * (bgArtLevel + ${f(CFG.BACKGROUND.edgeTintFloor)}) * uBgLayerWeight;
-      lit = mix(lit, bgArtLevel, bgCover);
-      luzExtra = mix(luzExtra, bgLuz, bgCover);
-    }
 
     // Colores de marca del VTuber como tinte del borde.
     // El barrido glare es holograma: se anula sobre el logo.
@@ -1362,19 +1415,24 @@ export const glowVertexShader = /* glsl */ `
 export const glowFragmentShader = /* glsl */ `
   precision highp float;
   uniform vec3 uGlowColor;
+  uniform vec3 uSecondary;
   uniform float uGlowStrength;
   /** Rectángulo de la CARTA dentro de este plano, en UV de 0..1. */
   uniform vec2 uCardRect;
   uniform float uCardRadius;
+  uniform float uTime;
+  uniform float uSmokeScale;
+  uniform float uSmokeSpeed;
+  uniform float uSmokeAmp;
+  uniform float uSmokeOctaves;
+  uniform float uSpectralScale;
+  uniform float uSpectralSpeed;
+  uniform float uSpectralMix;
   varying vec2 vUv;
 
   /**
    * Distancia con signo al CARD (negativa dentro de la carta, positiva fuera),
    * normalizada por la altura de la carta en este plano.
-   *
-   * uCardRect expresa qué fracción del plano ocupa la carta: el plano se estira
-   * hasta GEOMETRY.glowSpread veces la carta, así que sus bordes están más allá de
-   * 0 y 1. Todo lo que quede en la zona "fuera" contribuye; lo de dentro se apaga.
    */
   float cardDistance(vec2 uv) {
     vec2 p = (uv - 0.5) / uCardRect;
@@ -1383,51 +1441,70 @@ export const glowFragmentShader = /* glsl */ `
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uCardRadius;
   }
 
+  // Ruido procedural: la base del humo que perturba el borde.
+  float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+  }
+
+  float smokeNoise(vec2 uv) {
+    vec2 p = uv + uTime * uSmokeSpeed;
+    float suma = 0.0;
+    float amp = 0.5;
+    float norma = 0.0;
+    float freq = 1.0;
+    for (int i = 0; i < 6; i++) {
+      if (float(i) >= uSmokeOctaves) break;
+      vec2 celda = floor(p * freq);
+      vec2 f = fract(p * freq);
+      vec2 w = f * f * (3.0 - 2.0 * f);
+      float n00 = hash21(celda);
+      float n10 = hash21(celda + vec2(1.0, 0.0));
+      float n01 = hash21(celda + vec2(0.0, 1.0));
+      float n11 = hash21(celda + vec2(1.0, 1.0));
+      suma += mix(mix(n00, n10, w.x), mix(n01, n11, w.x), w.y) * amp;
+      norma += amp;
+      amp *= 0.5;
+      freq *= 2.0;
+    }
+    return suma / max(norma, 0.001);
+  }
+
+  // Espectro visible -> RGB. Se genera desde CFG.SPECTRUM.stops.
+${SPECTRUM_FN}
+
   void main() {
     float dist = cardDistance(vUv);
-    /**
-     * Caída EXPONENCIAL desde el borde de la carta, que es como decae la luz.
-     *
-     * Se probó antes un smoothstep hasta 0.5 y dejaba un CORTE RECTANGULAR visible:
-     * la distancia máxima del plano (su esquina, ~0.23) nunca llegaba al final del
-     * rango, así que el resplandor seguía encendido justo en el borde del plano. Una
-     * exponencial no depende del tamaño del plano y cae rápido, ceñida al canto.
-     */
-    float falloff = exp(-dist * ${f(CFG.GLOW.falloffRate)});
-    /** Filo más brillante pegado a la silueta: da un punto de contacto definido. */
-    float core = exp(-dist * ${f(CFG.GLOW.coreRate)});
+
+    // El humo perturba la distancia al borde: el resplandor deja de ser un anillo
+    // perfecto y se vuelve una nube irregular que respira alrededor de la carta.
+    float smoke = smokeNoise(vUv * uSmokeScale);
+    float wavyDist = dist - smoke * uSmokeAmp;
+    // Nos quedamos solo con la parte EXTERIOR: dentro de la carta el glow sigue
+    // apagado, porque la cara opaque lo tapa de todos modos.
+    float ringDist = max(wavyDist, 0.0);
+
+    float falloff = exp(-ringDist * ${f(CFG.GLOW.falloffRate)});
+    float core = exp(-ringDist * ${f(CFG.GLOW.coreRate)});
     float glow = falloff * ${f(CFG.GLOW.falloffWeight)} + core * ${f(CFG.GLOW.coreWeight)};
 
-    /**
-     * Suavizado de los cortes del resplandor, en PÍXELES.
-     *
-     * Se usa la derivada de la distancia (no un ancho fijo en unidades de carta)
-     * porque el mismo plano se ve a 163 px en la grilla y a 420 px en el detalle: un
-     * ancho fijo daría un borde más grueso en la carta pequeña. La cota inferior lo
-     * protege de un fwidth anómalo en una carta diminuta.
-     */
+    // Tinte espectral que recorre el arcoíris a lo largo del anillo humeante.
+    float spectralPhase = ringDist * uSpectralScale - uTime * uSpectralSpeed + vUv.x * 0.5;
+    vec3 spectral = wavelengthToRgb(fract(spectralPhase));
+    // Mezcla con el color de marca para que la carta conserve su identidad.
+    vec3 glowColor = mix(uGlowColor, mix(uGlowColor, spectral, uSpectralMix), 0.72);
+
+    // Suavizado de los cortes del resplandor, en PÍXELES.
     float aa = max(fwidth(dist) * ${f(CFG.GLOW.aaPixels)}, ${f(CFG.GLOW.aaMin)});
 
-    /**
-     * Apagado en el BORDE DEL PROPIO PLANO, en coordenadas UV.
-     *
-     * Es la garantía de que el resplandor llega exactamente a cero antes de que se
-     * acabe la geometría: sin esto, la esquina del plano conserva luz y se ve el
-     * rectángulo. El degradado empieza donde ya casi no hay resplandor, así que no
-     * corta la caída: solo remata las esquinas.
-     */
+    // Apagado en el borde del propio plano para que no se vea el rectángulo.
     vec2 d = abs(vUv - 0.5) * 2.0;
     float edgeFade =
       (1.0 - smoothstep(${f(CFG.GLOW.edgeFadeFrom)} - aa, 1.0, d.x))
         * (1.0 - smoothstep(${f(CFG.GLOW.edgeFadeFrom)} - aa, 1.0, d.y));
     glow *= edgeFade;
 
-    /**
-     * rgb va sin atenuar y el alpha lleva toda la intensidad: con blending aditivo
-     * el resultado es color * glow * strength, y así la perilla de intensidad y el
-     * perfil de caída no se multiplican entre sí (que era lo que pasaba al escalar
-     * los dos).
-     */
-    gl_FragColor = vec4(uGlowColor, glow * uGlowStrength);
+    gl_FragColor = vec4(glowColor, glow * uGlowStrength);
   }
 `;
