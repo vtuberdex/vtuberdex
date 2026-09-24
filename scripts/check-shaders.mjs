@@ -188,6 +188,21 @@ const LITERALES_LEGITIMOS = [
   // imagen de entorno fuese negra. Protección del cálculo, no un ajuste (el gris real vive
   // en METAL_REFLECT.envMean).
   { valor: '0.05', en: /max\(\s*gris,\s*vec3\(\s*0\.05\s*\)\)/ },
+  // RUIDO DEL GLOW: persistencia de amplitud, lacunaridad de frecuencia y suelo de
+  // normalización. Son constantes del generador de humo procedural, no perillas.
+  { valor: '0.5', en: /amp\s*=\s*0\.5|amp\s*=\s*amp\s*\*\s*0\.5|amp\s*\*=\s*0\.5/ },
+  { valor: '2.0', en: /freq\s*=\s*freq\s*\*\s*2\.0|freq\s*\*=\s*2\.0/ },
+  { valor: '0.001', en: /max\(norma,\s*0\.001\)/ },
+  // Suelo del normalize de la deriva radial del humo: evita división por cero
+  // en el centro exacto (0.5, 0.5), donde uv - vec2(0.5) es vec2(0.0).
+  { valor: '0.001', en: /vec2\(0\.001\)/ },
+  // HUMO ESPECTRAL DEL GLOW: modulación de intensidad y tinte del brillo.
+  // Son perillas de la config escritas directamente por `f()`; sin una regla
+  // explícita el guard las ve como literales sueltos.
+  { valor: '0.22', en: /smokeMod\s*=\s*0\.22\s*\*/ },
+  { valor: '0.45', en: /uSpectralMix\s*\*\s*smoke/ },
+  { valor: '0.4', en: /smoke\s*\*\s*0\.4/ },
+  { valor: '0.6', en: /warpOffset\s*\*\s*0\.6/ },
   // CENTRO del UV: la proyección de esfera del reflejo se pivota en el medio de la carta.
   // Es geometría, no una intensidad (y la fuerza del reflejo va por uMetalReflect).
   { valor: '0.5', en: /uv\s*-\s*vec2\(\s*0\.5\s*\)|0\.5\s*\+\s*dir/ },

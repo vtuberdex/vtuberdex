@@ -1415,7 +1415,6 @@ export const glowVertexShader = /* glsl */ `
 export const glowFragmentShader = /* glsl */ `
   precision highp float;
   uniform vec3 uGlowColor;
-  uniform vec3 uSecondary;
   uniform float uGlowStrength;
   /** Rectángulo de la CARTA dentro de este plano, en UV de 0..1. */
   uniform vec2 uCardRect;
@@ -1423,7 +1422,6 @@ export const glowFragmentShader = /* glsl */ `
   uniform float uTime;
   uniform float uSmokeScale;
   uniform float uSmokeSpeed;
-  uniform float uSmokeAmp;
   uniform float uSmokeOctaves;
   uniform float uSpectralScale;
   uniform float uSpectralSpeed;
@@ -1448,8 +1446,20 @@ export const glowFragmentShader = /* glsl */ `
     return fract(p.x * p.y);
   }
 
-  float smokeNoise(vec2 uv) {
-    vec2 p = uv + uTime * uSmokeSpeed;
+  float smokeNoise(vec2 uv, vec2 dirRadial) {
+    // DOMAIN WARPING: distorsionamos las coordenadas de entrada con una pasada
+    // de ruido antes de calcular el humo. Es lo que diferencia el humo de
+    // cigarro (volutas que se enroscan y se rompen) de una nube uniforme: el
+    // campo de ruido NO se mueve rígido, se deforma a sí mismo.
+    vec2 warpBase = floor(uv * 2.0);
+    vec2 warpOffset = vec2(
+      hash21(warpBase + vec2(1.0, 0.0)),
+      hash21(warpBase + vec2(0.0, 1.0))
+    ) - 0.5;
+    // La deriva radial se calcula en main() desde vUv (espacio de la carta,
+    // centro 0.5) y se pasa aqui, porque uv ya viene escalada por uSmokeScale
+    // y su centro NO es 0.5.
+    vec2 p = uv + warpOffset * ${f(CFG.GLOW.smokeWarp)} + dirRadial * uTime * uSmokeSpeed;
     float suma = 0.0;
     float amp = 0.5;
     float norma = 0.0;
@@ -1477,23 +1487,31 @@ ${SPECTRUM_FN}
   void main() {
     float dist = cardDistance(vUv);
 
-    // El humo perturba la distancia al borde: el resplandor deja de ser un anillo
-    // perfecto y se vuelve una nube irregular que respira alrededor de la carta.
-    float smoke = smokeNoise(vUv * uSmokeScale);
-    float wavyDist = dist - smoke * uSmokeAmp;
-    // Nos quedamos solo con la parte EXTERIOR: dentro de la carta el glow sigue
-    // apagado, porque la cara opaque lo tapa de todos modos.
-    float ringDist = max(wavyDist, 0.0);
+    // BRILLO BASE: el resplandor original que envuelve la carta. Se conserva
+    // intacto porque es lo que le da identidad de color (el acento del VTuber).
+    // El humo se añade ENCIMA como una capa de vapor sutil, no lo reemplaza.
+    float ringDist = max(dist, 0.0);
 
     float falloff = exp(-ringDist * ${f(CFG.GLOW.falloffRate)});
     float core = exp(-ringDist * ${f(CFG.GLOW.coreRate)});
     float glow = falloff * ${f(CFG.GLOW.falloffWeight)} + core * ${f(CFG.GLOW.coreWeight)};
 
-    // Tinte espectral que recorre el arcoíris a lo largo del anillo humeante.
-    float spectralPhase = ringDist * uSpectralScale - uTime * uSpectralSpeed + vUv.x * 0.5;
+    // HUMO ESPECTRAL: vapor caótico que fluye desde el centro de la carta hacia
+    // afuera, como humo de cigarro. La dirección radial se calcula desde vUv
+    // (centro 0.5) ANTES de escalar, para que el origen sea el centro real.
+    vec2 dirRadial = normalize(vUv - vec2(0.5) + vec2(0.001));
+    float smoke = smokeNoise(vUv * uSmokeScale, dirRadial);
+    // El humo hace que el brillo fluctúe suavemente: donde el ruido es más denso,
+    // el resplandor se intensifica; donde es más tenue, se atenúa.
+    float smokeMod = ${f(CFG.GLOW.smokeAmp)} * (smoke - 0.5);
+    glow *= 1.0 + smokeMod;
+
+    // Tinte espectral del humo: el arcoíris viaja por el vapor a lo largo del
+    // tiempo, pero se mezcla con el color de marca para que la carta no pierda
+    // su identidad. La mezcla es ponderada por la densidad del humo.
+    float spectralPhase = ringDist * uSpectralScale - uTime * uSpectralSpeed + smoke * ${f(CFG.GLOW.spectralDistort)};
     vec3 spectral = wavelengthToRgb(fract(spectralPhase));
-    // Mezcla con el color de marca para que la carta conserve su identidad.
-    vec3 glowColor = mix(uGlowColor, mix(uGlowColor, spectral, uSpectralMix), 0.72);
+    vec3 glowColor = mix(uGlowColor, spectral, uSpectralMix * smoke);
 
     // Suavizado de los cortes del resplandor, en PÍXELES.
     float aa = max(fwidth(dist) * ${f(CFG.GLOW.aaPixels)}, ${f(CFG.GLOW.aaMin)});

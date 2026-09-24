@@ -365,14 +365,12 @@ function CardMesh({
       front,
       glow: {
         uGlowColor: { value: accent.clone() },
-        uSecondary: { value: secondary.clone() },
         uGlowStrength: { value: CFG.GLOW.strength as number },
         uCardRect: { value: new THREE.Vector2(1 / CFG.GEOMETRY.glowSpread, 1 / CFG.GEOMETRY.glowSpread) },
         uCardRadius: { value: CFG.GEOMETRY.cornerRadius / CFG.GEOMETRY.glowSpread },
         uTime: { value: 0 },
         uSmokeScale: { value: CFG.GLOW.smokeScale as number },
         uSmokeSpeed: { value: CFG.GLOW.smokeSpeed as number },
-        uSmokeAmp: { value: CFG.GLOW.smokeAmp as number },
         uSmokeOctaves: { value: CFG.GLOW.smokeOctaves as number },
         uSpectralScale: { value: CFG.GLOW.spectralScale as number },
         uSpectralSpeed: { value: CFG.GLOW.spectralSpeed as number },
@@ -449,6 +447,7 @@ function CardMesh({
     uniforms.front.uEdgeStrength.value = live.edge;
     uniforms.front.uFactionStrength.value = live.faction;
     uniforms.glow.uGlowStrength.value = live.glow;
+    uniforms.glow.uTime.value = t;
     const px = pointer.current.x;
     const py = pointer.current.y;
     (uniforms.front.uPointer.value as THREE.Vector2).set(px, py);

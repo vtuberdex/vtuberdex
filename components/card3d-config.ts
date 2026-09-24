@@ -137,7 +137,7 @@ export const GEOMETRY = {
   /** Campo de visión de la cámara, en grados. */
   cameraFov: 42,
   /** Plano del resplandor: cuántas veces la carta mide de lado. */
-  glowSpread: 1.35,
+  glowSpread: 1.36,
   /** Z del plano del resplandor (negativo: detrás del cuerpo). */
   glowZ: -0.09,
   /** Separación de la cara frontal respecto del cuerpo, para evitar z-fighting. */
@@ -1083,7 +1083,7 @@ export const LAYER_PARALLAX_FACTORS: number[] = PARALLAX_LAYERS.map((l) => l.fac
 export const GLOW = {
   strength: 1.14,
   /** Caída exponencial desde el canto, que es como decae la luz. */
-  falloffRate: 12.0,
+  falloffRate: 11.5,
   falloffWeight: 0.6,
   /** Filo más brillante pegado a la silueta. */
   coreRate: 34.0,
@@ -1092,30 +1092,32 @@ export const GLOW = {
   aaPixels: 1.2,
   aaMin: 0.002,
   /** Apagado en el borde del propio plano, para que no se vea el rectángulo. */
-  edgeFadeFrom: 0.82,
+  edgeFadeFrom: 0.80,
   /**
-   * HUMO ESPECTRAL: el resplandor exterior deja de ser un anillo estático y se
-   * convierte en una nube iridiscente que respira alrededor de la carta.
+   * HUMO ESPECTRAL: vapor sutil que se sumerge en el resplandor exterior.
    *
-   * El efecto se calcula en el fragment shader del glow SIN añadir samplers: es
-   * ruido procedural de valor (hash + octavas) que perturba la distancia al borde
-   * de la carta, más un tinte espectral que recorre el arcoíris a lo largo de esa
-   * distancia. Así el brillo no es un halo uniforme sino una neblina animada que
-   * cambia de color según la posición y el tiempo.
+   * Se calcula con ruido procedural de valor (hash + octavas) que MODULA la
+   * intensidad y el tinte del brillo existente — no deforma la distancia al
+   * borde, que era lo que expandía el halo en una nube condensada. Así el
+   * resplandor original se conserva y el humo lo atraviesa como neblina.
    *
    * `smokeScale` frecuencia del ruido; `smokeSpeed` velocidad de la deriva;
-   * `smokeAmp` cuánto deforma el borde; `smokeOctaves` detalle del fractal.
-   * `spectralScale` densidad de franjas de color; `spectralSpeed` velocidad con
-   * la que el arcoíris viaja por el humo; `spectralMix` peso del tinte respecto
-   * al color de marca (`uGlowColor`).
+   * `smokeAmp` cuánto modula la intensidad (0.1 = susurro, 0.3 = respiración);
+   * `smokeOctaves` detalle del fractal; `smokeWarp` fuerza del domain warping
+   * (0 = nube uniforme, 1 = volutas caóticas como humo de cigarro).
+   * `spectralScale` densidad de franjas; `spectralSpeed` velocidad del arcoíris;
+   * `spectralMix` peso del tinte respecto al color de marca; `spectralDistort`
+   * cuánto el ruido desplaza el espectro (0 = arcoíris por anillo, 1 = por voluta).
    */
-  smokeScale: 3.5,
-  smokeSpeed: 0.35,
-  smokeAmp: 0.28,
-  smokeOctaves: 3,
-  spectralScale: 2.4,
-  spectralSpeed: 0.18,
-  spectralMix: 0.55,
+  smokeScale: 4.5,
+  smokeSpeed: 0.8,
+  smokeAmp: 0.22,
+  smokeOctaves: 4,
+  smokeWarp: 0.6,
+  spectralScale: 3.0,
+  spectralSpeed: 0.7,
+  spectralMix: 0.45,
+  spectralDistort: 0.4,
 } as const;
 
 /** Recorte de la silueta en el shader de la cara. */
