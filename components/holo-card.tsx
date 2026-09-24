@@ -674,23 +674,53 @@ export function HoloCard({
     return <CardFallback card={card} className={className} />;
   }
 
+  /**
+   * `relative` en la raíz y el canvas dentro de una caja POSICIONADA.
+   *
+   * POR QUE EL CANVAS NO PUEDE MEDIR SU PROPIO CONTENEDOR
+   * -----------------------------------------------------
+   * three.js escribe el tamaño medido en el estilo INLINE del canvas
+   * (`width: 414px; height: 579.594px`). Un canvas en el flujo normal aporta ese
+   * ancho a la cadena de `min-content` de sus ancestros, así que el contenedor
+   * queda con un SUELO igual al tamaño que ya tenía: no puede encoger y el
+   * `ResizeObserver` que debería re-medirlo nunca ve un cambio. Es un lazo
+   * cerrado — la medida vieja impide la nueva.
+   *
+   * Medido en la ficha, tras redimensionar 1440x900 -> 390x844 SIN recargar:
+   * el canvas se quedaba en 414 px CSS (745 px de búfer) dentro de una columna
+   * de 332 px, y en un viewport de 320 seguía en 694 px desbordando la página.
+   * La carga en frío del mismo tamaño da 332 px exactos, así que el fallo era
+   * SOLO el lazo: no había nada mal en el encuadre de la cámara.
+   *
+   * La grilla no lo sufría porque su caja de aspecto ya lleva `overflow: hidden`
+   * (ver `card-tile.tsx`), que exime al contenedor del `min-content` del hijo.
+   * Con esta caja posicionada el canvas sale del flujo en las DOS vistas y la
+   * medida la fija siempre el contenedor, en cualquier orden de redimensión
+   * (rotar el móvil, abrir el inspector, girar la tablet).
+   *
+   * Ningún gate ve este fallo: jsdom no mide, y el componente compila y renderiza
+   * bien. Lo que lo fija es `holo-card-layout.test.ts`, que comprueba que esta
+   * caja siga existiendo.
+   */
   return (
-    <div className={className} data-testid="holo-card">
-      <WebGLBoundary fallback={<CardFallback card={card} className="h-full w-full" />}>
-        <Canvas
-          dpr={plan.dpr}
-          gl={{ antialias: plan.antialias, alpha: true, powerPreference: plan.powerPreference }}
-          camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, CARD_CAMERA_Z] }}
-          onCreated={({ gl }) => {
-            gl.domElement.addEventListener('webglcontextlost', (event) => {
-              event.preventDefault();
-              setLost(true);
-            });
-          }}
-        >
-          <Rig accent={palette.accent} />
-          <CardMesh card={card} holo={holo} gloss={gloss} textureWidth={plan.textureWidth} />
-        </Canvas>
+    <div className={className ? `relative ${className}` : 'relative'} data-testid="holo-card">
+      <WebGLBoundary fallback={<CardFallback card={card} className="absolute inset-0" />}>
+        <div className="absolute inset-0">
+          <Canvas
+            dpr={plan.dpr}
+            gl={{ antialias: plan.antialias, alpha: true, powerPreference: plan.powerPreference }}
+            camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, CARD_CAMERA_Z] }}
+            onCreated={({ gl }) => {
+              gl.domElement.addEventListener('webglcontextlost', (event) => {
+                event.preventDefault();
+                setLost(true);
+              });
+            }}
+          >
+            <Rig accent={palette.accent} />
+            <CardMesh card={card} holo={holo} gloss={gloss} textureWidth={plan.textureWidth} />
+          </Canvas>
+        </div>
       </WebGLBoundary>
     </div>
   );

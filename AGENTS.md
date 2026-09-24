@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 153 tests (vitest): utilidades, componentes, páginas, carta 3D
+npm test                   # 157 tests (vitest): utilidades, componentes, páginas, carta 3D
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/59/153** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/59/157** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -176,6 +176,27 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   el sitio solo sirve esos assets en sus 211 páginas de detalle.
 
 ## Trampas conocidas (ya nos costaron tiempo)
+
+- **El canvas de la carta NO puede medir su propio contenedor (responsive roto al
+  redimensionar en vivo).** three.js escribe el tamaño medido en el estilo INLINE del
+  canvas (`width: 414px`), y un canvas en el flujo aporta ese ancho a la cadena de
+  `min-content` de sus ancestros: el contenedor queda con un SUELO igual al tamaño que
+  ya tenía, no puede encoger y el `ResizeObserver` que debería re-medirlo no ve ningún
+  cambio. Es un lazo cerrado —la medida vieja impide la nueva— y solo aparece cuando el
+  viewport cambia SIN recargar (rotar el móvil, girar la tablet, abrir el inspector).
+  Medido en la ficha al pasar 1440x900 → 390x844: el canvas se quedaba en **414 px CSS
+  (745 px de búfer)** dentro de una columna de 332 px, y con el viewport en 320 seguía
+  en **694 px desbordando la página**. La carga en frío del mismo tamaño da 332/597
+  exactos, así que el encuadre y la cámara NO tenían nada malo.
+  El arreglo es que el canvas no participe en el layout: raíz `relative` + caja
+  `absolute inset-0` en `holo-card.tsx` (la grilla no lo sufría porque su caja de
+  aspecto ya lleva `overflow: hidden`, que exime al contenedor del `min-content` del
+  hijo). Verificado al volver a medir: 390 → 332/597 y 320 → 262/471, idénticos a la
+  carga en frío en las dos vistas.
+  **Ningún gate lo ve**: jsdom no calcula layout, `tsc` y el build no leen CSS, y
+  `check:shaders` mira uniforms. Lo fija `components/holo-card-layout.test.ts`, que
+  comprueba por texto que la caja posicionada siga ahí (el resto de la clase está en la
+  skill `threejs-r3f-webgl-rendering`).
 
 - **R3F en producción**: la geometría del canto se crea con `useMemo` como
   instancia, NO como elemento JSX. Instanciar la clase desde JSX acaba en
