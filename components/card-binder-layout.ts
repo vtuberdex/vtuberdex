@@ -157,7 +157,7 @@ export function worldPosition(matrix: Matrix4): { x: number; y: number; z: numbe
  *   · `cover`: la carta vive en la hoja de destino y la va a tapar la hoja que cae; se
  *     esconde cuando a la hoja le falta menos de `revealAngle` para aterrizar.
  *
- * Sin esto los cuerpos extruidos (0.2 de alto) atravesarían una hoja casi plana.
+ * Sin esto la cara (~0.16 sobre la hoja) atravesaría una hoja casi plana cerca del lomo.
  */
 export type RevealRule = 'none' | 'uncover' | 'cover';
 

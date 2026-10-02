@@ -87,49 +87,19 @@ export const GEOMETRY = {
   cardWidth: 2.2,
   /**
    * Proporción alto/ancho de la cara (1411/1008). Vive aquí —y no como un literal en
-   * `holo-card.tsx`— porque el CUERPO 3D también la necesita para insetar el bisel, y el
-   * harness construye la misma geometría que el componente: una copia divergente haría que
-   * la medición del canto no valiera.
+   * `holo-card.tsx`— porque el plano de la cara, el del resplandor y el harness de medición
+   * deben usar la misma proporción.
    */
   aspect: 1411 / 1008,
   /**
-   * Grosor del cuerpo: es lo que da el CANTO.
-   *
-   * 0.035 era una lámina casi plana (1.6% del ancho) y al inclinarla no se veía
-   * canto alguno; 0.075 le da presencia de objeto sin volverla un ladrillo.
-   *
-   * Subido a 0.11 (petición del usuario: "dale un borde biselado"): con 0.075 y el bisel
-   * anterior la arista medía 3.1 px en pantalla y no se distinguía de un slab recto.
+   * Ya no hay cuerpo extruido (se retiró: ~2.000 triángulos y un draw call por carta para un
+   * canto que solo se veía al inclinar). Se conserva el valor porque la cara se sigue colocando
+   * en `cardDepth / 2`: `BINDER.cardLift`, `glowZ` y el resto de las z de la escena se
+   * calcularon respecto de esa posición y moverla desordenaría el resplandor y las fundas.
    */
   cardDepth: 0.11,
-  /**
-   * Radio de las esquinas. Lo comparten la máscara del shader (que recorta la
-   * textura) y la geometría del cuerpo: si divergieran, el canto asomaría por las
-   * esquinas de la cara.
-   */
+  /** Radio de las esquinas: lo usa la máscara del shader para recortar la textura. */
   cornerRadius: 0.16,
-  /**
-   * Bisel del canto, como fracción del grosor. Al redondearlo (ver
-   * `bevelSegments`) la arista del canto se funde con la silueta.
-   *
-   * La forma se dibuja INSETADA por este tamaño porque el bisel EXPANDE la
-   * geometría hacia fuera: a tamaño completo el cuerpo medía 2.2270x3.1066 contra
-   * una cara de 2.2000x3.0796 (1,30 px de canto asomando por lado en la grilla y
-   * 2,02 px en la ficha), y ese sobrante es geometría, no antialiasing.
-   *
-   * 0.18 daba una arista de 0.0135 unidades = 3.1 px en pantalla (medido), que NO se
-   * distingue de un canto recto: por eso el bisel existía en la geometría y no se veía.
-   * 0.38 lo lleva a 0.0418 u = 9.6 px, ya legible como chaflán con su degradado.
-   */
-  bevelRatio: 0.38,
-  /** Segmentos del bisel: con 1 es un chaflán plano con arista visible. */
-  bevelSegments: 4,
-  /**
-   * Segmentos de las esquinas curvas. Con 12, una esquina de radio 0.16 a 212 px
-   * da ~1,3 px por segmento y el contorno se ve como un POLÍGONO. Es una geometría
-   * por carta, no por frame, así que subirlo no cuesta.
-   */
-  curveSegments: 24,
   /**
    * Altura visible que ocupa la carta, como fracción del alto del encuadre: de ahí
    * sale la distancia de la cámara. A 0.98 (z=4.1) la carta se cortaba al
@@ -140,9 +110,9 @@ export const GEOMETRY = {
   cameraFov: 42,
   /** Plano del resplandor: cuántas veces la carta mide de lado. */
   glowSpread: 1.36,
-  /** Z del plano del resplandor (negativo: detrás del cuerpo). */
+  /** Z del plano del resplandor (negativo: detrás de la cara). */
   glowZ: -0.09,
-  /** Separación de la cara frontal respecto del cuerpo, para evitar z-fighting. */
+  /** Desfase de la cara respecto de `cardDepth / 2` (antes evitaba el z-fighting con el cuerpo). */
   faceZGap: 0.001,
 } as const;
 
@@ -1219,11 +1189,11 @@ export const LIGHTS = {
   top: { position: [0, 3, -4], intensity: 8, color: '#ffffff', distance: 10 },
 } as const;
 
-/** Cuerpo metálico del canto. */
+/**
+ * Metal de las anillas del libro (el cuerpo extruido de la carta se retiró). Solo queda la
+ * intensidad del entorno prefiltrado que reflejan.
+ */
 export const BODY = {
-  color: '#d8dde6',
-  roughness: 0.18,
-  metalness: 0.92,
   envMapIntensity: 1.2,
 } as const;
 
@@ -1240,7 +1210,7 @@ export const FOG = { color: '#c9cdd6', near: 8, far: 20 } as const;
  * decodificada del mismo `metal-env.webp`. El navegador no sostiene más de 16 y la
  * memoria crecía con cada carta visible. Aquí hay UN contexto y las 8 cartas son mallas
  * de la misma escena: comparten programa de shader (three lo cachea por fuente), el
- * entorno prefiltrado y la geometría del cuerpo. El coste pasa a ser el de UNA ficha.
+ * entorno prefiltrado de las anillas. El coste pasa a ser el de UNA ficha.
  *
  * Las medidas están en las unidades de la escena (la carta mide `GEOMETRY.cardWidth` de
  * ancho); el alto de página sale de dos cartas más huecos y márgenes.
@@ -1257,10 +1227,9 @@ export const BINDER = {
   /** Cuánto sobresale la funda dibujada alrededor de la carta. */
   pocketPad: 0.09,
   /**
-   * Z de la carta sobre la hoja. El cuerpo extruido mide ~0.097 hacia atrás
-   * (`cardDepth/2 + bisel`), así que con 0.1 el canto apoya justo sobre el papel y el
-   * plano del resplandor (`glowZ = -0.09`) queda a 0.01 por encima: el halo se pinta
-   * SOBRE la funda y no dentro de ella.
+   * Z de la carta sobre la hoja. Con 0.1 el plano del resplandor (`glowZ = -0.09`) queda a
+   * 0.01 por encima del papel: el halo se pinta SOBRE la funda y no dentro de ella. (Antes
+   * también hacía apoyar el canto del cuerpo extruido, que ya no existe.)
    */
   cardLift: 0.1,
   /**
@@ -1292,8 +1261,8 @@ export const BINDER = {
   holdProgress: 0.5,
   /**
    * Ángulo (rad) que la hoja debe haber girado para mostrar las cartas que tapaba y
-   * para ocultar las que va a tapar. Las cartas sobresalen ~0.2 de la hoja, así que con
-   * menos de 10 grados (0.2 rad) sus cuerpos atravesarían la hoja que las cubre.
+   * para ocultar las que va a tapar. La cara de la carta flota ~0.16 sobre la hoja, así que con
+   * menos de ~10 grados (0.2 rad) cerca del lomo atravesaría la hoja que la cubre.
    */
   revealAngle: 0.2,
   /** Cuánto gira el holograma de una carta con el ángulo de su hoja al pasar de página. */

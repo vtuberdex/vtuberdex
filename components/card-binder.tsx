@@ -51,7 +51,6 @@ import { CardTile } from '@/components/card-tile';
 import { pickCardQuality } from '@/components/card-quality';
 import { CardMeshes, Rig, WebGLBoundary, supportsWebGL, usePointerTilt } from '@/components/holo-card';
 import { CardEnvContext, useCardMaterials, useSharedCardEnv, type SharedCardEnv } from '@/components/card-material';
-import { buildCardBodyGeometry } from '@/components/card3d-geometry';
 import {
   CARD_H,
   CARD_W,
@@ -233,11 +232,10 @@ interface BinderCardProps {
   placement: Placement<VtuberCard>;
   frame: BinderFrame;
   textureWidth: number;
-  bodyGeometry: THREE.BufferGeometry;
   onOpen: (card: VtuberCard) => void;
 }
 
-function BinderCard({ placement, frame, textureWidth, bodyGeometry, onOpen }: BinderCardProps) {
+function BinderCard({ placement, frame, textureWidth, onOpen }: BinderCardProps) {
   const group = useRef<THREE.Group>(null);
   const hovered = useRef(false);
   const lift = useRef(0);
@@ -247,7 +245,6 @@ function BinderCard({ placement, frame, textureWidth, bodyGeometry, onOpen }: Bi
     holo: CFG.INTENSITY.holo.tile,
     gloss: CFG.INTENSITY.gloss.tile,
     textureWidth,
-    bodyGeometry,
   });
 
   useEffect(
@@ -334,8 +331,6 @@ function cameraTarget(focus: Focus, aspect: number) {
 
 function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, onOpen }: BinderSceneProps) {
   const env = useSharedCardEnv();
-  const bodyGeometry = useMemo(() => buildCardBodyGeometry(), []);
-  useEffect(() => () => bodyGeometry.dispose(), [bodyGeometry]);
   const pageTexture = useMemo(() => makePageTexture(), []);
   useEffect(() => () => pageTexture?.dispose(), [pageTexture]);
 
@@ -434,7 +429,6 @@ function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, 
             placement={placement}
             frame={f}
             textureWidth={textureWidth}
-            bodyGeometry={bodyGeometry}
             onOpen={onOpen}
           />
         ))}

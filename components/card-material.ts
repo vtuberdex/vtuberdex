@@ -40,7 +40,6 @@ import { LAYER_UNIFORM_NAMES } from '@/components/card3d-config';
 import { live, tocada } from '@/components/card3d-live';
 import { CARD_TEXTURE_FULL_WIDTH, loadImage } from '@/components/card-texture';
 import { cardFragmentShader, cardVertexShader, glowFragmentShader, glowVertexShader } from '@/components/shaders';
-import { buildCardBodyGeometry } from '@/components/card3d-geometry';
 import { iconosDeFaccion } from '@/components/card-texture/facciones';
 import type { ColorPredominante } from '@/components/card-texture/predominante';
 import { anclar, anchoEfectivo, generarTexturas, type TexturasDeCarta } from '@/components/card-texture/fabrica';
@@ -114,8 +113,6 @@ export interface CardMaterialOptions {
   holo?: number;
   gloss?: number;
   textureWidth?: number;
-  /** Geometría del cuerpo compartida (el libro construye una para las 8 cartas). */
-  bodyGeometry?: THREE.BufferGeometry;
 }
 
 export interface CardUniforms {
@@ -129,8 +126,6 @@ export interface CardMaterials {
   uniforms: CardUniforms;
   frontMaterial: THREE.ShaderMaterial;
   glowMaterial: THREE.ShaderMaterial;
-  bodyGeometry: THREE.BufferGeometry;
-  bodyEnvMap: THREE.Texture | null;
   cardWidth: number;
   cardHeight: number;
   /** Actualización por frame: tiempo, puntero (NDC) e inclinación (rad) que ve el shader. */
@@ -198,48 +193,11 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
     holo = CFG.INTENSITY.holo.default,
     gloss = CFG.INTENSITY.gloss.default,
     textureWidth,
-    bodyGeometry: sharedBody,
   } = options;
   const shared = useContext(CardEnvContext);
-  const { gl } = useThree();
   const [textures, setTextures] = useState<CardTextures | null>(null);
   const texturasActuales = useRef<CardTextures | null>(null);
   const palette = useMemo(() => cardPalette(card.themeColor, card.secondaryColor), [card.themeColor, card.secondaryColor]);
-
-  const ownBody = useMemo(() => (sharedBody ? null : buildCardBodyGeometry()), [sharedBody]);
-  useEffect(() => () => ownBody?.dispose(), [ownBody]);
-  const bodyGeometry = sharedBody ?? (ownBody as THREE.BufferGeometry);
-
-  /**
-   * ENTORNO DEL CANTO por PMREM.
-   *
-   * POR QUE NO BASTA PASAR EL WEBP COMO `envMap`
-   * --------------------------------------------
-   * Medido: con `envMap={textura}` el render salia BYTE-IDENTICO al caso sin entorno
-   * (maxdiff 0 en 1,4 M de bytes). La causa esta en three.js: un MeshStandardMaterial solo
-   * usa el mapa de entorno por la via IBL del shader
-   * (envmap_physical_pars_fragment), y ahi `getIBLRadiance`/`getIBLIrradiance` devuelven
-   * vec3(0.0) salvo que la textura sea CubeUV:
-   *
-   *   #ifdef ENVMAP_TYPE_CUBE_UV  ...  #else  return vec3( 0.0 );  #endif
-   *
-   * Una textura equirect de imagen normal NO tiene ese tipo, asi que no aporta NADA. Hay que
-   * prefiltrarla con PMREMGenerator para obtener el CubeUV (y de paso le da los mips que
-   * necesita el desenfoque por rugosidad). Con el PMREM: maxdiff 204, 12062 px cambiados y el
-   * canto pasa de 129.4 a 169.6 de luminancia — se ve el bisel en vez de una pared negra.
-   *
-   * Con entorno COMPARTIDO (el libro) el PMREM ya viene hecho y aquí no se calcula otro.
-   */
-  const ownEnv = shared ? null : textures?.envMap ?? null;
-  const ownBodyEnvMap = useMemo(() => {
-    if (!ownEnv) return null;
-    const pmrem = new THREE.PMREMGenerator(gl);
-    const prefiltrada = pmrem.fromEquirectangular(ownEnv).texture;
-    pmrem.dispose();
-    return prefiltrada;
-  }, [ownEnv, gl]);
-  useEffect(() => () => ownBodyEnvMap?.dispose(), [ownBodyEnvMap]);
-  const bodyEnvMap = shared ? shared.bodyEnvMap : ownBodyEnvMap;
 
   useEffect(() => {
     let cancelled = false;
@@ -584,12 +542,10 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
       uniforms,
       frontMaterial,
       glowMaterial,
-      bodyGeometry,
-      bodyEnvMap,
       cardWidth: CARD_W,
       cardHeight: CARD_H,
       tick,
     }),
-    [textures, uniforms, frontMaterial, glowMaterial, bodyGeometry, bodyEnvMap, tick],
+    [textures, uniforms, frontMaterial, glowMaterial, tick],
   );
 }

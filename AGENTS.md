@@ -255,10 +255,11 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   funda de DESTINO giradas media vuelta (`sheetCardLocalMatrix(..., 'back')`): al empezar
   quedan reflejadas detrás de la hoja de origen y, al completar PI, caen exactamente en
   la funda donde luego viven fijas, así que la MISMA `key` (el `id` de la carta) pasa de
-  «dorso» a «fija» sin remontarse ni regenerar texturas. Las cartas sobresalen ~0.2 de la
-  hoja (cuerpo extruido + bisel), por eso las fijas que una hoja tapa se esconden hasta
+  «dorso» a «fija» sin remontarse ni regenerar texturas. La cara de cada carta flota ~0.16 sobre la
+  hoja (ya no hay cuerpo extruido: se retiró por coste, ~2.000 triángulos y un draw call por carta),
+  por eso las fijas que una hoja tapa se esconden hasta
   que gira `BINDER.revealAngle` (0.2 rad), y las que va a tapar se esconden ese mismo
-  ángulo antes de aterrizar: sin eso los cuerpos atraviesan la hoja. Si la página
+  ángulo antes de aterrizar: sin eso las caras atraviesan la hoja cerca del lomo. Si la página
   siguiente no llegó de la API, el giro se queda en pie en `holdProgress` (90°) y sigue
   al llegar (`advanceFlip` integra por `delta`, no por marca de inicio, así no salta).
   Las texturas de las 8 cartas se generan EN COLA (`encolarTrabajo`, una por vuelta del
