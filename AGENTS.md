@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 249 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 259 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 66 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/66/249** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/66/259** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -281,6 +281,36 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   del mantenedor invalidan solas. La caché es de módulo y sobrevive a ir a una ficha y
   volver; los tests que montan el catálogo deben vaciarla (`__limpiarCachePaginas`) en
   `afterEach`, o leerán la página de otro test.
+- **Generar las texturas de las cartas es lo que cuesta, no traer los datos.** Medido al
+  cargar una página de 8: la API tarda 11-45 ms y el hilo principal quedó bloqueado 6,5 s
+  (4 lienzos por carta más dos máscaras píxel a píxel). `card-texture/fabrica.ts` es la
+  única puerta de generación y aplica cuatro medidas, con sus perillas en `TEXTURAS`:
+  (1) PROGRESIVA: `generarRapida` (superficie, personaje, título) muestra la carta y
+  `completar` añade marca y máscaras REUTILIZANDO esas capas (`reutilizar` en
+  `drawCardLayers`), nada se dibuja dos veces; (2) ADAPTATIVA: se mide la generación
+  completa y si la mediana de `muestras` supera `lentoMs` se baja un escalón de `anchos`
+  (512 -> 384 -> 256) para las siguientes, decide la máquina real y no
+  `hardwareConcurrency`; (3) CACHÉ LRU por carta y ancho con presupuesto en PÍXELES
+  (`cacheMaxPixels`), con las cartas montadas ancladas (`anclar`) para que no se
+  desalojen debajo de quien las usa, los canvases se cachean y las `CanvasTexture` se crean
+  por montaje porque pertenecen a un renderer; (4) PREGENERACIÓN: `pregenerar` encola con
+  prioridad BAJA y en `requestIdleCallback` las cartas de las páginas vecinas que trajo
+  `cache-paginas`, y un trabajo bajo que ya tenía turno lo CEDE si llega uno alto. Las
+  máscaras corren en un Web Worker (`mascaras.worker.ts`, matemática pura en
+  `mascaras-puras.ts` compartida con el camino síncrono de respaldo): el hilo principal
+  solo dibuja, lee y escribe píxeles. Dos trampas: la cola ejecuta de UNO en uno con un
+  `setTimeout 0` entre trabajos (ocho a la vez bloqueaban en un tramo), y `buscarEnCache`
+  REJUVENECE la entrada (LRU), así que una consulta la aleja del desalojo. Y una tercera
+  que costó una vuelta: la calidad adaptativa mide SOLO CPU del hilo principal
+  (`Completada.msCpu`), nunca la espera del worker, porque su arranque (~0,7 s en una
+  máquina lenta) se colaba en la primera carta y bajaba un escalón sin motivo; además
+  `precalentarMascaras()` arranca el worker mientras se descargan las imágenes. Medido con
+  canvas por CPU (`--disable-accelerated-2d-canvas`; con SwiftShader el canvas 2D también
+  va por software y las cifras no valen): ~14 ms la etapa rápida y ~13 ms de CPU la
+  completa por carta a 512, máximo 40 ms de pared, y 24 aciertos de caché al volver a una
+  página. Las etapas emiten `performance.measure` (`textura-rapida:*`,
+  `textura-completa:*`, `textura-completa-cpu:*`, `textura-cache`) para leerlas en la
+  pestaña Performance sin tocar el código.
 - **R3F en producción**: la geometría del canto se crea con `useMemo` como
   instancia, NO como elemento JSX. Instanciar la clase desde JSX acaba en
   `Class constructor cannot be invoked without 'new'` en el bundle minificado y

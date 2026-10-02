@@ -8,6 +8,9 @@ import { RETRASO_PRECARGA_MS, guardarPagina, imagenesDeCartas, leerPagina, preca
 import { DEFAULT_PER_PAGE, DEFAULT_SEARCH, searchParamsFromUrl, searchParamsToUrl } from '@/lib/query';
 import type { ApiListResponse, SearchParams, VtuberCard } from '@/lib/types';
 import { loadImage } from '@/components/card-texture/imagen';
+import { pregenerar } from '@/components/card-texture/fabrica';
+import { pickCardQuality } from '@/components/card-quality';
+import { BINDER } from '@/components/card3d-config';
 
 /**
  * El tamaño de página lo decide el LIBRO, no la URL: 8 cartas (dos hojas de 4) en
@@ -22,10 +25,19 @@ export interface UseVtuberSearchOptions {
   perPage?: number;
 }
 
-/** Deja las imágenes de unas cartas en la memoria de `loadImage` antes de que hagan falta. */
+/**
+ * Deja las imágenes de unas cartas en la memoria de `loadImage` y, en tiempo ocioso, sus
+ * TEXTURAS ya generadas en la caché de la fábrica (`pregenerar`, prioridad baja): al pasar
+ * de hoja, las cartas de la página vecina salen hechas en vez de pagar la generación
+ * delante del usuario. El ancho es el mismo que usa el libro (`card-binder.tsx`).
+ */
 const calentarImagenes = (items: VtuberCard[]) => {
   if (typeof Image === 'undefined') return;
   for (const src of imagenesDeCartas(items)) void loadImage(src);
+  if (typeof document === 'undefined' || typeof HTMLCanvasElement === 'undefined') return;
+  const quality = pickCardQuality();
+  if (quality.tier === 'static') return;
+  pregenerar(items, Math.min(quality.textureWidth, BINDER.textureWidthCap));
 };
 
 export interface UseVtuberSearchResult {

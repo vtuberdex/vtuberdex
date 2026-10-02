@@ -23,9 +23,10 @@
  * contexto. La carta suelta del detalle sigue cargando el suyo, como siempre.
  *
  * La GENERACIÓN de texturas (canvas 2D, el coste dominante medido en `card-quality.ts`)
- * pasa por una cola de UNA en una con un respiro entre trabajos: ocho cartas que llegan
- * juntas de la API ya no bloquean el hilo en un solo tramo largo; cada una aparece en
- * cuanto termina la suya.
+ * la hace `card-texture/fabrica.ts`: cola con prioridades, dos etapas (la carta se ve con
+ * superficie, personaje y título antes del acabado), máscaras en un worker, caché por
+ * carta y ancho adaptado a lo que la máquina tarda. Este hook solo convierte los canvases
+ * en texturas de three y los conecta a los uniforms.
  */
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useThree } from '@react-three/fiber';
@@ -37,43 +38,16 @@ import { cardPalette } from '@/lib/color';
 import * as CFG from '@/components/card3d-config';
 import { LAYER_UNIFORM_NAMES } from '@/components/card3d-config';
 import { live, tocada } from '@/components/card3d-live';
-import {
-  CARD_TEXTURE_FULL_WIDTH,
-  drawCardLayers,
-  inkAndSkinMask,
-  logoMask,
-  logoSticker,
-  loadImage,
-} from '@/components/card-texture';
+import { CARD_TEXTURE_FULL_WIDTH, loadImage } from '@/components/card-texture';
 import { cardFragmentShader, cardVertexShader, glowFragmentShader, glowVertexShader } from '@/components/shaders';
 import { buildCardBodyGeometry } from '@/components/card3d-geometry';
 import { iconosDeFaccion } from '@/components/card-texture/facciones';
-import { colorPredominante, type ColorPredominante } from '@/components/card-texture/predominante';
+import type { ColorPredominante } from '@/components/card-texture/predominante';
+import { anclar, anchoEfectivo, generarTexturas, type TexturasDeCarta } from '@/components/card-texture/fabrica';
 
 /** Proporción real de una carta coleccionable (5x7 pulgadas -> 1.4). */
 const CARD_W = CFG.GEOMETRY.cardWidth;
 const CARD_H = CARD_W * CFG.GEOMETRY.aspect;
-
-/* ----------------------------------------------------------------------------
- * Cola de generación de texturas.
- * ------------------------------------------------------------------------- */
-
-let cola: Promise<void> = Promise.resolve();
-
-/**
- * Encola un trabajo de CPU y lo ejecuta cuando terminen los anteriores, cediendo el
- * hilo entre uno y otro (`setTimeout 0`) para que el navegador pueda pintar y atender
- * la entrada. El trabajo puede comprobar su propia cancelación antes de hacer nada.
- */
-export function encolarTrabajo(trabajo: () => void): Promise<void> {
-  cola = cola
-    .then(() => new Promise<void>((resolve) => setTimeout(resolve, 0)))
-    .then(trabajo)
-    .catch((error) => {
-      console.warn('[card-material] fallo al generar texturas', error);
-    });
-  return cola;
-}
 
 /* ----------------------------------------------------------------------------
  * Entorno compartido.
@@ -172,6 +146,29 @@ interface CardTextures {
   logoSticker: THREE.CanvasTexture;
   /** Mapa de entorno propio (solo cuando NO hay uno compartido; puede faltar). */
   envMap: THREE.CanvasTexture | null;
+  /** Etapa rápida (`false`) o acabado completo (`true`); ver `fabrica.ts`. */
+  completa: boolean;
+}
+
+const texturaDeCanvas = (canvas: HTMLCanvasElement, anisotropy: number) => {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = anisotropy;
+  tex.needsUpdate = true;
+  return tex;
+};
+
+/** Convierte los canvases de la fábrica en texturas de three para ESTE renderer. */
+function aTexturasThree(t: TexturasDeCarta, envMap: HTMLImageElement | null): CardTextures {
+  return {
+    dominant: t.dominant,
+    layers: t.layers.map((canvas) => texturaDeCanvas(canvas, 8)),
+    edge: texturaDeCanvas(t.edge, 4),
+    logoMask: new THREE.CanvasTexture(t.logoMask),
+    logoSticker: new THREE.CanvasTexture(t.logoSticker),
+    envMap: envMap ? texturaDeCanvas(envMap as unknown as HTMLCanvasElement, 8) : null,
+    completa: t.completa,
+  };
 }
 
 export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions = {}): CardMaterials {
@@ -223,104 +220,42 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
 
   useEffect(() => {
     let cancelled = false;
-    const artSrc = card.images.character ?? card.images.card ?? '';
+    const width = anchoEfectivo(textureWidth ?? CARD_TEXTURE_FULL_WIDTH);
+    let soltar: () => void = () => undefined;
     /**
-     * El MAPA DE ENTORNO del reflejo de espejo se carga en el MISMO Promise.all que las
-     * capas. Va aparte del fondo a propósito: el reflejo describe dónde está el metal, no
-     * qué hay impreso detrás (ver METAL_REFLECT). Se pide el arte del personaje como
-     * respaldo para que el conjunto no se rechace si el entorno no está. Si la escena ya
-     * trae un entorno compartido, no se vuelve a descargar ni a decodificar.
+     * El MAPA DE ENTORNO del reflejo de espejo se carga aparte del fondo a propósito: el
+     * reflejo describe dónde está el metal, no qué hay impreso detrás (ver METAL_REFLECT).
+     * Si la escena ya trae un entorno compartido, no se vuelve a descargar ni a decodificar.
      */
-    Promise.all([
-      loadImage(artSrc),
-      loadImage(card.images.logo ?? ''),
-      loadImage(card.images.background ?? ''),
-      shared ? Promise.resolve(null) : loadImage(metalEnvUrl as unknown as string).catch(() => null),
-    ]).then(([art, logo, background, envMap]) => {
+    const entorno: Promise<HTMLImageElement | null> = shared
+      ? Promise.resolve(null)
+      : loadImage(metalEnvUrl as unknown as string).catch(() => null);
+
+    /**
+     * Dos etapas: la rápida muestra la carta en cuanto existe (superficie, personaje y
+     * título) y la completa la reemplaza con marca y máscaras. Si la carta ya está en la
+     * caché de la fábrica, llega completa de una vez y sin pasar por la cola.
+     */
+    const publicar = (t: TexturasDeCarta, envMap: HTMLImageElement | null) => {
       if (cancelled) return;
-      encolarTrabajo(() => {
-        if (cancelled) return;
-        const width = textureWidth ?? CARD_TEXTURE_FULL_WIDTH;
-
-        // 7 capas: fondo, personaje, logo, título, textos, tags, wordmark.
-        const layerCanvases = drawCardLayers({ card, art, logo, background, width });
-        const layers = [
-          layerCanvases.background,
-          layerCanvases.character,
-          layerCanvases.logo,
-          layerCanvases.title,
-          layerCanvases.texts,
-          layerCanvases.tags,
-          layerCanvases.wordmark,
-        ].map((canvas) => {
-          const tex = new THREE.CanvasTexture(canvas);
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.anisotropy = 8;
-          tex.needsUpdate = true;
-          return tex;
-        });
-
-        /**
-         * Capa COMBINADA: se usa SOLO como fuente de la máscara de tinta y piel.
-         *
-         * Antes también alimentaba un uMap de respaldo, que se eliminó al pasarse el
-         * shader a las 7 capas (18 samplers contra el límite de 16 del driver: la carta
-         * salía negra). La máscara de tinta no se puede calcular por capa porque el
-         * lineart y la piel son propiedades del ARTE, así que la combinada se mantiene
-         * para ese único cálculo y no se sube como textura.
-         */
-        const flatCanvas = document.createElement('canvas');
-        flatCanvas.width = width;
-        flatCanvas.height = layers[0].image.height;
-        const flatCtx = flatCanvas.getContext('2d');
-        if (flatCtx) {
-          flatCtx.drawImage(layerCanvases.background, 0, 0);
-          flatCtx.drawImage(layerCanvases.character, 0, 0);
-          flatCtx.drawImage(layerCanvases.logo, 0, 0);
-          flatCtx.drawImage(layerCanvases.title, 0, 0);
-          flatCtx.drawImage(layerCanvases.texts, 0, 0);
-          flatCtx.drawImage(layerCanvases.tags, 0, 0);
-          flatCtx.drawImage(layerCanvases.wordmark, 0, 0);
-        }
-
-        const edgeTexture = new THREE.CanvasTexture(inkAndSkinMask(flatCanvas, width, flatCanvas.height));
-        edgeTexture.colorSpace = THREE.SRGBColorSpace;
-        edgeTexture.anisotropy = 4;
-        edgeTexture.needsUpdate = true;
-
-        const logoBox = layerCanvases.info.logoBox;
-        const emptyCanvas = document.createElement('canvas');
-        emptyCanvas.width = width;
-        emptyCanvas.height = flatCanvas.height;
-        const logoMaskTexture = new THREE.CanvasTexture(
-          logoBox && logo ? logoMask(logo, logoBox, width, flatCanvas.height) : emptyCanvas,
-        );
-        const logoStickerTexture = new THREE.CanvasTexture(
-          logoBox && logo ? logoSticker(logo, logoBox, width, flatCanvas.height) : emptyCanvas,
-        );
-
-        const envTexture = envMap
-          ? (() => {
-              const t = new THREE.CanvasTexture(envMap);
-              t.colorSpace = THREE.SRGBColorSpace;
-              t.anisotropy = 8;
-              t.needsUpdate = true;
-              return t;
-            })()
-          : null;
-
-        setTextures({
-          dominant: colorPredominante(layerCanvases.background),
-          layers,
-          edge: edgeTexture,
-          logoMask: logoMaskTexture,
-          logoSticker: logoStickerTexture,
-          envMap: envTexture,
-        });
+      setTextures(aTexturasThree(t, envMap));
+    };
+    entorno.then((envMap) => {
+      if (cancelled) return;
+      void generarTexturas(card, {
+        width,
+        prioridad: 'alta',
+        cancelada: () => cancelled,
+        alRapida: (rapida) => publicar(rapida, envMap),
+      }).then((completa) => {
+        if (!completa || cancelled) return;
+        soltar = anclar(card, completa.width);
+        publicar(completa, envMap);
       });
     });
     return () => {
       cancelled = true;
+      soltar();
     };
   }, [card, textureWidth, shared]);
 

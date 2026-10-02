@@ -1365,3 +1365,41 @@ export const DOMINANT = {
   dominanceFrom: 0.45,
   dominanceTo: 0.75,
 } as const;
+
+/**
+ * FÁBRICA DE TEXTURAS (`card-texture/fabrica.ts`): calidad adaptativa, caché y precarga.
+ *
+ * MEDIDO al cargar una página de 8 cartas: la API tarda 11-45 ms, pero el hilo principal
+ * quedó bloqueado 6,5 s en total. El coste no es el dato, es GENERAR las texturas: por
+ * carta se dibujan 4 lienzos de 512 px y dos máscaras recorren el lienzo píxel a píxel.
+ * Estas perillas gobiernan las cuatro medidas que lo atacan: generar en dos etapas (la
+ * carta aparece con superficie, personaje y título antes de que lleguen máscaras y
+ * marca), adaptar el ancho de textura a lo que la máquina REAL tarda, guardar lo generado
+ * en una caché acotada y pregenerar las páginas vecinas en tiempo ocioso.
+ */
+export const TEXTURAS = {
+  /**
+   * Anchos de textura por los que se baja cuando la máquina es lenta (de mayor a menor).
+   * 256 es el piso: por debajo el nombre de la cabecera deja de leerse en el libro.
+   */
+  anchos: [512, 384, 256],
+  /**
+   * Umbral (ms de generación COMPLETA de una carta, en el hilo principal) a partir del
+   * cual se baja un escalón. 120 ms son ~7 frames a 60 fps: con 8 cartas en cola es un
+   * segundo de tirones; por debajo la cola los reparte sin que se note.
+   */
+  lentoMs: 120,
+  /** Mediciones que hacen falta antes de decidir (la primera suele pagar el calentamiento del JIT). */
+  muestras: 2,
+  /**
+   * Presupuesto de la caché de texturas, en PÍXELES de canvas retenidos. Una carta a
+   * 512 px son ~3,7 Mpx (8 lienzos de 512x717); 60 Mpx son ~16 cartas: la página actual
+   * y la vecina más próxima. Las cartas montadas no se desalojan aunque excedan.
+   */
+  cacheMaxPixels: 60e6,
+  /** Retraso (ms) con el que corre un trabajo de prioridad baja cuando no hay `requestIdleCallback`. */
+  retrasoOciosoMs: 60,
+  /** Tiempo máximo (ms) que un trabajo ocioso espera un hueco antes de ejecutarse igual. */
+  esperaOciosaMaxMs: 1500,
+} as const;
+

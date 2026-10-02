@@ -10,7 +10,7 @@ import { drawTitleLayer } from './capa-titulo';
 import { drawWordmarkLayer } from './capa-wordmark';
 
 /** Genera todas las capas y la información de layout medida. */
-export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTURE_WIDTH }: CardDrawInfo): CardLayers {
+export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTURE_WIDTH, reutilizar }: CardDrawInfo): CardLayers {
   const W = CARD_TEXTURE_WIDTH;
   const H = CARD_TEXTURE_HEIGHT;
   const { pad, top: headerTop, height: headerH } = HEADER;
@@ -103,8 +103,8 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
      * de la carta seguía siendo el degradado del shader. Ahora el degradado y el arte viven
      * AQUÍ, en el mismo canvas opaco, y el shader los trata como el sustrato de la carta.
      */
-    background: drawSurfaceLayer({ card, background, width }),
-    character: drawCharacterLayer({ art, width }),
+    background: reutilizar?.background ?? drawSurfaceLayer({ card, background, width }),
+    character: reutilizar?.character ?? drawCharacterLayer({ art, width }),
     /**
      * La capa del logo se sirve VACÍA a propósito.
      *
@@ -128,7 +128,7 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
      * existe para no renumerar `uLayer2` ni las posiciones de PARALLAX_LAYERS.
      */
     logo: emptyLayer(),
-    title: drawTitleLayer({ card, width }),
+    title: reutilizar?.title ?? drawTitleLayer({ card, width }),
     /**
      * CAPAS 4 y 5 VACÍAS: los textos y los tags SALIERON de la carta 3D.
      *
