@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 203 tests (vitest): utilidades, componentes, páginas, carta 3D
+npm test                   # 208 tests (vitest): utilidades, componentes, páginas, carta 3D
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 66 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/66/203** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/66/208** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -179,6 +179,10 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   secundario escrito como NOMBRE (`Rojo`, `Naranja`; 211 fichas) caía al cian de respaldo y teñía
   el degradado (`colorDesdeNombre` en `lib/color.ts`), y el arcoíris sumado como luz cambiaba el
   matiz de superficies saturadas u oscuras (`HUE_PROTECT` + `protegerMatiz` en el shader).
+  Además el foil del fondo se tiñe del **color predominante** de la superficie
+  (`card-texture/predominante.ts`, perilla `DOMINANT.mix` = 70 %): se calcula en CPU por matiz (no
+  promedio: rojo+azul no dan morado), ignora grises y su `amount` baja a 0 en fondos grises o
+  multicolor, donde queda el arcoíris completo.
 
 ## Base de datos y migraciones
 

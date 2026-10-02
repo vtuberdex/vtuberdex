@@ -1243,3 +1243,28 @@ export const HUE_PROTECT = {
   /** Piso del brillo máximo al normalizar el matiz: evita dividir por ~0 en negros y amplificar ruido. */
   valueFloor: 0.05,
 } as const;
+
+/**
+ * COLOR PREDOMINANTE del fondo: tiñe el foil holográfico de la superficie.
+ *
+ * El foil del fondo era un arcoíris fijo; ahora se mezcla con el color que domina la superficie
+ * (`predominante.ts`), así el destello es del color del arte y no cambia su matiz. Se MEZCLA, no
+ * se sustituye: al 100 % el foil sería monocromo y la carta perdería el aspecto holográfico.
+ */
+export const DOMINANT = {
+  /** Cuánto del arcoíris se sustituye por el predominante (0 = nada, 1 = monocromo). */
+  mix: 0.7,
+  /** Piso de la luminancia del tono al reescalarlo: evita dividir por ~0 con tonos muy oscuros. */
+  toneFloor: 0.2,
+  /** Lado de la cuadrícula en la que se muestrea la superficie (32x32 basta y es instantáneo). */
+  grid: 32,
+  /** Croma (0..1) por debajo del cual un píxel se considera gris y no vota. */
+  minChroma: 0.18,
+  /** Cubos de matiz: 12 separan rojo, naranja, amarillo… sin partir un mismo color en dos. */
+  hueBins: 12,
+  /** Fracción de la superficie que ha de tener el color ganador para confiar del todo en él. */
+  coverageFull: 0.3,
+  /** Cuánto del color con croma debe ser del ganador: por debajo de `From` es multicolor y no se fía. */
+  dominanceFrom: 0.45,
+  dominanceTo: 0.75,
+} as const;

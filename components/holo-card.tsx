@@ -39,6 +39,7 @@ import {
 import { cardFragmentShader, cardVertexShader, glowFragmentShader, glowVertexShader } from '@/components/shaders';
 import { buildCardBodyGeometry } from '@/components/card3d-geometry';
 import { iconosDeFaccion } from '@/components/card-texture/facciones';
+import { colorPredominante, type ColorPredominante } from '@/components/card-texture/predominante';
 import { LAYER_UNIFORM_NAMES } from '@/components/card3d-config';
 
 /** Proporción real de una carta coleccionable (5x7 pulgadas -> 1.4). */
@@ -115,6 +116,8 @@ function CardMesh({
 
   const { camera, gl } = useThree();
   const [textures, setTextures] = useState<{
+    /** Color predominante de la superficie: tiñe el foil del fondo (ver `DOMINANT`). */
+    dominant: ColorPredominante;
     layers: THREE.CanvasTexture[];
     edge: THREE.CanvasTexture;
     logoMask: THREE.CanvasTexture;
@@ -239,6 +242,7 @@ function CardMesh({
         : null;
 
       setTextures({
+        dominant: colorPredominante(layerCanvases.background),
         layers,
         edge: edgeTexture,
         logoMask: logoMaskTexture,
@@ -298,6 +302,8 @@ function CardMesh({
       uFactionMap0: { value: null as THREE.Texture | null },
       uFactionMap1: { value: null as THREE.Texture | null },
       uFactionCounts: { value: new THREE.Vector2(0, 0) },
+      uBgDominant: { value: new THREE.Vector3(0, 0, 0) },
+      uBgDominantAmount: { value: 0 },
       uFactionStrength: { value: CFG.FACTION.strength as number },
       uAccent: { value: accent },
       uSecondary: { value: secondary },
@@ -385,6 +391,8 @@ function CardMesh({
     uniforms.front.uLogoMask.value = textures.logoMask;
     uniforms.front.uLogoSticker.value = textures.logoSticker;
     uniforms.front.uMetalEnvMap.value = textures.envMap;
+    (uniforms.front.uBgDominant.value as THREE.Vector3).set(...textures.dominant.rgb);
+    uniforms.front.uBgDominantAmount.value = textures.dominant.amount;
   }, [textures, uniforms]);
 
   useEffect(() => {
