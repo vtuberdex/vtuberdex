@@ -233,11 +233,15 @@ export async function completar(card: VtuberCard, fuentes: Fuentes, rapida: Text
    * máscara de tinta no se puede calcular por capa porque el lineart y la piel son
    * propiedades del ARTE, así que la combinada se mantiene para ese único cálculo y no se
    * sube como textura.
+   *
+   * `willReadFrequently`: solo se LEE (la máscara de tinta la recorre píxel a píxel), así que
+   * vive en memoria de CPU y `getImageData` no fuerza una lectura sincrónica desde la GPU. La
+   * máscara lo lee directamente (ver `prepararTinta`), sin copiarlo a otro canvas.
    */
   const flat = document.createElement('canvas');
   flat.width = width;
   flat.height = height;
-  const flatCtx = flat.getContext('2d');
+  const flatCtx = flat.getContext('2d', { willReadFrequently: true });
   if (flatCtx) {
     for (const capa of [capas.background, capas.character, capas.logo, capas.title, capas.texts, capas.tags, capas.wordmark]) {
       flatCtx.drawImage(capa, 0, 0);
