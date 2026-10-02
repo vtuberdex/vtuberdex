@@ -304,6 +304,7 @@ function CardMesh({
       uFactionCounts: { value: new THREE.Vector2(0, 0) },
       uBgDominant: { value: new THREE.Vector3(0, 0, 0) },
       uBgDominantAmount: { value: 0 },
+      uBgDominantMix: { value: CFG.DOMINANT.mix as number },
       uFactionStrength: { value: CFG.FACTION.strength as number },
       uAccent: { value: accent },
       uSecondary: { value: secondary },
@@ -443,6 +444,7 @@ function CardMesh({
     uniforms.front.uBgFoilY.value = live.bgFoilY;
     uniforms.front.uBgFoilViewAngle.value = live.bgFoilViewAngle;
     uniforms.front.uBgFoilDesaturation.value = live.bgFoilDesaturation;
+    uniforms.front.uBgDominantMix.value = live.bgDominantMix;
     if (tocada('holo')) uniforms.front.uHolo.value = live.holo;
     if (tocada('gloss')) uniforms.front.uGloss.value = live.gloss;
     uniforms.front.uEdgeStrength.value = live.edge;

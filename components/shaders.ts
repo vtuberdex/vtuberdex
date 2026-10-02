@@ -152,6 +152,8 @@ export const cardFragmentShader = /* glsl */ `
   /** Color predominante de la superficie y cuánto fiarse de él (0 = arcoíris completo). */
   uniform vec3 uBgDominant;
   uniform float uBgDominantAmount;
+  /** Cuánto del arcoíris se sustituye por el predominante (DOMINANT.mix, ajustable en vivo). */
+  uniform float uBgDominantMix;
   /** Opacidad del emblema holográfico (permite atenuarlo sin tocarlo en CPU). */
   uniform float uFactionStrength;
   uniform vec3 uAccent;
@@ -884,7 +886,7 @@ ${SPECTRUM_FN}
      */
     vec3 tonoDominante = uBgDominant / max(max(uBgDominant.r, uBgDominant.g), max(uBgDominant.b, ${f(CFG.HUE_PROTECT.valueFloor)}));
     float lumTono = max(dot(tonoDominante, vec3(0.2126, 0.7152, 0.0722)), ${f(CFG.DOMINANT.toneFloor)});
-    bgSpectrum = mix(bgSpectrum, tonoDominante * (dot(bgSpectrum, vec3(0.2126, 0.7152, 0.0722)) / lumTono), uBgDominantAmount * ${f(CFG.DOMINANT.mix)});
+    bgSpectrum = mix(bgSpectrum, tonoDominante * (dot(bgSpectrum, vec3(0.2126, 0.7152, 0.0722)) / lumTono), uBgDominantAmount * uBgDominantMix);
     vec3 bgFoil = bgSpectrum * bgHoloMask
       * mix(vec3(1.0), vec3(clamp(artLum * uBgArtGain, 0.0, 1.0)), uBgArtFloor);
     /**

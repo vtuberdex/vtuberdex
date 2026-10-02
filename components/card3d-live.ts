@@ -108,7 +108,6 @@ export const KNOBS: readonly Knob[] = [
    * (acuario) no tiene metal para que la holografia se marque, asi que hay un refuerzo
    * local de la tinta espectral que solo afecta a donde hay fondo.
    */
-  { key: 'bgCover', label: 'Tamaño del arte', hint: 'Cuánto se agranda la imagen dentro de la carta (más = más zoom, menos borde visible)', min: 1, max: 1.6, step: 0.01, config: 'BACKGROUND.cover', grupo: 'fondo' },
   { key: 'bgHolo', label: 'Holografía del fondo', hint: 'Intensidad de la lámina SOBRE la capa 0: 0 = solo acabado base, 1 = igual que el personaje', min: 0, max: 1, step: 0.01, config: 'BACKGROUND.holo', grupo: 'fondo' },
   { key: 'bgLayerWeight', label: 'Peso de la lámina del fondo', hint: 'Cuánto de la lámina espectral se SUMA al arte del fondo (modulación, no luz)', min: 0, max: 1, step: 0.01, config: 'BACKGROUND.layerWeight', grupo: 'fondo' },
   { key: 'bgBaseMask', label: 'Piso del holograma del fondo', hint: 'Efecto holográfico del fondo visible con la carta quieta', min: 0, max: 3, step: 0.01, config: 'BACKGROUND.baseMask', grupo: 'fondo' },
@@ -117,6 +116,7 @@ export const KNOBS: readonly Knob[] = [
   { key: 'bgFoilX', label: 'Foil del fondo: frecuencia X', hint: 'Cuántas franjas del grabado caben en horizontal. Más = patrón más denso', min: 0, max: 8, step: 0.1, config: 'BACKGROUND.foilX', grupo: 'fondo' },
   { key: 'bgFoilY', label: 'Foil del fondo: frecuencia Y', hint: 'Cuántas franjas del grabado caben en vertical', min: 0, max: 8, step: 0.1, config: 'BACKGROUND.foilY', grupo: 'fondo' },
   { key: 'bgFoilViewAngle', label: 'Foil del fondo: respuesta al ángulo', hint: 'Cuánto recorre el arcoíris al inclinar la carta. Más = más vivo', min: 0, max: 6, step: 0.1, config: 'BACKGROUND.foilViewAngle', grupo: 'fondo' },
+  { key: 'bgDominantMix', label: 'Foil del fondo: color predominante', hint: 'Cuánto del arcoíris se sustituye por el color que domina el fondo. 0 = arcoíris puro, 1 = monocromo. En fondos grises o multicolor no actúa', min: 0, max: 1, step: 0.01, config: 'DOMINANT.mix', grupo: 'fondo' },
   { key: 'bgFoilDesaturation', label: 'Foil del fondo: saturación', hint: '0 = arcoíris puro, 1 = gris metálico sin color', min: 0, max: 1, step: 0.01, config: 'BACKGROUND.foilDesaturation', grupo: 'fondo' },
   { key: 'bgNoise', label: 'Textura de la superficie', hint: 'Micro-relieve de la superficie: 0 = lisa, 0.1 = grano visible. También controla el abollado del reflejo', min: 0, max: 0.15, step: 0.01, config: 'BG_NOISE.normalStrength', grupo: 'fondo' },
   // --- columna ACABADO (HDR) ----------------------------------------------
@@ -144,8 +144,6 @@ export interface LiveKnobs {
 
   /** Textura de micro-superficie de la lámina. */
   bgNoise: number;
-  /** Escala del arte dentro de la carta. */
-  bgCover: number;
   /** Refuerzo local de la lámina holográfica SOBRE la capa 0. */
   bgHolo: number;
   /** Cuánto de esa lámina se SUMA al arte del fondo. */
@@ -163,6 +161,8 @@ export interface LiveKnobs {
   bgFoilY: number;
   bgFoilViewAngle: number;
   bgFoilDesaturation: number;
+  /** Mezcla del foil del fondo con el color predominante de la superficie. */
+  bgDominantMix: number;
   /** HDR: ganancia de luces y codo de compresión. */
   hdrBoost: number;
   hdrCeiling: number;
@@ -192,7 +192,6 @@ export const DEFAULTS: LiveKnobs = {
   tiltFactor: CFG.HOLOGRAM.tiltFactor,
   baseMask: CFG.HOLOGRAM.baseMask,
   bgNoise: CFG.BG_NOISE.normalStrength,
-  bgCover: CFG.BACKGROUND.cover,
   bgHolo: CFG.BACKGROUND.holo,
   bgLayerWeight: CFG.BACKGROUND.layerWeight,
   bgBaseMask: CFG.BACKGROUND.baseMask,
@@ -203,6 +202,7 @@ export const DEFAULTS: LiveKnobs = {
   bgFoilY: CFG.BACKGROUND.foilY,
   bgFoilViewAngle: CFG.BACKGROUND.foilViewAngle,
   bgFoilDesaturation: CFG.BACKGROUND.foilDesaturation,
+  bgDominantMix: CFG.DOMINANT.mix,
   hdrBoost: CFG.HDR.highlightBoost,
   hdrCeiling: CFG.HDR.lightCeiling,
   metalReflect: CFG.METAL_REFLECT.strength,
