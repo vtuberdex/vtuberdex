@@ -13,15 +13,15 @@
  * memoiza por URL). Al pasar de página la respuesta ya está en memoria: el giro arranca
  * sin esperar y las texturas se generan con las imágenes ya decodificadas.
  *
- * La clave normaliza `perPage` al tamaño del libro, igual que el hook, para que una URL
- * con `perPage` viejo no genere entradas que nadie vuelve a leer.
+ * La clave lleva el `perPage` que pide el hook (8 en escritorio, 4 en celular): una
+ * página de 4 y una de 8 con el mismo número no son la misma página.
  *
  * Sin estado de React a propósito: la caché sobrevive a remontajes del catálogo (ir a
  * una ficha y volver) y el hook solo la consulta. `__limpiarCachePaginas` es para los
  * tests, que comparten módulo.
  */
 import type { ApiListResponse, SearchParams, VtuberCard } from '@/lib/types';
-import { DEFAULT_PER_PAGE, searchParamsToQuery } from '@/lib/query';
+import { searchParamsToQuery } from '@/lib/query';
 
 /** Páginas que se retienen: la actual, sus vecinas y un historial corto de navegación. */
 export const LIMITE_PAGINAS = 24;
@@ -37,7 +37,7 @@ const cache = new Map<string, ApiListResponse>();
 const enVuelo = new Set<string>();
 
 export function clavePagina(params: SearchParams): string {
-  return searchParamsToQuery({ ...params, perPage: DEFAULT_PER_PAGE });
+  return searchParamsToQuery(params);
 }
 
 /** Lee una página cacheada y la marca como recién usada (LRU). */

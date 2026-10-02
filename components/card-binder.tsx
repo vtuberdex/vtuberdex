@@ -24,10 +24,11 @@
  * las coloca, no se remontan ni regeneran texturas. Si la API aún no respondió, la hoja
  * se queda en pie (`holdProgress`) y sigue cuando llegan los datos.
  *
- * CELULAR (viewport < `BINDER.singleMaxWidth`): la cámara encuadra UNA hoja y «siguiente»
- * recorre izquierda -> derecha -> página siguiente (que gira y aterriza en la hoja
- * izquierda, donde ya mira la cámara). Es la misma escena: solo cambia hacia dónde
- * apunta la cámara, con una panorámica amortiguada entre hojas.
+ * CELULAR (`single`, lo decide el catálogo por viewport): cada página son 4 cartas que
+ * viven en la hoja DERECHA, la cámara encuadra solo esa hoja y la izquierda queda vacía.
+ * Avanzar gira la hoja derecha con las cartas salientes en su cara (se va por la
+ * izquierda) y destapa las entrantes; retroceder trae la hoja izquierda de vuelta con las
+ * entrantes en su dorso. Es la misma escena y la misma mecánica del libro de 8.
  *
  * ENTRADA: flechas del teclado, botones a los lados y gesto horizontal (toque o
  * arrastre) sobre el libro. Un toque corto sobre una carta abre su ficha (lo decide
@@ -79,6 +80,8 @@ export interface CardBinderProps {
   /** Hay una petición en vuelo: durante un giro, la hoja espera; sin giro, el libro se atenúa. */
   loading: boolean;
   onPage: (page: number) => void;
+  /** Modo de una hoja (celular): `items` son 4 cartas y van en la hoja derecha. */
+  single?: boolean;
 }
 
 /** Hoja que encuadra la cámara: `null` es el libro abierto entero. */
@@ -463,16 +466,16 @@ function FallbackPage({ cards, firstIndex }: { cards: VtuberCard[]; firstIndex: 
   );
 }
 
-function BinderFallback({ items, focus }: { items: VtuberCard[]; focus: Focus }) {
-  const left = <FallbackPage cards={items.slice(0, BINDER.cardsPerPage)} firstIndex={0} />;
-  const right = <FallbackPage cards={items.slice(BINDER.cardsPerPage, CARDS_PER_SPREAD)} firstIndex={BINDER.cardsPerPage} />;
-  if (focus) {
+function BinderFallback({ items, single }: { items: VtuberCard[]; single: boolean }) {
+  if (single) {
     return (
       <div data-testid="binder-fallback" className="rounded-2xl p-3" style={{ background: BINDER.coverColor }}>
-        {focus === 'left' ? left : right}
+        <FallbackPage cards={items.slice(0, BINDER.cardsPerPage)} firstIndex={0} />
       </div>
     );
   }
+  const left = <FallbackPage cards={items.slice(0, BINDER.cardsPerPage)} firstIndex={0} />;
+  const right = <FallbackPage cards={items.slice(BINDER.cardsPerPage, CARDS_PER_SPREAD)} firstIndex={BINDER.cardsPerPage} />;
   return (
     <div
       data-testid="binder-fallback"
@@ -497,7 +500,7 @@ const isTypingTarget = (target: EventTarget | null) => {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true;
 };
 
-export function CardBinder({ items, page, pageCount, loading, onPage }: CardBinderProps) {
+export function CardBinder({ items, page, pageCount, loading, onPage, single = false }: CardBinderProps) {
   const router = useRouter();
   /**
    * La detección de WebGL se hace en un efecto, no en el estado inicial: el HTML del
@@ -511,21 +514,8 @@ export function CardBinder({ items, page, pageCount, loading, onPage }: CardBind
   const textureWidth = Math.min(quality.textureWidth, BINDER.textureWidthCap);
   const threeD = webgl === true && !lost && quality.tier !== 'static';
 
-  /**
-   * Modo de una hoja por `matchMedia`, leído en un efecto (misma razón que WebGL: el
-   * servidor no tiene viewport). Arranca en «libro entero», que es lo que pinta el HTML.
-   */
-  const [single, setSingle] = useState(false);
-  useEffect(() => {
-    if (!window.matchMedia) return;
-    const query = window.matchMedia(`(max-width: ${BINDER.singleMaxWidth - 1}px)`);
-    const update = () => setSingle(query.matches);
-    update();
-    query.addEventListener?.('change', update);
-    return () => query.removeEventListener?.('change', update);
-  }, []);
-  const [side, setSide] = useState<Side>('left');
-  const focus: Focus = single ? side : null;
+  // En una hoja, la cámara mira siempre la derecha: ahí viven las 4 cartas de la página.
+  const focus: Focus = single ? 'right' : null;
 
   const [flip, setFlip] = useState<Flip | null>(null);
   const previousPage = useRef(page);
@@ -542,9 +532,6 @@ export function CardBinder({ items, page, pageCount, loading, onPage }: CardBind
     if (page === previousPage.current) return;
     const dir: FlipDir = page > previousPage.current ? 1 : -1;
     previousPage.current = page;
-    // En el celular la cámara se pone donde la hoja va a ATERRIZAR: avanzando cae a la
-    // izquierda, retrocediendo a la derecha. Así el giro se ve llegar, no irse.
-    setSide(dir === 1 ? 'left' : 'right');
     if (!threeD) return;
     tokens.current += 1;
     setFlip({ dir, outgoing: shown.current, pending: items, token: tokens.current });
@@ -558,32 +545,22 @@ export function CardBinder({ items, page, pageCount, loading, onPage }: CardBind
     setFlip((current) => (current && current.token === token ? null : current));
   }, []);
 
-  /** ¿Se puede avanzar/retroceder desde donde se está? (botones y teclas lo comparten). */
+  /** ¿Se puede avanzar/retroceder? (botones y teclas lo comparten). */
   const canGo = useCallback(
     (dir: FlipDir) => {
-      if (focus && (dir === 1 ? focus === 'left' : focus === 'right')) return true;
       const next = page + dir;
       return next >= 1 && next <= pageCount;
     },
-    [focus, page, pageCount],
+    [page, pageCount],
   );
 
   const go = useCallback(
     (dir: FlipDir) => {
       if (flip || !canGo(dir)) return false;
-      // Una hoja a la vez: primero se recorre el libro abierto, luego se pasa de página.
-      if (focus && dir === 1 && focus === 'left') {
-        setSide('right');
-        return true;
-      }
-      if (focus && dir === -1 && focus === 'right') {
-        setSide('left');
-        return true;
-      }
       onPage(page + dir);
       return true;
     },
-    [flip, canGo, focus, page, onPage],
+    [flip, canGo, page, onPage],
   );
 
   useEffect(() => {
@@ -621,7 +598,10 @@ export function CardBinder({ items, page, pageCount, loading, onPage }: CardBind
   // array de `items` y sin carga en vuelo); sin giro (cambio de filtros) se mantiene lo
   // visible, atenuado, para no parpadear.
   const arrived = !flip || (items !== flip.pending && !loading);
-  const placements = useMemo(() => planPlacements(arrived ? items : [], flip), [arrived, items, flip]);
+  const placements = useMemo(
+    () => planPlacements(arrived ? items : [], flip, { singleSheet: single }),
+    [arrived, items, flip, single],
+  );
   const { spreadW, pageW, pageH } = bookDimensions();
   const frameW = focus ? pageW : spreadW;
 
@@ -633,7 +613,7 @@ export function CardBinder({ items, page, pageCount, loading, onPage }: CardBind
       aria-label={`Libro de cartas, página ${page} de ${pageCount}`}
       data-testid="card-binder"
       data-flipping={flip ? 'true' : 'false'}
-      data-focus={focus ?? 'spread'}
+      data-single={single ? 'true' : 'false'}
     >
       <div
         className="relative select-none"
@@ -643,7 +623,7 @@ export function CardBinder({ items, page, pageCount, loading, onPage }: CardBind
         onPointerCancel={onPointerCancel}
       >
         {threeD ? (
-          <WebGLBoundary fallback={<BinderFallback items={items} focus={focus} />}>
+          <WebGLBoundary fallback={<BinderFallback items={items} single={single} />}>
             {/* Caja posicionada: el canvas no puede participar del layout (ver `holo-card.tsx`). */}
             <div className="absolute inset-0">
               <Canvas
@@ -679,7 +659,7 @@ export function CardBinder({ items, page, pageCount, loading, onPage }: CardBind
             </ul>
           </WebGLBoundary>
         ) : (
-          <BinderFallback items={items} focus={focus} />
+          <BinderFallback items={items} single={single} />
         )}
 
         <button
@@ -687,7 +667,7 @@ export function CardBinder({ items, page, pageCount, loading, onPage }: CardBind
           className={`${arrowClass} left-1`}
           onClick={() => go(-1)}
           disabled={!canGo(-1)}
-          aria-label={focus === 'right' ? 'Hoja izquierda' : 'Página anterior'}
+          aria-label="Página anterior"
         >
           ‹
         </button>
@@ -696,14 +676,13 @@ export function CardBinder({ items, page, pageCount, loading, onPage }: CardBind
           className={`${arrowClass} right-1`}
           onClick={() => go(1)}
           disabled={!canGo(1)}
-          aria-label={focus === 'left' ? 'Hoja derecha' : 'Página siguiente'}
+          aria-label="Página siguiente"
         >
           ›
         </button>
       </div>
       <p className="mt-3 text-center font-mono text-xs text-dex-muted">
         Página {page} de {pageCount}
-        {focus && <span> · hoja {focus === 'left' ? 'izquierda' : 'derecha'}</span>}
         <span className="hidden sm:inline"> · ← → o desliza para pasar de página</span>
       </p>
     </section>

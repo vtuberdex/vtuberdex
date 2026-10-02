@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 248 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 249 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 66 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/66/248** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/66/249** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -259,13 +259,16 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   event loop): las ocho a la vez bloqueaban el hilo en un tramo largo. El entorno
   metálico y su PMREM se cargan una vez por escena (`useSharedCardEnv`) y se reparten
   por contexto; la carta suelta del detalle sigue cargando el suyo.
-  **En celular (viewport < `BINDER.singleMaxWidth`, 640 px) el libro muestra UNA hoja**:
-  con el libro entero encajado en 390 px cada carta medía ~70 px. Es la misma escena con
-  la cámara encuadrando una hoja (`cameraTarget`, panorámica amortiguada), y «siguiente»
-  recorre izquierda -> derecha -> giro de página; al girar, la cámara se pone donde la
-  hoja va a ATERRIZAR (avanzar: izquierda; retroceder: derecha) para ver llegar la hoja.
-  El modo se decide por `matchMedia` en un efecto (el servidor no tiene viewport) y lo
-  expone `data-focus` en la sección, que es lo que fijan los tests.
+  **En celular (viewport < `BINDER.singleMaxWidth`, 640 px) cada PÁGINA son 4 cartas en
+  UNA hoja**: con el libro entero encajado en 390 px cada carta medía ~70 px. Lo decide el
+  CATÁLOGO (`useSingleSheet`, por `matchMedia` en un efecto: el servidor no tiene viewport)
+  porque cambia lo que se pide a la API: `useVtuberSearch({ perPage: 4 })`, y la clave de
+  la caché de páginas lleva ese `perPage`. En el libro (`single`), las 4 cartas van en la
+  hoja DERECHA (`planPlacements(..., { singleSheet: true })`), la cámara encuadra solo esa
+  hoja y la izquierda queda vacía; avanzar gira la hoja derecha con las salientes y destapa
+  las entrantes, retroceder trae la hoja izquierda con las entrantes en el dorso. El número
+  de página de la URL cuenta hojas de 4 en celular y de 8 en escritorio: un enlace compartido
+  entre ambos cae en cartas distintas, y se aceptó a cambio de no mezclar dos paginados.
 - **Pasar de página no debe esperar a la red: las páginas vecinas se PRECARGAN.** Medido
   por el usuario como «demasiado delay» al avanzar/retroceder: el libro dejaba la hoja en
   pie hasta que la API respondía y después cada carta esperaba sus imágenes. Hoy

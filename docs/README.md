@@ -146,7 +146,7 @@ Si la IP del host cambia, el script la detecta solo (contenedor en `--network ho
 ## Tests y lint
 
 ```bash
-npm test                   # 248 tests (vitest): utilidades, componentes, páginas, carta 3D y libro
+npm test                   # 249 tests (vitest): utilidades, componentes, páginas, carta 3D y libro
 npm run lint               # eslint . — cubre también server/ y scraper/
 npm run typecheck          # tsc --noEmit
 npm run check:shaders      # guard de uniforms de GLSL (ni tsc ni los tests lo ven)
@@ -180,7 +180,7 @@ solo `master`).
   horizontal) gira la hoja en 3D con las cartas salientes en su cara y las entrantes
   en el dorso. Un canvas por carta multiplicaba renderer, framebuffers y entorno por
   8 y disparaba la memoria; la carta del detalle tiene su propia escena. En celular
-  la cámara encuadra una hoja a la vez (izquierda, derecha y luego la página siguiente).
+  cada página son 4 cartas en una sola hoja, y pasar de página gira esa hoja.
 - **Degradación explícita.** Sin WebGL, la carta 3D cae a una vista 2D con el
   mismo arte en lugar de dejar un hueco negro.
 - **El color del dato manda.** El `THEME` de cada ficha alimenta la paleta

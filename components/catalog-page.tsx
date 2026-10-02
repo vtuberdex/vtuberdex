@@ -19,6 +19,7 @@ import { FilterPanel } from '@/components/filter-panel';
 import { Pagination } from '@/components/pagination';
 import { SearchBar } from '@/components/search-bar';
 import { SortSelect } from '@/components/sort-select';
+import { useSingleSheet } from '@/components/use-single-sheet';
 import { useVtuberSearch } from '@/components/use-vtuber-search';
 
 /**
@@ -29,14 +30,14 @@ import { useVtuberSearch } from '@/components/use-vtuber-search';
  * `data-testid` se conserva de la grilla anterior porque es el contrato que fijan los
  * tests («muestra esqueletos mientras carga»).
  */
-function SkeletonBook() {
+function SkeletonBook({ single = false }: { single?: boolean }) {
   return (
     <div
-      className="grid grid-cols-[1fr_12px_1fr] gap-2 rounded-2xl p-3"
+      className={single ? 'rounded-2xl p-3' : 'grid grid-cols-[1fr_12px_1fr] gap-2 rounded-2xl p-3'}
       style={{ background: BINDER.coverColor }}
       data-testid="skeleton-grid"
     >
-      {['izquierda', 'derecha'].map((side, position) => (
+      {(single ? ['derecha'] : ['izquierda', 'derecha']).map((side, position) => (
         <Fragment key={side}>
           {position === 1 && <div aria-hidden className="rounded-full bg-black/60" />}
           <div className="grid grid-cols-2 gap-3 rounded-xl p-3" style={{ background: BINDER.pageColor }}>
@@ -53,7 +54,11 @@ function SkeletonBook() {
 }
 
 export function CatalogPage() {
-  const { params, data, loading, error, setParams, reset, goToPage } = useVtuberSearch();
+  // En celular el libro es UNA hoja de 4 fundas: cada página son 4 cartas (ver `useSingleSheet`).
+  const single = useSingleSheet();
+  const { params, data, loading, error, setParams, reset, goToPage } = useVtuberSearch({
+    perPage: single ? BINDER.cardsPerPage : BINDER.cardsPerPage * 2,
+  });
   const [sheetOpen, setSheetOpen] = useState(false);
   const filterCount = activeFilterCount(params);
 
@@ -159,7 +164,7 @@ export function CatalogPage() {
           )}
 
           {loading && items.length === 0 ? (
-            <SkeletonBook />
+            <SkeletonBook single={single} />
           ) : items.length === 0 ? (
             <div className="rounded-2xl border border-dex-line bg-dex-panel/60 px-6 py-16 text-center">
               <p className="text-lg font-bold text-dex-ink">Sin resultados</p>
@@ -182,6 +187,7 @@ export function CatalogPage() {
             */
             <CardBinder
               items={items}
+              single={single}
               page={params.page}
               pageCount={data?.pageCount ?? 1}
               loading={loading}

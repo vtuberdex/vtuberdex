@@ -209,6 +209,22 @@ describe('reparto de cartas durante el giro', () => {
     expect(plan.find((p) => p.card.id === 5)?.role).toBe('sheet-back');
   });
 
+  it('en una hoja (celular) las 4 cartas van a la derecha y la hoja derecha gira al avanzar', () => {
+    const fijo = planPlacements(cards(1).slice(0, 4), null, { singleSheet: true });
+    expect(fijo.map((p) => p.slot)).toEqual([4, 5, 6, 7]);
+    const plan = planPlacements(cards(5).slice(0, 4), { dir: 1, outgoing: cards(1).slice(0, 4) }, { singleSheet: true });
+    const roles = (role: string) => plan.filter((p) => p.role === role).map((p) => p.card.id);
+    // Las salientes se van en la cara de la hoja derecha; las entrantes esperan debajo.
+    expect(roles('sheet-front')).toEqual([1, 2, 3, 4]);
+    expect(roles('sheet-back')).toEqual([]);
+    expect(plan.filter((p) => p.reveal === 'uncover').map((p) => p.card.id)).toEqual([5, 6, 7, 8]);
+    plan.forEach((p) => expect(p.slot).toBeGreaterThanOrEqual(4));
+    // Al retroceder, las entrantes llegan en el dorso de la hoja izquierda y aterrizan a la derecha.
+    const atras = planPlacements(cards(1).slice(0, 4), { dir: -1, outgoing: cards(5).slice(0, 4) }, { singleSheet: true });
+    expect(atras.filter((p) => p.role === 'sheet-back').map((p) => p.slot)).toEqual([4, 5, 6, 7]);
+    expect(atras.filter((p) => p.reveal === 'cover').map((p) => p.card.id)).toEqual([5, 6, 7, 8]);
+  });
+
   it('tolera una página entrante vacía (datos aún en vuelo)', () => {
     const plan = planPlacements([], { dir: 1, outgoing: cards(1) });
     expect(plan).toHaveLength(8);

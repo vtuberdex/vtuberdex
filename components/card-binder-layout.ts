@@ -224,20 +224,38 @@ interface Identified {
  * y en la entrante (puede pasar al cambiar filtros y página a la vez) gana la entrante:
  * una `key` duplicada en React montaría dos veces la misma carta y sus texturas.
  */
+export interface PlacementOptions {
+  /**
+   * Modo de UNA hoja (celular): las 4 cartas de la página van todas en la hoja DERECHA
+   * (slots 4..7) y la izquierda queda vacía. Al avanzar, la hoja derecha gira con las
+   * cartas salientes en su cara y deja ver las entrantes debajo; al retroceder, la hoja
+   * izquierda (vacía) vuelve con las entrantes en su dorso. Es la misma mecánica del
+   * libro de 8 con la mitad izquierda sin cartas.
+   */
+  singleSheet?: boolean;
+}
+
 export function planPlacements<T extends Identified>(
   incoming: readonly T[],
   flip: { dir: FlipDir; outgoing: readonly T[] } | null,
+  options: PlacementOptions = {},
 ): Placement<T>[] {
   const half = BINDER.cardsPerPage;
-  const incomingLeft = incoming.slice(0, half);
-  const incomingRight = incoming.slice(half, CARDS_PER_SPREAD);
+  const single = options.singleSheet === true;
+  const splitLeft = (cards: readonly T[]) => (single ? [] : cards.slice(0, half));
+  const splitRight = (cards: readonly T[]) => (single ? cards.slice(0, half) : cards.slice(half, CARDS_PER_SPREAD));
+  const incomingLeft = splitLeft(incoming);
+  const incomingRight = splitRight(incoming);
   if (!flip) {
-    return incoming.slice(0, CARDS_PER_SPREAD).map((card, slot) => ({ card, slot, role: 'static', reveal: 'none' }));
+    return [
+      ...incomingLeft.map((card, i) => ({ card, slot: i, role: 'static' as const, reveal: 'none' as const })),
+      ...incomingRight.map((card, i) => ({ card, slot: half + i, role: 'static' as const, reveal: 'none' as const })),
+    ];
   }
   const incomingIds = new Set(incoming.map((card) => card.id));
   const outgoing = flip.outgoing.filter((card) => !incomingIds.has(card.id));
-  const outgoingLeft = flip.outgoing.slice(0, half).filter((card) => outgoing.includes(card));
-  const outgoingRight = flip.outgoing.slice(half, CARDS_PER_SPREAD).filter((card) => outgoing.includes(card));
+  const outgoingLeft = splitLeft(flip.outgoing).filter((card) => outgoing.includes(card));
+  const outgoingRight = splitRight(flip.outgoing).filter((card) => outgoing.includes(card));
 
   const place = <U,>(cards: readonly U[], firstSlot: number, role: CardRole, reveal: RevealRule): Placement<U>[] =>
     cards.map((card, i) => ({ card, slot: firstSlot + i, role, reveal }));

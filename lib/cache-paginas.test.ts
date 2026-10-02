@@ -21,8 +21,8 @@ import { makeCard, makeList } from '@/test/fixtures';
 afterEach(() => __limpiarCachePaginas());
 
 describe('clave y LRU', () => {
-  it('la clave ignora el perPage de la URL (el libro siempre pide 8)', () => {
-    expect(clavePagina({ ...DEFAULT_SEARCH, perPage: 48 })).toBe(clavePagina({ ...DEFAULT_SEARCH, perPage: 8 }));
+  it('la clave distingue filtros, página y tamaño de página (8 escritorio, 4 celular)', () => {
+    expect(clavePagina({ ...DEFAULT_SEARCH, perPage: 4 })).not.toBe(clavePagina({ ...DEFAULT_SEARCH, perPage: 8 }));
     expect(clavePagina({ ...DEFAULT_SEARCH, page: 2 })).not.toBe(clavePagina(DEFAULT_SEARCH));
     expect(clavePagina({ ...DEFAULT_SEARCH, q: 'gku' })).not.toBe(clavePagina(DEFAULT_SEARCH));
   });
