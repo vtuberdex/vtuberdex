@@ -3,10 +3,15 @@
  * consume funciones tipadas y nunca arma URLs a mano.
  */
 import type {
+  AdminListResponse,
+  AdminStatusFilter,
   ApiListResponse,
+  FactionRow,
   Neighbors,
   UploadKind,
+  VtuberCreate,
   VtuberDetail,
+  VtuberPatch,
   SearchParams,
 } from '@/lib/types';
 import { searchParamsToQuery } from '@/lib/query';
@@ -55,6 +60,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
+const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+
 export const api = {
   list(params: SearchParams, signal?: AbortSignal): Promise<ApiListResponse> {
     return request<ApiListResponse>(`/api/vtubers?${searchParamsToQuery(params)}`, { signal });
@@ -77,11 +84,68 @@ export const api = {
       headers: { authorization: `Bearer ${token}` },
     });
   },
-  updateVtuber(token: string, id: number, patch: Record<string, unknown>) {
+  updateVtuber(token: string, id: number, patch: VtuberPatch) {
     return request<VtuberDetail>(`/api/admin/vtubers/${id}`, {
       method: 'PATCH',
       headers: { authorization: `Bearer ${token}` },
       body: JSON.stringify(patch),
+    });
+  },
+  /**
+   * Listado del mantenedor: a diferencia de `list`, INCLUYE borradores y ocultos
+   * (la ruta pública solo devuelve lo publicado).
+   */
+  adminList(
+    token: string,
+    params: { q?: string; status?: AdminStatusFilter; page?: number; perPage?: number },
+    signal?: AbortSignal,
+  ) {
+    const query = new URLSearchParams();
+    if (params.q) query.set('q', params.q);
+    query.set('status', params.status ?? 'all');
+    if (params.page) query.set('page', String(params.page));
+    if (params.perPage) query.set('perPage', String(params.perPage));
+    return request<AdminListResponse>(`/api/admin/vtubers?${query}`, { headers: bearer(token), signal });
+  },
+  /** Detalle por id, sin filtrar por estado: `detail(slug)` da 404 en borradores. */
+  adminDetail(token: string, id: number) {
+    return request<VtuberDetail>(`/api/admin/vtubers/${id}`, { headers: bearer(token) });
+  },
+  /** Crea una ficha; nace en BORRADOR y al final de la dex. */
+  createVtuber(token: string, body: VtuberCreate) {
+    return request<VtuberDetail>('/api/admin/vtubers', {
+      method: 'POST',
+      headers: bearer(token),
+      body: JSON.stringify(body),
+    });
+  },
+  /** Número que recibiría una ficha mandada «al final» de la dex. */
+  dexNext(token: string) {
+    return request<{ next: number }>('/api/admin/dex/next', { headers: bearer(token) });
+  },
+  factions(token: string) {
+    return request<{ items: FactionRow[] }>('/api/admin/factions', { headers: bearer(token) });
+  },
+  createFaction(token: string, body: { label: string; icon?: string | null }) {
+    return request<{ faction: FactionRow; items: FactionRow[] }>('/api/admin/factions', {
+      method: 'POST',
+      headers: bearer(token),
+      body: JSON.stringify(body),
+    });
+  },
+  updateFaction(token: string, id: number, body: { label?: string; icon?: string | null }) {
+    return request<{ faction: FactionRow; items: FactionRow[] }>(`/api/admin/factions/${id}`, {
+      method: 'PATCH',
+      headers: bearer(token),
+      body: JSON.stringify(body),
+    });
+  },
+  /** Con `mergeInto` las fichas pasan a esa facción; sin él pierden la facción. */
+  deleteFaction(token: string, id: number, mergeInto?: number) {
+    const query = mergeInto ? `?mergeInto=${mergeInto}` : '';
+    return request<{ ok: boolean; items: FactionRow[] }>(`/api/admin/factions/${id}${query}`, {
+      method: 'DELETE',
+      headers: bearer(token),
     });
   },
   /**

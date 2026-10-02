@@ -8,8 +8,28 @@ import express from 'express';
 
 import { facetCounts, getNeighbors, getVtuberBySlug, searchVtubers } from './search.mjs';
 import { hashPassword, verifyPassword } from './auth.mjs';
-import { listQuerySchema, vtuberUpdateSchema, formatIssues, loginSchema, bulkStatusSchema } from './validation.mjs';
-import { slugify, normalizeText } from './text.mjs';
+import {
+  adminListQuerySchema,
+  bulkStatusSchema,
+  factionCreateSchema,
+  factionUpdateSchema,
+  formatIssues,
+  listQuerySchema,
+  loginSchema,
+  vtuberCreateSchema,
+  vtuberUpdateSchema,
+} from './validation.mjs';
+import {
+  MutationError,
+  aplicarParche,
+  crearFaccion,
+  crearFicha,
+  editarFaccion,
+  eliminarFaccion,
+  listarFacciones,
+  refreshFacetCounters,
+  ultimoDex,
+} from './mutations.mjs';
 import { UPLOADABLE_KINDS, MAX_UPLOAD_BYTES, saveUploadedImage, removeUploadedImage } from './uploads.mjs';
 
 const splitCsv = (value) => String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
@@ -21,96 +41,26 @@ function audit(db, actor, entity, entityId, action, payload) {
   ).run(actor, entity, entityId ?? null, action, payload ? JSON.stringify(payload) : null);
 }
 
-function upsertTag(db, kind, label) {
-  const slug = slugify(label);
-  db.prepare(
-    `INSERT INTO tag (kind, slug, label, vtuber_count) VALUES (?, ?, ?, 0)
-     ON CONFLICT (kind, slug) DO UPDATE SET label = excluded.label`,
-  ).run(kind, slug, label);
-  return db.prepare('SELECT id FROM tag WHERE kind = ? AND slug = ?').get(kind, slug).id;
+/** Responde un error de mutación con el estado y el código que le corresponden. */
+function responderError(res, error) {
+  if (error instanceof MutationError) {
+    res.status(error.status).json({ error: error.code, detail: error.detail });
+    return;
+  }
+  res.status(500).json({ error: 'error_al_guardar', detail: error.message });
 }
 
-function upsertFaction(db, label) {
-  const slug = slugify(label);
-  db.prepare(
-    `INSERT INTO faction (slug, label, vtuber_count) VALUES (?, ?, 0)
-     ON CONFLICT (slug) DO UPDATE SET label = excluded.label`,
-  ).run(slug, label);
-  return db.prepare('SELECT id FROM faction WHERE slug = ?').get(slug).id;
-}
-
-/** Reemplaza las relaciones multivaluadas de una carta. */
-export function replaceRelations(db, vtuberId, patch) {
-  if (patch.countries) {
-    db.prepare('DELETE FROM vtuber_country WHERE vtuber_id = ?').run(vtuberId);
-    const insert = db.prepare('INSERT OR IGNORE INTO vtuber_country (vtuber_id, country_id, position) VALUES (?, ?, ?)');
-    patch.countries.forEach((slug, index) => {
-      const country = db.prepare('SELECT id FROM country WHERE slug = ?').get(slug);
-      if (!country) throw Object.assign(new Error(`país desconocido: ${slug}`), { status: 422 });
-      insert.run(vtuberId, country.id, index);
-    });
+/** Ejecuta `fn` en una transacción; si lanza, deshace todo y relanza. */
+function enTransaccion(db, fn) {
+  db.exec('BEGIN');
+  try {
+    const resultado = fn();
+    db.exec('COMMIT');
+    return resultado;
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
   }
-  if (patch.languages) {
-    db.prepare('DELETE FROM vtuber_language WHERE vtuber_id = ?').run(vtuberId);
-    const insert = db.prepare('INSERT OR IGNORE INTO vtuber_language (vtuber_id, code) VALUES (?, ?)');
-    patch.languages.forEach((code) => insert.run(vtuberId, code));
-  }
-  if (patch.groups) {
-    db.prepare(`DELETE FROM vtuber_tag WHERE vtuber_id = ? AND tag_id IN (SELECT id FROM tag WHERE kind = 'group')`).run(vtuberId);
-    const insert = db.prepare('INSERT OR IGNORE INTO vtuber_tag (vtuber_id, tag_id, position) VALUES (?, ?, ?)');
-    patch.groups.forEach((label, index) => insert.run(vtuberId, upsertTag(db, 'group', label), index));
-  }
-  if (patch.artists) {
-    db.prepare(`DELETE FROM vtuber_tag WHERE vtuber_id = ? AND tag_id IN (SELECT id FROM tag WHERE kind = 'artist')`).run(vtuberId);
-    const insert = db.prepare('INSERT OR IGNORE INTO vtuber_tag (vtuber_id, tag_id, position) VALUES (?, ?, ?)');
-    patch.artists.forEach((label, index) => insert.run(vtuberId, upsertTag(db, 'artist', label), index));
-  }
-  if (patch.factions) {
-    db.prepare('DELETE FROM vtuber_faction WHERE vtuber_id = ?').run(vtuberId);
-    const insert = db.prepare('INSERT OR IGNORE INTO vtuber_faction (vtuber_id, faction_id, position) VALUES (?, ?, ?)');
-    patch.factions.forEach((label, index) => insert.run(vtuberId, upsertFaction(db, label), index));
-  }
-  if (patch.profile) {
-    db.prepare('DELETE FROM profile_field WHERE vtuber_id = ?').run(vtuberId);
-    const insert = db.prepare('INSERT INTO profile_field (vtuber_id, label, value, position) VALUES (?, ?, ?, ?)');
-    patch.profile.forEach((field, index) => insert.run(vtuberId, field.label, field.value, index));
-  }
-}
-
-/** Recalcula el texto indexado en FTS para una carta. */
-export function refreshSearchIndex(db, vtuberId) {
-  const row = db
-    .prepare(
-      `SELECT v.name, v.phrase,
-              (SELECT group_concat(t.label, ' ') FROM vtuber_tag vt JOIN tag t ON t.id = vt.tag_id WHERE vt.vtuber_id = v.id) AS tagText,
-              (SELECT group_concat(c.name, ' ') FROM vtuber_country vc JOIN country c ON c.id = vc.country_id WHERE vc.vtuber_id = v.id) AS countryText,
-              (SELECT group_concat(f.label, ' ') FROM vtuber_faction vf JOIN faction f ON f.id = vf.faction_id WHERE vf.vtuber_id = v.id) AS factionText
-         FROM vtuber v WHERE v.id = ?`,
-    )
-    .get(vtuberId);
-  if (!row) return;
-  const tags = [row.tagText, row.countryText, row.factionText].filter(Boolean).join(' ');
-  db.prepare('DELETE FROM vtuber_fts WHERE rowid = ?').run(vtuberId);
-  db.prepare('INSERT INTO vtuber_fts (rowid, name, phrase, tags) VALUES (?, ?, ?, ?)').run(
-    vtuberId,
-    row.name,
-    row.phrase ?? '',
-    tags,
-  );
-}
-
-function refreshFacetCounters(db) {
-  db.exec(`
-    UPDATE country SET vtuber_count = (
-      SELECT COUNT(*) FROM vtuber_country vc JOIN vtuber v ON v.id = vc.vtuber_id
-      WHERE vc.country_id = country.id AND v.status = 'published');
-    UPDATE tag SET vtuber_count = (
-      SELECT COUNT(*) FROM vtuber_tag vt JOIN vtuber v ON v.id = vt.vtuber_id
-      WHERE vt.tag_id = tag.id AND v.status = 'published');
-    UPDATE faction SET vtuber_count = (
-      SELECT COUNT(*) FROM vtuber_faction vf JOIN vtuber v ON v.id = vf.vtuber_id
-      WHERE vf.faction_id = faction.id AND v.status = 'published');
-  `);
 }
 
 /**
@@ -215,9 +165,60 @@ export function createApiRouter({ db, sessions, imageRoot }) {
     next();
   };
 
+  /**
+   * Listado del MANTENEDOR: incluye borradores y ocultos. La ruta pública solo devuelve lo
+   * publicado, así que una ficha en borrador (o una carta recién creada) no podía abrirse para
+   * editarla.
+   */
+  router.get('/admin/vtubers', requireAdmin, (req, res) => {
+    const parsed = adminListQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'query_invalida', issues: formatIssues(parsed.error) });
+      return;
+    }
+    const { q, status, page, perPage } = parsed.data;
+    res.json(
+      searchVtubers(db, { q, page, perPage, includeHidden: true, status: status === 'all' ? null : status, sort: 'dex' }),
+    );
+  });
+
+  /** Detalle por id, sin filtrar por estado: es lo que el editor abre. */
+  router.get('/admin/vtubers/:id', requireAdmin, (req, res) => {
+    const row = db.prepare('SELECT slug FROM vtuber WHERE id = ?').get(Number(req.params.id));
+    const detail = row ? getVtuberBySlug(db, row.slug, { includeHidden: true }) : null;
+    if (!detail) {
+      res.status(404).json({ error: 'no_encontrado' });
+      return;
+    }
+    res.json(detail);
+  });
+
+  /** El siguiente número libre al final de la dex, para el botón "al final". */
+  router.get('/admin/dex/next', requireAdmin, (req, res) => {
+    res.json({ next: ultimoDex(db) + 1 });
+  });
+
+  router.post('/admin/vtubers', requireAdmin, (req, res) => {
+    const parsed = vtuberCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'payload_invalido', issues: formatIssues(parsed.error) });
+      return;
+    }
+    try {
+      const creada = enTransaccion(db, () => {
+        const resultado = crearFicha(db, parsed.data);
+        audit(db, req.user.username, 'vtuber', resultado.id, 'create', parsed.data);
+        return resultado;
+      });
+      res.status(201).json(getVtuberBySlug(db, creada.slug, { includeHidden: true }));
+    } catch (error) {
+      responderError(res, error);
+    }
+  });
+
   router.patch('/admin/vtubers/:id', requireAdmin, (req, res) => {
     const id = Number(req.params.id);
-    const current = db.prepare('SELECT * FROM vtuber WHERE id = ?').get(id);
+    const current = db.prepare('SELECT id FROM vtuber WHERE id = ?').get(id);
     if (!current) {
       res.status(404).json({ error: 'no_encontrado' });
       return;
@@ -227,54 +228,77 @@ export function createApiRouter({ db, sessions, imageRoot }) {
       res.status(400).json({ error: 'payload_invalido', issues: formatIssues(parsed.error) });
       return;
     }
-    const patch = parsed.data;
-    const columns = {
-      name: 'name',
-      phrase: 'phrase',
-      themeColor: 'theme_color',
-      birthday: 'birthday',
-      height: 'height',
-      hashtag: 'hashtag',
-      favoriteColor: 'favorite_color',
-      status: 'status',
-    };
-    const updates = [];
-    const args = [];
-    for (const [key, column] of Object.entries(columns)) {
-      if (patch[key] !== undefined) {
-        updates.push(`${column} = ?`);
-        args.push(patch[key]);
-      }
-    }
-    if (patch.name !== undefined) {
-      updates.push('search_name = ?', 'slug = ?');
-      const slug = slugify(patch.name);
-      const clash = db.prepare('SELECT id FROM vtuber WHERE slug = ? AND id != ?').get(slug, id);
-      if (clash) {
-        res.status(409).json({ error: 'slug_duplicado', detail: slug });
-        return;
-      }
-      args.push(normalizeText(patch.name), slug);
-    }
-
-    db.exec('BEGIN');
     try {
-      if (updates.length > 0) {
-        db.prepare(`UPDATE vtuber SET ${updates.join(', ')}, updated_at = datetime('now') WHERE id = ?`).run(...args, id);
-      }
-      replaceRelations(db, id, patch);
-      refreshSearchIndex(db, id);
-      refreshFacetCounters(db);
-      audit(db, req.user.username, 'vtuber', id, 'update', patch);
-      db.exec('COMMIT');
+      const slug = enTransaccion(db, () => {
+        const resultado = aplicarParche(db, id, parsed.data);
+        audit(db, req.user.username, 'vtuber', id, 'update', parsed.data);
+        return resultado;
+      });
+      res.json(getVtuberBySlug(db, slug, { includeHidden: true }));
     } catch (error) {
-      db.exec('ROLLBACK');
-      res.status(error.status ?? 500).json({ error: 'error_al_guardar', detail: error.message });
+      responderError(res, error);
+    }
+  });
+
+  // ------------------------------------------------------------- facciones
+  router.get('/admin/factions', requireAdmin, (req, res) => {
+    res.json({ items: listarFacciones(db) });
+  });
+
+  router.post('/admin/factions', requireAdmin, (req, res) => {
+    const parsed = factionCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'payload_invalido', issues: formatIssues(parsed.error) });
       return;
     }
+    try {
+      const faccion = enTransaccion(db, () => {
+        const creada = crearFaccion(db, parsed.data);
+        audit(db, req.user.username, 'faction', creada.id, 'create', parsed.data);
+        return creada;
+      });
+      res.status(201).json({ faction: faccion, items: listarFacciones(db) });
+    } catch (error) {
+      responderError(res, error);
+    }
+  });
 
-    const updated = getVtuberBySlug(db, db.prepare('SELECT slug FROM vtuber WHERE id = ?').get(id).slug, { includeHidden: true });
-    res.json(updated);
+  router.patch('/admin/factions/:id', requireAdmin, (req, res) => {
+    const parsed = factionUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'payload_invalido', issues: formatIssues(parsed.error) });
+      return;
+    }
+    try {
+      const id = Number(req.params.id);
+      const faccion = enTransaccion(db, () => {
+        const editada = editarFaccion(db, id, parsed.data);
+        audit(db, req.user.username, 'faction', id, 'update', parsed.data);
+        return editada;
+      });
+      res.json({ faction: faccion, items: listarFacciones(db) });
+    } catch (error) {
+      responderError(res, error);
+    }
+  });
+
+  /** `DELETE /admin/factions/:id?mergeInto=<id>`: sin `mergeInto` las fichas pierden la facción. */
+  router.delete('/admin/factions/:id', requireAdmin, (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const mergeInto = req.query.mergeInto === undefined ? null : Number(req.query.mergeInto);
+      if (mergeInto !== null && !Number.isInteger(mergeInto)) {
+        res.status(400).json({ error: 'fusion_invalida', detail: 'mergeInto debe ser un id' });
+        return;
+      }
+      enTransaccion(db, () => {
+        eliminarFaccion(db, id, { fusionarEn: mergeInto });
+        audit(db, req.user.username, 'faction', id, mergeInto === null ? 'delete' : 'merge', { mergeInto });
+      });
+      res.json({ ok: true, items: listarFacciones(db) });
+    } catch (error) {
+      responderError(res, error);
+    }
   });
 
   // ------------------------------------------------- subida de imágenes (admin)

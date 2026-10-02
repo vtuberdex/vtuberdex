@@ -25,7 +25,7 @@ export function makeCard(overrides: Partial<VtuberCard> = {}): VtuberCard {
     groups: ['Moonly'],
     artists: ['PROJECT AR-AI.I'],
     factions: ['Mythical Legacy'],
-    factionIcons: [{ label: 'Mythical Legacy', icon: 'images/faction/mythical-legacy.png' }],
+    factionIcons: [{ label: 'Mythical Legacy', slug: 'mythical-legacy', icon: 'images/faction/mythical-legacy.png' }],
     languages: ['es'],
     statsPreview: [142, 233, 123],
     socialCount: 10,

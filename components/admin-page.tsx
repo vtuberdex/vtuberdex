@@ -1,14 +1,21 @@
 'use client';
 /**
- * Mantenedor: login, estadísticas de calidad y edición de fichas.
- * Reemplaza el "editar HTML a mano" del origen.
+ * Mantenedor: orquestador. Login, métricas, lista, facciones y editor.
+ * Reemplaza el "editar HTML a mano" del origen. Cada pieza del editor vive en
+ * `components/admin/`; aquí solo está el estado que comparten (sesión, ficha
+ * seleccionada, catálogo de facciones) y el guardado.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
-import { cardPalette } from '@/lib/color';
-import type { VtuberCard, VtuberDetail } from '@/lib/types';
+import { facetValue, type FactionRow, type VtuberDetail, type VtuberPatch } from '@/lib/types';
+import { DEFAULT_SEARCH } from '@/lib/query';
+import { EditorCard, type SaveFailure } from '@/components/admin/editor-card';
+import { FactionManager } from '@/components/admin/faction-manager';
+import { NewCardDialog } from '@/components/admin/new-card-dialog';
+import { VtuberList } from '@/components/admin/vtuber-list';
+import type { ChipOption } from '@/components/admin/chip-picker';
 import { ImageManager } from '@/components/image-manager';
 
 const TOKEN_KEY = 'vtuberdex.admin.token';
@@ -41,8 +48,14 @@ export function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [audit, setAudit] = useState<Array<{ id: number; actor: string; action: string; entityId: number | null; createdAt: string }>>([]);
-  const [rows, setRows] = useState<VtuberCard[]>([]);
-  const [query, setQuery] = useState('');
+  const [factions, setFactions] = useState<FactionRow[]>([]);
+  const [countryOptions, setCountryOptions] = useState<ChipOption[]>([]);
+  const [languageOptions, setLanguageOptions] = useState<ChipOption[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [createdNotice, setCreatedNotice] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<SaveFailure | null>(null);
+  /** Sube solo tras un guardado exitoso: remonta el editor con lo que devolvió el servidor. */
+  const [editorVersion, setEditorVersion] = useState(0);
   const [selected, setSelected] = useState<VtuberDetail | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -81,27 +94,28 @@ export function AdminPage() {
     void loadAdmin();
   }, [loadAdmin]);
 
-  // Búsqueda del mantenedor (incluye borradores y ocultos vía API pública filtrada).
+  // Catálogo de facciones y opciones de país/idioma para los selectores del editor.
+  const loadFactions = useCallback(async () => {
+    if (!token) return;
+    try {
+      setFactions((await api.factions(token)).items);
+    } catch {
+      // El editor sigue funcionando sin selector de facciones; el panel mostrará su propio error al operar.
+    }
+  }, [token]);
+
   useEffect(() => {
-    if (!user) return;
-    const controller = new AbortController();
+    if (!user || !token) return;
+    void loadFactions();
+    // Las facetas salen de la API pública (`facet=all`): una página de 1 ficha basta.
     api
-      .list({
-        q: query,
-        countries: [],
-        languages: [],
-        groups: [],
-        artists: [],
-        factions: [],
-        language: null,
-        sort: 'dex',
-        page: 1,
-        perPage: 40,
-      }, controller.signal)
-      .then((response) => setRows(response.items))
+      .list({ ...DEFAULT_SEARCH, perPage: 1 })
+      .then((response) => {
+        setCountryOptions((response.facets?.countries ?? []).map((bucket) => ({ value: facetValue(bucket), label: bucket.name })));
+        setLanguageOptions((response.facets?.languages ?? []).map((bucket) => ({ value: facetValue(bucket), label: bucket.name })));
+      })
       .catch(() => undefined);
-    return () => controller.abort();
-  }, [query, user, savedAt]);
+  }, [user, token, loadFactions]);
 
   const login = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -123,22 +137,30 @@ export function AdminPage() {
     setUser(null);
     setSelected(null);
     setStats(null);
+    setFactions([]);
   };
 
-  const openEditor = async (slug: string) => {
+  const openEditor = async (id: number) => {
+    if (!token) return;
     setError(null);
+    setSaveError(null);
+    setSavedAt(null);
+    setCreatedNotice(null);
+    setCreating(false);
     try {
-      const detail = await api.detail(slug);
-      setSelected(detail);
+      // Por id y por la ruta del mantenedor: `api.detail(slug)` da 404 en borradores y ocultos.
+      setSelected(await api.adminDetail(token, id));
+      setEditorVersion((current) => current + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'error');
     }
   };
 
-  const save = async (patch: Record<string, unknown>) => {
+  const save = async (patch: VtuberPatch) => {
     if (!token || !selected) return;
     setSaving(true);
     setError(null);
+    setSaveError(null);
     try {
       const updated = await api.updateVtuber(token, selected.id, patch);
       /**
@@ -150,14 +172,32 @@ export function AdminPage() {
        * pasaba a tener esos campos en `undefined`. La ruta ya devuelve el detalle, y esta guarda
        * evita que un despliegue anterior repita el síntoma en silencio.
        */
-      if (updated?.slug) setSelected(updated);
+      if (updated?.slug) {
+        setSelected(updated);
+        setEditorVersion((current) => current + 1);
+      }
       setSavedAt(new Date().toISOString());
-      await loadAdmin();
+      // Cambiar número, estado o facciones mueve conteos de la lista, de las métricas y del catálogo.
+      await Promise.all([loadAdmin(), loadFactions()]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'error al guardar');
+      const message = cause instanceof Error ? cause.message : 'error al guardar';
+      setError(message);
+      setSaveError({ message, status: (cause as { status?: number }).status });
     } finally {
       setSaving(false);
     }
+  };
+
+  const created = (detail: VtuberDetail) => {
+    setCreating(false);
+    setSelected(detail);
+    setEditorVersion((current) => current + 1);
+    setSavedAt(null);
+    setCreatedNotice(
+      `Carta «${detail.name}» creada como BORRADOR con el número #${detail.dexNumber}: aún no se ve en el catálogo. Complétala y cambia la visibilidad a «publicado» cuando esté lista.`,
+    );
+    void loadAdmin();
+    void loadFactions();
   };
 
   const qualitySummary = useMemo(
@@ -290,57 +330,81 @@ export function AdminPage() {
         </section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        {/* Lista */}
-        <aside className="rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
-          <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-            Buscar ficha
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm text-dex-ink outline-none focus:border-dex-accent"
-              placeholder="nombre o número"
+      {createdNotice && (
+        <p
+          role="status"
+          data-testid="admin-created"
+          className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-100"
+        >
+          {createdNotice}
+        </p>
+      )}
+
+      {token && (
+        <details className="mb-6 rounded-2xl border border-dex-line bg-dex-panel/60 p-4" data-testid="faction-panel">
+          <summary className="cursor-pointer text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">
+            Administrar facciones ({factions.length})
+          </summary>
+          <div className="mt-4">
+            <FactionManager
+              token={token}
+              factions={factions}
+              onItems={(items) => {
+                setFactions(items);
+                // Fusionar o eliminar cambia las facciones de muchas fichas: la ficha abierta se recarga
+                // para que el selector no muestre una facción que ya no existe.
+                if (selected) void api.adminDetail(token, selected.id).then(setSelected).catch(() => undefined);
+              }}
             />
-          </label>
-          <ul className="dex-scroll mt-3 max-h-[60vh] space-y-1 overflow-y-auto">
-            {rows.map((row) => (
-              <li key={row.id}>
-                <button
-                  type="button"
-                  onClick={() => openEditor(row.slug)}
-                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${
-                    selected?.id === row.id ? 'bg-dex-accent/15 text-dex-ink' : 'text-dex-muted hover:bg-white/5'
-                  }`}
-                >
-                  <span className="font-mono text-[11px] text-dex-muted">#{String(row.dexNumber).padStart(3, '0')}</span>
-                  <span className="min-w-0 flex-1 truncate">{row.name}</span>
-                  {row.status !== 'published' && (
-                    <span className="rounded bg-amber-500/20 px-1.5 text-[10px] text-amber-200">{row.status}</span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </aside>
+          </div>
+        </details>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setCreating((current) => !current)}
+            className="w-full rounded-xl bg-dex-accent px-4 py-2.5 text-sm font-bold text-black"
+          >
+            {creating ? 'Cerrar' : 'Nueva carta'}
+          </button>
+          {creating && token && (
+            <NewCardDialog token={token} countryOptions={countryOptions} onCreated={created} onCancel={() => setCreating(false)} />
+          )}
+          {token && (
+            <VtuberList
+              token={token}
+              selectedId={selected?.id ?? null}
+              refreshKey={`${savedAt}|${createdNotice}`}
+              onOpen={(row) => openEditor(row.id)}
+            />
+          )}
+        </div>
 
         {/* Editor */}
         <section className="min-w-0">
           {!selected ? (
             <div className="rounded-2xl border border-dex-line bg-dex-panel/60 px-6 py-16 text-center text-sm text-dex-muted">
-              Elige una ficha de la lista para editarla.
+              Elige una ficha de la lista para editarla, o crea una nueva.
             </div>
           ) : (
             <div className="space-y-6">
-              <EditorCard
-                key={selected.id}
-                detail={selected}
-                saving={saving}
-                savedAt={savedAt}
-                error={error}
-                onSave={save}
-              />
-              {/* Gestión de imágenes: va DESPUÉS del formulario para que el botón
-                  "Guardar cambios" quede al final de la edición de la ficha. */}
+              {token && (
+                <EditorCard
+                  key={`${selected.id}:${editorVersion}`}
+                  token={token}
+                  detail={selected}
+                  factions={factions}
+                  countryOptions={countryOptions}
+                  languageOptions={languageOptions}
+                  saving={saving}
+                  savedAt={savedAt}
+                  error={saveError}
+                  onSave={save}
+                />
+              )}
+              {/* Gestión de imágenes: va DESPUÉS del formulario. */}
               {token && (
                 <ImageManager
                   token={token}
@@ -371,176 +435,6 @@ export function AdminPage() {
         </section>
       </div>
     </div>
-  );
-}
-
-/** Formulario de edición de una ficha. */
-function EditorCard({
-  detail,
-  saving,
-  savedAt,
-  error,
-  onSave,
-}: {
-  detail: VtuberDetail;
-  saving: boolean;
-  /** Marca de tiempo del último guardado, para el aviso de éxito. */
-  savedAt: string | null;
-  /** Mensaje de error del guardado, si lo hubo. */
-  error: string | null;
-  onSave: (patch: Record<string, unknown>) => void;
-}) {
-  const [form, setForm] = useState({
-    name: detail.name,
-    themeColor: detail.themeColor ?? '#5eead4',
-    birthday: detail.birthday ?? '',
-    height: detail.height ?? '',
-    hashtag: detail.hashtag ?? '',
-    favoriteColor: detail.favoriteColor ?? '',
-    status: detail.status,
-    phrase: detail.phrase ?? '',
-  });
-  const palette = cardPalette(form.themeColor, detail.secondaryColor);
-
-  return (
-    <form
-      className="space-y-5 rounded-2xl border border-dex-line bg-dex-panel/60 p-5"
-      data-testid="admin-editor"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSave({
-          name: form.name,
-          themeColor: form.themeColor,
-          birthday: form.birthday || null,
-          height: form.height || null,
-          hashtag: form.hashtag || null,
-          favoriteColor: form.favoriteColor || null,
-          status: form.status,
-          phrase: form.phrase || null,
-        });
-      }}
-    >
-      <header className="flex items-center gap-4">
-        {/* Vista previa del PERSONAJE: es la imagen de identidad del VTuber. La
-            miniatura no se muestra aquí porque es una copia reducida del
-            personaje, no una imagen con vida propia. */}
-        {(detail.images.character ?? detail.images.card) && (
-          <img
-            src={(detail.images.character ?? detail.images.card) as string}
-            alt=""
-            className="h-20 w-16 rounded-lg object-cover ring-1 ring-dex-line"
-            style={{ boxShadow: `0 0 24px ${palette.accent}44` }}
-          />
-        )}
-        <div className="min-w-0">
-          <h2 className="truncate text-lg font-extrabold text-dex-ink">{detail.name}</h2>
-          <p className="font-mono text-xs text-dex-muted">
-            #{String(detail.dexNumber).padStart(3, '0')} · /v/{detail.slug}
-          </p>
-        </div>
-      </header>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-          Nombre
-          <input
-            value={form.name}
-            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm normal-case text-dex-ink outline-none focus:border-dex-accent"
-          />
-        </label>
-        <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-          Color de marca
-          <span className="mt-1 flex items-center gap-2">
-            <input
-              type="color"
-              value={form.themeColor}
-              onChange={(event) => setForm((current) => ({ ...current, themeColor: event.target.value }))}
-              className="h-9 w-12 rounded border border-dex-line bg-dex-void"
-            />
-            <input
-              value={form.themeColor}
-              onChange={(event) => setForm((current) => ({ ...current, themeColor: event.target.value }))}
-              pattern="^#[0-9a-fA-F]{6}$"
-              className="w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 font-mono text-xs text-dex-ink outline-none focus:border-dex-accent"
-            />
-          </span>
-        </label>
-        {(
-          [
-            ['birthday', 'Cumpleaños'],
-            ['height', 'Altura'],
-            ['hashtag', 'Hashtag'],
-            ['favoriteColor', 'Color favorito'],
-          ] as const
-        ).map(([key, label]) => (
-          <label key={key} className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-            {label}
-            <input
-              value={form[key]}
-              onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm normal-case text-dex-ink outline-none focus:border-dex-accent"
-            />
-          </label>
-        ))}
-        <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-          Visibilidad
-          <select
-            value={form.status}
-            onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as VtuberDetail['status'] }))}
-            className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm normal-case text-dex-ink outline-none focus:border-dex-accent"
-          >
-            <option value="published">publicado</option>
-            <option value="draft">borrador</option>
-            <option value="hidden">oculto</option>
-          </select>
-        </label>
-      </div>
-
-      <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-        Frase de presentación
-        <textarea
-          value={form.phrase}
-          onChange={(event) => setForm((current) => ({ ...current, phrase: event.target.value }))}
-          rows={3}
-          className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm normal-case text-dex-ink outline-none focus:border-dex-accent"
-        />
-      </label>
-
-      {/* Avisos AL FINAL del formulario, junto al botón: es donde está el foco
-          cuando pulsas guardar, así que el resultado se ve sin buscar arriba. */}
-      {error && (
-        <p
-          role="alert"
-          data-testid="admin-editor-error"
-          className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-200"
-        >
-          {error}
-        </p>
-      )}
-      {savedAt && !error && (
-        <p
-          role="status"
-          data-testid="admin-editor-saved"
-          className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200"
-        >
-          Guardado a las {new Date(savedAt).toLocaleTimeString('es-CL')}
-        </p>
-      )}
-
-      <footer className="flex items-center justify-between gap-3">
-        <p className="text-xs text-dex-muted">
-          {detail.profile.length} campos de ficha · {detail.stats.length} atributos · {detail.skills.length} habilidades
-        </p>
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-xl bg-dex-accent px-4 py-2 text-sm font-bold text-black disabled:opacity-50"
-        >
-          {saving ? 'Guardando…' : 'Guardar cambios'}
-        </button>
-      </footer>
-    </form>
   );
 }
 

@@ -27,17 +27,16 @@
 import { NextResponse } from 'next/server';
 
 import {
-  aplicarEdiciones,
   aplicarImagenesDelMantenedor,
+  aplicarReemplazosALista,
   borrarAssetDelMantenedor,
   guardarAssetDelMantenedor,
-  guardarEdicion,
-  guardarEdicionMasiva,
   leerAssetDelMantenedor,
-  leerEdiciones,
+  renombrarAssetsDelMantenedor,
   reemplazosDelMantenedor,
   tursoConfigurado,
 } from '../../../../lib/ediciones.mjs';
+import { aplicarYAnotar, dbConDiario } from '../../../../lib/diario.mjs';
 import { KINDS_GESTIONABLES, EXTENSION_DE_CARPETA } from '../../../../lib/carpetas.mjs';
 import {
   cerrarSesion,
@@ -49,10 +48,18 @@ import {
   tokenDeCabecera,
   usuarioEsperado,
 } from '../../../../lib/admin-auth.mjs';
-import { vtuberUpdateSchema, formatIssues } from '../../../../server/src/validation.mjs';
-import { getVtuberBySlug } from '../../../../server/src/search.mjs';
+import {
+  adminListQuerySchema,
+  bulkStatusSchema,
+  factionCreateSchema,
+  factionUpdateSchema,
+  formatIssues,
+  vtuberCreateSchema,
+  vtuberUpdateSchema,
+} from '../../../../server/src/validation.mjs';
+import { MutationError, listarFacciones, ultimoDex } from '../../../../server/src/mutations.mjs';
+import { getVtuberBySlug, searchVtubers } from '../../../../server/src/search.mjs';
 import { readWebpSize } from '../../../../server/src/seed.mjs';
-import { getDb } from '../../../../lib/db.mjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,43 +87,41 @@ async function exigirSesion(request) {
 }
 
 /**
+ * Respuesta de error de una mutación: el estado y el código que decidieron las reglas
+ * compartidas (`server/src/mutations.mjs`), idénticos a los del Express local.
+ */
+function responderError(error) {
+  if (error instanceof MutationError) {
+    return NextResponse.json({ error: error.code, detail: error.detail }, { status: error.status });
+  }
+  console.error('[admin] error al guardar', error);
+  return NextResponse.json({ error: 'error_al_guardar', detail: error.message }, { status: 500 });
+}
+
+/**
  * El detalle de una ficha tal como lo ve el mantenedor, listo para devolverlo.
  *
  * POR QUÉ DEVOLVER EL DETALLE Y NO `{ok:true}`
  * -------------------------------------------
  * El cliente hace `setSelected(respuesta)` con el resultado de cada escritura y vuelve a
- * dibujar la página desde ese objeto (`components/admin-page.tsx`, `onUpdated`). Devolver un
- * acuse —`{ok, slug, kind, size}`— no da error, pero deja la ficha con los campos del
- * catálogo: al subir una imagen, `images[kind]` sigue en `null` y el mantenedor pinta "sin
- * imagen" con la imagen YA guardada. Medido en producción: era el síntoma de "no puedo subir
- * imágenes". El Express devuelve el detalle desde siempre (`res.json({ok, kind, asset,
- * vtuber})`), así que este es el contrato al que hay que igualarse, no uno nuevo.
+ * dibujar la página desde ese objeto (`components/admin-page.tsx`). Devolver un acuse no da
+ * error, pero deja la ficha con campos en `undefined`: el formulario aparecía vacío tras guardar
+ * y el gestor de imágenes pintaba "sin imagen" con la imagen ya guardada. El Express devuelve el
+ * detalle desde siempre, así que este es el contrato al que hay que igualarse.
  *
- * Se aplican las ediciones de Turso por la misma razón por la que las aplica la lectura:
- * `getVtuberBySlug` lee el CATÁLOGO, y sin volver a pasar las ediciones una ficha editada en
- * el mantenedor volvería a mostrar los valores del scrape tras guardar.
- *
- * `includeHidden: true` porque el mantenedor trabaja con fichas despublicadas: sin esto,
- * guardar en una ficha en borrador la haría desaparecer de la pantalla.
- */
-async function detalleActualizado(db, slug) {
-  const detalle = getVtuberBySlug(db, slug, { includeHidden: true });
-  if (!detalle) return null;
-  const ediciones = await leerEdiciones();
-  return aplicarEdiciones(detalle, ediciones);
-}
-
-/**
- * El detalle con los reemplazos de imagen del mantenedor visibles.
- *
- * Se consulta Turso por tipo (solo hay reemplazo si alguien subió una imagen a mano) y se
- * compone con `aplicarImagenesDelMantenedor`. La extensión de cada carpeta sale del módulo
- * compartido: los emblemas de facción son PNG y suponer `.webp` los dejaría fuera.
+ * `db` es la base CON el diario aplicado (`dbConDiario`), así que ya trae las ediciones, y
+ * `includeHidden: true` porque el mantenedor trabaja con borradores y fichas ocultas. Lo único
+ * que se superpone es lo que vive fuera de SQLite: los bytes de las imágenes en Turso.
  */
 async function detalleConReemplazos(db, slug) {
-  const detalle = await detalleActualizado(db, slug);
+  const detalle = getVtuberBySlug(db, slug, { includeHidden: true });
   if (!detalle) return null;
-  return aplicarImagenesDelMantenedor(detalle, await reemplazosDelMantenedor(slug));
+  return aplicarImagenesDelMantenedor(detalle, await reemplazosDelMantenedor(detalle.slug));
+}
+
+/** Ficha por id sobre la base materializada, o `null`. */
+function fichaPorId(db, id) {
+  return db.prepare('SELECT id, slug FROM vtuber WHERE id = ?').get(Number(id)) ?? null;
 }
 
 /** Reenvía al Express local (comportamiento de siempre, sin cambios). */
@@ -249,7 +254,7 @@ async function logout(request) {
  * muestre "sin registros" y no un error.
  */
 async function estadisticas() {
-  const db = getDb();
+  const db = await dbConDiario();
   const totals = db
     .prepare(
       `SELECT COUNT(*) AS total,
@@ -263,34 +268,15 @@ async function estadisticas() {
     .all()
     .map((row) => ({ flags: JSON.parse(row.flags ?? '[]'), count: row.count }));
   const themes = db.prepare('SELECT COUNT(DISTINCT theme_color) AS n FROM vtuber').get().n;
-
-  const ediciones = await leerEdiciones();
-  let despublicadas = 0;
-  for (const campos of Object.values(ediciones)) {
-    if (campos.status !== undefined) {
-      const valor = campos.status === null ? null : jsonTolerante(campos.status);
-      if (valor && valor !== 'published') despublicadas += 1;
-    }
-  }
   return NextResponse.json({
     totals: {
-      ...totals,
       total: Number(totals.total ?? 0),
       withDetail: Number(totals.withDetail ?? 0),
-      notPublished: Number(totals.notPublished ?? 0) + despublicadas,
+      notPublished: Number(totals.notPublished ?? 0),
     },
     themes,
     quality,
   });
-}
-
-/** `JSON.parse` tolerante: una fila antigua o corrupta no debe tumbar las estadísticas. */
-function jsonTolerante(bruto) {
-  try {
-    return JSON.parse(bruto);
-  } catch {
-    return bruto;
-  }
 }
 
 /**
@@ -303,41 +289,122 @@ function jsonTolerante(bruto) {
  */
 
 /**
- * `PATCH /api/admin/vtubers/:id` — guarda una edición en Turso.
+ * `PATCH /api/admin/vtubers/:id` — edita una ficha: se anota en el diario de Turso.
  *
- * Se resuelve el `id` a `slug` contra el catálogo (el mantenedor sigue trabajando con
- * ids) y se valida con `vtuberUpdateSchema`, el MISMO esquema que usa el Express: si la
- * validación fuera otra, una edición aceptada en local podría ser rechazada en
- * producción y el mantenedor tendría dos comportamientos.
+ * Se valida con `vtuberUpdateSchema`, el MISMO esquema que usa el Express, y se aplica con las
+ * MISMAS funciones (`server/src/mutations.mjs`): si la validación o las reglas fueran otras, una
+ * edición aceptada en local podría ser rechazada en producción y el mantenedor tendría dos
+ * comportamientos. Las reglas (número libre, URL única, máximo dos facciones…) las hace cumplir
+ * `aplicarYAnotar` ANTES de escribir nada.
  */
-async function editarVtuber(request, id) {
-  const db = getDb();
-  const actual = db.prepare('SELECT slug FROM vtuber WHERE id = ?').get(Number(id));
-  if (!actual) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
-
+async function editarVtuber(request, id, usuario) {
   const body = await request.json().catch(() => null);
   const parsed = vtuberUpdateSchema.safeParse(body ?? {});
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'payload_invalido', issues: formatIssues(parsed.error) },
-      { status: 400 },
+    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
+  }
+  if (Object.keys(parsed.data).length === 0) {
+    return NextResponse.json({ error: 'sin_cambios' }, { status: 400 });
+  }
+  try {
+    const db = await dbConDiario();
+    const actual = fichaPorId(db, id);
+    if (!actual) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+    const { db: dbNueva, resultado } = await aplicarYAnotar(
+      { tipo: 'vtuber.editar', id: actual.id, patch: parsed.data },
+      usuario.username,
     );
+    // Los reemplazos de imagen del mantenedor se guardan por slug: al cambiar la URL se mudan
+    // con la ficha, o la imagen subida dejaría de verse.
+    if (resultado.slug !== actual.slug) await renombrarAssetsDelMantenedor(actual.slug, resultado.slug);
+    return NextResponse.json(await detalleConReemplazos(dbNueva, resultado.slug));
+  } catch (error) {
+    return responderError(error);
   }
-  const guardado = await guardarEdicion(actual.slug, parsed.data);
-  if (!guardado) {
-    return NextResponse.json({ error: 'sin_cambios', slug: actual.slug }, { status: 400 });
+}
+
+/** `POST /api/admin/vtubers` — crea una carta nueva (nace en borrador, al final de la dex). */
+async function crearVtuber(request, usuario) {
+  const body = await request.json().catch(() => null);
+  const parsed = vtuberCreateSchema.safeParse(body ?? {});
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
   }
-  /**
-   * El detalle COMPLETO, no un acuse.
-   *
-   * El cliente hace `setSelected(await api.updateVtuber(...))` (`admin-page.tsx`). Al devolver
-   * `{ok, slug, editado}`, ese objeto pasaba a ser la ficha seleccionada: sin `name`, sin
-   * `assets`, sin `images` — con los campos en `undefined`, el formulario aparecía vacío
-   * después de guardar. El Express devuelve `res.json(updated)` desde siempre, así que este es
-   * el contrato correcto y el que el tipo `VtuberDetail` del cliente declara.
-   */
-  const detalle = await detalleConReemplazos(db, actual.slug);
+  try {
+    const { db, resultado } = await aplicarYAnotar({ tipo: 'vtuber.crear', datos: parsed.data }, usuario.username);
+    return NextResponse.json(await detalleConReemplazos(db, resultado.slug), { status: 201 });
+  } catch (error) {
+    return responderError(error);
+  }
+}
+
+/** `GET /api/admin/vtubers` — listado del mantenedor: incluye borradores y ocultos. */
+async function listarVtubers(request) {
+  const parsed = adminListQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'query_invalida', issues: formatIssues(parsed.error) }, { status: 400 });
+  }
+  const { q, status, page, perPage } = parsed.data;
+  const db = await dbConDiario();
+  const resultado = searchVtubers(db, { q, page, perPage, includeHidden: true, status: status === 'all' ? null : status, sort: 'dex' });
+  return NextResponse.json({ ...resultado, items: await aplicarReemplazosALista(resultado.items) });
+}
+
+/** `GET /api/admin/vtubers/:id` — detalle sin filtrar por estado: es lo que abre el editor. */
+async function detalleVtuber(id) {
+  const db = await dbConDiario();
+  const actual = fichaPorId(db, id);
+  const detalle = actual ? await detalleConReemplazos(db, actual.slug) : null;
+  if (!detalle) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
   return NextResponse.json(detalle);
+}
+
+/** `GET /api/admin/dex/next` — el siguiente número libre al final de la dex. */
+async function siguienteDex() {
+  const db = await dbConDiario();
+  return NextResponse.json({ next: ultimoDex(db) + 1 });
+}
+
+// ------------------------------------------------------------- facciones
+
+/** `GET /api/admin/factions` — las facciones con su conteo real. */
+async function listaDeFacciones() {
+  return NextResponse.json({ items: listarFacciones(await dbConDiario()) });
+}
+
+/** Aplica una operación de facción y devuelve la lista nueva (la UI repinta desde ella). */
+async function mutarFaccion(operacion, usuario, status = 200) {
+  try {
+    const { db, resultado } = await aplicarYAnotar(operacion, usuario.username);
+    return NextResponse.json({ faction: resultado, items: listarFacciones(db) }, { status });
+  } catch (error) {
+    return responderError(error);
+  }
+}
+
+async function crearFaccionRuta(request, usuario) {
+  const parsed = factionCreateSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
+  }
+  return mutarFaccion({ tipo: 'faccion.crear', datos: parsed.data }, usuario, 201);
+}
+
+async function editarFaccionRuta(request, id, usuario) {
+  const parsed = factionUpdateSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
+  }
+  return mutarFaccion({ tipo: 'faccion.editar', id: Number(id), patch: parsed.data }, usuario);
+}
+
+async function eliminarFaccionRuta(request, id, usuario) {
+  const bruto = new URL(request.url).searchParams.get('mergeInto');
+  const destino = bruto === null ? null : Number(bruto);
+  if (destino !== null && !Number.isInteger(destino)) {
+    return NextResponse.json({ error: 'fusion_invalida', detail: 'mergeInto debe ser un id' }, { status: 400 });
+  }
+  return mutarFaccion({ tipo: 'faccion.eliminar', id: Number(id), fusionarEn: destino }, usuario);
 }
 
 /**
@@ -361,8 +428,8 @@ async function subirImagen(request, id, kind) {
       { status: 400 },
     );
   }
-  const db = getDb();
-  const actual = db.prepare('SELECT slug FROM vtuber WHERE id = ?').get(Number(id));
+  const db = await dbConDiario();
+  const actual = fichaPorId(db, id);
   if (!actual) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
 
   const bytes = Buffer.from(await request.arrayBuffer());
@@ -417,8 +484,8 @@ async function subirImagen(request, id, kind) {
 
 /** `DELETE /api/admin/vtubers/:id/image/:kind` — vuelve a la imagen del catálogo. */
 async function borrarImagen(id, kind) {
-  const db = getDb();
-  const actual = db.prepare('SELECT slug FROM vtuber WHERE id = ?').get(Number(id));
+  const db = await dbConDiario();
+  const actual = fichaPorId(db, id);
   if (!actual) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
   if (!KINDS_GESTIONABLES.includes(kind)) {
     return NextResponse.json(
@@ -446,89 +513,90 @@ async function borrarImagen(id, kind) {
 /**
  * `POST /api/admin/vtubers/bulk-status` — cambia el estado de varias fichas.
  *
- * El estado es una edición más, así que va a Turso como cualquier otro campo. Se hace en
- * un solo `batch` para que sean una operación y no N viajes.
+ * Es UNA operación del diario (no N): se aplica en una transacción y se anota con una sola
+ * escritura a Turso.
  */
-async function estadoMasivo(request) {
-  const body = await request.json().catch(() => null);
-  const ids = Array.isArray(body?.ids) ? body.ids : null;
-  if (!ids || !body?.status) {
-    return NextResponse.json({ error: 'payload_invalido', detail: 'ids[] y status' }, { status: 400 });
+async function estadoMasivo(request, usuario) {
+  const parsed = bulkStatusSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
   }
-  const db = getDb();
-  const lugar = ids.map(() => '?').join(',');
-  const filas = db.prepare(`SELECT slug FROM vtuber WHERE id IN (${lugar})`).all(...ids.map(Number));
-  const actualizados = await guardarEdicionMasiva(filas.map((f) => f.slug), 'status', body.status);
-  return NextResponse.json({ ok: true, actualizados, status: body.status });
+  try {
+    const { ids, status } = parsed.data;
+    const { resultado } = await aplicarYAnotar({ tipo: 'vtuber.estado', ids, status }, usuario.username);
+    return NextResponse.json({ updated: resultado.ids.length, status });
+  } catch (error) {
+    return responderError(error);
+  }
+}
+
+/** Respuesta común cuando no hay ningún backend de escritura. */
+function sinBackend() {
+  return noDisponible('el mantenedor solo existe en local: en Vercel hace falta TURSO_DATABASE_URL');
 }
 
 export async function GET(request, context) {
   if (ADMIN_UPSTREAM) return reenviar(request, context, 'GET');
-  if (!tursoConfigurado()) {
-    return noDisponible('el mantenedor solo existe en local: en Vercel hace falta TURSO_DATABASE_URL');
-  }
+  if (!tursoConfigurado()) return sinBackend();
   const { path } = await context.params;
-  const sufijo = Array.isArray(path) ? path.join('/') : (path ?? '');
+  const partes = Array.isArray(path) ? path : [path];
+  const sufijo = partes.join('/');
   if (sufijo === 'session') return sesionTurso(request);
-  if (sufijo === 'stats') {
-    const [, negado] = await exigirSesion(request);
-    if (negado) return negado;
-    return estadisticas();
-  }
+  const [, negado] = await exigirSesion(request);
+  if (negado) return negado;
+  if (sufijo === 'stats') return estadisticas();
   // `audit` va vacío a propósito: el registro vive en `audit_log`, que la base que se
   // despliega sanea (contiene el hash de la contraseña). Se devuelve `{items: []}` para que
   // la UI muestre "sin registros" en vez de un error que parecería una avería.
-  if (sufijo === 'audit') {
-    const [, negado] = await exigirSesion(request);
-    if (negado) return negado;
-    return NextResponse.json({ items: [] });
-  }
+  if (sufijo === 'audit') return NextResponse.json({ items: [] });
+  if (sufijo === 'vtubers') return listarVtubers(request);
+  if (partes[0] === 'vtubers' && partes[1] && partes.length === 2) return detalleVtuber(partes[1]);
+  if (sufijo === 'dex/next') return siguienteDex();
+  if (sufijo === 'factions') return listaDeFacciones();
   return noDisponible(`ruta del mantenedor no soportada en producción: ${sufijo}`);
 }
 
 export async function PATCH(request, context) {
   if (ADMIN_UPSTREAM) return reenviar(request, context, 'PATCH');
-  if (!tursoConfigurado()) {
-    return noDisponible('el mantenedor solo existe en local: en Vercel hace falta TURSO_DATABASE_URL');
-  }
-  const [, negado] = await exigirSesion(request);
+  if (!tursoConfigurado()) return sinBackend();
+  const [usuario, negado] = await exigirSesion(request);
   if (negado) return negado;
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
-  if (partes[0] === 'vtubers' && partes[1]) return editarVtuber(request, partes[1]);
+  if (partes[0] === 'vtubers' && partes[1]) return editarVtuber(request, partes[1], usuario);
+  if (partes[0] === 'factions' && partes[1]) return editarFaccionRuta(request, partes[1], usuario);
   return noDisponible(`ruta del mantenedor no soportada en producción: ${partes.join('/')}`);
 }
 
 export async function POST(request, context) {
   if (ADMIN_UPSTREAM) return reenviar(request, context, 'POST');
-  if (!tursoConfigurado()) {
-    return noDisponible('el mantenedor solo existe en local: en Vercel hace falta TURSO_DATABASE_URL');
-  }
+  if (!tursoConfigurado()) return sinBackend();
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
   // El login es la ÚNICA ruta sin sesión: es la que la crea.
   if (partes[0] === 'login') return login(request);
   if (partes[0] === 'logout') return logout(request);
-  const [, negado] = await exigirSesion(request);
+  const [usuario, negado] = await exigirSesion(request);
   if (negado) return negado;
-  if (partes[0] === 'vtubers' && partes[1] === 'bulk-status') return estadoMasivo(request);
+  if (partes[0] === 'vtubers' && partes.length === 1) return crearVtuber(request, usuario);
+  if (partes[0] === 'vtubers' && partes[1] === 'bulk-status') return estadoMasivo(request, usuario);
   if (partes[0] === 'vtubers' && partes[1] && partes[2] === 'image' && partes[3]) {
     return subirImagen(request, partes[1], partes[3]);
   }
+  if (partes[0] === 'factions' && partes.length === 1) return crearFaccionRuta(request, usuario);
   return noDisponible(`ruta del mantenedor no soportada en producción: ${partes.join('/')}`);
 }
 
 export async function DELETE(request, context) {
   if (ADMIN_UPSTREAM) return reenviar(request, context, 'DELETE');
-  if (!tursoConfigurado()) {
-    return noDisponible('el mantenedor solo existe en local: en Vercel hace falta TURSO_DATABASE_URL');
-  }
-  const [, negado] = await exigirSesion(request);
+  if (!tursoConfigurado()) return sinBackend();
+  const [usuario, negado] = await exigirSesion(request);
   if (negado) return negado;
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
   if (partes[0] === 'vtubers' && partes[1] && partes[2] === 'image' && partes[3]) {
     return borrarImagen(partes[1], partes[3]);
   }
+  if (partes[0] === 'factions' && partes[1]) return eliminarFaccionRuta(request, partes[1], usuario);
   return noDisponible(`ruta del mantenedor no soportada en producción: ${partes.join('/')}`);
 }

@@ -38,6 +38,7 @@ import {
 } from '@/components/card-texture';
 import { cardFragmentShader, cardVertexShader, glowFragmentShader, glowVertexShader } from '@/components/shaders';
 import { buildCardBodyGeometry } from '@/components/card3d-geometry';
+import { iconosDeFaccion } from '@/components/card-texture/facciones';
 import { LAYER_UNIFORM_NAMES } from '@/components/card3d-config';
 
 /** Proporción real de una carta coleccionable (5x7 pulgadas -> 1.4). */
@@ -264,10 +265,8 @@ function CardMesh({
   const [factionTextures, setFactionTextures] = useState<THREE.Texture[]>([]);
   useEffect(() => {
     let cancelled = false;
-    const icons = (card.factionIcons ?? [])
-      .map((f) => f.icon)
-      .filter((icon): icon is string => Boolean(icon))
-      .slice(0, CFG.FACTION.slots.length);
+    // La MISMA lista que usa la textura del título para pintar los engarces.
+    const icons = iconosDeFaccion(card);
     setFactionTextures([]);
     if (icons.length === 0) return undefined;
     Promise.all(icons.map((src) => loadImage(src))).then((imgs) => {
@@ -298,9 +297,7 @@ function CardMesh({
       uEdgeStrength: { value: CFG.EDGE.strength as number },
       uFactionMap0: { value: null as THREE.Texture | null },
       uFactionMap1: { value: null as THREE.Texture | null },
-      uFactionMap2: { value: null as THREE.Texture | null },
-      uFactionMap3: { value: null as THREE.Texture | null },
-      uFactionCounts: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uFactionCounts: { value: new THREE.Vector2(0, 0) },
       uFactionStrength: { value: CFG.FACTION.strength as number },
       uAccent: { value: accent },
       uSecondary: { value: secondary },
@@ -391,21 +388,17 @@ function CardMesh({
   }, [textures, uniforms]);
 
   useEffect(() => {
-    const maps = [
-      uniforms.front.uFactionMap0,
-      uniforms.front.uFactionMap1,
-      uniforms.front.uFactionMap2,
-      uniforms.front.uFactionMap3,
-    ];
-    maps.forEach((map, index) => {
-      map.value = factionTextures[index] ?? null;
-    });
-    (uniforms.front.uFactionCounts.value as THREE.Vector4).set(
-      factionTextures[0] ? 1 : 0,
-      factionTextures[1] ? 1 : 0,
-      factionTextures[2] ? 1 : 0,
-      factionTextures[3] ? 1 : 0,
-    );
+    /**
+     * Con UNA facción el emblema va al slot de la DERECHA (el 1), pegado al borde de la placa,
+     * igual que su engarce en la textura del título; con dos, cada uno en el suyo. Rellenar desde
+     * el slot 0 dejaba el único emblema separado de su engarce.
+     */
+    const [primero, segundo] = factionTextures;
+    const derecha = segundo ?? primero ?? null;
+    const izquierda = segundo ? primero : null;
+    uniforms.front.uFactionMap0.value = izquierda ?? null;
+    uniforms.front.uFactionMap1.value = derecha;
+    (uniforms.front.uFactionCounts.value as THREE.Vector2).set(izquierda ? 1 : 0, derecha ? 1 : 0);
   }, [factionTextures, uniforms]);
 
   useEffect(() => {

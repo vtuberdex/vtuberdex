@@ -79,10 +79,11 @@ ${lineas.join('\n')}
  * Posiciones y tamaños de los slots de facción, como líneas GLSL.
  *
  * Se generan desde la config en vez de escribirse aquí: el shader describe CÓMO se
- * reparten (cuatro posiciones, cuatro tamaños), no dónde están.
+ * reparten (dos emblemas en la cabecera), no dónde están. El tamaño es un `vec2` porque el UV
+ * de la carta no es cuadrado: un emblema cuadrado mide distinto en cada eje.
  */
 const FACTION_SLOTS = CFG.FACTION.slots.map((s, i) => `        slots[${i}] = vec2(${f(s.x)}, ${f(s.y)});`).join('\n');
-const FACTION_SIZES = CFG.FACTION.slots.map((s, i) => `        sizes[${i}] = ${f(s.size)};`).join('\n');
+const FACTION_SIZES = CFG.FACTION.slots.map((s, i) => `        sizes[${i}] = vec2(${f(s.w)}, ${f(s.h)});`).join('\n');
 
 export const cardVertexShader = /* glsl */ `
   uniform vec2 uPointer;
@@ -141,15 +142,13 @@ export const cardFragmentShader = /* glsl */ `
   uniform sampler2D uEdgeMap;
   uniform float uEdgeStrength;
   /**
-   * Emblemas de las facciones del VTuber. Un VTuber tiene entre 2 y 4 facciones,
-   * así que se superponen hasta 4 emblemas en posiciones distintas (ver
-   * FACTION.slots): no se apilan en el centro, se reparten por la lámina.
+   * Emblemas de las facciones del VTuber. Un VTuber tiene como máximo DOS facciones, y
+   * sus emblemas van en la cabecera, a la derecha del nombre (ver FACTION.slots).
+   * Pasar de cuatro a dos samplers libera dos de los 16 que permite el driver.
    */
   uniform sampler2D uFactionMap0;
   uniform sampler2D uFactionMap1;
-  uniform sampler2D uFactionMap2;
-  uniform sampler2D uFactionMap3;
-  uniform vec4 uFactionCounts;
+  uniform vec2 uFactionCounts;
   /** Opacidad del emblema holográfico (permite atenuarlo sin tocarlo en CPU). */
   uniform float uFactionStrength;
   uniform vec3 uAccent;
@@ -514,6 +513,24 @@ export const cardFragmentShader = /* glsl */ `
    * es suave y se acerca al techo sin llegar a recortarse, que es lo que da el aspecto de
    * luz con rango en vez de mancha plana.
    */
+  /**
+   * Sustituye la luz cromática del holograma por luz del MISMO matiz que el arte cuando el
+   * arte es saturado u oscuro (ver HUE_PROTECT). Devuelve la luz ya corregida.
+   */
+  vec3 protegerMatiz(vec3 luz, vec3 arte) {
+    float mx = max(arte.r, max(arte.g, arte.b));
+    float mn = min(arte.r, min(arte.g, arte.b));
+    float croma = (mx - mn) / max(mx, ${f(CFG.HUE_PROTECT.valueFloor)});
+    float lumArte = dot(arte, vec3(0.2126, 0.7152, 0.0722));
+    float porColor = smoothstep(${f(CFG.HUE_PROTECT.chromaFrom)}, ${f(CFG.HUE_PROTECT.chromaTo)}, croma);
+    float porOscuro = smoothstep(${f(CFG.HUE_PROTECT.darkFrom)}, ${f(CFG.HUE_PROTECT.darkTo)}, lumArte);
+    float proteger = max(porColor, porOscuro) * ${f(CFG.HUE_PROTECT.strength)};
+    // Matiz del arte llevado a su máximo brillo, con la luminancia de la luz original.
+    vec3 matiz = arte / max(mx, ${f(CFG.HUE_PROTECT.valueFloor)});
+    float lumLuz = dot(luz, vec3(0.2126, 0.7152, 0.0722));
+    return mix(luz, matiz * lumLuz, proteger);
+  }
+
   vec3 hdrLuz(vec3 luz) {
     float techo = max(uHdrCeiling, 0.05);
     vec3 x = max(luz, 0.0) / techo;
@@ -900,30 +917,26 @@ ${SPECTRUM_FN}
     vec3 holoLayer = foil * uLayerWeight;
 
     // --- CAPA 3: emblemas de FACCIÓN como holograma ---------------------------
-    // Cada VTuber tiene entre 2 y 4 facciones. Se reparten por la lámina en
-    // cuatro posiciones (no se apilan en el centro) y se mezclan en modo LUZ para
-    // que se lean como holograma superpuesto sin manchar la carta. Cada emblema
-    // recibe su propio tinte iridiscente y su fase de latido, así no parecen un
+    // Cada VTuber tiene como máximo DOS facciones. Sus emblemas van en la cabecera, a la
+    // derecha del nombre, sobre un engarce de acero oscuro que pinta la textura del título, y
+    // se mezclan en modo LUZ para que se lean como holograma encastrado sin manchar la carta.
+    // Cada emblema recibe su propio tinte iridiscente y su fase de latido, así no parecen un
     // mismo sello repetido.
 
-    if (uFactionCounts.x > 0.5) {
-      // Posición de cada slot en la carta (x,y) y su tamaño relativo, generados
-      // desde FACTION.slots: 1º arriba-derecha, 2º abajo-izquierda,
-      // 3º arriba-izquierda, 4º abajo-derecha.
-      vec2 slots[4];
+    if (uFactionCounts.x + uFactionCounts.y > 0.5) {
+      // Posición (x,y) y tamaño (ancho,alto en UV) de cada slot, generados desde
+      // FACTION.slots: el 0 es el de la izquierda y el 1 el de la derecha.
+      vec2 slots[2];
 ${FACTION_SLOTS}
-      float sizes[4];
+      vec2 sizes[2];
 ${FACTION_SIZES}
 
-      for (int i = 0; i < 4; i++) {
-        float activo = (i == 0) ? uFactionCounts.x
-                     : (i == 1) ? uFactionCounts.y
-                     : (i == 2) ? uFactionCounts.z
-                     : uFactionCounts.w;
+      for (int i = 0; i < 2; i++) {
+        float activo = (i == 0) ? uFactionCounts.x : uFactionCounts.y;
         if (activo < 0.5) continue;
 
         vec2 slot = slots[i];
-        float size = sizes[i];
+        vec2 size = sizes[i];
         // Parallax por slot: cada emblema se desplaza con el puntero a distinta
         // intensidad, dando sensación de capas a distinta profundidad.
         float depth = 1.0 + float(i) * 0.5;
@@ -932,9 +945,7 @@ ${FACTION_SIZES}
 
         vec4 fac;
         if (i == 0) fac = texture2D(uFactionMap0, fUv);
-        else if (i == 1) fac = texture2D(uFactionMap1, fUv);
-        else if (i == 2) fac = texture2D(uFactionMap2, fUv);
-        else fac = texture2D(uFactionMap3, fUv);
+        else fac = texture2D(uFactionMap1, fUv);
 
         // Los emblemas traen el interior en negro OPACO (~30-45% del PNG), así que
         // usar solo el alfa los hacía invisibles: su color casi negro se multiplica
@@ -1105,11 +1116,10 @@ ${FACTION_SIZES}
      *     para el HDR y lo que después se comprime en el codo, porque es lo que en una foto
      *     real tiene rango y "quema" con degradado.
      */
+    vec3 luzCromatica = protegerMatiz(holoLayer * uHoloSelf + edgeLayer + bgLit, base);
     vec3 luzExtra = base * (glossLayer + holoLayer)
       + glossLayer * uGlossSelf
-      + holoLayer * uHoloSelf
-      + edgeLayer
-      + bgLit;
+      + luzCromatica;
     vec3 lit = base;
 
     /**

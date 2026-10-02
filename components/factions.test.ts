@@ -10,50 +10,67 @@ import { expect, test } from 'vitest';
 
 import { cardFragmentShader } from '@/components/shaders';
 import { FACTION } from '@/components/card3d-config';
+import { CARD_TEXTURE_HEIGHT, CARD_TEXTURE_WIDTH, FACTION_SOCKET, HEADER, MAX_FACTION_EMBLEMS } from '@/components/card-texture/dimensiones';
 
-test('el shader declara los cuatro slots de facción', () => {
-  for (const i of [0, 1, 2, 3]) {
-    assert.ok(
+test('el shader declara los dos slots de facción (máximo de facciones por VTuber)', () => {
+  for (const i of [0, 1]) {
+    expect(
       cardFragmentShader.includes(`uniform sampler2D uFactionMap${i};`),
       `debe declarar uFactionMap${i}`,
-    );
-    expect(cardFragmentShader.includes(`texture2D(uFactionMap${i}, fUv)`),
-      `debe MUESTREAR uFactionMap${i} (declararlo sin usarlo no dibuja nada)`,).toBeTruthy();
+    ).toBeTruthy();
+    expect(
+      cardFragmentShader.includes(`texture2D(uFactionMap${i}, fUv)`),
+      `debe MUESTREAR uFactionMap${i} (declararlo sin usarlo no dibuja nada)`,
+    ).toBeTruthy();
+  }
+  // Ya no hay slots 2 y 3: dos samplers menos contra el límite de 16 del driver.
+  for (const i of [2, 3]) {
+    expect(cardFragmentShader.includes(`uFactionMap${i}`), `uFactionMap${i} ya no existe`).toBe(false);
   }
 });
 
-test('la máscara de slots permite 1..4 facciones', () => {
-  assert.ok(cardFragmentShader.includes('uniform vec4 uFactionCounts;'), 'máscara vec4');
+test('la máscara de slots permite 1..2 facciones', () => {
+  expect(cardFragmentShader.includes('uniform vec2 uFactionCounts;'), 'máscara vec2').toBeTruthy();
   // El shader solo debe entrar si hay al menos una facción activa.
-  expect(/uFactionCounts\.x\s*>\s*0\.5/.test(cardFragmentShader), 'corta si no hay ninguna').toBeTruthy();
-  // Y debe consultar los cuatro componentes de la máscara.
-  for (const c of ['x', 'y', 'z', 'w']) {
-    expect(cardFragmentShader.includes(`uFactionCounts.${c}`),
-      `debe consultar uFactionCounts.${c}`,).toBeTruthy();
+  expect(/uFactionCounts\.x \+ uFactionCounts\.y\s*>\s*0\.5/.test(cardFragmentShader), 'corta si no hay ninguna').toBeTruthy();
+  for (const c of ['x', 'y']) {
+    expect(cardFragmentShader.includes(`uFactionCounts.${c}`), `debe consultar uFactionCounts.${c}`).toBeTruthy();
   }
 });
 
-test('las posiciones de los slots están repartidas, no apiladas', () => {
-  // Se extraen los vec2 asignados a slots[] y se comprueba que están separados:
-  // si dos emblemas caen casi en el mismo punto se pisarían entre sí.
-  const matches = [...cardFragmentShader.matchAll(/slots\[(\d)\]\s*=\s*vec2\(([\d.]+),\s*([\d.]+)\)/g)];
-  expect(matches.length, 'deben definirse las 4 posiciones').toBe(4);
+test('los emblemas están en la CABECERA, a la derecha del nombre y sin solaparse', () => {
+  expect(FACTION.slots).toHaveLength(MAX_FACTION_EMBLEMS);
+  const [izquierdo, derecho] = FACTION.slots;
+  // Misma altura, y esa altura es la de la placa de cabecera (arriba del todo: UV y cerca de 1).
+  expect(izquierdo.y).toBeCloseTo(derecho.y, 6);
+  const centroPx = HEADER.top + HEADER.height / 2;
+  expect(izquierdo.y).toBeCloseTo(1 - centroPx / CARD_TEXTURE_HEIGHT, 6);
+  // Orden: el slot 0 queda a la izquierda del 1, y los dos en la mitad derecha de la carta.
+  expect(izquierdo.x).toBeLessThan(derecho.x);
+  expect(izquierdo.x).toBeGreaterThan(0.5);
+  // No se pisan: la separación entre centros es mayor que el ancho de un emblema.
+  expect(derecho.x - izquierdo.x).toBeGreaterThan(izquierdo.w);
+  // Caben dentro de la placa (el borde derecho de la placa es W - pad).
+  const bordeDerecho = (CARD_TEXTURE_WIDTH - HEADER.pad) / CARD_TEXTURE_WIDTH;
+  expect(derecho.x + derecho.w / 2).toBeLessThanOrEqual(bordeDerecho);
+  // Y dentro de su altura.
+  const alto = HEADER.height / CARD_TEXTURE_HEIGHT;
+  expect(derecho.h).toBeLessThan(alto);
+});
 
-  const puntos = matches
-    .sort((a, b) => Number(a[1]) - Number(b[1]))
-    .map(([, , x, y]) => ({ x: Number(x), y: Number(y) }));
+test('el emblema es CUADRADO en píxeles aunque el UV de la carta no lo sea', () => {
+  for (const slot of FACTION.slots) {
+    expect(slot.w * CARD_TEXTURE_WIDTH).toBeCloseTo(slot.h * CARD_TEXTURE_HEIGHT, 6);
+  }
+});
 
-  for (let i = 0; i < puntos.length; i += 1) {
-    for (let j = i + 1; j < puntos.length; j += 1) {
-      const d = Math.hypot(puntos[i].x - puntos[j].x, puntos[i].y - puntos[j].y);
-      expect(d > 0.25, `los slots ${i} y ${j} están a ${d.toFixed(2)}: demasiado juntos`).toBeTruthy();
-    }
-  }
-  // Y todos dentro de la lámina.
-  for (const p of puntos) {
-    expect(p.x > 0.1 && p.x < 0.9, `x ${p.x} fuera de la lámina`).toBeTruthy();
-    expect(p.y > 0.1 && p.y < 0.9, `y ${p.y} fuera de la lámina`).toBeTruthy();
-  }
+test('los engarces de la textura y los slots del shader salen de la MISMA geometría', () => {
+  // La textura pinta el engarce en `FACTION_SOCKET` y el shader dibuja el emblema en
+  // `FACTION.slots`; si las dos cuentas divergen, el emblema queda fuera de su engarce.
+  const [izquierdo, derecho] = FACTION.slots;
+  const centroDerechoPx = CARD_TEXTURE_WIDTH - HEADER.pad - FACTION_SOCKET.inset - FACTION_SOCKET.size / 2;
+  expect(derecho.x * CARD_TEXTURE_WIDTH).toBeCloseTo(centroDerechoPx, 6);
+  expect((derecho.x - izquierdo.x) * CARD_TEXTURE_WIDTH).toBeCloseTo(FACTION_SOCKET.size + FACTION_SOCKET.gap, 6);
 });
 
 test('cada slot tiene su propio tinte y su propia fase de latido', () => {
@@ -74,7 +91,7 @@ test('las posiciones del shader salen de la config, no de literales sueltos', ()
       `el shader debe tomar la posición ${i} de FACTION.slots`,
     ).toBeTruthy();
     expect(
-      cardFragmentShader.includes(`sizes[${i}] = ${slot.size};`),
+      cardFragmentShader.includes(`sizes[${i}] = vec2(${slot.w}, ${slot.h});`),
       `el shader debe tomar el tamaño ${i} de FACTION.slots`,
     ).toBeTruthy();
   }

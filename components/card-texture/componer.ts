@@ -1,7 +1,7 @@
 /**
  * Ensambla las 7 capas y publica la info de layout medida.
  */
-import { CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT, FONT } from './dimensiones';
+import { CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT, FONT, HEADER } from './dimensiones';
 import type { CardDrawInfo, CardLayers } from './tipos';
 import { createLayer, emptyLayer } from './lienzo';
 import { drawSurfaceLayer } from './capa-superficie';
@@ -13,9 +13,7 @@ import { drawWordmarkLayer } from './capa-wordmark';
 export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTURE_WIDTH }: CardDrawInfo): CardLayers {
   const W = CARD_TEXTURE_WIDTH;
   const H = CARD_TEXTURE_HEIGHT;
-  const pad = 46;
-  const headerTop = 44;
-  const headerH = 116;
+  const { pad, top: headerTop, height: headerH } = HEADER;
   const headerBottom = headerTop + headerH;
   const barY = H - 140;
 
