@@ -908,32 +908,44 @@ export const FACTION = {
    */
   slots: [ranuraDeCabecera(0), ranuraDeCabecera(1)],
   /**
-   * Parallax: cada emblema se desplaza con el puntero a distinta profundidad. Bajó de 0.02 a
-   * 0.004: con emblemas de 74 px dentro de un engarce, 0.02 de UV son ~20 px y el emblema se
-   * salía del engarce al mover el puntero.
+   * EL EMBLEMA VA FIJO EN SU ENGARCE. Antes tenía un paralaje propio (0.004 por slot) y el
+   * engarce, que es parte de la capa del título, otro (`PARALLAX_LAYERS[3]`): al mover el
+   * puntero se desplazaban a velocidades distintas y el emblema «flotaba» fuera del
+   * cuadrado. Ahora el shader lo muestrea con el MISMO desplazamiento que la capa del
+   * título, así que engarce y emblema se mueven como una sola pieza. No hay perilla: el
+   * acoplamiento es la regla, no un valor.
+   *
+   * Y SIN LATIDO. El pulso (0.72 ± 0.28, desfasado por slot) hacía que el emblema se
+   * apagara y encendiera; se pidió que quedara ESTÁTICO y legible, así que la intensidad
+   * es constante y solo la inclinación y el glare la suben un poco, como al resto del
+   * holograma.
    */
-  pointerParallax: 0.004,
-  /** Filtro del trazo por luminancia (el relleno oscuro del PNG no aporta nada). */
-  strokeLow: 0.10,
-  strokeHigh: 0.55,
-  /** Latido desfasado por slot: los emblemas no pulsan al unísono. */
-  pulseBase: 0.72,
-  pulseAmplitude: 0.28,
-  pulseSpeed: 1.5,
-  pulsePhase: 1.9,
-  pulseSurface: 5.0,
-  /** Máscara: piso, cuánto sube con la inclinación y con el glare. */
-  maskBase: 0.85,
-  maskTilt: 1.0,
-  maskGlare: 0.45,
-  /** Tinte iridiscente propio de cada slot. */
-  tintSpectrumMix: 0.7,
+  /**
+   * Filtro del trazo por luminancia (el relleno oscuro del PNG no aporta nada). Umbrales
+   * más bajos que antes (0.10/0.55): el trazo gris de varios emblemas quedaba a medias y el
+   * emblema se veía tenue; ahora cualquier trazo por encima del gris medio cuenta entero.
+   */
+  strokeLow: 0.06,
+  strokeHigh: 0.35,
+  /** Máscara: piso (constante, lo que se ve en reposo), cuánto sube con la inclinación y con el glare. */
+  maskBase: 1.0,
+  maskTilt: 0.35,
+  maskGlare: 0.25,
+  /**
+   * Tinte iridiscente propio de cada slot. Bajó de 0.7 a 0.35: con el arcoíris al 70 % el
+   * trazo cambiaba de color al mover la carta y se leía peor; ahora domina el trazo blanco
+   * del emblema y el arcoíris es un matiz.
+   */
+  tintSpectrumMix: 0.35,
   tintUvScale: 0.9,
   tintPointer: 0.1,
   tintPhase: 0.2,
-  /** Mezcla sobre el arte: tinte del propio color y luz añadida. */
+  /**
+   * Mezcla sobre el arte: tinte del propio color y luz añadida. La luz subió de 1.2 a 1.8
+   * para que el emblema se «note más» sobre el acero oscuro del engarce.
+   */
   selfTint: 0.45,
-  addedLight: 1.2,
+  addedLight: 1.8,
 } as const;
 
 /**

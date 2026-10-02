@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 259 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 260 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 66 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/66/259** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/66/260** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -187,7 +187,13 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   Además el foil del fondo se tiñe del **color predominante** de la superficie
   (`card-texture/predominante.ts`, perilla `DOMINANT.mix` = 70 %): se calcula en CPU por matiz (no
   promedio: rojo+azul no dan morado), ignora grises y su `amount` baja a 0 en fondos grises o
-  multicolor, donde queda el arcoíris completo.
+  multicolor, donde queda el arcoíris completo. **El emblema va FIJO y centrado en su
+  engarce**: el shader lo muestrea con el MISMO paralaje que la capa del título
+  (`parallax * uParallaxFactors[3]`), porque con un paralaje propio se despegaba del cuadrado
+  al mover el puntero; lo encaja «contain» con la proporción real del PNG (`uFactionAspect`,
+  que `card-material.ts` saca de la imagen) en vez de estirarlo; y no late: la intensidad es
+  constante (`FACTION.maskBase`) con un leve realce por inclinación y glare. `factions.test.ts`
+  fija las tres cosas sobre el GLSL generado.
 
 ## Base de datos y migraciones
 

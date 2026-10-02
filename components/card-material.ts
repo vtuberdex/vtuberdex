@@ -306,6 +306,7 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
       uFactionMap0: { value: null as THREE.Texture | null },
       uFactionMap1: { value: null as THREE.Texture | null },
       uFactionCounts: { value: new THREE.Vector2(0, 0) },
+      uFactionAspect: { value: new THREE.Vector2(1, 1) },
       uBgDominant: { value: new THREE.Vector3(0, 0, 0) },
       uBgDominantAmount: { value: 0 },
       uBgDominantMix: { value: CFG.DOMINANT.mix as number },
@@ -424,6 +425,12 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
     uniforms.front.uFactionMap0.value = izquierda ?? null;
     uniforms.front.uFactionMap1.value = derecha;
     (uniforms.front.uFactionCounts.value as THREE.Vector2).set(izquierda ? 1 : 0, derecha ? 1 : 0);
+    // Proporción del PNG para encajarlo «contain» en el engarce cuadrado (ver uFactionAspect).
+    const proporcion = (tex: THREE.Texture | null | undefined) => {
+      const img = tex?.image as { width?: number; height?: number } | undefined;
+      return img?.width && img?.height ? img.width / img.height : 1;
+    };
+    (uniforms.front.uFactionAspect.value as THREE.Vector2).set(proporcion(izquierda), proporcion(derecha));
   }, [factionTextures, uniforms]);
 
   useEffect(() => {

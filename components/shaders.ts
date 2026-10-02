@@ -146,6 +146,13 @@ export const cardFragmentShader = /* glsl */ `
    * sus emblemas van en la cabecera, a la derecha del nombre (ver FACTION.slots).
    * Pasar de cuatro a dos samplers libera dos de los 16 que permite el driver.
    */
+  /**
+   * Proporción ancho/alto de cada emblema (uFactionAspect.x = slot 0, .y = slot 1). El PNG de
+   * una facción no es cuadrado y el engarce sí: sin esto el emblema se ESTIRABA para llenar
+   * el cuadrado y su centro óptico no coincidía con el del engarce. Con la proporción se
+   * encaja «contain», centrado.
+   */
+  uniform vec2 uFactionAspect;
   uniform sampler2D uFactionMap0;
   uniform sampler2D uFactionMap1;
   uniform vec2 uFactionCounts;
@@ -950,10 +957,15 @@ ${FACTION_SIZES}
 
         vec2 slot = slots[i];
         vec2 size = sizes[i];
-        // Parallax por slot: cada emblema se desplaza con el puntero a distinta
-        // intensidad, dando sensación de capas a distinta profundidad.
-        float depth = 1.0 + float(i) * 0.5;
-        vec2 fUv = (vUv - slot - uPointer * ${f(CFG.FACTION.pointerParallax)} * depth) / size + 0.5;
+        // El emblema se muestrea con el MISMO desplazamiento que la capa del título (donde
+        // está pintado su engarce): engarce y emblema se mueven como una sola pieza y el
+        // emblema nunca se sale del cuadrado al mover el puntero.
+        vec2 fUv = (vUv + parallax * uParallaxFactors[3] - slot) / size + 0.5;
+        // Encaje «contain» centrado: el PNG conserva su proporción dentro del engarce.
+        float aspecto = (i == 0) ? uFactionAspect.x : uFactionAspect.y;
+        vec2 centro = vec2(0.5);
+        vec2 ajuste = aspecto >= 1.0 ? vec2(1.0, aspecto) : vec2(1.0 / aspecto, 1.0);
+        fUv = (fUv - centro) * ajuste + centro;
         if (fUv.x < 0.0 || fUv.x > 1.0 || fUv.y < 0.0 || fUv.y > 1.0) continue;
 
         vec4 fac;
@@ -967,14 +979,10 @@ ${FACTION_SIZES}
         float facLum = max(max(fac.r, fac.g), fac.b);
         float facStroke = smoothstep(${f(CFG.FACTION.strokeLow)}, ${f(CFG.FACTION.strokeHigh)}, facLum);
         float facAlpha = fac.a * facStroke * uFactionStrength;
-        // Latido desfasado por slot: los emblemas no pulsan al unísono.
-        float pulse = ${f(CFG.FACTION.pulseBase)} + ${f(CFG.FACTION.pulseAmplitude)} * sin(
-          uTime * ${f(CFG.FACTION.pulseSpeed)} + float(i) * ${f(CFG.FACTION.pulsePhase)}
-            + vUv.y * ${f(CFG.FACTION.pulseSurface)}
-        );
+        // Intensidad CONSTANTE en reposo (sin latido): el emblema debe leerse siempre igual.
         float facMask = facAlpha * (
           ${f(CFG.FACTION.maskBase)} + tiltAmount * ${f(CFG.FACTION.maskTilt)} + glare * ${f(CFG.FACTION.maskGlare)}
-        ) * pulse;
+        );
         // Tinte iridiscente propio de cada slot.
         vec3 facTint = mix(
           vec3(1.0),
