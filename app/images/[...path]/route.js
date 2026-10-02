@@ -223,6 +223,16 @@ export async function GET(request, { params }) {
       if (etag && etagPedido === etag) {
         return new Response(null, { status: 304, headers: { etag } });
       }
+      /**
+       * Si la URL trae la versión (`?v=`) Y coincide con la marca de la fila, el contenido de ESA
+       * URL ya no puede cambiar: reemplazar o restaurar la imagen produce otra versión y, con
+       * ella, otra URL. Se puede cachear un año como `immutable`, sin revalidar ni en el borde
+       * ni en el navegador. Sin versión, o con una versión que ya no es la vigente, se queda la
+       * caché corta de abajo (la copia vieja no puede vivir mucho).
+       */
+      const versionPedida = new URL(request.url).searchParams.get('v');
+      const marca = remoto.actualizado ? String(remoto.actualizado).replace(/\D/g, '') : '';
+      const versionVigente = Boolean(versionPedida) && versionPedida === marca;
       return new Response(remoto.bytes, {
         status: 200,
         headers: {
@@ -236,7 +246,9 @@ export async function GET(request, { params }) {
            * catálogo y sin él la vieja). Cinco minutos de CDN y uno de navegador son
            * suficiente protección de cuota y no dejan una imagen obsoleta a la vista.
            */
-          'cache-control': 'public, max-age=60, s-maxage=300',
+          'cache-control': versionVigente
+            ? 'public, max-age=31536000, s-maxage=31536000, immutable'
+            : 'public, max-age=60, s-maxage=300',
           'content-length': String(remoto.bytes.byteLength),
         },
       });

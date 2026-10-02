@@ -15,9 +15,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 
 // --- Turso falso: SQLite en memoria con la misma interfaz que usa `lib/ediciones.mjs`.
 const turso = new DatabaseSync(':memory:');
+/** Cuántas veces se preguntó la clave del diario (la consulta con `MAX(seq)`). */
+let consultasDeClave = 0;
 const clienteFalso = {
   execute: async (arg: string | { sql: string; args?: unknown[] }) => {
     const sql = typeof arg === 'string' ? arg : arg.sql;
+    if (/MAX\(seq\)/i.test(sql)) consultasDeClave += 1;
     const args = (typeof arg === 'string' ? [] : (arg.args ?? [])) as never[];
     const sentencia = turso.prepare(sql);
     if (/^\s*(select|pragma)/i.test(sql)) {
@@ -88,6 +91,33 @@ const cartas = async (): Promise<Carta[]> =>
 /** Id de una ficha del catálogo de prueba, por slug. */
 const idDe = async (slug: string): Promise<number> =>
   ((await diario.dbConDiario()).prepare('SELECT id FROM vtuber WHERE slug = ?').get(slug) as { id: number }).id;
+
+describe('la clave del diario no se pregunta en cada lectura pública', () => {
+  // Este coste no lo ve ningún otro gate: la respuesta es idéntica con 1 consulta o con 100.
+  test('con TTL, una ráfaga de lecturas comparte UNA consulta; sin TTL, cada lectura pregunta', async () => {
+    await diario.dbConDiario({ ttlMs: 60_000 });
+    consultasDeClave = 0;
+    for (let i = 0; i < 5; i += 1) await diario.dbConDiario({ ttlMs: 60_000 });
+    expect(consultasDeClave).toBe(0);
+    for (let i = 0; i < 3; i += 1) await diario.dbConDiario();
+    expect(consultasDeClave).toBe(3);
+  });
+
+  test('una escritura de esta instancia invalida el TTL: la siguiente lectura vuelve a preguntar', async () => {
+    const id = await idDe('gkuro');
+    await diario.dbConDiario({ ttlMs: 60_000 });
+    await diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { name: 'GKuro 2' } });
+    // Otra instancia escribe en medio: la clave de ESTA ya no coincide con la de Turso.
+    turso.prepare("INSERT INTO cambio (tipo, payload, actor, creado) VALUES ('vtuber.editar', ?, 'x', 'x')").run(
+      JSON.stringify({ tipo: 'vtuber.editar', id, patch: { name: 'GKuro 3' } }),
+    );
+    consultasDeClave = 0;
+    await diario.dbConDiario(); // sin TTL: pregunta y reconstruye
+    expect(consultasDeClave).toBe(1);
+    const fila = (await diario.dbConDiario({ ttlMs: 60_000 })).prepare('SELECT name FROM vtuber WHERE id = ?').get(id) as { name: string };
+    expect(fila.name).toBe('GKuro 3');
+  });
+});
 
 describe('el diario se reproduce en una instancia fría', () => {
   test('sin cambios, el catálogo sale tal cual', async () => {
