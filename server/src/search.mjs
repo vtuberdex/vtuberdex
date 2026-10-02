@@ -46,7 +46,7 @@ const CARD_SELECT = `
        FROM (SELECT faction_id FROM vtuber_faction WHERE vtuber_id = v.id ORDER BY position) vf
        JOIN faction f ON f.id = vf.faction_id) AS factionsJson,
     /* Facciones con su emblema: la carta 3D lo superpone como holograma. */
-    (SELECT json_group_array(json_object('label', f.label, 'icon', f.icon))
+    (SELECT json_group_array(json_object('label', f.label, 'slug', f.slug, 'icon', f.icon))
        FROM (SELECT faction_id FROM vtuber_faction WHERE vtuber_id = v.id ORDER BY position) vf
        JOIN faction f ON f.id = vf.faction_id) AS factionIconsJson,
     (SELECT json_group_array(code) FROM vtuber_language WHERE vtuber_id = v.id) AS languagesJson,
@@ -115,7 +115,7 @@ export function mapCard(row) {
     factions: parseJsonArray(row.factionsJson),
     /** Facciones con emblema, para superponerlo como holograma en la carta. */
     factionIcons: parseJsonArray(row.factionIconsJson)
-      .map((f) => ({ label: f?.label ?? null, icon: f?.icon ? toPublicPath(f.icon) : null }))
+      .map((f) => ({ label: f?.label ?? null, slug: f?.slug ?? null, icon: f?.icon ? toPublicPath(f.icon) : null }))
       .filter((f) => f.label),
     languages: parseJsonArray(row.languagesJson),
     statsPreview: parseJsonArray(row.statsPreviewJson).filter((value) => typeof value === 'number'),
@@ -181,6 +181,8 @@ export function searchVtubers(db, params = {}) {
     page = 1,
     perPage = 24,
     includeHidden = false,
+    /** Filtra por un estado concreto (solo tiene sentido con `includeHidden`: lo usa el mantenedor). */
+    status = null,
     minPower = null,
     theme = null,
   } = params;
@@ -189,6 +191,10 @@ export function searchVtubers(db, params = {}) {
   const args = [];
 
   if (!includeHidden) where.push(`v.status = 'published'`);
+  else if (status) {
+    where.push('v.status = ?');
+    args.push(status);
+  }
   if (theme) {
     where.push('v.theme_color = ?');
     args.push(theme);
@@ -369,12 +375,33 @@ export function facetCounts(db, params = {}) {
   return { countries, languages, groups, artists, factions, totals };
 }
 
+/**
+ * El id de la ficha a la que apuntaba un slug anterior, o `null`.
+ *
+ * Tolera la ausencia de la tabla: la base empaquetada se abre en SOLO LECTURA y no aplica el
+ * esquema, así que una base anterior a esta función no la tiene y no debe tumbar el detalle.
+ */
+function buscarAlias(db, slug) {
+  try {
+    return db.prepare('SELECT vtuber_id AS id FROM slug_alias WHERE slug = ?').get(slug)?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Detalle completo de una carta (perfil, stats, skills, socials, assets). */
 export function getVtuberBySlug(db, slug, { includeHidden = false } = {}) {
   const where = includeHidden ? '' : `AND v.status = 'published'`;
-  const row = db
+  let row = db
     .prepare(`${CARD_SELECT} WHERE v.slug = ? ${where}`)
     .get(slug);
+  if (!row) {
+    // Un slug que la ficha ya no usa (se le cambió la URL) sigue resolviendo: el detalle devuelve
+    // la ficha con su slug ACTUAL y el cliente redirige. Sin esto, renombrar una página rompería
+    // todos los enlaces compartidos.
+    const alias = buscarAlias(db, slug);
+    if (alias) row = db.prepare(`${CARD_SELECT} WHERE v.id = ? ${where}`).get(alias);
+  }
   if (!row) return null;
   const card = mapCard(row);
 

@@ -39,9 +39,9 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 157 tests (vitest): utilidades, componentes, páginas, carta 3D
+npm test                   # 208 tests (vitest): utilidades, componentes, páginas, carta 3D
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
-cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
+cd server  && npm test     # 66 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
 # Linter (raíz; cubre también server/ y scraper/)
 npm run lint               # eslint . — falla con cualquier error
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/59/157** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/66/208** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -144,6 +144,45 @@ se comporta como antes (es lo que hace que local y CI no necesiten cuenta ni red
 Resultado del arreglo, medido en producción tras desplegar: `perPage=1/24/48/100` →
 **0,33 s planos** (antes 0,417 / 0,824 / 1,138 / 1,854 s). El detalle completo, con
 la tabla de antes y después, está en `docs/optimizacion-turso.md`.
+
+## El mantenedor edita TODO: diario de cambios (Turso) y reglas compartidas
+
+- **Una sola definición de las reglas**: `server/src/mutations.mjs` (editar, crear, facciones,
+  número de dex, slug). El Express local y la producción llaman a las mismas funciones; no
+  dupliques reglas en las rutas.
+- **Producción no escribe SQLite**: cada cambio es una OPERACIÓN en la tabla `cambio` de Turso
+  (`lib/diario.mjs`). Para leer, la instancia copia la base empaquetada a `/tmp`, reproduce el
+  diario (primero la tabla `edicion` antigua, luego `cambio`) y abre esa copia: así el SQL
+  (FTS, facetas, orden, paginación) ve el número de dex, las facciones y las cartas nuevas. Cuesta
+  UNA consulta a Turso por petición (la «clave» del diario), no una por carta. Las cartas y
+  facciones creadas llevan id explícito en la operación (`ID_BASE_*`) para que cada instancia las
+  cree igual. Las rutas públicas y de admin usan `await dbConDiario()`, no `getDb()`.
+- **Facciones: catálogo cerrado de 22, máximo 2 por VTuber.** `buscarFaccion` NO crea: se dan de
+  alta/renombran/fusionan desde el mantenedor. `FACCION_ALIAS` funde las variantes con errata del
+  scrape (`Netherbane2`, `Mythical Lecagy`…); lo aplican el seed y la migración
+  `2026-10-facciones-canonicas`. Las fichas con 3-4 facciones quedaron recortadas a las 2 primeras.
+- **El nombre ya NO cambia la URL**: el `slug` es un campo propio; el anterior queda en
+  `slug_alias` y sigue resolviendo (el detalle redirige). Las imágenes subidas desde el mantenedor
+  se mudan con el slug (`renombrarAssetsDelMantenedor`).
+- **Número de dex**: debe estar LIBRE (409 `dex_ocupado`); `'end'` = el siguiente al último. No
+  se intercambia: se mueve primero a quien lo tiene.
+- **Emblemas**: `POST /api/admin/factions/:id/image` (PNG). El cliente convierte a PNG ≤512 px
+  (`lib/imagen-cliente.ts`; en producción no hay sharp) y la facción apunta a
+  `images/faction/<slug>.png?v=<ms>` (la ruta es canónica: sin `?v` el navegador sigue con el viejo).
+- **Mantenedor guiado**: un solo asistente de 6 pasos (`components/admin/card-wizard.tsx`) sirve para
+  crear y editar fichas; las facciones tienen su propio asistente y pestaña «Emblemas y facciones».
+- **Cartas nuevas nacen en borrador**; el listado del mantenedor (`/api/admin/vtubers`) incluye
+  borradores y ocultos (la ruta pública no).
+- **Carta 3D**: los emblemas de facción van en la cabecera, a la derecha del nombre, sobre un
+  engarce oscuro que pinta `capa-titulo.ts` (geometría única en `card-texture/dimensiones.ts`,
+  de donde sale `FACTION.slots`). El «fondo rojo/oscuro que no se veía» eran DOS fallos: el color
+  secundario escrito como NOMBRE (`Rojo`, `Naranja`; 211 fichas) caía al cian de respaldo y teñía
+  el degradado (`colorDesdeNombre` en `lib/color.ts`), y el arcoíris sumado como luz cambiaba el
+  matiz de superficies saturadas u oscuras (`HUE_PROTECT` + `protegerMatiz` en el shader).
+  Además el foil del fondo se tiñe del **color predominante** de la superficie
+  (`card-texture/predominante.ts`, perilla `DOMINANT.mix` = 70 %): se calcula en CPU por matiz (no
+  promedio: rojo+azul no dan morado), ignora grises y su `amount` baja a 0 en fondos grises o
+  multicolor, donde queda el arcoíris completo.
 
 ## Base de datos y migraciones
 

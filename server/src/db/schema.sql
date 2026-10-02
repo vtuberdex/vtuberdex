@@ -129,6 +129,12 @@ CREATE TABLE IF NOT EXISTS vtuber_faction (
   PRIMARY KEY (vtuber_id, faction_id)
 );
 
+-- Alias de URL: el slug anterior de una ficha cuyo slug se cambió (ver mutations.mjs).
+CREATE TABLE IF NOT EXISTS slug_alias (
+  slug      TEXT PRIMARY KEY,
+  vtuber_id INTEGER NOT NULL REFERENCES vtuber (id) ON DELETE CASCADE
+);
+
 -- --- datos de la ficha de detalle -------------------------------------------
 CREATE TABLE IF NOT EXISTS profile_field (
   id        INTEGER PRIMARY KEY,

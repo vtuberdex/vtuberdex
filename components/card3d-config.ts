@@ -37,6 +37,8 @@
  * `shaders.ts`. Aquí solo están los números.
  */
 
+import { CARD_TEXTURE_HEIGHT, CARD_TEXTURE_WIDTH, FACTION_SOCKET, HEADER } from './card-texture/dimensiones';
+
 /**
  * PALETA DEL ESPECTRO: de aquí sale el color de TODAS las capas holográficas.
  *
@@ -690,6 +692,18 @@ export const TEXT_FINISH = {
    * Placa del número de dex: acero más oscuro que la cabecera, para que el `#002`
    * se lea como una pieza distinta y no como parte del mismo bloque.
    */
+  /**
+   * Acero OSCURO del engarce donde se encastra cada emblema de facción (cabecera). Casi negro con
+   * un filo claro arriba: es lo que hace legible el holograma del emblema con cualquier color de
+   * marca (sobre acero claro teñido de rojo, o sobre una placa oscura, un emblema de luz se perdía).
+   */
+  emblemSocketStops: [
+    { at: 0.0, color: '#3b414d' },
+    { at: 0.1, color: '#7a8496' },
+    { at: 0.3, color: '#171b22' },
+    { at: 0.85, color: '#0b0d12' },
+    { at: 1.0, color: '#262c36' },
+  ],
   badgeStops: [
     { at: 0.0, color: '#4a5260' },
     { at: 0.08, color: '#a3adbd' },
@@ -850,6 +864,28 @@ export const GLOSS = {
   highlightWeight: 0.4,
 } as const;
 
+/**
+ * Posición de un emblema de facción en UV de la carta (origen abajo-izquierda), derivada de la
+ * geometría de la cabecera. `indice` 1 es el de más a la derecha; el 0, el que va a su izquierda.
+ *
+ * `w` y `h` son DISTINTOS a propósito: el UV de la carta no es cuadrado (1008x1411), así que un
+ * emblema cuadrado de N píxeles mide N/1008 de ancho y N/1411 de alto. Con el mismo valor en los
+ * dos ejes el emblema salía estirado, que era invisible cuando eran grandes y decorativos y
+ * saltaría a la vista en un engarce de 74 px.
+ */
+function ranuraDeCabecera(indice: 0 | 1) {
+  const emblema = FACTION_SOCKET.size - FACTION_SOCKET.margin * 2;
+  const centroDerecho = CARD_TEXTURE_WIDTH - HEADER.pad - FACTION_SOCKET.inset - FACTION_SOCKET.size / 2;
+  const cx = centroDerecho - (1 - indice) * (FACTION_SOCKET.size + FACTION_SOCKET.gap);
+  const cy = HEADER.top + HEADER.height / 2;
+  return {
+    x: cx / CARD_TEXTURE_WIDTH,
+    y: 1 - cy / CARD_TEXTURE_HEIGHT,
+    w: emblema / CARD_TEXTURE_WIDTH,
+    h: emblema / CARD_TEXTURE_HEIGHT,
+  };
+}
+
 /** Emblemas de facción, superpuestos como holograma. */
 export const FACTION = {
   /**
@@ -859,18 +895,24 @@ export const FACTION = {
    */
   strength: 1.0,
   /**
-   * Posición y tamaño relativo de cada slot sobre la lámina. Los cuatro están
-   * separados a propósito (no apilados): 1º arriba-derecha, 2º abajo-izquierda,
-   * 3º arriba-izquierda, 4º abajo-derecha.
+   * Los DOS emblemas (máximo de facciones por VTuber) van en la CABECERA, a la derecha del
+   * nombre y dentro de un engarce oscuro que pinta la textura (`capa-titulo.ts`).
+   *
+   * Antes eran cuatro emblemas grandes repartidos por la lámina. Se movieron a la cabecera por
+   * petición del dueño; el engarce oscuro resuelve de paso el defecto de cartas rojas u oscuras,
+   * donde un emblema de luz sobre el color de marca no se distinguía: sobre acero casi negro el
+   * holograma se lee igual con cualquier color de marca.
+   *
+   * Con UNA sola facción se usa el slot 1 (el de la derecha): el emblema queda pegado al borde
+   * de la placa y no deja un hueco a su derecha.
    */
-  slots: [
-    { x: 0.70, y: 0.76, size: 0.30 },
-    { x: 0.30, y: 0.30, size: 0.28 },
-    { x: 0.28, y: 0.78, size: 0.24 },
-    { x: 0.72, y: 0.28, size: 0.24 },
-  ],
-  /** Parallax: cada emblema se desplaza con el puntero a distinta profundidad. */
-  pointerParallax: 0.02,
+  slots: [ranuraDeCabecera(0), ranuraDeCabecera(1)],
+  /**
+   * Parallax: cada emblema se desplaza con el puntero a distinta profundidad. Bajó de 0.02 a
+   * 0.004: con emblemas de 74 px dentro de un engarce, 0.02 de UV son ~20 px y el emblema se
+   * salía del engarce al mover el puntero.
+   */
+  pointerParallax: 0.004,
   /** Filtro del trazo por luminancia (el relleno oscuro del PNG no aporta nada). */
   strokeLow: 0.10,
   strokeHigh: 0.55,
@@ -881,7 +923,7 @@ export const FACTION = {
   pulsePhase: 1.9,
   pulseSurface: 5.0,
   /** Máscara: piso, cuánto sube con la inclinación y con el glare. */
-  maskBase: 0.5,
+  maskBase: 0.85,
   maskTilt: 1.0,
   maskGlare: 0.45,
   /** Tinte iridiscente propio de cada slot. */
@@ -891,7 +933,7 @@ export const FACTION = {
   tintPhase: 0.2,
   /** Mezcla sobre el arte: tinte del propio color y luz añadida. */
   selfTint: 0.45,
-  addedLight: 0.8,
+  addedLight: 1.2,
 } as const;
 
 /**
@@ -1175,3 +1217,54 @@ export const BODY = {
 
 /** Fondo de la escena: un gris claro, no la niebla oscura anterior (#05060a). */
 export const FOG = { color: '#c9cdd6', near: 8, far: 20 } as const;
+
+/**
+ * PROTECCIÓN DEL MATIZ DEL FONDO frente al holograma.
+ *
+ * EL DEFECTO: en cartas de fondo ROJO o de colores OSCUROS el color de marca no se veía. El
+ * arcoíris del holograma se SUMA como luz (rojo + verde = amarillo/oliva), así que un rojo
+ * #c33f00 salía verde oliva y un casi negro #120808 salía verde azulado: el efecto «cubría» el
+ * color en vez de brillar sobre él. Medido renderizando ambas cartas.
+ *
+ * LA CORRECCIÓN: sobre superficies saturadas u oscuras la luz cromática del holograma se
+ * sustituye por luz DEL MISMO MATIZ que el arte (tono sobre tono): sigue habiendo destello, pero
+ * ya no cambia el color. Sobre grises, blancos y pasteles (croma bajo y claros) el arcoíris
+ * queda como estaba.
+ */
+export const HUE_PROTECT = {
+  /** Croma (saturación HSV) del arte a partir del cual se protege, y donde llega al máximo. */
+  chromaFrom: 0.3,
+  chromaTo: 0.8,
+  /** Luminancia por debajo de la cual el arte se considera oscuro (protección total en `darkTo`). */
+  darkFrom: 0.45,
+  darkTo: 0.12,
+  /** Cuánto del arcoíris se sustituye en el caso peor (1 = nada de arcoíris). Deja un resto. */
+  strength: 0.85,
+  /** Piso del brillo máximo al normalizar el matiz: evita dividir por ~0 en negros y amplificar ruido. */
+  valueFloor: 0.05,
+} as const;
+
+/**
+ * COLOR PREDOMINANTE del fondo: tiñe el foil holográfico de la superficie.
+ *
+ * El foil del fondo era un arcoíris fijo; ahora se mezcla con el color que domina la superficie
+ * (`predominante.ts`), así el destello es del color del arte y no cambia su matiz. Se MEZCLA, no
+ * se sustituye: al 100 % el foil sería monocromo y la carta perdería el aspecto holográfico.
+ */
+export const DOMINANT = {
+  /** Cuánto del arcoíris se sustituye por el predominante (0 = nada, 1 = monocromo). */
+  mix: 0.7,
+  /** Piso de la luminancia del tono al reescalarlo: evita dividir por ~0 con tonos muy oscuros. */
+  toneFloor: 0.2,
+  /** Lado de la cuadrícula en la que se muestrea la superficie (32x32 basta y es instantáneo). */
+  grid: 32,
+  /** Croma (0..1) por debajo del cual un píxel se considera gris y no vota. */
+  minChroma: 0.18,
+  /** Cubos de matiz: 12 separan rojo, naranja, amarillo… sin partir un mismo color en dos. */
+  hueBins: 12,
+  /** Fracción de la superficie que ha de tener el color ganador para confiar del todo en él. */
+  coverageFull: 0.3,
+  /** Cuánto del color con croma debe ser del ganador: por debajo de `From` es multicolor y no se fía. */
+  dominanceFrom: 0.45,
+  dominanceTo: 0.75,
+} as const;

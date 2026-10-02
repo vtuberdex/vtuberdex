@@ -73,7 +73,7 @@ export interface VtuberCard {
   artists: string[];
   factions: string[];
   /** Facciones con su emblema; la carta lo superpone como holograma. */
-  factionIcons?: Array<{ label: string | null; icon: string | null }>;
+  factionIcons?: Array<{ label: string | null; slug?: string | null; icon: string | null }>;
   languages: string[];
   /** Muestra de stats (máx. 5) para la barra segmentada de la carta. */
   statsPreview: number[];
@@ -185,3 +185,88 @@ export interface SearchParams {
   page: number;
   perPage: number;
 }
+
+/* ───────────── Mantenedor ───────────── */
+
+export type VtuberStatus = VtuberCard['status'];
+
+/** Filtro de estado del listado del mantenedor (`all` incluye borradores y ocultos). */
+export type AdminStatusFilter = 'all' | VtuberStatus;
+
+/** Fila del catálogo cerrado de facciones, con su uso (`total` = fichas, `publicadas` = visibles). */
+export interface FactionRow {
+  id: number;
+  slug: string;
+  label: string;
+  /** Ruta pública sin barra inicial (`images/faction/<slug>.png`); se muestra como `/${icon}`. */
+  icon: string | null;
+  total: number;
+  publicadas: number;
+}
+
+export interface AdminListResponse {
+  items: VtuberCard[];
+  total: number;
+  page: number;
+  perPage: number;
+  pageCount: number;
+}
+
+export interface StatInput {
+  label: string;
+  value: number | null;
+  max: number | null;
+  valueText?: string | null;
+  slug?: string;
+}
+
+export interface SkillInput {
+  category: SkillRow['category'];
+  section?: string | null;
+  type?: string | null;
+  name?: string | null;
+  effect?: string | null;
+  /** Emblemas de la habilidad: solo se conservan al reenviar, no se crean a mano. */
+  factions?: Array<{ src: string | null; name: string | null }>;
+}
+
+export interface SocialInput {
+  platform: string;
+  label?: string | null;
+  url: string;
+  icon?: string | null;
+}
+
+/**
+ * Cuerpo del PATCH del mantenedor: todo es opcional y los arrays REEMPLAZAN la lista
+ * completa (el servidor no mezcla). Espejo de `vtuberUpdateSchema` (server/src/validation.mjs).
+ */
+export interface VtuberPatch {
+  name?: string;
+  slug?: string;
+  /** Entero libre, o `'end'` = siguiente al último. */
+  dexNumber?: number | 'end';
+  phrase?: string | null;
+  cardText?: string | null;
+  themeColor?: string | null;
+  secondaryColor?: string | null;
+  birthday?: string | null;
+  height?: string | null;
+  hashtag?: string | null;
+  favoriteColor?: string | null;
+  level?: number | null;
+  status?: VtuberStatus;
+  countries?: string[];
+  languages?: string[];
+  groups?: string[];
+  artists?: string[];
+  /** Slugs de facciones existentes; máximo 2. */
+  factions?: string[];
+  profile?: ProfileField[];
+  stats?: StatInput[];
+  skills?: SkillInput[];
+  socials?: SocialInput[];
+}
+
+/** Alta de una ficha: igual que el parche pero con `name` obligatorio. */
+export type VtuberCreate = VtuberPatch & { name: string };

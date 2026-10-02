@@ -138,3 +138,22 @@ describe('query', () => {
     ).toBe(4);
   });
 });
+
+describe('color secundario escrito como nombre', () => {
+  test('un nombre en español se traduce a su color, no al cian de respaldo', async () => {
+    const { cardPalette, colorDesdeNombre } = await import('@/lib/color');
+    expect(colorDesdeNombre('Rojo')).toBe('#d62839');
+    expect(colorDesdeNombre('Negro y Rojo')).toBe('#14161c'); // gana el primero que se menciona
+    expect(colorDesdeNombre('Púrpura/Negro')).toBe('#8e44d8');
+    expect(colorDesdeNombre('No especificado')).toBeNull();
+    const paleta = cardPalette('#c33f00', 'Naranja');
+    expect(paleta.secondary).toBe('#f07b1a');
+    expect(paleta.secondary).not.toBe('#5eead4');
+  });
+
+  test('un texto irreconocible deriva del primario, como si no hubiera secundario', async () => {
+    const { cardPalette } = await import('@/lib/color');
+    expect(cardPalette('#c33f00', 'No especificado').secondary).toBe(cardPalette('#c33f00', null).secondary);
+    expect(cardPalette('#c33f00', '#112233').secondary).toBe('#112233');
+  });
+});

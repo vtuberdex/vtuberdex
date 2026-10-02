@@ -170,7 +170,19 @@ test('login correcto entrega token utilizable', async () => {
   assert.equal((await session.json()).user.username, 'tester');
 });
 
+/** Helper del mantenedor: llamada autenticada con cuerpo JSON. */
+const admin = (method, ruta, cuerpo) =>
+  fetch(`${baseUrl}/api/admin${ruta}`, {
+    method,
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+  });
+
 test('PATCH del mantenedor actualiza campos, relaciones y reindexa la búsqueda', async () => {
+  // Las facciones son un catálogo cerrado: la que no existe NO se crea sola (así nacían las
+  // variantes con errata), se da de alta aparte.
+  const creada = await admin('POST', '/factions', { label: 'Mythical Legacy' });
+  assert.equal(creada.status, 201);
   const response = await fetch(`${baseUrl}/api/admin/vtubers/1`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
@@ -186,7 +198,8 @@ test('PATCH del mantenedor actualiza campos, relaciones y reindexa la búsqueda'
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.name, 'GKuro Monochrome VT');
-  assert.equal(body.slug, 'gkuro-monochrome-vt');
+  // El nombre ya NO reescribe la URL: el slug es un campo propio.
+  assert.equal(body.slug, 'gkuro-monochrome');
   assert.equal(body.themeColor, '#22d3ee');
   assert.deepEqual(body.factions, ['Mythical Legacy']);
   assert.deepEqual(body.groups, ['Moonly', 'Celestials']);
@@ -284,6 +297,158 @@ test('GET /api/admin/stats resume totales y calidad', async () => {
   assert.equal(body.totals.total, 2);
   assert.equal(body.totals.notPublished, 0);
   assert.ok(body.quality.length > 0);
+});
+
+test('el número de dex solo se cambia a uno LIBRE y el anterior queda disponible', async () => {
+  // El 30 lo tiene Drawchii: pedirlo para GKuro se rechaza, no se intercambia en silencio.
+  const ocupado = await admin('PATCH', '/vtubers/1', { dexNumber: 30 });
+  assert.equal(ocupado.status, 409);
+  assert.equal((await ocupado.json()).error, 'dex_ocupado');
+
+  // Mover Drawchii al final libera el 30...
+  const alFinal = await admin('PATCH', '/vtubers/2', { dexNumber: 'end' });
+  assert.equal(alFinal.status, 200);
+  assert.equal((await alFinal.json()).dexNumber, 31);
+  // ...y ahora sí se puede usar para GKuro.
+  const libre = await admin('PATCH', '/vtubers/1', { dexNumber: 30 });
+  assert.equal(libre.status, 200);
+  assert.equal((await libre.json()).dexNumber, 30);
+  const orden = (await get('/api/vtubers?sort=dex')).body.items.map((item) => item.dexNumber);
+  assert.deepEqual(orden, [30, 31]);
+
+  // Se restaura para no afectar a los tests siguientes (dex 18 y 30).
+  await admin('PATCH', '/vtubers/1', { dexNumber: 18 });
+  await admin('PATCH', '/vtubers/2', { dexNumber: 30 });
+});
+
+test('cambiar la URL de una ficha deja el slug anterior como alias', async () => {
+  const response = await admin('PATCH', '/vtubers/2', { slug: 'Drawchii Oficial!' });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).slug, 'drawchii-oficial');
+
+  const nueva = await get('/api/vtubers/drawchii-oficial');
+  assert.equal(nueva.status, 200);
+  // La URL vieja sigue resolviendo (con el slug actual, para que el cliente redirija).
+  const vieja = await get('/api/vtubers/drawchii');
+  assert.equal(vieja.status, 200);
+  assert.equal(vieja.body.slug, 'drawchii-oficial');
+
+  const duplicado = await admin('PATCH', '/vtubers/1', { slug: 'drawchii-oficial' });
+  assert.equal(duplicado.status, 409);
+  assert.equal((await duplicado.json()).error, 'slug_duplicado');
+
+  await admin('PATCH', '/vtubers/2', { slug: 'drawchii' });
+});
+
+test('las facciones: máximo dos, solo existentes y se fusionan los duplicados', async () => {
+  const a = (await (await admin('POST', '/factions', { label: 'Aetherion Valor' })).json()).faction;
+  const b = (await (await admin('POST', '/factions', { label: 'Netherbane' })).json()).faction;
+  const dup = (await (await admin('POST', '/factions', { label: 'Netherbane2' })).json()).faction;
+
+  // Tres facciones: rechazado por el esquema.
+  const tres = await admin('PATCH', '/vtubers/2', { factions: [a.slug, b.slug, dup.slug] });
+  assert.equal(tres.status, 400);
+  // Una que no existe: rechazada, no se crea.
+  const fantasma = await admin('PATCH', '/vtubers/2', { factions: ['no-existe'] });
+  assert.equal(fantasma.status, 422);
+  assert.equal((await fantasma.json()).error, 'faccion_desconocida');
+
+  const ok = await admin('PATCH', '/vtubers/2', { factions: [a.slug, dup.slug] });
+  assert.equal(ok.status, 200);
+  assert.deepEqual((await ok.json()).factions, ['Aetherion Valor', 'Netherbane2']);
+
+  // Fusionar el duplicado en la real: la ficha conserva dos facciones y la variante desaparece.
+  const fusion = await admin('DELETE', `/factions/${dup.id}?mergeInto=${b.id}`);
+  assert.equal(fusion.status, 200);
+  const despues = await get('/api/vtubers/drawchii');
+  assert.deepEqual(despues.body.factions, ['Aetherion Valor', 'Netherbane']);
+  const etiquetas = (await (await admin('GET', '/factions')).json()).items.map((f) => f.label);
+  assert.ok(!etiquetas.includes('Netherbane2'));
+  // Y el emblema/faceta refleja el cambio.
+  const faceta = (await get('/api/meta?language=es')).body.factions.find((f) => f.slug === 'netherbane');
+  assert.equal(faceta.count, 1);
+
+  await admin('PATCH', '/vtubers/2', { factions: [] });
+});
+
+test('el mantenedor edita lore, atributos, habilidades y redes de una ficha', async () => {
+  const response = await admin('PATCH', '/vtubers/1', {
+    cardText: 'Una historia nueva.',
+    stats: [
+      { label: 'HP', value: 120, max: 200 },
+      { label: 'Ataque', value: 50 },
+    ],
+    skills: [{ category: 'active', name: 'Golpe', effect: 'Hace daño' }],
+    socials: [{ platform: 'twitch', url: 'https://twitch.tv/gkuro' }],
+  });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.cardText, 'Una historia nueva.');
+  assert.equal(body.stats.length, 2);
+  assert.equal(body.stats[0].slug, 'hp');
+  assert.equal(body.skills[0].name, 'Golpe');
+  assert.equal(body.socials[0].url, 'https://twitch.tv/gkuro');
+  // El poder se recalcula desde los atributos nuevos (50 de ataque x 1.2 + 120 de hp x 0.3 = 96).
+  assert.equal(body.powerScore, 96);
+
+  // Una red con esquema peligroso se rechaza.
+  const peligrosa = await admin('PATCH', '/vtubers/1', { socials: [{ platform: 'x', url: 'javascript:alert(1)' }] });
+  assert.equal(peligrosa.status, 400);
+});
+
+test('crear una carta nueva: nace en borrador, al final de la dex y visible solo en el mantenedor', async () => {
+  const response = await admin('POST', '/vtubers', { name: 'Nueva Estrella', phrase: 'Recién llegada' });
+  assert.equal(response.status, 201);
+  const carta = await response.json();
+  assert.equal(carta.slug, 'nueva-estrella');
+  assert.equal(carta.status, 'draft');
+  assert.equal(carta.dexNumber, 31);
+
+  // El catálogo público no la ve; el listado del mantenedor sí.
+  assert.equal((await get('/api/vtubers/nueva-estrella')).status, 404);
+  const lista = await (await admin('GET', '/vtubers?status=draft')).json();
+  assert.deepEqual(lista.items.map((item) => item.slug), ['nueva-estrella']);
+  const detalle = await (await admin('GET', `/vtubers/${carta.id}`)).json();
+  assert.equal(detalle.name, 'Nueva Estrella');
+
+  // Publicarla la hace visible y encontrable por búsqueda.
+  await admin('PATCH', `/vtubers/${carta.id}`, { status: 'published' });
+  assert.equal((await get('/api/vtubers?q=estrella')).body.total, 1);
+
+  // Nombre repetido: la URL colisiona.
+  const repetida = await admin('POST', '/vtubers', { name: 'Nueva Estrella' });
+  assert.equal(repetida.status, 409);
+  // Un número ocupado: rechazado.
+  const ocupada = await admin('POST', '/vtubers', { name: 'Otra', dexNumber: 18 });
+  assert.equal(ocupada.status, 409);
+
+  // Limpieza: se oculta para no contar en los demás tests.
+  await admin('PATCH', `/vtubers/${carta.id}`, { status: 'hidden' });
+});
+
+test('el emblema de una facción se sube como PNG y la facción pasa a usarlo', async () => {
+  const sharp = (await import('sharp')).default;
+  const png = await sharp({ create: { width: 900, height: 600, channels: 4, background: '#ffffff' } }).png().toBuffer();
+  const faccion = (await (await admin('POST', '/factions', { label: 'Con Emblema' })).json()).faction;
+  const subida = await fetch(`${baseUrl}/api/admin/factions/${faccion.id}/image`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/octet-stream', authorization: `Bearer ${token}` },
+    body: png,
+  });
+  assert.equal(subida.status, 200);
+  const cuerpo = await subida.json();
+  assert.match(cuerpo.faction.icon, /^images\/faction\/con-emblema\.png\?v=\d+$/);
+  // Se limita a 512 px de lado y se guarda en la carpeta canónica.
+  assert.equal(cuerpo.asset.width, 512);
+  assert.ok(fs.existsSync(path.join(path.dirname(dbPath), 'images', 'faction', 'con-emblema.png')));
+
+  // Un archivo que no es imagen se rechaza.
+  const basura = await fetch(`${baseUrl}/api/admin/factions/${faccion.id}/image`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/octet-stream', authorization: `Bearer ${token}` },
+    body: Buffer.from('esto no es una imagen'),
+  });
+  assert.equal(basura.status, 400);
 });
 
 test('CORS habilita el dev-server de Vite', async () => {

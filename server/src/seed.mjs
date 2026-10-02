@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { DEFAULT_DB_PATH, getMeta, openDatabase, setMeta, transaction } from './db/index.mjs';
+import { FACCION_ALIAS, MAX_FACCIONES } from './mutations.mjs';
 import { normalizeText, slugify } from './text.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -273,7 +274,10 @@ export function readWebpSize(buf) {
 }
 
 /** Crea o actualiza una facción junto con el emblema que le corresponde. */
-function upsertFaction(db, label) {
+function upsertFaction(db, rawLabel) {
+  // Las variantes con errata del origen (`Netherbane2`…) se funden en su facción real: sin esto
+  // el catálogo acumulaba 26 facciones donde existen 22.
+  const label = FACCION_ALIAS[slugify(rawLabel)] ?? rawLabel;
   const slug = slugify(label);
   const icon = factionIcon(slug);
   db.prepare(
@@ -407,7 +411,12 @@ export function seedDatabase({ db, dataset, reset = false }) {
       (payload.artists ?? []).forEach((label, index) => tagStmt.run(vtuberId, upsertTag(db, 'artist', label), index));
 
       const factionStmt = db.prepare('INSERT OR IGNORE INTO vtuber_faction (vtuber_id, faction_id, position) VALUES (?, ?, ?)');
-      (detail.factions ?? []).forEach((label, index) => factionStmt.run(vtuberId, upsertFaction(db, label), index));
+      // Máximo dos facciones por ficha (la carta tiene dos emblemas): el origen llega a traer 4.
+      // `INSERT OR IGNORE` + la clave (ficha, facción) descartan además los duplicados que
+      // aparecen al fundir las variantes.
+      const facciones = [...new Set((detail.factions ?? []).map((label) => FACCION_ALIAS[slugify(label)] ?? label))]
+        .slice(0, MAX_FACCIONES);
+      facciones.forEach((label, index) => factionStmt.run(vtuberId, upsertFaction(db, label), index));
 
       replaceChildren(db, vtuberId, payload);
 
@@ -416,7 +425,7 @@ export function seedDatabase({ db, dataset, reset = false }) {
         ...(payload.groups ?? []),
         ...(payload.artists ?? []),
         ...(payload.countries ?? []).map((country) => country.name),
-        ...(detail.factions ?? []),
+        ...facciones,
       ].join(' ');
       db.prepare('DELETE FROM vtuber_fts WHERE rowid = ?').run(vtuberId);
       db.prepare('INSERT INTO vtuber_fts (rowid, name, phrase, tags) VALUES (?, ?, ?, ?)').run(

@@ -64,9 +64,54 @@ export function readableInk(hex: string): string {
  * Paleta holográfica de la carta: acento, secundario y tono de fondo.
  * Si el VTuber no declara color, se usa un cian neutro.
  */
+/**
+ * Nombres de color en español (y alguno en inglés) que el origen escribe en el color secundario.
+ *
+ * POR QUÉ EXISTE (defecto medido): 211 fichas traen el secundario como TEXTO —`Rojo`, `Naranja`,
+ * `Morado`…— y `normalizeHex` lo convertía en el cian de respaldo (`#5eead4`). Ese cian entra al
+ * 45% en el degradado de la superficie, así que una carta de fondo rojo salía verde oliva y una
+ * oscura salía verde azulada: el color de marca «desaparecía» y parecía culpa del holograma. Ahora
+ * el nombre se traduce a su color y, si no se reconoce, se deriva del primario como cuando no hay
+ * secundario.
+ */
+const COLORES_POR_NOMBRE: Array<[RegExp, string]> = [
+  [/\b(rojo|carmesi|escarlata|guinda|bordo|burdeos|granate)\b/, '#d62839'],
+  [/\b(naranja|naranjo|ocre|anaranjado)\b/, '#f07b1a'],
+  [/\b(amarillo|dorado|oro)\b/, '#f5c518'],
+  [/\b(verde|menta|lima|leaf)\b/, '#2fb35a'],
+  [/\b(turquesa|cian|cyan|aqua)\b/, '#1fc8c8'],
+  [/\b(celeste)\b/, '#6ec6ff'],
+  [/\b(azul|cobalto|ultramarino|periwinkle)\b/, '#2f6bf0'],
+  [/\b(morado|purpura|violeta|lila|lavanda|magenta)\b/, '#8e44d8'],
+  [/\b(rosa|rosado|rosita|fucsia)\b/, '#f06eaa'],
+  [/\b(marron|cafe|beige)\b/, '#8b5a2b'],
+  [/\b(blanco|plateado|plata)\b/, '#e8ecf5'],
+  [/\b(gris)\b/, '#8a93a3'],
+  [/\b(negro)\b/, '#14161c'],
+];
+
+/** El color al que se refiere un texto libre (`Rojo y negro` -> el rojo), o `null` si no se reconoce. */
+export function colorDesdeNombre(texto: string | null | undefined): string | null {
+  const limpio = String(texto ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  let mejor: { indice: number; hex: string } | null = null;
+  // Gana el primer color que se menciona: es el dominante en frases como «Rojo y negro».
+  for (const [patron, hex] of COLORES_POR_NOMBRE) {
+    const encontrado = patron.exec(limpio);
+    if (encontrado && (!mejor || encontrado.index < mejor.indice)) mejor = { indice: encontrado.index, hex };
+  }
+  return mejor?.hex ?? null;
+}
+
 export function cardPalette(themeColor: string | null, secondaryColor: string | null) {
   const accent = normalizeHex(themeColor);
-  const secondary = normalizeHex(secondaryColor ?? mixHex(accent, '#a855f7', 0.45));
+  const derivado = mixHex(accent, '#a855f7', 0.45);
+  const crudo = String(secondaryColor ?? '').trim();
+  const secondary = /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(crudo)
+    ? normalizeHex(crudo)
+    : (colorDesdeNombre(crudo) ?? derivado);
   return {
     accent,
     secondary,
