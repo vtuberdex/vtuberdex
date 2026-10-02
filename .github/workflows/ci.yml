@@ -2,14 +2,18 @@
 #
 # POR QUÉ ESTE WORKFLOW EXISTE APARTE DEL DE DEPLOY
 # -------------------------------------------------
-# El repo es PRIVADO y de una organización en plan Hobby, así que Vercel no lo
-# conecta por integración Git y el deploy necesita un token (`.github/workflows/
-# deploy.yml`). Pero el CI tiene dos trabajos distintos y conviene no mezclarlos:
+# El deploy ya no vive en Actions: el repo es PÚBLICO y Vercel lo construye por
+# integración Git en cada push a `master`. Pero ese build solo corre `next build`,
+# así que NO ve el lint, `check:shaders`, los tests ni `verify` — y el límite de
+# samplers de GLSL, por ejemplo, solo se manifiesta como la carta negra en el
+# navegador. Este workflow es el único que valida todo eso, y lo hace en CUALQUIER
+# push y en cada PR, sin necesitar ningún secreto.
 #
 #   · Este (`ci.yml`) VALIDA. Corre en cada push —a cualquier rama— y en cada
 #     pull request, no necesita ningún secreto y su único resultado es verde o
 #     rojo. Es lo que se mira antes de mezclar trabajo.
-#   · `deploy.yml` PUBLICA. Solo en `master`, y con el token de Vercel.
+#   · `deploy.yml` PUBLICA a mano (`workflow_dispatch`). Es el camino de respaldo,
+#     y el único que exige los gates ANTES de publicar.
 #
 # Antes de este archivo no había NINGÚN gate automático: `npm run lint` estaba
 # roto (ESLint 9 exige config plana y el repo no tenía ninguna), así que errores
@@ -44,7 +48,8 @@ name: ci
 
 on:
   # Todo push, en CUALQUIER rama: el sentido del CI es ver el rojo ANTES de
-  # mezclar, no después. El deploy se encarga aparte de publicar solo `master`.
+  # mezclar, no después. La publicación a producción la hace la integración Git
+  # de Vercel al entrar en `master`, no este workflow.
   #
   # Sin filtro `branches:` a propósito. Un patrón glob mal escrito ahí es un fallo
   # SILENCIOSO (el workflow no se dispara nunca y el repo parece "sin CI"), y no

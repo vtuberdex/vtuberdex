@@ -1,11 +1,23 @@
-# Despliegue a Vercel desde GitHub Actions.
+# Despliegue MANUAL a Vercel desde GitHub Actions.
 #
-# POR QUÉ UN WORKFLOW CON TOKEN Y NO LA INTEGRACIÓN GIT DE VERCEL
-# -------------------------------------------------------------
-# El team es **Hobby** y Vercel no conecta repositorios de organizaciones en ese plan:
-# no hay forma de que un push dispare el deploy desde el panel. La alternativa oficial
-# es la CLI con un token, que es lo que hace este workflow. Lo mismo documenta AGENTS.md
-# («El deploy NO puede ser por integración Git»).
+# POR QUÉ ESTE WORKFLOW YA NO SE DISPARA EN CADA PUSH
+# --------------------------------------------------
+# El repo es **público** (desde 2026-10-02) y la GitHub App de Vercel está instalada en la
+# organización. Con eso la integración Git SÍ está disponible —antes no: Vercel no conecta
+# repos de organizaciones en plan Hobby, y la CLI con token era el único camino— y el
+# proyecto `vtuberdex` quedó enlazado a `vtuberdex/vtuberdex` con `productionBranch: master`:
+# un push a `master` lo publica Vercel directamente.
+#
+# Si esto siguiera disparándose en cada push habría DOS deploys por commit compitiendo por el
+# alias de producción, y el que termina último gana (puede ser el del commit más viejo). Por eso
+# queda solo como `workflow_dispatch`: es el camino de RESPALDO cuando la integración no sirve
+# (deployar un commit que Vercel no construyó, reintentar sin pushear, publicar desde una red
+# donde la integración no llega) y el ÚNICO camino que exige los gates ANTES de publicar.
+#
+# OJO CON LOS GATES EN EL CAMINO AUTOMÁTICO: la integración Git construye con el build del repo
+# (`next build`), que NO corre lint, typecheck, check:shaders, tests ni `verify`. En el camino
+# automático el único aviso es `ci.yml`, y ese no bloquea el deploy de Vercel. Para exigir el
+# verde antes de publicar hay que lanzar este workflow a mano.
 #
 # POR QUÉ EL TOKEN VA EN UN SECRET Y NO EN EL REPO
 # ------------------------------------------------
@@ -23,12 +35,12 @@
 name: deploy
 
 on:
-  push:
-    branches: [master]
-  # Permite relanzarlo a mano desde la pestaña Actions.
+  # SOLO a mano (pestaña Actions o `gh workflow run deploy.yml`). El push a `master` ya lo
+  # publica la integración Git de Vercel (ver arriba); dejarlo aquí también duplicaría el
+  # deploy de cada commit.
   workflow_dispatch:
 
-# Un deploy a la vez. Sin esto, dos pushes seguidos pueden solaparse y dejar en
+# Un deploy a la vez. Sin esto, dos lanzamientos seguidos pueden solaparse y dejar en
 # producción el commit más VIEJO de los dos (el último en terminar gana).
 # `cancel-in-progress: false` a propósito: no se cancela un deploy ya empezado, se
 # encola detrás.
