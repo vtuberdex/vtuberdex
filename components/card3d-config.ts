@@ -1253,6 +1253,15 @@ export const BINDER = {
   hoverDampingBase: 0.0003,
   /** Fracción del encuadre que ocupa el libro: casi todo, porque no se inclina tanto. */
   cameraFill: 0.94,
+  /**
+   * MODO DE UNA HOJA (celular). Con el libro entero encajado en 390 px de ancho cada
+   * carta medía ~70 px: legible como miniatura, inútil como carta. Por debajo de este
+   * ancho de viewport (px, el `sm` de Tailwind) la cámara encuadra UNA hoja y «siguiente»
+   * alterna izquierda -> derecha -> giro de página; la panorámica entre hojas va
+   * amortiguada para que se lea como mover la vista sobre el álbum, no como un corte.
+   */
+  singleMaxWidth: 640,
+  cameraDampingBase: 0.0008,
   /** Umbrales de gesto: desplazamiento mínimo para pasar página y holgura de un toque. */
   swipeMinPx: 48,
   tapSlopPx: 8,

@@ -8,7 +8,7 @@
  * `card-binder-layout.test.ts`.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { CardBinder } from '@/components/card-binder';
@@ -106,5 +106,94 @@ describe('CardBinder (respaldo 2D)', () => {
     swipe(200, 204);
     swipe(200, 200 - BINDER.swipeMinPx - 10, 400);
     expect(onPage).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * Modo celular: por debajo de `BINDER.singleMaxWidth` el libro muestra UNA hoja y
+ * «siguiente» recorre izquierda -> derecha -> página siguiente. Se simula con
+ * `matchMedia`, que es la señal real que usa el componente.
+ */
+describe('CardBinder en celular (una hoja)', () => {
+  const withNarrowViewport = () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes(`max-width: ${BINDER.singleMaxWidth - 1}px`),
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+    return () => {
+      window.matchMedia = original;
+    };
+  };
+
+  it('muestra una sola hoja y recorre izquierda -> derecha antes de pasar de página', async () => {
+    const restore = withNarrowViewport();
+    try {
+      const user = userEvent.setup();
+      const { onPage } = renderBinder({ page: 2, pageCount: 5 });
+      const binder = await screen.findByTestId('card-binder');
+      await waitFor(() => expect(binder).toHaveAttribute('data-focus', 'left'));
+      expect(screen.getAllByTestId('binder-page')).toHaveLength(1);
+      expect(screen.getAllByTestId('card-tile')).toHaveLength(BINDER.cardsPerPage);
+      expect(screen.getByText(/hoja izquierda/)).toBeInTheDocument();
+
+      // Primero la otra hoja del mismo libro abierto: no se pide otra página.
+      await user.click(screen.getByLabelText('Hoja derecha'));
+      expect(onPage).not.toHaveBeenCalled();
+      expect(binder).toHaveAttribute('data-focus', 'right');
+      expect(screen.getAllByTestId('card-tile')[0]).toHaveAttribute('href', '/v/v-4');
+
+      // Desde la hoja derecha, «siguiente» sí pasa de página.
+      await user.click(screen.getByLabelText('Página siguiente'));
+      expect(onPage).toHaveBeenCalledWith(3);
+    } finally {
+      restore();
+    }
+  });
+
+  it('retroceder desde la hoja izquierda pide la página anterior; en la primera página se deshabilita', async () => {
+    const restore = withNarrowViewport();
+    try {
+      const user = userEvent.setup();
+      const { onPage } = renderBinder({ page: 2, pageCount: 5 });
+      const binder = await screen.findByTestId('card-binder');
+      await waitFor(() => expect(binder).toHaveAttribute('data-focus', 'left'));
+      await user.click(screen.getByLabelText('Página anterior'));
+      expect(onPage).toHaveBeenCalledWith(1);
+    } finally {
+      restore();
+    }
+    const restore2 = withNarrowViewport();
+    try {
+      renderBinder({ page: 1, pageCount: 5 });
+      const binder = (await screen.findAllByTestId('card-binder')).at(-1)!;
+      await waitFor(() => expect(binder).toHaveAttribute('data-focus', 'left'));
+      expect(binder.querySelector('[aria-label="Página anterior"]')).toBeDisabled();
+      expect(binder.querySelector('[aria-label="Hoja derecha"]')).toBeEnabled();
+    } finally {
+      restore2();
+    }
+  });
+
+  it('las flechas del teclado siguen la misma secuencia', async () => {
+    const restore = withNarrowViewport();
+    try {
+      const { onPage } = renderBinder({ page: 2, pageCount: 5 });
+      const binder = await screen.findByTestId('card-binder');
+      await waitFor(() => expect(binder).toHaveAttribute('data-focus', 'left'));
+      fireEvent.keyDown(window, { key: 'ArrowRight' });
+      await waitFor(() => expect(binder).toHaveAttribute('data-focus', 'right'));
+      expect(onPage).not.toHaveBeenCalled();
+      fireEvent.keyDown(window, { key: 'ArrowRight' });
+      expect(onPage).toHaveBeenCalledWith(3);
+    } finally {
+      restore();
+    }
   });
 });
