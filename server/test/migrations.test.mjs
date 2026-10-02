@@ -171,3 +171,47 @@ test('la base de desarrollo declara el tipo `background` en su CHECK', () => {
   assert.match(sql, /background/, 'el CHECK de asset incluye el tipo background');
   db.close();
 });
+
+/**
+ * La migración de facciones: fusiona las variantes con errata del scrape y recorta cada ficha a
+ * dos facciones. Se ejercita sobre una base con el estado REAL del problema (26 facciones, fichas
+ * con 4), no sobre una limpia: una base nueva nunca pasa por este camino.
+ */
+test('2026-10-facciones-canonicas fusiona duplicados y deja máximo dos por ficha', () => {
+  const dbPath = tmpDb();
+  const db = openDatabase(dbPath);
+  const faccion = (slug, label) => db.prepare('INSERT INTO faction (slug, label) VALUES (?, ?)').run(slug, label);
+  faccion('mythical-legacy', 'Mythical Legacy');
+  faccion('mythical-lecagy', 'Mythical Lecagy');
+  faccion('netherbane', 'Netherbane');
+  faccion('netherbane2', 'Netherbane2');
+  faccion('primal-monarch', 'Primal Monarch');
+  const id = (slug) => db.prepare('SELECT id FROM faction WHERE slug = ?').get(slug).id;
+
+  db.prepare('INSERT INTO vtuber (dex_number, slug, name, search_name) VALUES (1, ?, ?, ?)').run('uno', 'Uno', 'uno');
+  db.prepare('INSERT INTO vtuber (dex_number, slug, name, search_name) VALUES (2, ?, ?, ?)').run('dos', 'Dos', 'dos');
+  const link = db.prepare('INSERT INTO vtuber_faction (vtuber_id, faction_id, position) VALUES (?, ?, ?)');
+  // Uno: la variante y la real a la vez (debe quedar UNA) + dos más (se recortan).
+  link.run(1, id('mythical-lecagy'), 0);
+  link.run(1, id('mythical-legacy'), 1);
+  link.run(1, id('netherbane'), 2);
+  link.run(1, id('primal-monarch'), 3);
+  // Dos: solo la variante (debe pasar a la real).
+  link.run(2, id('netherbane2'), 0);
+
+  db.prepare(`DELETE FROM meta WHERE key = 'migration:2026-10-facciones-canonicas'`).run();
+  db.close();
+
+  const migrada = openDatabase(dbPath);
+  const slugs = migrada.prepare('SELECT slug FROM faction ORDER BY slug').all().map((f) => f.slug);
+  assert.deepEqual(slugs, ['mythical-legacy', 'netherbane', 'primal-monarch']);
+  const de = (vtuber) =>
+    migrada
+      .prepare('SELECT f.slug FROM vtuber_faction vf JOIN faction f ON f.id = vf.faction_id WHERE vf.vtuber_id = ? ORDER BY vf.position')
+      .all(vtuber)
+      .map((f) => f.slug);
+  assert.deepEqual(de(1), ['mythical-legacy', 'netherbane']);
+  assert.deepEqual(de(2), ['netherbane']);
+  assert.equal(migrada.prepare("SELECT vtuber_count AS n FROM faction WHERE slug = 'netherbane'").get().n, 2);
+  migrada.close();
+});

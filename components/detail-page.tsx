@@ -59,6 +59,15 @@ export function DetailPage({ slug }: { slug: string }) {
   }, []);
 
   useEffect(() => {
+    /**
+     * Si se entró por una URL ANTERIOR de la ficha (el mantenedor le cambió el slug), la API
+     * responde con la ficha y su slug actual: se corrige la barra de direcciones sin recargar,
+     * para que lo que se comparta desde aquí sea la URL vigente.
+     */
+    if (data && data.slug !== slug) window.history.replaceState(null, '', `/v/${data.slug}`);
+  }, [data, slug]);
+
+  useEffect(() => {
     document.title = data ? `${data.name} · VTuberDex` : 'VTuberDex';
     return () => {
       document.title = 'VTuberDex';
@@ -204,7 +213,12 @@ export function DetailPage({ slug }: { slug: string }) {
               {data.factions.map((faction) => (
                 <Link
                   key={faction}
-                  href={`/?factions=${encodeURIComponent(faction.toLowerCase().replace(/\s+/g, '-'))}`}
+                  // El slug real de la facción (`heaven-s-arbiter`): derivarlo de la etiqueta daba
+                  // `heaven's-arbiter` y el filtro no encontraba nada.
+                  href={`/?factions=${encodeURIComponent(
+                    data.factionIcons?.find((icon) => icon.label === faction)?.slug ??
+                      faction.toLowerCase().replace(/\s+/g, '-'),
+                  )}`}
                   className="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide text-black/85"
                   style={{ background: gradientCss(palette.accent, palette.secondary) }}
                 >

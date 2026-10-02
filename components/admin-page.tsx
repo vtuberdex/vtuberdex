@@ -1,15 +1,23 @@
 'use client';
 /**
- * Mantenedor: login, estadísticas de calidad y edición de fichas.
- * Reemplaza el "editar HTML a mano" del origen.
+ * Mantenedor: orquestador. Login, métricas y dos secciones («Fichas» y «Emblemas y
+ * facciones»); el trabajo de cada una vive en `components/admin/`.
+ * Reemplaza el "editar HTML a mano" del origen. Aquí solo está el estado que comparten
+ * (sesión, catálogo de facciones, qué ficha está abierta) y los avisos.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
-import { cardPalette } from '@/lib/color';
-import type { VtuberCard, VtuberDetail } from '@/lib/types';
-import { ImageManager } from '@/components/image-manager';
+import { facetValue, type FactionRow, type VtuberDetail } from '@/lib/types';
+import { DEFAULT_SEARCH } from '@/lib/query';
+import { CardWizard } from '@/components/admin/card-wizard';
+import { FactionManager } from '@/components/admin/faction-manager';
+import { GettingStarted } from '@/components/admin/getting-started';
+import { VtuberList } from '@/components/admin/vtuber-list';
+import type { ChipOption } from '@/components/admin/chip-picker';
+import { primaryButton } from '@/components/admin/ui';
+import { ToastContainer, useToasts } from '@/components/toast';
 
 const TOKEN_KEY = 'vtuberdex.admin.token';
 
@@ -28,6 +36,9 @@ const FLAG_LABELS: Record<string, string> = {
   'sin-logo': 'Sin logo',
 };
 
+type Section = 'fichas' | 'emblemas';
+type View = { kind: 'none' } | { kind: 'create'; n: number } | { kind: 'edit'; detail: VtuberDetail; epoch: number };
+
 export function AdminPage() {
   // El token se lee del `localStorage` en un `useEffect`, NO en el inicializador
   // del estado. Este componente es de cliente ('use client'), pero Next lo
@@ -41,11 +52,14 @@ export function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [audit, setAudit] = useState<Array<{ id: number; actor: string; action: string; entityId: number | null; createdAt: string }>>([]);
-  const [rows, setRows] = useState<VtuberCard[]>([]);
-  const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<VtuberDetail | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [factions, setFactions] = useState<FactionRow[]>([]);
+  const [countryOptions, setCountryOptions] = useState<ChipOption[]>([]);
+  const [languageOptions, setLanguageOptions] = useState<ChipOption[]>([]);
+  const [section, setSection] = useState<Section>('fichas');
+  const [view, setView] = useState<View>({ kind: 'none' });
+  /** Sube tras cada guardado/alta: la lista lateral vuelve a pedir su página. */
+  const [listVersion, setListVersion] = useState(0);
+  const { toasts, add: notify, remove: removeToast } = useToasts();
 
   // El token se lee al MONTAR, no durante el render: en el servidor no hay
   // `localStorage`. Este efecto corre solo en el cliente.
@@ -81,27 +95,28 @@ export function AdminPage() {
     void loadAdmin();
   }, [loadAdmin]);
 
-  // Búsqueda del mantenedor (incluye borradores y ocultos vía API pública filtrada).
+  // Catálogo de facciones y opciones de país/idioma para los selectores del asistente.
+  const loadFactions = useCallback(async () => {
+    if (!token) return;
+    try {
+      setFactions((await api.factions(token)).items);
+    } catch {
+      // El asistente sigue funcionando sin selector de facciones; la sección de emblemas muestra su propio error al operar.
+    }
+  }, [token]);
+
   useEffect(() => {
-    if (!user) return;
-    const controller = new AbortController();
+    if (!user || !token) return;
+    void loadFactions();
+    // Las facetas salen de la API pública (`facet=all`): una página de 1 ficha basta.
     api
-      .list({
-        q: query,
-        countries: [],
-        languages: [],
-        groups: [],
-        artists: [],
-        factions: [],
-        language: null,
-        sort: 'dex',
-        page: 1,
-        perPage: 40,
-      }, controller.signal)
-      .then((response) => setRows(response.items))
+      .list({ ...DEFAULT_SEARCH, perPage: 1 })
+      .then((response) => {
+        setCountryOptions((response.facets?.countries ?? []).map((bucket) => ({ value: facetValue(bucket), label: bucket.name })));
+        setLanguageOptions((response.facets?.languages ?? []).map((bucket) => ({ value: facetValue(bucket), label: bucket.name })));
+      })
       .catch(() => undefined);
-    return () => controller.abort();
-  }, [query, user, savedAt]);
+  }, [user, token, loadFactions]);
 
   const login = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -121,42 +136,45 @@ export function AdminPage() {
     window.localStorage.removeItem(TOKEN_KEY);
     setToken(null);
     setUser(null);
-    setSelected(null);
+    setView({ kind: 'none' });
     setStats(null);
+    setFactions([]);
   };
 
-  const openEditor = async (slug: string) => {
+  const startCreate = () => {
+    setSection('fichas');
+    setView((current) => ({ kind: 'create', n: current.kind === 'create' ? current.n + 1 : 0 }));
+  };
+
+  const openEditor = async (id: number) => {
+    if (!token) return;
     setError(null);
     try {
-      const detail = await api.detail(slug);
-      setSelected(detail);
+      // Por id y por la ruta del mantenedor: `api.detail(slug)` da 404 en borradores y ocultos.
+      const detail = await api.adminDetail(token, id);
+      setView({ kind: 'edit', detail, epoch: 0 });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'error');
     }
   };
 
-  const save = async (patch: Record<string, unknown>) => {
-    if (!token || !selected) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const updated = await api.updateVtuber(token, selected.id, patch);
-      /**
-       * Solo se reemplaza la ficha seleccionada si la respuesta la trae entera.
-       *
-       * `save` hacía `setSelected(updated)` sin comprobar nada, y la ruta de producción
-       * devolvía `{ok, slug, editado}` en vez del detalle: el resultado era la ficha vacía
-       * después de guardar (sin nombre, sin campos, sin imágenes) porque el objeto seleccionado
-       * pasaba a tener esos campos en `undefined`. La ruta ya devuelve el detalle, y esta guarda
-       * evita que un despliegue anterior repita el síntoma en silencio.
-       */
-      if (updated?.slug) setSelected(updated);
-      setSavedAt(new Date().toISOString());
-      await loadAdmin();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'error al guardar');
-    } finally {
-      setSaving(false);
+  /** Tras guardar o crear: la lista, las métricas y los conteos de facciones cambian. */
+  const changed = () => {
+    setListVersion((current) => current + 1);
+    void loadAdmin();
+    void loadFactions();
+  };
+
+  /** Fusionar/eliminar una facción cambia las fichas: la abierta se recarga para no pisar el cambio al guardar. */
+  const factionStructureChanged = () => {
+    setListVersion((current) => current + 1);
+    void loadAdmin();
+    if (view.kind === 'edit' && token) {
+      const epoch = view.epoch + 1;
+      void api
+        .adminDetail(token, view.detail.id)
+        .then((detail) => setView({ kind: 'edit', detail, epoch }))
+        .catch(() => undefined);
     }
   };
 
@@ -218,8 +236,14 @@ export function AdminPage() {
     );
   }
 
+  const sections: Array<{ id: Section; label: string }> = [
+    { id: 'fichas', label: 'Fichas' },
+    { id: 'emblemas', label: 'Emblemas y facciones' },
+  ];
+
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-dex-ink">Mantenedor</h1>
@@ -250,15 +274,8 @@ export function AdminPage() {
           {error}
         </p>
       )}
-      {savedAt && (
-        <p
-          role="status"
-          data-testid="admin-saved"
-          className="mb-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200"
-        >
-          Guardado a las {new Date(savedAt).toLocaleTimeString('es-CL')}
-        </p>
-      )}
+
+      <GettingStarted onGoFactions={() => setSection('emblemas')} onNewCard={startCreate} />
 
       {/* Métricas */}
       {stats && (
@@ -290,257 +307,116 @@ export function AdminPage() {
         </section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        {/* Lista */}
-        <aside className="rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
-          <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-            Buscar ficha
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm text-dex-ink outline-none focus:border-dex-accent"
-              placeholder="nombre o número"
-            />
-          </label>
-          <ul className="dex-scroll mt-3 max-h-[60vh] space-y-1 overflow-y-auto">
-            {rows.map((row) => (
-              <li key={row.id}>
-                <button
-                  type="button"
-                  onClick={() => openEditor(row.slug)}
-                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${
-                    selected?.id === row.id ? 'bg-dex-accent/15 text-dex-ink' : 'text-dex-muted hover:bg-white/5'
-                  }`}
-                >
-                  <span className="font-mono text-[11px] text-dex-muted">#{String(row.dexNumber).padStart(3, '0')}</span>
-                  <span className="min-w-0 flex-1 truncate">{row.name}</span>
-                  {row.status !== 'published' && (
-                    <span className="rounded bg-amber-500/20 px-1.5 text-[10px] text-amber-200">{row.status}</span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </aside>
-
-        {/* Editor */}
-        <section className="min-w-0">
-          {!selected ? (
-            <div className="rounded-2xl border border-dex-line bg-dex-panel/60 px-6 py-16 text-center text-sm text-dex-muted">
-              Elige una ficha de la lista para editarla.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <EditorCard
-                key={selected.id}
-                detail={selected}
-                saving={saving}
-                savedAt={savedAt}
-                error={error}
-                onSave={save}
-              />
-              {/* Gestión de imágenes: va DESPUÉS del formulario para que el botón
-                  "Guardar cambios" quede al final de la edición de la ficha. */}
-              {token && (
-                <ImageManager
-                  token={token}
-                  detail={selected}
-                  onUpdated={(vtuber) => {
-                    // Se conserva el editor abierto: reemplazar una imagen no debe
-                    // sacarte de la ficha en la que estás trabajando. Solo se
-                    // actualiza el detalle; no se toca la búsqueda ni el scroll.
-                    setSelected(vtuber);
-                  }}
-                />
-              )}
-            </div>
-          )}
-
-          <section className="mt-6 rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
-            <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">Actividad reciente</h2>
-            <ul className="mt-3 space-y-1 font-mono text-xs text-dex-muted">
-              {audit.slice(0, 12).map((entry) => (
-                <li key={entry.id}>
-                  {entry.createdAt} · {entry.actor} · {entry.action}
-                  {entry.entityId ? ` · #${entry.entityId}` : ''}
-                </li>
-              ))}
-              {audit.length === 0 && <li key="empty">Sin registros todavía.</li>}
-            </ul>
-          </section>
-        </section>
+      <div role="tablist" aria-label="Secciones del mantenedor" className="mb-6 flex gap-1 border-b border-dex-line">
+        {sections.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            id={`section-tab-${item.id}`}
+            aria-selected={section === item.id}
+            aria-controls={`section-${item.id}`}
+            onClick={() => setSection(item.id)}
+            className={`border-b-2 px-4 py-2.5 text-sm font-semibold ${
+              section === item.id ? 'border-dex-accent text-dex-ink' : 'border-transparent text-dex-muted hover:text-dex-ink'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
-    </div>
-  );
-}
 
-/** Formulario de edición de una ficha. */
-function EditorCard({
-  detail,
-  saving,
-  savedAt,
-  error,
-  onSave,
-}: {
-  detail: VtuberDetail;
-  saving: boolean;
-  /** Marca de tiempo del último guardado, para el aviso de éxito. */
-  savedAt: string | null;
-  /** Mensaje de error del guardado, si lo hubo. */
-  error: string | null;
-  onSave: (patch: Record<string, unknown>) => void;
-}) {
-  const [form, setForm] = useState({
-    name: detail.name,
-    themeColor: detail.themeColor ?? '#5eead4',
-    birthday: detail.birthday ?? '',
-    height: detail.height ?? '',
-    hashtag: detail.hashtag ?? '',
-    favoriteColor: detail.favoriteColor ?? '',
-    status: detail.status,
-    phrase: detail.phrase ?? '',
-  });
-  const palette = cardPalette(form.themeColor, detail.secondaryColor);
-
-  return (
-    <form
-      className="space-y-5 rounded-2xl border border-dex-line bg-dex-panel/60 p-5"
-      data-testid="admin-editor"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSave({
-          name: form.name,
-          themeColor: form.themeColor,
-          birthday: form.birthday || null,
-          height: form.height || null,
-          hashtag: form.hashtag || null,
-          favoriteColor: form.favoriteColor || null,
-          status: form.status,
-          phrase: form.phrase || null,
-        });
-      }}
-    >
-      <header className="flex items-center gap-4">
-        {/* Vista previa del PERSONAJE: es la imagen de identidad del VTuber. La
-            miniatura no se muestra aquí porque es una copia reducida del
-            personaje, no una imagen con vida propia. */}
-        {(detail.images.character ?? detail.images.card) && (
-          <img
-            src={(detail.images.character ?? detail.images.card) as string}
-            alt=""
-            className="h-20 w-16 rounded-lg object-cover ring-1 ring-dex-line"
-            style={{ boxShadow: `0 0 24px ${palette.accent}44` }}
+      {/* Las dos secciones se montan siempre y la inactiva se oculta: así cambiar de pestaña no descarta lo que hay escrito en el asistente. */}
+      <div role="tabpanel" id="section-emblemas" aria-labelledby="section-tab-emblemas" hidden={section !== 'emblemas'}>
+        {token && (
+          <FactionManager
+            token={token}
+            factions={factions}
+            onItems={setFactions}
+            onStructureChanged={factionStructureChanged}
+            onAssign={() => {
+              setSection('fichas');
+              notify('ok', 'Abre una ficha y elige la facción en el paso «Colores y facciones».');
+            }}
+            notify={notify}
           />
         )}
-        <div className="min-w-0">
-          <h2 className="truncate text-lg font-extrabold text-dex-ink">{detail.name}</h2>
-          <p className="font-mono text-xs text-dex-muted">
-            #{String(detail.dexNumber).padStart(3, '0')} · /v/{detail.slug}
-          </p>
-        </div>
-      </header>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-          Nombre
-          <input
-            value={form.name}
-            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm normal-case text-dex-ink outline-none focus:border-dex-accent"
-          />
-        </label>
-        <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-          Color de marca
-          <span className="mt-1 flex items-center gap-2">
-            <input
-              type="color"
-              value={form.themeColor}
-              onChange={(event) => setForm((current) => ({ ...current, themeColor: event.target.value }))}
-              className="h-9 w-12 rounded border border-dex-line bg-dex-void"
-            />
-            <input
-              value={form.themeColor}
-              onChange={(event) => setForm((current) => ({ ...current, themeColor: event.target.value }))}
-              pattern="^#[0-9a-fA-F]{6}$"
-              className="w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 font-mono text-xs text-dex-ink outline-none focus:border-dex-accent"
-            />
-          </span>
-        </label>
-        {(
-          [
-            ['birthday', 'Cumpleaños'],
-            ['height', 'Altura'],
-            ['hashtag', 'Hashtag'],
-            ['favoriteColor', 'Color favorito'],
-          ] as const
-        ).map(([key, label]) => (
-          <label key={key} className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-            {label}
-            <input
-              value={form[key]}
-              onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm normal-case text-dex-ink outline-none focus:border-dex-accent"
-            />
-          </label>
-        ))}
-        <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-          Visibilidad
-          <select
-            value={form.status}
-            onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as VtuberDetail['status'] }))}
-            className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm normal-case text-dex-ink outline-none focus:border-dex-accent"
-          >
-            <option value="published">publicado</option>
-            <option value="draft">borrador</option>
-            <option value="hidden">oculto</option>
-          </select>
-        </label>
       </div>
 
-      <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-        Frase de presentación
-        <textarea
-          value={form.phrase}
-          onChange={(event) => setForm((current) => ({ ...current, phrase: event.target.value }))}
-          rows={3}
-          className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm normal-case text-dex-ink outline-none focus:border-dex-accent"
-        />
-      </label>
+      <div role="tabpanel" id="section-fichas" aria-labelledby="section-tab-fichas" hidden={section !== 'fichas'}>
+        <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+          <div className="space-y-4">
+            <button type="button" onClick={startCreate} className={`${primaryButton} w-full py-3`}>
+              Nueva carta
+            </button>
+            {token && (
+              <VtuberList
+                token={token}
+                selectedId={view.kind === 'edit' ? view.detail.id : null}
+                refreshKey={listVersion}
+                onOpen={(row) => openEditor(row.id)}
+                onCreate={startCreate}
+              />
+            )}
+          </div>
 
-      {/* Avisos AL FINAL del formulario, junto al botón: es donde está el foco
-          cuando pulsas guardar, así que el resultado se ve sin buscar arriba. */}
-      {error && (
-        <p
-          role="alert"
-          data-testid="admin-editor-error"
-          className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-200"
-        >
-          {error}
-        </p>
-      )}
-      {savedAt && !error && (
-        <p
-          role="status"
-          data-testid="admin-editor-saved"
-          className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200"
-        >
-          Guardado a las {new Date(savedAt).toLocaleTimeString('es-CL')}
-        </p>
-      )}
+          <section className="min-w-0">
+            {token && view.kind === 'create' && (
+              <CardWizard
+                key={`new-${view.n}`}
+                token={token}
+                mode="create"
+                initial={null}
+                factions={factions}
+                countryOptions={countryOptions}
+                languageOptions={languageOptions}
+                notify={notify}
+                onChanged={changed}
+                onFactionsChanged={setFactions}
+                onExit={() => setView({ kind: 'none' })}
+                onCreateAnother={startCreate}
+              />
+            )}
+            {token && view.kind === 'edit' && (
+              <CardWizard
+                key={`${view.detail.id}:${view.epoch}`}
+                token={token}
+                mode="edit"
+                initial={view.detail}
+                factions={factions}
+                countryOptions={countryOptions}
+                languageOptions={languageOptions}
+                notify={notify}
+                onChanged={changed}
+                onFactionsChanged={setFactions}
+                onExit={() => setView({ kind: 'none' })}
+              />
+            )}
+            {view.kind === 'none' && (
+              <div className="rounded-2xl border border-dashed border-dex-line px-6 py-16 text-center">
+                <p className="text-sm text-dex-muted">Elige una ficha de la lista para editarla, o crea una nueva.</p>
+                <button type="button" onClick={startCreate} className={`${primaryButton} mt-4`}>
+                  Nueva carta
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
 
-      <footer className="flex items-center justify-between gap-3">
-        <p className="text-xs text-dex-muted">
-          {detail.profile.length} campos de ficha · {detail.stats.length} atributos · {detail.skills.length} habilidades
-        </p>
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-xl bg-dex-accent px-4 py-2 text-sm font-bold text-black disabled:opacity-50"
-        >
-          {saving ? 'Guardando…' : 'Guardar cambios'}
-        </button>
-      </footer>
-    </form>
+      <section className="mt-6 rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
+        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">Actividad reciente</h2>
+        <ul className="mt-3 space-y-1 font-mono text-xs text-dex-muted">
+          {audit.slice(0, 12).map((entry) => (
+            <li key={entry.id}>
+              {entry.createdAt} · {entry.actor} · {entry.action}
+              {entry.entityId ? ` · #${entry.entityId}` : ''}
+            </li>
+          ))}
+          {audit.length === 0 && <li key="empty">Sin registros todavía.</li>}
+        </ul>
+      </section>
+    </div>
   );
 }
 

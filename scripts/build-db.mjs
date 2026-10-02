@@ -131,7 +131,7 @@ function assetPaths(db) {
     ...db.prepare(`SELECT icon AS p FROM faction WHERE icon IS NOT NULL`).all(),
   ];
   const unique = new Set(
-    rows.map((row) => `images/${String(row.p).replace(/^\/?images\//, '')}`),
+    rows.map((row) => `images/${String(row.p).replace(/^\/?images\//, '').split('?')[0]}`),
   );
   unique.delete('images/');
   return [...unique];

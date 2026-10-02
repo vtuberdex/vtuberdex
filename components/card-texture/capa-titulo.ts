@@ -4,7 +4,8 @@
 import type { VtuberCard } from '@/lib/types';
 import { cardPalette, rgba } from '@/lib/color';
 import { TEXT_FINISH } from '../card3d-config';
-import { FONT } from './dimensiones';
+import { FACTION_SOCKET, FONT, HEADER } from './dimensiones';
+import { anchoDeEngarces, iconosDeFaccion } from './facciones';
 import { createLayer } from './lienzo';
 import { roundRect, fitText, metalFill, metalSheen, metalBevel, drawEngrave } from './pintura';
 
@@ -12,9 +13,7 @@ import { roundRect, fitText, metalFill, metalSheen, metalBevel, drawEngrave } fr
 export function drawTitleLayer({ card, width }: { card: VtuberCard; width: number }): HTMLCanvasElement {
   const { canvas, ctx, W } = createLayer(width);
   if (!ctx) return canvas;
-  const pad = 46;
-  const headerTop = 44;
-  const headerH = 116;
+  const { pad, top: headerTop, height: headerH } = HEADER;
   const headerW = W - pad * 2;
   const headerRadius = 22;
 
@@ -68,12 +67,46 @@ export function drawTitleLayer({ card, width }: { card: VtuberCard; width: numbe
   ctx.fillStyle = TEXT_FINISH.badgeColor;
   ctx.fillText(badge, pad + 100, headerTop + 59);
 
-  // Nombre: reserva el ancho del país para que nunca se solapen.
+  /**
+   * ENGARCES DE LAS FACCIONES, a la derecha del nombre.
+   *
+   * Aquí solo se pinta el ENGARCE (acero oscuro con bisel): el emblema es un holograma y lo dibuja
+   * el shader encima, en la misma posición (`FACTION.slots`, que sale de esta misma geometría).
+   * Con una sola facción el engarce ocupa el sitio de la derecha, igual que el emblema.
+   *
+   * El engarce es oscuro a propósito. Sobre la placa clara teñida del color de marca, un emblema
+   * de luz se perdía —sobre todo en cartas rojas— y sobre una placa ya oscura tampoco destacaba:
+   * con el fondo propio, el holograma se lee igual con cualquier color de marca.
+   */
+  const emblemas = iconosDeFaccion(card).length;
+  const socketY = headerTop + (headerH - FACTION_SOCKET.size) / 2;
+  const socketRight = W - pad - FACTION_SOCKET.inset;
+  for (let i = 0; i < emblemas; i += 1) {
+    // El último engarce va pegado a la derecha; los anteriores, a su izquierda.
+    const socketX = socketRight - FACTION_SOCKET.size - (emblemas - 1 - i) * (FACTION_SOCKET.size + FACTION_SOCKET.gap);
+    ctx.fillStyle = metalFill(ctx, socketX, socketY, FACTION_SOCKET.size, FACTION_SOCKET.size, TEXT_FINISH.emblemSocketStops, accent, TEXT_FINISH.brandTint * 0.4);
+    roundRect(ctx, socketX, socketY, FACTION_SOCKET.size, FACTION_SOCKET.size, 18);
+    ctx.fill();
+    metalBevel(ctx, socketX, socketY, FACTION_SOCKET.size, FACTION_SOCKET.size, 18);
+  }
+  // Ancho que ocupan los engarces, con el hueco que los separa del país/nombre.
+  const emblemsWidth = anchoDeEngarces(emblemas, FACTION_SOCKET.size, FACTION_SOCKET.gap, FACTION_SOCKET.inset + 12);
+
+  // Nombre: reserva el ancho del país Y de los engarces para que nunca se solapen.
   const primary = card.countries[0];
-  const countryLabel = primary ? `${primary.flag ?? ''} ${primary.name}`.trim() : '';
+  /**
+   * Con emblemas, el país se reduce a su BANDERA: el nombre del país ya va impreso en el pie de la
+   * carta (`capa-textos.ts`), y en la cabecera el sitio lo necesitan los emblemas. Con el nombre
+   * completo, el del VTuber se encogía hasta la mitad de su tamaño. Sin facciones no cambia nada.
+   */
+  const countryLabel = primary
+    ? emblemas > 0
+      ? (primary.flag ?? '').trim()
+      : `${primary.flag ?? ''} ${primary.name}`.trim()
+    : '';
   ctx.font = `600 34px ${FONT}`;
   const countryWidth = countryLabel ? ctx.measureText(countryLabel).width + 28 : 0;
-  const nameMax = W - pad * 2 - 232 - countryWidth;
+  const nameMax = W - pad * 2 - 232 - countryWidth - emblemsWidth;
   ctx.textAlign = 'left';
   const nameSize = fitText(ctx, card.name.toUpperCase(), nameMax, 58, '800');
   const nameFont = `800 ${nameSize}px ${FONT}`;
@@ -90,7 +123,8 @@ export function drawTitleLayer({ card, width }: { card: VtuberCard; width: numbe
     ctx.textAlign = 'right';
     ctx.font = `600 34px ${FONT}`;
     ctx.fillStyle = rgba('#05060a', 0.78);
-    ctx.fillText(countryLabel, W - pad - 18, headerTop + 59);
+    // El país se corre a la izquierda de los engarces, no debajo de ellos.
+    ctx.fillText(countryLabel, W - pad - 18 - emblemsWidth, headerTop + 59);
   }
 
   return canvas;

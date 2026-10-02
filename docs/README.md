@@ -146,7 +146,7 @@ Si la IP del host cambia, el script la detecta solo (contenedor en `--network ho
 ## Tests y lint
 
 ```bash
-npm test                   # 187 tests (vitest): utilidades, componentes, páginas, carta 3D y libro
+npm test                   # 238 tests (vitest): utilidades, componentes, páginas, carta 3D y libro
 npm run lint               # eslint . — cubre también server/ y scraper/
 npm run typecheck          # tsc --noEmit
 npm run check:shaders      # guard de uniforms de GLSL (ni tsc ni los tests lo ven)

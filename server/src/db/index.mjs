@@ -9,6 +9,8 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
+import { consolidarFacciones } from './../mutations.mjs';
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 export const SCHEMA_PATH = path.join(HERE, 'schema.sql');
@@ -103,6 +105,16 @@ const MIGRATIONS = [
           ALTER TABLE asset_new RENAME TO asset;
           CREATE INDEX IF NOT EXISTS idx_asset_vtuber ON asset (vtuber_id);`,
   },
+  {
+    /**
+     * Limpia las facciones: el scrape trajo variantes con errata (`Netherbane2`, `Mythical Lecagy`…)
+     * que se sembraron como facciones distintas (26 en vez de 22) y fichas con 3-4 facciones
+     * cuando la carta solo tiene dos emblemas. Se fusionan las variantes y se conservan las dos
+     * primeras de cada ficha; el resto se reasigna a mano desde el mantenedor.
+     */
+    id: '2026-10-facciones-canonicas',
+    run: (db) => consolidarFacciones(db),
+  },
 ];
 
 /**
@@ -151,7 +163,8 @@ function applyMigrations(db) {
     const already = db.prepare('SELECT value FROM meta WHERE key = ?').get(key);
     if (already) continue;
     try {
-      db.exec(migration.sql);
+      if (migration.run) migration.run(db);
+      else db.exec(migration.sql);
     } catch (error) {
       // Columna ya presente (base creada con el esquema nuevo): no es un fallo.
       if (!/duplicate column name/i.test(String(error))) throw error;
