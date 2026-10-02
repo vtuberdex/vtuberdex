@@ -908,32 +908,44 @@ export const FACTION = {
    */
   slots: [ranuraDeCabecera(0), ranuraDeCabecera(1)],
   /**
-   * Parallax: cada emblema se desplaza con el puntero a distinta profundidad. Bajó de 0.02 a
-   * 0.004: con emblemas de 74 px dentro de un engarce, 0.02 de UV son ~20 px y el emblema se
-   * salía del engarce al mover el puntero.
+   * EL EMBLEMA VA FIJO EN SU ENGARCE. Antes tenía un paralaje propio (0.004 por slot) y el
+   * engarce, que es parte de la capa del título, otro (`PARALLAX_LAYERS[3]`): al mover el
+   * puntero se desplazaban a velocidades distintas y el emblema «flotaba» fuera del
+   * cuadrado. Ahora el shader lo muestrea con el MISMO desplazamiento que la capa del
+   * título, así que engarce y emblema se mueven como una sola pieza. No hay perilla: el
+   * acoplamiento es la regla, no un valor.
+   *
+   * Y SIN LATIDO. El pulso (0.72 ± 0.28, desfasado por slot) hacía que el emblema se
+   * apagara y encendiera; se pidió que quedara ESTÁTICO y legible, así que la intensidad
+   * es constante y solo la inclinación y el glare la suben un poco, como al resto del
+   * holograma.
    */
-  pointerParallax: 0.004,
-  /** Filtro del trazo por luminancia (el relleno oscuro del PNG no aporta nada). */
-  strokeLow: 0.10,
-  strokeHigh: 0.55,
-  /** Latido desfasado por slot: los emblemas no pulsan al unísono. */
-  pulseBase: 0.72,
-  pulseAmplitude: 0.28,
-  pulseSpeed: 1.5,
-  pulsePhase: 1.9,
-  pulseSurface: 5.0,
-  /** Máscara: piso, cuánto sube con la inclinación y con el glare. */
-  maskBase: 0.85,
-  maskTilt: 1.0,
-  maskGlare: 0.45,
-  /** Tinte iridiscente propio de cada slot. */
-  tintSpectrumMix: 0.7,
+  /**
+   * Filtro del trazo por luminancia (el relleno oscuro del PNG no aporta nada). Umbrales
+   * más bajos que antes (0.10/0.55): el trazo gris de varios emblemas quedaba a medias y el
+   * emblema se veía tenue; ahora cualquier trazo por encima del gris medio cuenta entero.
+   */
+  strokeLow: 0.06,
+  strokeHigh: 0.35,
+  /** Máscara: piso (constante, lo que se ve en reposo), cuánto sube con la inclinación y con el glare. */
+  maskBase: 1.0,
+  maskTilt: 0.35,
+  maskGlare: 0.25,
+  /**
+   * Tinte iridiscente propio de cada slot. Bajó de 0.7 a 0.35: con el arcoíris al 70 % el
+   * trazo cambiaba de color al mover la carta y se leía peor; ahora domina el trazo blanco
+   * del emblema y el arcoíris es un matiz.
+   */
+  tintSpectrumMix: 0.35,
   tintUvScale: 0.9,
   tintPointer: 0.1,
   tintPhase: 0.2,
-  /** Mezcla sobre el arte: tinte del propio color y luz añadida. */
+  /**
+   * Mezcla sobre el arte: tinte del propio color y luz añadida. La luz subió de 1.2 a 1.8
+   * para que el emblema se «note más» sobre el acero oscuro del engarce.
+   */
   selfTint: 0.45,
-  addedLight: 1.2,
+  addedLight: 1.8,
 } as const;
 
 /**
@@ -1219,6 +1231,103 @@ export const BODY = {
 export const FOG = { color: '#c9cdd6', near: 8, far: 20 } as const;
 
 /**
+ * EL LIBRO DE CARTAS (catálogo): una sola escena WebGL con las 8 cartas de la página.
+ *
+ * POR QUÉ UN LIBRO Y NO UNA GRILLA DE CANVAS
+ * -----------------------------------------
+ * La grilla montaba UN canvas WebGL por carta: 8 contextos, cada uno con su renderer,
+ * sus framebuffers (a DPR 1.8 en escritorio), su PMREM del entorno metálico y su copia
+ * decodificada del mismo `metal-env.webp`. El navegador no sostiene más de 16 y la
+ * memoria crecía con cada carta visible. Aquí hay UN contexto y las 8 cartas son mallas
+ * de la misma escena: comparten programa de shader (three lo cachea por fuente), el
+ * entorno prefiltrado y la geometría del cuerpo. El coste pasa a ser el de UNA ficha.
+ *
+ * Las medidas están en las unidades de la escena (la carta mide `GEOMETRY.cardWidth` de
+ * ancho); el alto de página sale de dos cartas más huecos y márgenes.
+ */
+export const BINDER = {
+  /** Cartas por página y columnas: 2x2, como una hoja de álbum de 4 fundas. */
+  cardsPerPage: 4,
+  columns: 2,
+  /** Hueco entre fundas y margen interior de cada hoja. */
+  gap: 0.3,
+  padding: 0.36,
+  /** Ancho del lomo entre las dos hojas: ahí van las anillas. */
+  spine: 0.62,
+  /** Cuánto sobresale la funda dibujada alrededor de la carta. */
+  pocketPad: 0.09,
+  /**
+   * Z de la carta sobre la hoja. El cuerpo extruido mide ~0.097 hacia atrás
+   * (`cardDepth/2 + bisel`), así que con 0.1 el canto apoya justo sobre el papel y el
+   * plano del resplandor (`glowZ = -0.09`) queda a 0.01 por encima: el halo se pinta
+   * SOBRE la funda y no dentro de ella.
+   */
+  cardLift: 0.1,
+  /**
+   * Z de la hoja que gira respecto de la hoja fija. Es minúsculo a propósito: al
+   * empezar queda APENAS por encima de la hoja de origen y, al aterrizar (la rotación
+   * de PI invierte la z), apenas por debajo de la de destino, que la tapa. Un valor
+   * mayor dejaría una rendija visible entre las dos hojas durante el giro.
+   */
+  sheetZ: 0.012,
+  /** Tapa del álbum, detrás de las dos hojas. */
+  coverMargin: 0.3,
+  coverZ: -0.04,
+  /** Colores del papel, la funda y la tapa (superficies neutras: el color lo pone la carta). */
+  pageColor: '#121722',
+  pocketColor: '#1a2030',
+  pocketLine: 'rgba(255, 255, 255, 0.09)',
+  coverColor: '#080b11',
+  /** Anillas del lomo: radio, grosor del aro y posición vertical (fracción del alto). */
+  ringRadius: 0.24,
+  ringTube: 0.035,
+  ringOffsets: [-0.34, 0, 0.34],
+  /** Duración del paso de página, en ms (una hoja de cartón, sin curvarse). */
+  flipMs: 1100,
+  /**
+   * Progreso en el que la hoja se queda EN PIE (90 grados) si la página siguiente aún no
+   * llegó de la API: el giro continúa cuando hay datos, así nunca se cierra sobre
+   * fundas vacías para rellenarlas después.
+   */
+  holdProgress: 0.5,
+  /**
+   * Ángulo (rad) que la hoja debe haber girado para mostrar las cartas que tapaba y
+   * para ocultar las que va a tapar. Las cartas sobresalen ~0.2 de la hoja, así que con
+   * menos de 10 grados (0.2 rad) sus cuerpos atravesarían la hoja que las cubre.
+   */
+  revealAngle: 0.2,
+  /** Cuánto gira el holograma de una carta con el ángulo de su hoja al pasar de página. */
+  sheetTiltGain: 0.35,
+  /** Inclinación del libro entero hacia el puntero. Menor que la de una carta: es grande. */
+  tiltY: 0.14,
+  tiltX: 0.1,
+  dampingBase: 0.002,
+  /** Elevación de la carta bajo el puntero (y su amortiguación), para saber cuál se abre. */
+  hoverLift: 0.22,
+  hoverDampingBase: 0.0003,
+  /** Fracción del encuadre que ocupa el libro: casi todo, porque no se inclina tanto. */
+  cameraFill: 0.94,
+  /**
+   * MODO DE UNA HOJA (celular). Con el libro entero encajado en 390 px de ancho cada
+   * carta medía ~70 px: legible como miniatura, inútil como carta. Por debajo de este
+   * ancho de viewport (px, el `sm` de Tailwind) la cámara encuadra UNA hoja y «siguiente»
+   * alterna izquierda -> derecha -> giro de página; la panorámica entre hojas va
+   * amortiguada para que se lea como mover la vista sobre el álbum, no como un corte.
+   */
+  singleMaxWidth: 640,
+  cameraDampingBase: 0.0008,
+  /** Umbrales de gesto: desplazamiento mínimo para pasar página y holgura de un toque. */
+  swipeMinPx: 48,
+  tapSlopPx: 8,
+  /**
+   * Techo del ancho de textura por carta en el libro. En pantalla cada carta mide
+   * ~200 px (8 en una fila de 1000 px), así que 1008 px sería 5x la resolución útil con
+   * 8 cartas a la vez: aquí el nivel «full» también se queda en 512.
+   */
+  textureWidthCap: 512,
+} as const;
+
+/**
  * PROTECCIÓN DEL MATIZ DEL FONDO frente al holograma.
  *
  * EL DEFECTO: en cartas de fondo ROJO o de colores OSCUROS el color de marca no se veía. El
@@ -1268,3 +1377,41 @@ export const DOMINANT = {
   dominanceFrom: 0.45,
   dominanceTo: 0.75,
 } as const;
+
+/**
+ * FÁBRICA DE TEXTURAS (`card-texture/fabrica.ts`): calidad adaptativa, caché y precarga.
+ *
+ * MEDIDO al cargar una página de 8 cartas: la API tarda 11-45 ms, pero el hilo principal
+ * quedó bloqueado 6,5 s en total. El coste no es el dato, es GENERAR las texturas: por
+ * carta se dibujan 4 lienzos de 512 px y dos máscaras recorren el lienzo píxel a píxel.
+ * Estas perillas gobiernan las cuatro medidas que lo atacan: generar en dos etapas (la
+ * carta aparece con superficie, personaje y título antes de que lleguen máscaras y
+ * marca), adaptar el ancho de textura a lo que la máquina REAL tarda, guardar lo generado
+ * en una caché acotada y pregenerar las páginas vecinas en tiempo ocioso.
+ */
+export const TEXTURAS = {
+  /**
+   * Anchos de textura por los que se baja cuando la máquina es lenta (de mayor a menor).
+   * 256 es el piso: por debajo el nombre de la cabecera deja de leerse en el libro.
+   */
+  anchos: [512, 384, 256],
+  /**
+   * Umbral (ms de generación COMPLETA de una carta, en el hilo principal) a partir del
+   * cual se baja un escalón. 120 ms son ~7 frames a 60 fps: con 8 cartas en cola es un
+   * segundo de tirones; por debajo la cola los reparte sin que se note.
+   */
+  lentoMs: 120,
+  /** Mediciones que hacen falta antes de decidir (la primera suele pagar el calentamiento del JIT). */
+  muestras: 2,
+  /**
+   * Presupuesto de la caché de texturas, en PÍXELES de canvas retenidos. Una carta a
+   * 512 px son ~3,7 Mpx (8 lienzos de 512x717); 60 Mpx son ~16 cartas: la página actual
+   * y la vecina más próxima. Las cartas montadas no se desalojan aunque excedan.
+   */
+  cacheMaxPixels: 60e6,
+  /** Retraso (ms) con el que corre un trabajo de prioridad baja cuando no hay `requestIdleCallback`. */
+  retrasoOciosoMs: 60,
+  /** Tiempo máximo (ms) que un trabajo ocioso espera un hueco antes de ejecutarse igual. */
+  esperaOciosaMaxMs: 1500,
+} as const;
+

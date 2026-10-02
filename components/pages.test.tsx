@@ -25,6 +25,7 @@ import {
   logoMask,
 } from '@/components/card-texture';
 import { api } from '@/lib/api';
+import { __limpiarCachePaginas } from '@/lib/cache-paginas';
 import { makeCard, makeDetail, makeList } from '@/test/fixtures';
 
 vi.mock('next/navigation', async () => {
@@ -81,6 +82,8 @@ const navigation = (await import('next/navigation')) as unknown as { __setQuery:
 
 afterEach(() => {
   vi.clearAllMocks();
+  // La caché de páginas es de módulo: sin vaciarla, un test leería la página de otro.
+  __limpiarCachePaginas();
 });
 
 const renderCatalog = (initial = '/') => {
@@ -100,6 +103,9 @@ describe('CatalogPage', () => {
 
     await waitFor(() => expect(screen.getAllByTestId('card-tile')).toHaveLength(2));
     expect(screen.getByRole('status')).toHaveTextContent('2 VTubers encontrados');
+    // Las cartas viven dentro del libro (dos hojas), no en una grilla suelta.
+    expect(screen.getByTestId('card-binder')).toBeInTheDocument();
+    expect(screen.getAllByTestId('binder-page')).toHaveLength(2);
     // El nombre ya no es texto del DOM: lo dibuja la textura de la carta, así que
     // la identidad de la tarjeta se comprueba por su enlace y su etiqueta.
     const cards = screen.getAllByTestId('card-tile');
@@ -167,28 +173,59 @@ describe('CatalogPage', () => {
     });
   });
 
-  it('el orden y el tamaño de página se propagan a la API', async () => {
+  it('el orden se propaga a la API y el tamaño de página es FIJO (las 8 fundas del libro)', async () => {
     const user = userEvent.setup();
     mockedApi.list.mockResolvedValue(makeList());
-    renderCatalog();
+    // Un enlace antiguo con `perPage=48` no puede agrandar el libro: se piden 8 igual.
+    renderCatalog('/?perPage=48');
     await waitFor(() => expect(mockedApi.list).toHaveBeenCalled());
+    expect(mockedApi.list.mock.calls.at(-1)?.[0]?.perPage).toBe(8);
 
+    // Solo queda el selector de orden: el de «por página» desapareció con la grilla.
     const selects = screen.getAllByRole('combobox');
+    expect(selects).toHaveLength(1);
     await user.selectOptions(selects[0], 'name');
     await waitFor(() => expect(mockedApi.list.mock.calls.at(-1)?.[0]?.sort).toBe('name'));
-
-    await user.selectOptions(selects[1], '48');
-    await waitFor(() => expect(mockedApi.list.mock.calls.at(-1)?.[0]?.perPage).toBe(48));
+    expect(mockedApi.list.mock.calls.at(-1)?.[0]?.perPage).toBe(8);
   });
 
   it('la paginación pide la página siguiente', async () => {
     const user = userEvent.setup();
-    mockedApi.list.mockResolvedValue(makeList({ total: 100, pageCount: 5, page: 1 }));
+    mockedApi.list.mockImplementation((params) =>
+      Promise.resolve(makeList({ total: 100, pageCount: 5, page: params.page })),
+    );
     renderCatalog();
     await waitFor(() => expect(screen.getByText('Siguiente →')).toBeInTheDocument());
 
     await user.click(screen.getByText('Siguiente →'));
-    await waitFor(() => expect(mockedApi.list.mock.calls.at(-1)?.[0]?.page).toBe(2));
+    // La página 2 se pide (directamente o por la precarga de vecinas) y la UI la muestra.
+    await waitFor(() => expect(mockedApi.list.mock.calls.some((call) => call[0]?.page === 2)).toBe(true));
+    await waitFor(() => expect(screen.getByRole('button', { name: '2' })).toHaveAttribute('aria-current', 'page'));
+  });
+
+  it('precarga las páginas vecinas y la siguiente se muestra desde la caché', async () => {
+    const user = userEvent.setup();
+    mockedApi.list.mockImplementation((params) =>
+      Promise.resolve(
+        makeList({
+          total: 24,
+          pageCount: 3,
+          page: params.page,
+          items: [makeCard({ id: params.page, slug: `pagina-${params.page}`, name: `Página ${params.page}` })],
+        }),
+      ),
+    );
+    renderCatalog();
+    await waitFor(() => expect(screen.getAllByTestId('card-tile')[0]).toHaveAttribute('href', '/v/pagina-1'));
+    // Tras un respiro, la vecina (página 2) ya se pidió sola.
+    await waitFor(() => expect(mockedApi.list.mock.calls.some((call) => call[0]?.page === 2)).toBe(true));
+    const llamadasAntes = mockedApi.list.mock.calls.length;
+
+    await user.click(screen.getByText('Siguiente →'));
+    await waitFor(() => expect(screen.getAllByTestId('card-tile')[0]).toHaveAttribute('href', '/v/pagina-2'));
+    // Mostrar la página 2 no volvió a pedirla: solo se añadió la precarga de la 3.
+    const nuevas = mockedApi.list.mock.calls.slice(llamadasAntes).map((call) => call[0]?.page);
+    expect(nuevas).not.toContain(2);
   });
 });
 

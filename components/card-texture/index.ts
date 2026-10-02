@@ -22,4 +22,4 @@ export { drawTagsLayer } from './capa-tags';
 export { drawWordmarkLayer } from './capa-wordmark';
 export { drawCardLayers, drawCardFront } from './componer';
 export { loadImage } from './imagen';
-export { inkAndSkinMask, logoMask, logoSticker } from './mascaras';
+export { inkAndSkinMask, inkAndSkinMaskAsync, logoMask, logoMaskAsync, logoSticker } from './mascaras';

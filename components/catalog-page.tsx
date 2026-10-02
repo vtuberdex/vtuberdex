@@ -1,54 +1,64 @@
 'use client';
 /**
- * Catálogo: buscador + facetas + grilla de cartas.
+ * Catálogo: buscador + facetas + libro de cartas.
+ *
+ * Las 8 cartas de la página se muestran como un álbum abierto (dos hojas de 4 fundas)
+ * en UN solo canvas WebGL (`CardBinder`); pasar de página es un giro de hoja. El
+ * tamaño de página es fijo (8 = las dos hojas), así que ya no hay selector «por
+ * página»: ver `use-vtuber-search.ts`.
  *
  * Responsive: en escritorio los filtros son una columna fija; en móvil viven en
  * una hoja inferior (los 785 divs del origen obligaban a hacer scroll infinito).
  */
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 
 import { activeFilterCount } from '@/lib/query';
-import { CardTile } from '@/components/card-tile';
+import { CardBinder } from '@/components/card-binder';
+import { BINDER } from '@/components/card3d-config';
 import { FilterPanel } from '@/components/filter-panel';
 import { Pagination } from '@/components/pagination';
 import { SearchBar } from '@/components/search-bar';
 import { SortSelect } from '@/components/sort-select';
+import { useSingleSheet } from '@/components/use-single-sheet';
 import { useVtuberSearch } from '@/components/use-vtuber-search';
 
 /**
- * Tamaños de página ofrecidos.
+ * Libro fantasma mientras carga.
  *
- * Se empieza en 8 por el límite de contextos WebGL (ver `DEFAULT_PER_PAGE`); los
- * valores mayores existen para quien quiera barrer el catálogo rápido, y en ese
- * caso la grilla muestra en 2D lo que no cabe en el presupuesto de 3D — nunca un
- * hueco negro.
+ * Tiene la MISMA forma que el libro real (dos hojas de 2x2 fundas con proporción de
+ * carta 5/7): si divergieran, al llegar los datos el libro saltaría de sitio. El
+ * `data-testid` se conserva de la grilla anterior porque es el contrato que fijan los
+ * tests («muestra esqueletos mientras carga»).
  */
-const PER_PAGE_OPTIONS = [8, 12, 24, 48];
-
-/**
- * Rejilla fantasma mientras carga.
- *
- * Las columnas son las MISMAS que las de la grilla real (`grid-cols-2 md:grid-cols-4`):
- * si divergieran, al llegar los datos las tarjetas saltarían de sitio. Los
- * tamaños de página (8, 12, 24, 48) son todos múltiplos de 4 y de 2, así que la
- * última fila nunca queda a medias con un hueco.
- */
-function SkeletonGrid({ count = 8 }: { count?: number }) {
+function SkeletonBook({ single = false }: { single?: boolean }) {
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-4" data-testid="skeleton-grid">
-      {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="overflow-hidden rounded-2xl border border-dex-line">
-          {/* Proporción de carta (5/7), no 5/6: el hueco debe medir lo mismo que la
-              tarjeta real para que no haya salto de layout al cargar. */}
-          <div className="dex-skeleton aspect-[5/7]" />
-        </div>
+    <div
+      className={single ? 'rounded-2xl p-3' : 'grid grid-cols-[1fr_12px_1fr] gap-2 rounded-2xl p-3'}
+      style={{ background: BINDER.coverColor }}
+      data-testid="skeleton-grid"
+    >
+      {(single ? ['derecha'] : ['izquierda', 'derecha']).map((side, position) => (
+        <Fragment key={side}>
+          {position === 1 && <div aria-hidden className="rounded-full bg-black/60" />}
+          <div className="grid grid-cols-2 gap-3 rounded-xl p-3" style={{ background: BINDER.pageColor }}>
+            {Array.from({ length: BINDER.cardsPerPage }, (_, index) => (
+              <div key={index} className="overflow-hidden rounded-2xl border border-dex-line">
+                <div className="dex-skeleton aspect-[5/7]" />
+              </div>
+            ))}
+          </div>
+        </Fragment>
       ))}
     </div>
   );
 }
 
 export function CatalogPage() {
-  const { params, data, loading, error, setParams, reset, goToPage } = useVtuberSearch();
+  // En celular el libro es UNA hoja de 4 fundas: cada página son 4 cartas (ver `useSingleSheet`).
+  const single = useSingleSheet();
+  const { params, data, loading, error, setParams, reset, goToPage } = useVtuberSearch({
+    perPage: single ? BINDER.cardsPerPage : BINDER.cardsPerPage * 2,
+  });
   const [sheetOpen, setSheetOpen] = useState(false);
   const filterCount = activeFilterCount(params);
 
@@ -86,7 +96,7 @@ export function CatalogPage() {
               loading={loading}
             />
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -104,20 +114,6 @@ export function CatalogPage() {
                 <SortSelect value={params.sort} onChange={(sort) => setParams({ sort, page: 1 })} />
               </div>
 
-              <label className="inline-flex items-center gap-2 text-xs text-dex-muted">
-                <span className="uppercase tracking-[0.14em]">Por página</span>
-                <select
-                  value={params.perPage}
-                  onChange={(event) => setParams({ perPage: Number(event.target.value), page: 1 })}
-                  className="rounded-lg border border-dex-line bg-dex-panel px-2 py-1.5 text-xs text-dex-ink outline-none focus:border-dex-accent"
-                >
-                  {PER_PAGE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
 
             {/* Chips de filtros activos. */}
@@ -168,9 +164,7 @@ export function CatalogPage() {
           )}
 
           {loading && items.length === 0 ? (
-            // El fantasma usa el MISMO número que la página: así el alto no cambia
-            // al llegar los datos y no hay salto de scroll.
-            <SkeletonGrid count={params.perPage} />
+            <SkeletonBook single={single} />
           ) : items.length === 0 ? (
             <div className="rounded-2xl border border-dex-line bg-dex-panel/60 px-6 py-16 text-center">
               <p className="text-lg font-bold text-dex-ink">Sin resultados</p>
@@ -186,15 +180,19 @@ export function CatalogPage() {
               </button>
             </div>
           ) : (
-            <div
-              className={`grid grid-cols-2 gap-4 md:grid-cols-4 ${
-                loading ? 'opacity-60 transition-opacity' : ''
-              }`}
-            >
-              {items.map((card, index) => (
-                <CardTile key={card.id} card={card} index={index} />
-              ))}
-            </div>
+            /*
+              `page` sale de la URL (cambia al instante) y `pageCount` de la respuesta: el
+              libro necesita saber hacia dónde gira ANTES de que lleguen los datos de la
+              página nueva, y mientras tanto mantiene la hoja en pie.
+            */
+            <CardBinder
+              items={items}
+              single={single}
+              page={params.page}
+              pageCount={data?.pageCount ?? 1}
+              loading={loading}
+              onPage={goToPage}
+            />
           )}
 
           {data && <Pagination page={data.page} pageCount={data.pageCount} onPage={goToPage} />}

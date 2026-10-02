@@ -73,11 +73,25 @@ test('los engarces de la textura y los slots del shader salen de la MISMA geomet
   expect((derecho.x - izquierdo.x) * CARD_TEXTURE_WIDTH).toBeCloseTo(FACTION_SOCKET.size + FACTION_SOCKET.gap, 6);
 });
 
-test('cada slot tiene su propio tinte y su propia fase de latido', () => {
+test('cada slot tiene su propio tinte, y el emblema es ESTÁTICO (sin latido)', () => {
   // El tinte debe depender del índice del slot; si no, los emblemas se ven como
   // el mismo sello repetido en vez de capas holográficas distintas.
   expect(/spectralFoil\([^)]*float\(i\)/.test(cardFragmentShader), 'el tinte usa el índice').toBeTruthy();
-  expect(/sin\([^)]*float\(i\)/.test(cardFragmentShader), 'el latido usa el índice').toBeTruthy();
+  // Se pidió que el emblema quedara fijo y legible: la intensidad no late con el tiempo.
+  const bloque = cardFragmentShader.slice(
+    cardFragmentShader.indexOf('CAPA 3: emblemas de FACCIÓN'),
+    cardFragmentShader.indexOf('CAPA 4: HOLOGRAMA DE CONTRASTE'),
+  );
+  expect(bloque).not.toMatch(/sin\(\s*uTime/);
+});
+
+test('el emblema va pegado a su engarce y conserva su proporción', () => {
+  // El engarce vive en la capa del título (índice 3): el emblema debe muestrearse con el
+  // MISMO paralaje, o se despega del cuadrado al mover el puntero.
+  expect(cardFragmentShader).toMatch(/parallax \* uParallaxFactors\[3\] - slot/);
+  // Y el PNG se encaja «contain» con su proporción, centrado, en vez de estirarse.
+  expect(cardFragmentShader).toContain('uniform vec2 uFactionAspect;');
+  expect(cardFragmentShader).toMatch(/aspecto >= 1\.0 \? vec2\(1\.0, aspecto\) : vec2\(1\.0 \/ aspecto, 1\.0\)/);
 });
 
 test('las posiciones del shader salen de la config, no de literales sueltos', () => {

@@ -60,3 +60,30 @@ describe('layout del canvas', () => {
     expect(bloque).not.toMatch(/\bwidth:|\bheight:/);
   });
 });
+
+/**
+ * El libro del catálogo monta su propio `<Canvas>` y sufre el MISMO lazo de medida: su
+ * contenedor fija el alto por `aspect-ratio`, y si el canvas entrara en el flujo el
+ * ancho inline que escribe three.js impediría encoger al rotar el móvil.
+ */
+const fuenteLibro = readFileSync(path.resolve(process.cwd(), 'components/card-binder.tsx'), 'utf8');
+
+describe('layout del canvas del libro', () => {
+  it('el canvas del libro vive en una caja posicionada dentro de una raíz `relative`', () => {
+    const caja = fuenteLibro.indexOf('<div className="absolute inset-0">');
+    const canvas = fuenteLibro.indexOf('<Canvas');
+    expect(caja).toBeGreaterThan(-1);
+    expect(canvas).toBeGreaterThan(caja);
+    expect(fuenteLibro.slice(caja, canvas)).not.toContain('</div>');
+    // La raíz que lo contiene es la superficie de gestos, posicionada.
+    expect(fuenteLibro).toMatch(/className="relative select-none"/);
+  });
+
+  it('el canvas del libro no se declara con tamaño propio', () => {
+    const canvas = fuenteLibro.indexOf('<Canvas');
+    const cierre = fuenteLibro.indexOf('>', fuenteLibro.indexOf('onCreated', canvas));
+    const bloque = fuenteLibro.slice(canvas, cierre);
+    expect(bloque).not.toMatch(/style=\{\{/);
+    expect(bloque).not.toMatch(/\bwidth:|\bheight:/);
+  });
+});

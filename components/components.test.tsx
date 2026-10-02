@@ -183,20 +183,19 @@ describe('CardTile', () => {
     expect(link).toHaveAttribute('data-dex', '18');
   });
 
-  it('monta la carta 3D y no un marco con los mismos datos', () => {
+  it('monta la vista 2D de la carta y no un marco con los mismos datos', () => {
     renderWithRouter(<CardTile card={makeCard()} />);
     const link = screen.getByRole('link');
-    // En jsdom no hay WebGL, así que `HoloCard` cae a su vista 2D; lo importante
-    // es que la tarjeta NO añada cabecera ni pie propios: el marco exterior que
+    // La tarjeta es la vista 2D de la carta (la 3D vive en el libro, `CardBinder`);
+    // lo importante es que NO añada cabecera ni pie propios: el marco exterior que
     // repetía número/nombre/país/LV ya no existe.
     expect(link.querySelector('[data-testid="holo-card-fallback"]')).not.toBeNull();
     expect(screen.queryByRole('heading')).toBeNull();
   });
 
-  it('muestra el ART del personaje (la carta 3D lo usa como textura)', () => {
-    // En la grilla la carta es la MISMA holográfica del detalle: el arte lo
-    // consume `drawCardFront` vía `HoloCard`. En jsdom no hay WebGL, así que se
-    // renderiza el respaldo 2D, que lleva el personaje en un `<img>`.
+  it('muestra el ART del personaje (la misma imagen que la carta 3D usa como textura)', () => {
+    // La tarjeta 2D lleva el personaje en un `<img>`: es el respaldo del libro y lo
+    // que lee un lector de pantalla; en 3D ese mismo arte es la capa 1 de la textura.
     renderWithRouter(<CardTile card={makeCard()} />);
     const art = screen.getByAltText('GKuro Monochrome');
     expect(art).toHaveAttribute('src', 'images/character/gkuro-monochrome.webp');

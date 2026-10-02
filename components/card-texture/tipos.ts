@@ -12,6 +12,12 @@ export interface CardDrawInfo {
   background: HTMLImageElement | null;
   /** Ancho del lienzo. */
   width?: number;
+  /**
+   * Capas YA dibujadas que se reutilizan tal cual (generación progresiva, ver
+   * `fabrica.ts`): la etapa rápida pinta superficie, personaje y título para mostrar la
+   * carta cuanto antes, y la completa no debe volver a pagarlas.
+   */
+  reutilizar?: Partial<Pick<CardLayers, 'background' | 'character' | 'title'>>;
 }
 
 /** Las 7 capas que se generan. */

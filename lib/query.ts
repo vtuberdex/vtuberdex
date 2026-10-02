@@ -6,12 +6,13 @@ import type { SearchParams, SortKey } from '@/lib/types';
 /**
  * Cartas por página.
  *
- * 8, no 24: el navegador no sostiene más de 16 contextos WebGL y destruye los más
- * antiguos al pasarse. Con 24 cartas por página, en un viewport de escritorio 15
- * quedaban a la vista y el presupuesto no alcanzaba, así que las últimas de la
- * rejilla aparecían en 2D y solo pasaban a 3D al desplazarse (y al salir se
- * destruían). Con 8 caben todas en pantalla: nadie espera turno y ninguna carta se
- * queda sin su carta 3D.
+ * 8 = las dos hojas del libro de cartas (`CardBinder`: 2 hojas x 4 fundas). Es el
+ * único tamaño que el catálogo pide a la API (ver `use-vtuber-search.ts`): el
+ * selector «por página» desapareció con la grilla, y un `perPage` distinto en la URL
+ * se tolera al parsear pero no se usa. El número nació del límite de contextos WebGL
+ * (una grilla con un canvas por carta no podía pasar de 8 sin que el navegador
+ * destruyera contextos); hoy el libro dibuja las 8 en un solo canvas, y 8 sigue
+ * siendo lo que cabe en un álbum abierto.
  */
 export const DEFAULT_PER_PAGE = 8;
 

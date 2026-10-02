@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 208 tests (vitest): utilidades, componentes, páginas, carta 3D
+npm test                   # 260 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 66 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/66/208** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/66/260** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -97,9 +97,14 @@ Turso. Si añades tests, actualiza **los dos** archivos.
    no duplica fichas.
 6. **La URL es el estado de la búsqueda.** Todo filtro vive en el querystring
    (`lib/query.ts`); un resultado filtrado se comparte por enlace.
-7. **Una sola carta WebGL por pantalla.** La grilla usa CSS 3D (24 contextos
-   WebGL matarían el rendimiento en móvil); el canvas con shaders vive en el
-   detalle.
+7. **Un solo canvas WebGL por pantalla.** El catálogo es un LIBRO
+   (`components/card-binder.tsx`): las 8 cartas de la página son mallas de UNA escena
+   (dos hojas de 4 fundas, la hoja gira al pasar de página); el detalle tiene su
+   propia carta. Nunca un canvas por carta: 8 contextos con su renderer, PMREM y
+   framebuffers cada uno fue lo que disparó la memoria, y el navegador destruye
+   contextos al pasar de 16. Lo que pinta una carta (texturas, uniforms, materiales)
+   está UNA vez en `card-material.ts` (`useCardMaterials`) y lo consumen las dos
+   escenas; `check:shaders` lee ese archivo para cruzar los uniforms con el GLSL.
 8. **El color del dato manda.** `THEME` de cada ficha alimenta la paleta
    (acento, secundario, fondo, tinta) de cartas, chips y bordes.
 
@@ -182,7 +187,13 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   Además el foil del fondo se tiñe del **color predominante** de la superficie
   (`card-texture/predominante.ts`, perilla `DOMINANT.mix` = 70 %): se calcula en CPU por matiz (no
   promedio: rojo+azul no dan morado), ignora grises y su `amount` baja a 0 en fondos grises o
-  multicolor, donde queda el arcoíris completo.
+  multicolor, donde queda el arcoíris completo. **El emblema va FIJO y centrado en su
+  engarce**: el shader lo muestrea con el MISMO paralaje que la capa del título
+  (`parallax * uParallaxFactors[3]`), porque con un paralaje propio se despegaba del cuadrado
+  al mover el puntero; lo encaja «contain» con la proporción real del PNG (`uFactionAspect`,
+  que `card-material.ts` saca de la imagen) en vez de estirarlo; y no late: la intensidad es
+  constante (`FACTION.maskBase`) con un leve realce por inclinación y glare. `factions.test.ts`
+  fija las tres cosas sobre el GLSL generado.
 
 ## Base de datos y migraciones
 
@@ -237,6 +248,75 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   comprueba por texto que la caja posicionada siga ahí (el resto de la clase está en la
   skill `threejs-r3f-webgl-rendering`).
 
+- **El libro de cartas (`card-binder.tsx`) tiene reglas de geometría que ningún gate ve
+  salvo `card-binder-layout.test.ts`.** La hoja gira alrededor del lomo (x = 0) con un
+  ángulo de signo NEGATIVO al avanzar: con el signo contrario `z' = -x·sin θ` manda la hoja
+  hacia DENTRO de la tapa y el giro se ve «por detrás». Las cartas del dorso van en su
+  funda de DESTINO giradas media vuelta (`sheetCardLocalMatrix(..., 'back')`): al empezar
+  quedan reflejadas detrás de la hoja de origen y, al completar PI, caen exactamente en
+  la funda donde luego viven fijas, así que la MISMA `key` (el `id` de la carta) pasa de
+  «dorso» a «fija» sin remontarse ni regenerar texturas. Las cartas sobresalen ~0.2 de la
+  hoja (cuerpo extruido + bisel), por eso las fijas que una hoja tapa se esconden hasta
+  que gira `BINDER.revealAngle` (0.2 rad), y las que va a tapar se esconden ese mismo
+  ángulo antes de aterrizar: sin eso los cuerpos atraviesan la hoja. Si la página
+  siguiente no llegó de la API, el giro se queda en pie en `holdProgress` (90°) y sigue
+  al llegar (`advanceFlip` integra por `delta`, no por marca de inicio, así no salta).
+  Las texturas de las 8 cartas se generan EN COLA (`encolarTrabajo`, una por vuelta del
+  event loop): las ocho a la vez bloqueaban el hilo en un tramo largo. El entorno
+  metálico y su PMREM se cargan una vez por escena (`useSharedCardEnv`) y se reparten
+  por contexto; la carta suelta del detalle sigue cargando el suyo.
+  **En celular (viewport < `BINDER.singleMaxWidth`, 640 px) cada PÁGINA son 4 cartas en
+  UNA hoja**: con el libro entero encajado en 390 px cada carta medía ~70 px. Lo decide el
+  CATÁLOGO (`useSingleSheet`, por `matchMedia` en un efecto: el servidor no tiene viewport)
+  porque cambia lo que se pide a la API: `useVtuberSearch({ perPage: 4 })`, y la clave de
+  la caché de páginas lleva ese `perPage`. En el libro (`single`), las 4 cartas van en la
+  hoja DERECHA (`planPlacements(..., { singleSheet: true })`), la cámara encuadra solo esa
+  hoja y la izquierda queda vacía; avanzar gira la hoja derecha con las salientes y destapa
+  las entrantes, retroceder trae la hoja izquierda con las entrantes en el dorso. El número
+  de página de la URL cuenta hojas de 4 en celular y de 8 en escritorio: un enlace compartido
+  entre ambos cae en cartas distintas, y se aceptó a cambio de no mezclar dos paginados.
+- **Pasar de página no debe esperar a la red: las páginas vecinas se PRECARGAN.** Medido
+  por el usuario como «demasiado delay» al avanzar/retroceder: el libro dejaba la hoja en
+  pie hasta que la API respondía y después cada carta esperaba sus imágenes. Hoy
+  `lib/cache-paginas.ts` guarda cada respuesta en un LRU por clave de consulta (filtros +
+  orden + página, `perPage` normalizado a 8) y, `RETRASO_PRECARGA_MS` después de mostrar
+  una página, pide la anterior y la siguiente en segundo plano y calienta sus imágenes.
+  `loadImage` (`card-texture/imagen.ts`) memoiza la PROMESA por URL (LRU de 96), así que
+  dos cartas con el mismo emblema comparten petición y una carta precargada genera su
+  textura sin red. Un fallo no se memoiza (se reintenta) y las URLs versionadas (`?v=`)
+  del mantenedor invalidan solas. La caché es de módulo y sobrevive a ir a una ficha y
+  volver; los tests que montan el catálogo deben vaciarla (`__limpiarCachePaginas`) en
+  `afterEach`, o leerán la página de otro test.
+- **Generar las texturas de las cartas es lo que cuesta, no traer los datos.** Medido al
+  cargar una página de 8: la API tarda 11-45 ms y el hilo principal quedó bloqueado 6,5 s
+  (4 lienzos por carta más dos máscaras píxel a píxel). `card-texture/fabrica.ts` es la
+  única puerta de generación y aplica cuatro medidas, con sus perillas en `TEXTURAS`:
+  (1) PROGRESIVA: `generarRapida` (superficie, personaje, título) muestra la carta y
+  `completar` añade marca y máscaras REUTILIZANDO esas capas (`reutilizar` en
+  `drawCardLayers`), nada se dibuja dos veces; (2) ADAPTATIVA: se mide la generación
+  completa y si la mediana de `muestras` supera `lentoMs` se baja un escalón de `anchos`
+  (512 -> 384 -> 256) para las siguientes, decide la máquina real y no
+  `hardwareConcurrency`; (3) CACHÉ LRU por carta y ancho con presupuesto en PÍXELES
+  (`cacheMaxPixels`), con las cartas montadas ancladas (`anclar`) para que no se
+  desalojen debajo de quien las usa, los canvases se cachean y las `CanvasTexture` se crean
+  por montaje porque pertenecen a un renderer; (4) PREGENERACIÓN: `pregenerar` encola con
+  prioridad BAJA y en `requestIdleCallback` las cartas de las páginas vecinas que trajo
+  `cache-paginas`, y un trabajo bajo que ya tenía turno lo CEDE si llega uno alto. Las
+  máscaras corren en un Web Worker (`mascaras.worker.ts`, matemática pura en
+  `mascaras-puras.ts` compartida con el camino síncrono de respaldo): el hilo principal
+  solo dibuja, lee y escribe píxeles. Dos trampas: la cola ejecuta de UNO en uno con un
+  `setTimeout 0` entre trabajos (ocho a la vez bloqueaban en un tramo), y `buscarEnCache`
+  REJUVENECE la entrada (LRU), así que una consulta la aleja del desalojo. Y una tercera
+  que costó una vuelta: la calidad adaptativa mide SOLO CPU del hilo principal
+  (`Completada.msCpu`), nunca la espera del worker, porque su arranque (~0,7 s en una
+  máquina lenta) se colaba en la primera carta y bajaba un escalón sin motivo; además
+  `precalentarMascaras()` arranca el worker mientras se descargan las imágenes. Medido con
+  canvas por CPU (`--disable-accelerated-2d-canvas`; con SwiftShader el canvas 2D también
+  va por software y las cifras no valen): ~14 ms la etapa rápida y ~13 ms de CPU la
+  completa por carta a 512, máximo 40 ms de pared, y 24 aciertos de caché al volver a una
+  página. Las etapas emiten `performance.measure` (`textura-rapida:*`,
+  `textura-completa:*`, `textura-completa-cpu:*`, `textura-cache`) para leerlas en la
+  pestaña Performance sin tocar el código.
 - **R3F en producción**: la geometría del canto se crea con `useMemo` como
   instancia, NO como elemento JSX. Instanciar la clase desde JSX acaba en
   `Class constructor cannot be invoked without 'new'` en el bundle minificado y
