@@ -426,6 +426,31 @@ test('crear una carta nueva: nace en borrador, al final de la dex y visible solo
   await admin('PATCH', `/vtubers/${carta.id}`, { status: 'hidden' });
 });
 
+test('el emblema de una facción se sube como PNG y la facción pasa a usarlo', async () => {
+  const sharp = (await import('sharp')).default;
+  const png = await sharp({ create: { width: 900, height: 600, channels: 4, background: '#ffffff' } }).png().toBuffer();
+  const faccion = (await (await admin('POST', '/factions', { label: 'Con Emblema' })).json()).faction;
+  const subida = await fetch(`${baseUrl}/api/admin/factions/${faccion.id}/image`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/octet-stream', authorization: `Bearer ${token}` },
+    body: png,
+  });
+  assert.equal(subida.status, 200);
+  const cuerpo = await subida.json();
+  assert.match(cuerpo.faction.icon, /^images\/faction\/con-emblema\.png\?v=\d+$/);
+  // Se limita a 512 px de lado y se guarda en la carpeta canónica.
+  assert.equal(cuerpo.asset.width, 512);
+  assert.ok(fs.existsSync(path.join(path.dirname(dbPath), 'images', 'faction', 'con-emblema.png')));
+
+  // Un archivo que no es imagen se rechaza.
+  const basura = await fetch(`${baseUrl}/api/admin/factions/${faccion.id}/image`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/octet-stream', authorization: `Bearer ${token}` },
+    body: Buffer.from('esto no es una imagen'),
+  });
+  assert.equal(basura.status, 400);
+});
+
 test('CORS habilita el dev-server de Vite', async () => {
   const response = await fetch(`${baseUrl}/api/health`, { headers: { origin: 'http://localhost:5173' } });
   assert.equal(response.headers.get('access-control-allow-origin'), 'http://localhost:5173');

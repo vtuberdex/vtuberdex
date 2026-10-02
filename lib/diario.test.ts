@@ -163,4 +163,19 @@ describe('el diario se reproduce en una instancia fría', () => {
     expect(buscar.getVtuberBySlug(fresca, 'drawchii')).toBeNull(); // oculta
     expect(buscar.getVtuberBySlug(fresca, 'drawchii', { includeHidden: true })?.factions).toEqual(['Nueva Liga']);
   });
+
+  test('el emblema de una facción creada se guarda en el diario con su ruta versionada', async () => {
+    const { resultado } = await diario.aplicarYAnotar({ tipo: 'faccion.crear', datos: { label: 'Con Emblema' } });
+    const { id } = resultado as { id: number };
+    const ruta = 'images/faction/con-emblema.png?v=123';
+    await diario.aplicarYAnotar({ tipo: 'faccion.editar', id, patch: { icon: ruta } });
+    await instanciaFria();
+    const fila = (await diario.dbConDiario()).prepare('SELECT icon FROM faction WHERE id = ?').get(id) as { icon: string };
+    expect(fila.icon).toBe(ruta);
+    // La carta que la usa expone el emblema versionado como URL pública.
+    const gkuro = await idDe('gkuro');
+    await diario.aplicarYAnotar({ tipo: 'vtuber.editar', id: gkuro, patch: { factions: ['con-emblema'] } });
+    const detalle = buscar.getVtuberBySlug(await diario.dbConDiario(), 'gkuro', { includeHidden: true });
+    expect(detalle?.factionIcons?.[0]?.icon).toBe(`/${ruta}`);
+  });
 });

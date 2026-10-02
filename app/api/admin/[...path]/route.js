@@ -398,6 +398,47 @@ async function editarFaccionRuta(request, id, usuario) {
   return mutarFaccion({ tipo: 'faccion.editar', id: Number(id), patch: parsed.data }, usuario);
 }
 
+/**
+ * Medidas de un PNG leídas de su cabecera (IHDR), o `null` si los bytes no son un PNG.
+ * JS puro: aquí no hay `sharp` (binario nativo que no viaja a la función).
+ */
+function leerMedidasPng(bytes) {
+  const firma = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (bytes.length < 24 || firma.some((valor, i) => bytes[i] !== valor)) return null;
+  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+}
+
+/**
+ * `POST /api/admin/factions/:id/image` — sube el emblema de una facción (PNG).
+ *
+ * El cliente lo normaliza a PNG de hasta 512 px antes de enviarlo (en producción no hay `sharp`),
+ * y aquí se valida la FIRMA, no la extensión. Se guarda como asset del mantenedor (`kind =
+ * 'faction'`, por slug de la facción) y la facción pasa a apuntar a él con `?v=<ms>`: la ruta es
+ * canónica y sin versión el navegador seguiría mostrando el emblema anterior.
+ */
+async function subirEmblema(request, id, usuario) {
+  try {
+    const db = await dbConDiario();
+    const faccion = db.prepare('SELECT id, slug FROM faction WHERE id = ?').get(Number(id));
+    if (!faccion) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+    const bytes = Buffer.from(await request.arrayBuffer());
+    if (bytes.length > 2 * 1024 * 1024) {
+      return NextResponse.json({ error: 'archivo_demasiado_grande', detail: 'el emblema admite hasta 2 MB' }, { status: 400 });
+    }
+    const medidas = leerMedidasPng(bytes);
+    if (!medidas) return NextResponse.json({ error: 'formato_invalido', detail: 'se esperaba un PNG' }, { status: 400 });
+    await guardarAssetDelMantenedor(faccion.slug, 'faction', bytes, 'image/png', medidas);
+    const ruta = `images/faction/${faccion.slug}.png?v=${Date.now()}`;
+    const { db: dbNueva, resultado } = await aplicarYAnotar(
+      { tipo: 'faccion.editar', id: faccion.id, patch: { icon: ruta } },
+      usuario.username,
+    );
+    return NextResponse.json({ faction: resultado, items: listarFacciones(dbNueva), asset: { path: ruta, ...medidas, bytes: bytes.length } });
+  } catch (error) {
+    return responderError(error);
+  }
+}
+
 async function eliminarFaccionRuta(request, id, usuario) {
   const bruto = new URL(request.url).searchParams.get('mergeInto');
   const destino = bruto === null ? null : Number(bruto);
@@ -584,6 +625,7 @@ export async function POST(request, context) {
     return subirImagen(request, partes[1], partes[3]);
   }
   if (partes[0] === 'factions' && partes.length === 1) return crearFaccionRuta(request, usuario);
+  if (partes[0] === 'factions' && partes[1] && partes[2] === 'image') return subirEmblema(request, partes[1], usuario);
   return noDisponible(`ruta del mantenedor no soportada en producción: ${partes.join('/')}`);
 }
 

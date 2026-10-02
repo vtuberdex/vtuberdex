@@ -211,3 +211,35 @@ export async function removeUploadedImage({ kind, slug, imageRoot }) {
   if (fs.existsSync(file)) await fsP.unlink(file);
   return { path: `images/${spec.folder}/${slug}.webp` };
 }
+
+/**
+ * Guarda el EMBLEMA de una facción como PNG (`<imageRoot>/faction/<slug>.png`).
+ *
+ * A diferencia de las imágenes de un VTuber, los emblemas son PNG y no WebP: así los publica el
+ * scraper (`images/faction/*.png`) y así los sirve la ruta `/images`. Se conserva el alfa y se
+ * limita a 512 px de lado (el emblema se dibuja a ~74 px en la carta: más es peso muerto en
+ * Turso). Se valida por contenido con `sharp`, igual que el resto de subidas.
+ */
+export async function saveFactionEmblem({ buffer, slug, imageRoot, sharp }) {
+  if (!buffer || buffer.length === 0) throw new Error('archivo_vacio');
+  if (buffer.length > MAX_UPLOAD_BYTES) throw new Error('archivo_demasiado_grande');
+  let meta;
+  try {
+    meta = await sharp(buffer).metadata();
+  } catch {
+    throw new Error('no_es_imagen');
+  }
+  if (!meta.format || !ACCEPTED_FORMATS.includes(meta.format)) {
+    throw new Error(`formato_no_soportado:${meta.format ?? 'desconocido'}`);
+  }
+  const dir = path.join(imageRoot, 'faction');
+  await fsP.mkdir(dir, { recursive: true });
+  const converted = await sharp(buffer, { animated: false })
+    .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
+    .ensureAlpha()
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+  await fsP.writeFile(path.join(dir, `${slug}.png`), converted);
+  const out = await sharp(converted).metadata();
+  return { path: `images/faction/${slug}.png`, width: out.width ?? 0, height: out.height ?? 0, bytes: converted.length };
+}

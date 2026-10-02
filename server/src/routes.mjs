@@ -30,7 +30,7 @@ import {
   refreshFacetCounters,
   ultimoDex,
 } from './mutations.mjs';
-import { UPLOADABLE_KINDS, MAX_UPLOAD_BYTES, saveUploadedImage, removeUploadedImage } from './uploads.mjs';
+import { UPLOADABLE_KINDS, MAX_UPLOAD_BYTES, saveUploadedImage, saveFactionEmblem, removeUploadedImage } from './uploads.mjs';
 
 const splitCsv = (value) => String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
 
@@ -308,6 +308,38 @@ export function createApiRouter({ db, sessions, imageRoot }) {
   const rawImage = express.raw({
     type: () => true,
     limit: MAX_UPLOAD_BYTES,
+  });
+
+  /**
+   * Emblema de una facción. La ruta guardada en `faction.icon` lleva `?v=<ms>`: el archivo es
+   * canónico (`faction/<slug>.png`) y reemplazarlo no cambia su URL, así que sin versión el
+   * navegador seguiría mostrando el emblema anterior (misma razón que las imágenes de las fichas).
+   */
+  router.post('/admin/factions/:id/image', requireAdmin, rawImage, async (req, res) => {
+    const id = Number(req.params.id);
+    const faccion = db.prepare('SELECT id, slug FROM faction WHERE id = ?').get(id);
+    if (!faccion) {
+      res.status(404).json({ error: 'no_encontrado' });
+      return;
+    }
+    try {
+      const saved = await saveFactionEmblem({
+        buffer: req.body,
+        slug: faccion.slug,
+        imageRoot,
+        sharp: await import('sharp').then((m) => m.default),
+      });
+      const editada = enTransaccion(db, () => {
+        const resultado = editarFaccion(db, id, { icon: `${saved.path}?v=${Date.now()}` });
+        audit(db, req.user.username, 'faction', id, 'upload-emblem', saved);
+        return resultado;
+      });
+      res.json({ faction: editada, items: listarFacciones(db), asset: saved });
+    } catch (error) {
+      const known = ['no_es_imagen', 'archivo_vacio', 'archivo_demasiado_grande'];
+      const status = known.includes(error.message) || error.message.startsWith('formato_no_soportado') ? 400 : 500;
+      res.status(status).json({ error: error.message ?? 'error_al_subir' });
+    }
   });
 
   router.post('/admin/vtubers/:id/image/:kind', requireAdmin, rawImage, async (req, res) => {
