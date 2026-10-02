@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/lib/api';
-import { DEFAULT_SEARCH, searchParamsFromUrl, searchParamsToUrl } from '@/lib/query';
+import { DEFAULT_PER_PAGE, DEFAULT_SEARCH, searchParamsFromUrl, searchParamsToUrl } from '@/lib/query';
 import type { ApiListResponse, SearchParams } from '@/lib/types';
 
 export interface UseVtuberSearchResult {
@@ -38,8 +38,14 @@ export function useVtuberSearch(): UseVtuberSearchResult {
     setLoading(true);
     setError(null);
 
+    /**
+     * El tamaño de página es FIJO: el catálogo es un libro con dos hojas de 4 fundas
+     * (`CardBinder`), así que siempre se piden `DEFAULT_PER_PAGE` (8) cartas aunque la
+     * URL traiga otro `perPage` (enlaces antiguos). Pedir 24 y mostrar 8 descartaría
+     * trabajo del servidor; pedir menos dejaría fundas vacías.
+     */
     api
-      .list({ ...params, perPage: params.perPage }, controller.signal)
+      .list({ ...params, perPage: DEFAULT_PER_PAGE }, controller.signal)
       .then((response) => {
         if (requestId.current !== id) return;
         setData(response);

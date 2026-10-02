@@ -58,7 +58,7 @@ const CANDIDATAS = [
   'lib/shaders.ts',
 ];
 /** El archivo que crea los objetos de uniforms (los lee el shader, los escribe la CPU). */
-const DECLARANTE = 'components/holo-card.tsx';
+const DECLARANTE = 'components/card-material.ts';
 
 const arg = process.argv[2];
 const ruta = resolve(raiz, arg ?? CANDIDATAS.find((c) => existsSync(resolve(raiz, c))) ?? CANDIDATAS[0]);

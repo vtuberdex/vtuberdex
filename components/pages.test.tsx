@@ -100,6 +100,9 @@ describe('CatalogPage', () => {
 
     await waitFor(() => expect(screen.getAllByTestId('card-tile')).toHaveLength(2));
     expect(screen.getByRole('status')).toHaveTextContent('2 VTubers encontrados');
+    // Las cartas viven dentro del libro (dos hojas), no en una grilla suelta.
+    expect(screen.getByTestId('card-binder')).toBeInTheDocument();
+    expect(screen.getAllByTestId('binder-page')).toHaveLength(2);
     // El nombre ya no es texto del DOM: lo dibuja la textura de la carta, así que
     // la identidad de la tarjeta se comprueba por su enlace y su etiqueta.
     const cards = screen.getAllByTestId('card-tile');
@@ -167,18 +170,20 @@ describe('CatalogPage', () => {
     });
   });
 
-  it('el orden y el tamaño de página se propagan a la API', async () => {
+  it('el orden se propaga a la API y el tamaño de página es FIJO (las 8 fundas del libro)', async () => {
     const user = userEvent.setup();
     mockedApi.list.mockResolvedValue(makeList());
-    renderCatalog();
+    // Un enlace antiguo con `perPage=48` no puede agrandar el libro: se piden 8 igual.
+    renderCatalog('/?perPage=48');
     await waitFor(() => expect(mockedApi.list).toHaveBeenCalled());
+    expect(mockedApi.list.mock.calls.at(-1)?.[0]?.perPage).toBe(8);
 
+    // Solo queda el selector de orden: el de «por página» desapareció con la grilla.
     const selects = screen.getAllByRole('combobox');
+    expect(selects).toHaveLength(1);
     await user.selectOptions(selects[0], 'name');
     await waitFor(() => expect(mockedApi.list.mock.calls.at(-1)?.[0]?.sort).toBe('name'));
-
-    await user.selectOptions(selects[1], '48');
-    await waitFor(() => expect(mockedApi.list.mock.calls.at(-1)?.[0]?.perPage).toBe(48));
+    expect(mockedApi.list.mock.calls.at(-1)?.[0]?.perPage).toBe(8);
   });
 
   it('la paginación pide la página siguiente', async () => {

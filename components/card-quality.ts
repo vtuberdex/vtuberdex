@@ -19,12 +19,14 @@
  *     carta se inclina siguiendo el puntero en cada frame, y quien pide menos
  *     movimiento no debería recibir eso. Se sirve la vista 2D.
  *
- * POR QUÉ NO BASTA CON EL LÍMITE DE CONTEXTOS
- * -------------------------------------------
- * `card-visibility.ts` reparte los contextos disponibles y evita pasarse del techo
- * del navegador, pero no distingue un escritorio de un móvil modesto: en ambos
- * concede el mismo presupuesto. La textura es la otra mitad del coste, y ahí la
- * única señal razonable está en el propio dispositivo.
+ * POR QUÉ SIGUE HACIENDO FALTA CON UN SOLO CANVAS
+ * -----------------------------------------------
+ * El catálogo ya no abre un contexto WebGL por carta (el libro, `card-binder.tsx`,
+ * dibuja las 8 en uno), así que el techo de contextos dejó de ser el problema. Lo que
+ * queda es la otra mitad del coste: el DPR del canvas (multiplica la memoria del
+ * búfer) y el ancho de las texturas que se generan por carta, y ahí la única señal
+ * razonable está en el propio dispositivo. `maxContexts` se conserva como dato
+ * descriptivo del nivel, aunque hoy nadie reparta contextos.
  *
  * NINGÚN MODO DEJA LA CARTA SIN VER
  * ---------------------------------

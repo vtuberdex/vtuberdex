@@ -24,13 +24,12 @@ if (!window.scrollTo) {
 }
 
 /**
- * jsdom no trae `IntersectionObserver`, y las tarjetas de la grilla lo usan para
- * pedir su contexto WebGL al entrar en pantalla (ver `card-visibility.ts`).
+ * jsdom no trae `IntersectionObserver`. Ya no lo usa el catálogo (la grilla que
+ * repartía contextos WebGL por visibilidad se reemplazó por el libro de un solo
+ * canvas), pero el stub se conserva por si alguna librería lo pide al montar.
  *
- * El stub es deliberadamente INERTE: nunca dispara el callback, así que en los
- * tests una tarjeta se queda en su vista 2D — que es el estado estable y sin
- * WebGL que interesa comprobar aquí. Los tests que quieran simular la entrada en
- * pantalla pueden capturar la instancia y llamar al callback a mano.
+ * Es deliberadamente INERTE: nunca dispara el callback. Los tests que quieran
+ * simular la entrada en pantalla pueden capturar la instancia y llamar al callback.
  */
 if (!globalThis.IntersectionObserver) {
   class FakeIntersectionObserver implements IntersectionObserver {

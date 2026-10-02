@@ -34,7 +34,7 @@ vtuberdex.com  ──scraper──▶  dataset.json ──seed──▶  SQLite 
 - **API** (Express 5 + zod): listado paginado con facetas calculadas en la base,
   detalle completo, y mantenedor con login `scrypt`, edición y auditoría.
 - **Web** (React 19 + Tailwind 4 + three.js): búsqueda con estado en la URL,
-  grilla de cartas 2D y carta holográfica 3D con shaders propios.
+  libro de cartas 3D (8 por página, en un solo canvas) y carta holográfica con shaders propios.
 
 ## Datos extraídos (evidencia real del scrape)
 
@@ -146,7 +146,7 @@ Si la IP del host cambia, el script la detecta solo (contenedor en `--network ho
 ## Tests y lint
 
 ```bash
-npm test                   # 157 tests (vitest): utilidades, componentes, páginas y carta 3D
+npm test                   # 184 tests (vitest): utilidades, componentes, páginas, carta 3D y libro
 npm run lint               # eslint . — cubre también server/ y scraper/
 npm run typecheck          # tsc --noEmit
 npm run check:shaders      # guard de uniforms de GLSL (ni tsc ni los tests lo ven)
@@ -174,8 +174,12 @@ solo `master`).
 
 - **La URL es el estado de la búsqueda.** Un resultado filtrado se puede
   compartir por enlace; en el origen todo el filtrado era cliente y se perdía.
-- **Una sola carta WebGL por pantalla.** La grilla usa CSS 3D (24 contextos WebGL
-  matarían el rendimiento en móvil); la carta con shaders vive en el detalle.
+- **Un solo canvas WebGL por pantalla.** El catálogo es un libro de cartas
+  (`CardBinder`): las 8 cartas de la página se dibujan en UNA escena, como un álbum
+  abierto con dos hojas de 4 fundas, y pasar de página (flechas, botones o gesto
+  horizontal) gira la hoja en 3D con las cartas salientes en su cara y las entrantes
+  en el dorso. Un canvas por carta multiplicaba renderer, framebuffers y entorno por
+  8 y disparaba la memoria; la carta del detalle tiene su propia escena.
 - **Degradación explícita.** Sin WebGL, la carta 3D cae a una vista 2D con el
   mismo arte en lugar de dejar un hueco negro.
 - **El color del dato manda.** El `THEME` de cada ficha alimenta la paleta

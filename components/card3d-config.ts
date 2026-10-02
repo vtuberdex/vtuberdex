@@ -1175,3 +1175,91 @@ export const BODY = {
 
 /** Fondo de la escena: un gris claro, no la niebla oscura anterior (#05060a). */
 export const FOG = { color: '#c9cdd6', near: 8, far: 20 } as const;
+
+/**
+ * EL LIBRO DE CARTAS (catálogo): una sola escena WebGL con las 8 cartas de la página.
+ *
+ * POR QUÉ UN LIBRO Y NO UNA GRILLA DE CANVAS
+ * -----------------------------------------
+ * La grilla montaba UN canvas WebGL por carta: 8 contextos, cada uno con su renderer,
+ * sus framebuffers (a DPR 1.8 en escritorio), su PMREM del entorno metálico y su copia
+ * decodificada del mismo `metal-env.webp`. El navegador no sostiene más de 16 y la
+ * memoria crecía con cada carta visible. Aquí hay UN contexto y las 8 cartas son mallas
+ * de la misma escena: comparten programa de shader (three lo cachea por fuente), el
+ * entorno prefiltrado y la geometría del cuerpo. El coste pasa a ser el de UNA ficha.
+ *
+ * Las medidas están en las unidades de la escena (la carta mide `GEOMETRY.cardWidth` de
+ * ancho); el alto de página sale de dos cartas más huecos y márgenes.
+ */
+export const BINDER = {
+  /** Cartas por página y columnas: 2x2, como una hoja de álbum de 4 fundas. */
+  cardsPerPage: 4,
+  columns: 2,
+  /** Hueco entre fundas y margen interior de cada hoja. */
+  gap: 0.3,
+  padding: 0.36,
+  /** Ancho del lomo entre las dos hojas: ahí van las anillas. */
+  spine: 0.62,
+  /** Cuánto sobresale la funda dibujada alrededor de la carta. */
+  pocketPad: 0.09,
+  /**
+   * Z de la carta sobre la hoja. El cuerpo extruido mide ~0.097 hacia atrás
+   * (`cardDepth/2 + bisel`), así que con 0.1 el canto apoya justo sobre el papel y el
+   * plano del resplandor (`glowZ = -0.09`) queda a 0.01 por encima: el halo se pinta
+   * SOBRE la funda y no dentro de ella.
+   */
+  cardLift: 0.1,
+  /**
+   * Z de la hoja que gira respecto de la hoja fija. Es minúsculo a propósito: al
+   * empezar queda APENAS por encima de la hoja de origen y, al aterrizar (la rotación
+   * de PI invierte la z), apenas por debajo de la de destino, que la tapa. Un valor
+   * mayor dejaría una rendija visible entre las dos hojas durante el giro.
+   */
+  sheetZ: 0.012,
+  /** Tapa del álbum, detrás de las dos hojas. */
+  coverMargin: 0.3,
+  coverZ: -0.04,
+  /** Colores del papel, la funda y la tapa (superficies neutras: el color lo pone la carta). */
+  pageColor: '#121722',
+  pocketColor: '#1a2030',
+  pocketLine: 'rgba(255, 255, 255, 0.09)',
+  coverColor: '#080b11',
+  /** Anillas del lomo: radio, grosor del aro y posición vertical (fracción del alto). */
+  ringRadius: 0.24,
+  ringTube: 0.035,
+  ringOffsets: [-0.34, 0, 0.34],
+  /** Duración del paso de página, en ms (una hoja de cartón, sin curvarse). */
+  flipMs: 1100,
+  /**
+   * Progreso en el que la hoja se queda EN PIE (90 grados) si la página siguiente aún no
+   * llegó de la API: el giro continúa cuando hay datos, así nunca se cierra sobre
+   * fundas vacías para rellenarlas después.
+   */
+  holdProgress: 0.5,
+  /**
+   * Ángulo (rad) que la hoja debe haber girado para mostrar las cartas que tapaba y
+   * para ocultar las que va a tapar. Las cartas sobresalen ~0.2 de la hoja, así que con
+   * menos de 10 grados (0.2 rad) sus cuerpos atravesarían la hoja que las cubre.
+   */
+  revealAngle: 0.2,
+  /** Cuánto gira el holograma de una carta con el ángulo de su hoja al pasar de página. */
+  sheetTiltGain: 0.35,
+  /** Inclinación del libro entero hacia el puntero. Menor que la de una carta: es grande. */
+  tiltY: 0.14,
+  tiltX: 0.1,
+  dampingBase: 0.002,
+  /** Elevación de la carta bajo el puntero (y su amortiguación), para saber cuál se abre. */
+  hoverLift: 0.22,
+  hoverDampingBase: 0.0003,
+  /** Fracción del encuadre que ocupa el libro: casi todo, porque no se inclina tanto. */
+  cameraFill: 0.94,
+  /** Umbrales de gesto: desplazamiento mínimo para pasar página y holgura de un toque. */
+  swipeMinPx: 48,
+  tapSlopPx: 8,
+  /**
+   * Techo del ancho de textura por carta en el libro. En pantalla cada carta mide
+   * ~200 px (8 en una fila de 1000 px), así que 1008 px sería 5x la resolución útil con
+   * 8 cartas a la vez: aquí el nivel «full» también se queda en 512.
+   */
+  textureWidthCap: 512,
+} as const;

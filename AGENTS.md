@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 157 tests (vitest): utilidades, componentes, páginas, carta 3D
+npm test                   # 184 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/59/157** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/59/184** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -97,9 +97,14 @@ Turso. Si añades tests, actualiza **los dos** archivos.
    no duplica fichas.
 6. **La URL es el estado de la búsqueda.** Todo filtro vive en el querystring
    (`lib/query.ts`); un resultado filtrado se comparte por enlace.
-7. **Una sola carta WebGL por pantalla.** La grilla usa CSS 3D (24 contextos
-   WebGL matarían el rendimiento en móvil); el canvas con shaders vive en el
-   detalle.
+7. **Un solo canvas WebGL por pantalla.** El catálogo es un LIBRO
+   (`components/card-binder.tsx`): las 8 cartas de la página son mallas de UNA escena
+   (dos hojas de 4 fundas, la hoja gira al pasar de página); el detalle tiene su
+   propia carta. Nunca un canvas por carta: 8 contextos con su renderer, PMREM y
+   framebuffers cada uno fue lo que disparó la memoria, y el navegador destruye
+   contextos al pasar de 16. Lo que pinta una carta (texturas, uniforms, materiales)
+   está UNA vez en `card-material.ts` (`useCardMaterials`) y lo consumen las dos
+   escenas; `check:shaders` lee ese archivo para cruzar los uniforms con el GLSL.
 8. **El color del dato manda.** `THEME` de cada ficha alimenta la paleta
    (acento, secundario, fondo, tinta) de cartas, chips y bordes.
 
@@ -198,6 +203,23 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   comprueba por texto que la caja posicionada siga ahí (el resto de la clase está en la
   skill `threejs-r3f-webgl-rendering`).
 
+- **El libro de cartas (`card-binder.tsx`) tiene reglas de geometría que ningún gate ve
+  salvo `card-binder-layout.test.ts`.** La hoja gira alrededor del lomo (x = 0) con un
+  ángulo de signo NEGATIVO al avanzar: con el signo contrario `z' = -x·sin θ` manda la hoja
+  hacia DENTRO de la tapa y el giro se ve «por detrás». Las cartas del dorso van en su
+  funda de DESTINO giradas media vuelta (`sheetCardLocalMatrix(..., 'back')`): al empezar
+  quedan reflejadas detrás de la hoja de origen y, al completar PI, caen exactamente en
+  la funda donde luego viven fijas, así que la MISMA `key` (el `id` de la carta) pasa de
+  «dorso» a «fija» sin remontarse ni regenerar texturas. Las cartas sobresalen ~0.2 de la
+  hoja (cuerpo extruido + bisel), por eso las fijas que una hoja tapa se esconden hasta
+  que gira `BINDER.revealAngle` (0.2 rad), y las que va a tapar se esconden ese mismo
+  ángulo antes de aterrizar: sin eso los cuerpos atraviesan la hoja. Si la página
+  siguiente no llegó de la API, el giro se queda en pie en `holdProgress` (90°) y sigue
+  al llegar (`advanceFlip` integra por `delta`, no por marca de inicio, así no salta).
+  Las texturas de las 8 cartas se generan EN COLA (`encolarTrabajo`, una por vuelta del
+  event loop): las ocho a la vez bloqueaban el hilo en un tramo largo. El entorno
+  metálico y su PMREM se cargan una vez por escena (`useSharedCardEnv`) y se reparten
+  por contexto; la carta suelta del detalle sigue cargando el suyo.
 - **R3F en producción**: la geometría del canto se crea con `useMemo` como
   instancia, NO como elemento JSX. Instanciar la clase desde JSX acaba en
   `Class constructor cannot be invoked without 'new'` en el bundle minificado y
