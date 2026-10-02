@@ -4,8 +4,25 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/lib/api';
+import { RETRASO_PRECARGA_MS, guardarPagina, imagenesDeCartas, leerPagina, precargarVecinas } from '@/lib/cache-paginas';
 import { DEFAULT_PER_PAGE, DEFAULT_SEARCH, searchParamsFromUrl, searchParamsToUrl } from '@/lib/query';
-import type { ApiListResponse, SearchParams } from '@/lib/types';
+import type { ApiListResponse, SearchParams, VtuberCard } from '@/lib/types';
+import { loadImage } from '@/components/card-texture/imagen';
+
+/**
+ * El tamaño de página es FIJO: el catálogo es un libro con dos hojas de 4 fundas
+ * (`CardBinder`), así que siempre se piden `DEFAULT_PER_PAGE` (8) cartas aunque la
+ * URL traiga otro `perPage` (enlaces antiguos). Pedir 24 y mostrar 8 descartaría
+ * trabajo del servidor; pedir menos dejaría fundas vacías.
+ */
+const pedirPagina = (params: SearchParams, signal?: AbortSignal) =>
+  api.list({ ...params, perPage: DEFAULT_PER_PAGE }, signal);
+
+/** Deja las imágenes de unas cartas en la memoria de `loadImage` antes de que hagan falta. */
+const calentarImagenes = (items: VtuberCard[]) => {
+  if (typeof Image === 'undefined') return;
+  for (const src of imagenesDeCartas(items)) void loadImage(src);
+};
 
 export interface UseVtuberSearchResult {
   params: SearchParams;
@@ -35,20 +52,37 @@ export function useVtuberSearch(): UseVtuberSearchResult {
     const controller = new AbortController();
     const id = requestId.current + 1;
     requestId.current = id;
-    setLoading(true);
     setError(null);
 
     /**
-     * El tamaño de página es FIJO: el catálogo es un libro con dos hojas de 4 fundas
-     * (`CardBinder`), así que siempre se piden `DEFAULT_PER_PAGE` (8) cartas aunque la
-     * URL traiga otro `perPage` (enlaces antiguos). Pedir 24 y mostrar 8 descartaría
-     * trabajo del servidor; pedir menos dejaría fundas vacías.
+     * Tras mostrar una página se piden sus VECINAS en segundo plano y se calientan sus
+     * imágenes (ver `lib/cache-paginas.ts`): la siguiente y la anterior ya están en
+     * memoria cuando el usuario pasa de hoja, así que el giro no espera a la red.
      */
-    api
-      .list({ ...params, perPage: DEFAULT_PER_PAGE }, controller.signal)
+    let precarga: ReturnType<typeof setTimeout> | undefined;
+    const programarPrecarga = (response: ApiListResponse) => {
+      precarga = setTimeout(() => {
+        void precargarVecinas(params, response.pageCount, (vecina) => pedirPagina(vecina), calentarImagenes);
+      }, RETRASO_PRECARGA_MS);
+    };
+
+    // Página ya en caché (visitada o precargada): se muestra sin tocar la red.
+    const enCache = leerPagina(params);
+    if (enCache) {
+      setData(enCache);
+      setLoading(false);
+      calentarImagenes(enCache.items);
+      programarPrecarga(enCache);
+      return () => clearTimeout(precarga);
+    }
+
+    setLoading(true);
+    pedirPagina(params, controller.signal)
       .then((response) => {
         if (requestId.current !== id) return;
+        guardarPagina(params, response);
         setData(response);
+        programarPrecarga(response);
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted || requestId.current !== id) return;
@@ -58,7 +92,10 @@ export function useVtuberSearch(): UseVtuberSearchResult {
         if (requestId.current === id) setLoading(false);
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      clearTimeout(precarga);
+    };
   }, [params]);
 
   /**

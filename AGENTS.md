@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 238 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 248 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 66 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/66/238** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/66/248** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -266,6 +266,18 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   hoja va a ATERRIZAR (avanzar: izquierda; retroceder: derecha) para ver llegar la hoja.
   El modo se decide por `matchMedia` en un efecto (el servidor no tiene viewport) y lo
   expone `data-focus` en la sección, que es lo que fijan los tests.
+- **Pasar de página no debe esperar a la red: las páginas vecinas se PRECARGAN.** Medido
+  por el usuario como «demasiado delay» al avanzar/retroceder: el libro dejaba la hoja en
+  pie hasta que la API respondía y después cada carta esperaba sus imágenes. Hoy
+  `lib/cache-paginas.ts` guarda cada respuesta en un LRU por clave de consulta (filtros +
+  orden + página, `perPage` normalizado a 8) y, `RETRASO_PRECARGA_MS` después de mostrar
+  una página, pide la anterior y la siguiente en segundo plano y calienta sus imágenes.
+  `loadImage` (`card-texture/imagen.ts`) memoiza la PROMESA por URL (LRU de 96), así que
+  dos cartas con el mismo emblema comparten petición y una carta precargada genera su
+  textura sin red. Un fallo no se memoiza (se reintenta) y las URLs versionadas (`?v=`)
+  del mantenedor invalidan solas. La caché es de módulo y sobrevive a ir a una ficha y
+  volver; los tests que montan el catálogo deben vaciarla (`__limpiarCachePaginas`) en
+  `afterEach`, o leerán la página de otro test.
 - **R3F en producción**: la geometría del canto se crea con `useMemo` como
   instancia, NO como elemento JSX. Instanciar la clase desde JSX acaba en
   `Class constructor cannot be invoked without 'new'` en el bundle minificado y
