@@ -17,6 +17,7 @@ import type {
   SkillInput,
   SocialInput,
   StatInput,
+  VtuberCreate,
   VtuberDetail,
   VtuberPatch,
   VtuberStatus,
@@ -77,6 +78,8 @@ export interface EditorForm {
 }
 
 export const MAX_FACTIONS = 2;
+/** Color con el que arranca el formulario cuando la ficha aún no tiene uno. */
+export const DEFAULT_THEME = '#5eead4';
 const HTTP_URL = /^https?:\/\/\S+$/i;
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -98,7 +101,7 @@ export function formFromDetail(detail: VtuberDetail): EditorForm {
     dexEnd: false,
     phrase: detail.phrase ?? '',
     cardText: detail.cardText ?? '',
-    themeColor: detail.themeColor ?? '#5eead4',
+    themeColor: detail.themeColor ?? DEFAULT_THEME,
     secondaryColor: detail.secondaryColor ?? '',
     birthday: detail.birthday ?? '',
     height: detail.height ?? '',
@@ -259,17 +262,69 @@ export function toPayload(form: EditorForm): { payload: VtuberPatch; errors: Pay
  * heredado inválido (p. ej. una red scrapeada sin http) no bloquea guardar otro campo.
  */
 export function buildPatch(detail: VtuberDetail, form: EditorForm): { patch: VtuberPatch; errors: string[] } {
-  const base = toPayload(formFromDetail(detail)).payload;
+  const baseForm = formFromDetail(detail);
+  const base = toPayload(baseForm).payload;
   const { payload, errors } = toPayload(form);
   const patch: Record<string, unknown> = {};
-  const messages: string[] = [];
   for (const key of Object.keys(payload) as Array<keyof VtuberPatch>) {
-    if (JSON.stringify(payload[key]) === JSON.stringify(base[key])) continue;
-    patch[key] = payload[key];
-    const message = errors[key];
-    if (message) messages.push(message);
+    if (JSON.stringify(payload[key]) !== JSON.stringify(base[key])) patch[key] = payload[key];
   }
-  // Un número inválido no entra al payload, así que su error no pasaría por el bucle.
-  if (errors.dexNumber) messages.push(errors.dexNumber);
+  /**
+   * Los errores se miran contra el FORMULARIO crudo, no contra el payload: un elemento
+   * inválido (una red sin http, un número escrito mal) no entra al payload, así que
+   * comparar payloads lo daría por «sin cambios» y el error se perdería. Un dato heredado
+   * inválido que el usuario no tocó sigue sin bloquear el guardado de otros campos.
+   */
+  const messages: string[] = [];
+  for (const key of Object.keys(errors) as Array<keyof PayloadErrors>) {
+    const raw = key as unknown as keyof EditorForm;
+    const touched = key === 'dexNumber' ? form.dexNumber !== baseForm.dexNumber || form.dexEnd : JSON.stringify(form[raw]) !== JSON.stringify(baseForm[raw]);
+    if (touched && errors[key]) messages.push(errors[key] as string);
+  }
   return { patch: patch as VtuberPatch, errors: messages };
+}
+
+/** Formulario vacío de una carta nueva: nace «al final» de la dex y en borrador. */
+export function emptyForm(): EditorForm {
+  return {
+    name: '',
+    slug: '',
+    dexNumber: '',
+    dexEnd: true,
+    phrase: '',
+    cardText: '',
+    themeColor: DEFAULT_THEME,
+    secondaryColor: '',
+    birthday: '',
+    height: '',
+    hashtag: '',
+    favoriteColor: '',
+    level: '',
+    status: 'draft',
+    countries: [],
+    languages: [],
+    groups: '',
+    artists: '',
+    factions: [],
+    profile: [],
+    stats: [],
+    skills: [],
+    socials: [],
+  };
+}
+
+/** Cuerpo del POST de una carta nueva: solo la identidad (lo demás se guarda con un PATCH por paso). */
+export function createBody(form: EditorForm): { body: VtuberCreate | null; problem: string | null } {
+  const name = form.name.trim();
+  if (!name) return { body: null, problem: 'Escribe un nombre para continuar.' };
+  const body: VtuberCreate = { name };
+  const slug = slugifyUrl(form.slug);
+  if (slug) body.slug = slug;
+  if (!form.dexEnd && form.dexNumber.trim()) {
+    const parsed = Number(form.dexNumber);
+    if (!Number.isInteger(parsed) || parsed < 1) return { body: null, problem: 'El número debe ser un entero positivo.' };
+    body.dexNumber = parsed;
+  }
+  if (form.countries.length > 0) body.countries = form.countries;
+  return { body, problem: null };
 }

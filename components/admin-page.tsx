@@ -1,22 +1,23 @@
 'use client';
 /**
- * Mantenedor: orquestador. Login, métricas, lista, facciones y editor.
- * Reemplaza el "editar HTML a mano" del origen. Cada pieza del editor vive en
- * `components/admin/`; aquí solo está el estado que comparten (sesión, ficha
- * seleccionada, catálogo de facciones) y el guardado.
+ * Mantenedor: orquestador. Login, métricas y dos secciones («Fichas» y «Emblemas y
+ * facciones»); el trabajo de cada una vive en `components/admin/`.
+ * Reemplaza el "editar HTML a mano" del origen. Aquí solo está el estado que comparten
+ * (sesión, catálogo de facciones, qué ficha está abierta) y los avisos.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
-import { facetValue, type FactionRow, type VtuberDetail, type VtuberPatch } from '@/lib/types';
+import { facetValue, type FactionRow, type VtuberDetail } from '@/lib/types';
 import { DEFAULT_SEARCH } from '@/lib/query';
-import { EditorCard, type SaveFailure } from '@/components/admin/editor-card';
+import { CardWizard } from '@/components/admin/card-wizard';
 import { FactionManager } from '@/components/admin/faction-manager';
-import { NewCardDialog } from '@/components/admin/new-card-dialog';
+import { GettingStarted } from '@/components/admin/getting-started';
 import { VtuberList } from '@/components/admin/vtuber-list';
 import type { ChipOption } from '@/components/admin/chip-picker';
-import { ImageManager } from '@/components/image-manager';
+import { primaryButton } from '@/components/admin/ui';
+import { ToastContainer, useToasts } from '@/components/toast';
 
 const TOKEN_KEY = 'vtuberdex.admin.token';
 
@@ -35,6 +36,9 @@ const FLAG_LABELS: Record<string, string> = {
   'sin-logo': 'Sin logo',
 };
 
+type Section = 'fichas' | 'emblemas';
+type View = { kind: 'none' } | { kind: 'create'; n: number } | { kind: 'edit'; detail: VtuberDetail; epoch: number };
+
 export function AdminPage() {
   // El token se lee del `localStorage` en un `useEffect`, NO en el inicializador
   // del estado. Este componente es de cliente ('use client'), pero Next lo
@@ -51,14 +55,11 @@ export function AdminPage() {
   const [factions, setFactions] = useState<FactionRow[]>([]);
   const [countryOptions, setCountryOptions] = useState<ChipOption[]>([]);
   const [languageOptions, setLanguageOptions] = useState<ChipOption[]>([]);
-  const [creating, setCreating] = useState(false);
-  const [createdNotice, setCreatedNotice] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<SaveFailure | null>(null);
-  /** Sube solo tras un guardado exitoso: remonta el editor con lo que devolvió el servidor. */
-  const [editorVersion, setEditorVersion] = useState(0);
-  const [selected, setSelected] = useState<VtuberDetail | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [section, setSection] = useState<Section>('fichas');
+  const [view, setView] = useState<View>({ kind: 'none' });
+  /** Sube tras cada guardado/alta: la lista lateral vuelve a pedir su página. */
+  const [listVersion, setListVersion] = useState(0);
+  const { toasts, add: notify, remove: removeToast } = useToasts();
 
   // El token se lee al MONTAR, no durante el render: en el servidor no hay
   // `localStorage`. Este efecto corre solo en el cliente.
@@ -94,13 +95,13 @@ export function AdminPage() {
     void loadAdmin();
   }, [loadAdmin]);
 
-  // Catálogo de facciones y opciones de país/idioma para los selectores del editor.
+  // Catálogo de facciones y opciones de país/idioma para los selectores del asistente.
   const loadFactions = useCallback(async () => {
     if (!token) return;
     try {
       setFactions((await api.factions(token)).items);
     } catch {
-      // El editor sigue funcionando sin selector de facciones; el panel mostrará su propio error al operar.
+      // El asistente sigue funcionando sin selector de facciones; la sección de emblemas muestra su propio error al operar.
     }
   }, [token]);
 
@@ -135,69 +136,46 @@ export function AdminPage() {
     window.localStorage.removeItem(TOKEN_KEY);
     setToken(null);
     setUser(null);
-    setSelected(null);
+    setView({ kind: 'none' });
     setStats(null);
     setFactions([]);
+  };
+
+  const startCreate = () => {
+    setSection('fichas');
+    setView((current) => ({ kind: 'create', n: current.kind === 'create' ? current.n + 1 : 0 }));
   };
 
   const openEditor = async (id: number) => {
     if (!token) return;
     setError(null);
-    setSaveError(null);
-    setSavedAt(null);
-    setCreatedNotice(null);
-    setCreating(false);
     try {
       // Por id y por la ruta del mantenedor: `api.detail(slug)` da 404 en borradores y ocultos.
-      setSelected(await api.adminDetail(token, id));
-      setEditorVersion((current) => current + 1);
+      const detail = await api.adminDetail(token, id);
+      setView({ kind: 'edit', detail, epoch: 0 });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'error');
     }
   };
 
-  const save = async (patch: VtuberPatch) => {
-    if (!token || !selected) return;
-    setSaving(true);
-    setError(null);
-    setSaveError(null);
-    try {
-      const updated = await api.updateVtuber(token, selected.id, patch);
-      /**
-       * Solo se reemplaza la ficha seleccionada si la respuesta la trae entera.
-       *
-       * `save` hacía `setSelected(updated)` sin comprobar nada, y la ruta de producción
-       * devolvía `{ok, slug, editado}` en vez del detalle: el resultado era la ficha vacía
-       * después de guardar (sin nombre, sin campos, sin imágenes) porque el objeto seleccionado
-       * pasaba a tener esos campos en `undefined`. La ruta ya devuelve el detalle, y esta guarda
-       * evita que un despliegue anterior repita el síntoma en silencio.
-       */
-      if (updated?.slug) {
-        setSelected(updated);
-        setEditorVersion((current) => current + 1);
-      }
-      setSavedAt(new Date().toISOString());
-      // Cambiar número, estado o facciones mueve conteos de la lista, de las métricas y del catálogo.
-      await Promise.all([loadAdmin(), loadFactions()]);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'error al guardar';
-      setError(message);
-      setSaveError({ message, status: (cause as { status?: number }).status });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const created = (detail: VtuberDetail) => {
-    setCreating(false);
-    setSelected(detail);
-    setEditorVersion((current) => current + 1);
-    setSavedAt(null);
-    setCreatedNotice(
-      `Carta «${detail.name}» creada como BORRADOR con el número #${detail.dexNumber}: aún no se ve en el catálogo. Complétala y cambia la visibilidad a «publicado» cuando esté lista.`,
-    );
+  /** Tras guardar o crear: la lista, las métricas y los conteos de facciones cambian. */
+  const changed = () => {
+    setListVersion((current) => current + 1);
     void loadAdmin();
     void loadFactions();
+  };
+
+  /** Fusionar/eliminar una facción cambia las fichas: la abierta se recarga para no pisar el cambio al guardar. */
+  const factionStructureChanged = () => {
+    setListVersion((current) => current + 1);
+    void loadAdmin();
+    if (view.kind === 'edit' && token) {
+      const epoch = view.epoch + 1;
+      void api
+        .adminDetail(token, view.detail.id)
+        .then((detail) => setView({ kind: 'edit', detail, epoch }))
+        .catch(() => undefined);
+    }
   };
 
   const qualitySummary = useMemo(
@@ -258,8 +236,14 @@ export function AdminPage() {
     );
   }
 
+  const sections: Array<{ id: Section; label: string }> = [
+    { id: 'fichas', label: 'Fichas' },
+    { id: 'emblemas', label: 'Emblemas y facciones' },
+  ];
+
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-dex-ink">Mantenedor</h1>
@@ -290,15 +274,8 @@ export function AdminPage() {
           {error}
         </p>
       )}
-      {savedAt && (
-        <p
-          role="status"
-          data-testid="admin-saved"
-          className="mb-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200"
-        >
-          Guardado a las {new Date(savedAt).toLocaleTimeString('es-CL')}
-        </p>
-      )}
+
+      <GettingStarted onGoFactions={() => setSection('emblemas')} onNewCard={startCreate} />
 
       {/* Métricas */}
       {stats && (
@@ -330,110 +307,115 @@ export function AdminPage() {
         </section>
       )}
 
-      {createdNotice && (
-        <p
-          role="status"
-          data-testid="admin-created"
-          className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-100"
-        >
-          {createdNotice}
-        </p>
-      )}
-
-      {token && (
-        <details className="mb-6 rounded-2xl border border-dex-line bg-dex-panel/60 p-4" data-testid="faction-panel">
-          <summary className="cursor-pointer text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">
-            Administrar facciones ({factions.length})
-          </summary>
-          <div className="mt-4">
-            <FactionManager
-              token={token}
-              factions={factions}
-              onItems={(items) => {
-                setFactions(items);
-                // Fusionar o eliminar cambia las facciones de muchas fichas: la ficha abierta se recarga
-                // para que el selector no muestre una facción que ya no existe.
-                if (selected) void api.adminDetail(token, selected.id).then(setSelected).catch(() => undefined);
-              }}
-            />
-          </div>
-        </details>
-      )}
-
-      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        <div className="space-y-4">
+      <div role="tablist" aria-label="Secciones del mantenedor" className="mb-6 flex gap-1 border-b border-dex-line">
+        {sections.map((item) => (
           <button
+            key={item.id}
             type="button"
-            onClick={() => setCreating((current) => !current)}
-            className="w-full rounded-xl bg-dex-accent px-4 py-2.5 text-sm font-bold text-black"
+            role="tab"
+            id={`section-tab-${item.id}`}
+            aria-selected={section === item.id}
+            aria-controls={`section-${item.id}`}
+            onClick={() => setSection(item.id)}
+            className={`border-b-2 px-4 py-2.5 text-sm font-semibold ${
+              section === item.id ? 'border-dex-accent text-dex-ink' : 'border-transparent text-dex-muted hover:text-dex-ink'
+            }`}
           >
-            {creating ? 'Cerrar' : 'Nueva carta'}
+            {item.label}
           </button>
-          {creating && token && (
-            <NewCardDialog token={token} countryOptions={countryOptions} onCreated={created} onCancel={() => setCreating(false)} />
-          )}
-          {token && (
-            <VtuberList
-              token={token}
-              selectedId={selected?.id ?? null}
-              refreshKey={`${savedAt}|${createdNotice}`}
-              onOpen={(row) => openEditor(row.id)}
-            />
-          )}
-        </div>
-
-        {/* Editor */}
-        <section className="min-w-0">
-          {!selected ? (
-            <div className="rounded-2xl border border-dex-line bg-dex-panel/60 px-6 py-16 text-center text-sm text-dex-muted">
-              Elige una ficha de la lista para editarla, o crea una nueva.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {token && (
-                <EditorCard
-                  key={`${selected.id}:${editorVersion}`}
-                  token={token}
-                  detail={selected}
-                  factions={factions}
-                  countryOptions={countryOptions}
-                  languageOptions={languageOptions}
-                  saving={saving}
-                  savedAt={savedAt}
-                  error={saveError}
-                  onSave={save}
-                />
-              )}
-              {/* Gestión de imágenes: va DESPUÉS del formulario. */}
-              {token && (
-                <ImageManager
-                  token={token}
-                  detail={selected}
-                  onUpdated={(vtuber) => {
-                    // Se conserva el editor abierto: reemplazar una imagen no debe
-                    // sacarte de la ficha en la que estás trabajando. Solo se
-                    // actualiza el detalle; no se toca la búsqueda ni el scroll.
-                    setSelected(vtuber);
-                  }}
-                />
-              )}
-            </div>
-          )}
-
-          <section className="mt-6 rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
-            <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">Actividad reciente</h2>
-            <ul className="mt-3 space-y-1 font-mono text-xs text-dex-muted">
-              {audit.slice(0, 12).map((entry) => (
-                <li key={entry.id}>
-                  {entry.createdAt} · {entry.actor} · {entry.action}
-                  {entry.entityId ? ` · #${entry.entityId}` : ''}
-                </li>
-              ))}
-              {audit.length === 0 && <li key="empty">Sin registros todavía.</li>}
-            </ul>
-          </section>
-        </section>
+        ))}
       </div>
+
+      {/* Las dos secciones se montan siempre y la inactiva se oculta: así cambiar de pestaña no descarta lo que hay escrito en el asistente. */}
+      <div role="tabpanel" id="section-emblemas" aria-labelledby="section-tab-emblemas" hidden={section !== 'emblemas'}>
+        {token && (
+          <FactionManager
+            token={token}
+            factions={factions}
+            onItems={setFactions}
+            onStructureChanged={factionStructureChanged}
+            onAssign={() => {
+              setSection('fichas');
+              notify('ok', 'Abre una ficha y elige la facción en el paso «Colores y facciones».');
+            }}
+            notify={notify}
+          />
+        )}
+      </div>
+
+      <div role="tabpanel" id="section-fichas" aria-labelledby="section-tab-fichas" hidden={section !== 'fichas'}>
+        <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+          <div className="space-y-4">
+            <button type="button" onClick={startCreate} className={`${primaryButton} w-full py-3`}>
+              Nueva carta
+            </button>
+            {token && (
+              <VtuberList
+                token={token}
+                selectedId={view.kind === 'edit' ? view.detail.id : null}
+                refreshKey={listVersion}
+                onOpen={(row) => openEditor(row.id)}
+                onCreate={startCreate}
+              />
+            )}
+          </div>
+
+          <section className="min-w-0">
+            {token && view.kind === 'create' && (
+              <CardWizard
+                key={`new-${view.n}`}
+                token={token}
+                mode="create"
+                initial={null}
+                factions={factions}
+                countryOptions={countryOptions}
+                languageOptions={languageOptions}
+                notify={notify}
+                onChanged={changed}
+                onFactionsChanged={setFactions}
+                onExit={() => setView({ kind: 'none' })}
+                onCreateAnother={startCreate}
+              />
+            )}
+            {token && view.kind === 'edit' && (
+              <CardWizard
+                key={`${view.detail.id}:${view.epoch}`}
+                token={token}
+                mode="edit"
+                initial={view.detail}
+                factions={factions}
+                countryOptions={countryOptions}
+                languageOptions={languageOptions}
+                notify={notify}
+                onChanged={changed}
+                onFactionsChanged={setFactions}
+                onExit={() => setView({ kind: 'none' })}
+              />
+            )}
+            {view.kind === 'none' && (
+              <div className="rounded-2xl border border-dashed border-dex-line px-6 py-16 text-center">
+                <p className="text-sm text-dex-muted">Elige una ficha de la lista para editarla, o crea una nueva.</p>
+                <button type="button" onClick={startCreate} className={`${primaryButton} mt-4`}>
+                  Nueva carta
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+
+      <section className="mt-6 rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
+        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">Actividad reciente</h2>
+        <ul className="mt-3 space-y-1 font-mono text-xs text-dex-muted">
+          {audit.slice(0, 12).map((entry) => (
+            <li key={entry.id}>
+              {entry.createdAt} · {entry.actor} · {entry.action}
+              {entry.entityId ? ` · #${entry.entityId}` : ''}
+            </li>
+          ))}
+          {audit.length === 0 && <li key="empty">Sin registros todavía.</li>}
+        </ul>
+      </section>
     </div>
   );
 }

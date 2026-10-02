@@ -39,9 +39,9 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 181 tests (vitest): utilidades, componentes, páginas, carta 3D
+npm test                   # 203 tests (vitest): utilidades, componentes, páginas, carta 3D
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
-cd server  && npm test     # 65 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
+cd server  && npm test     # 66 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
 # Linter (raíz; cubre también server/ y scraper/)
 npm run lint               # eslint . — falla con cualquier error
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/65/181** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/66/203** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -166,6 +166,11 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   se mudan con el slug (`renombrarAssetsDelMantenedor`).
 - **Número de dex**: debe estar LIBRE (409 `dex_ocupado`); `'end'` = el siguiente al último. No
   se intercambia: se mueve primero a quien lo tiene.
+- **Emblemas**: `POST /api/admin/factions/:id/image` (PNG). El cliente convierte a PNG ≤512 px
+  (`lib/imagen-cliente.ts`; en producción no hay sharp) y la facción apunta a
+  `images/faction/<slug>.png?v=<ms>` (la ruta es canónica: sin `?v` el navegador sigue con el viejo).
+- **Mantenedor guiado**: un solo asistente de 6 pasos (`components/admin/card-wizard.tsx`) sirve para
+  crear y editar fichas; las facciones tienen su propio asistente y pestaña «Emblemas y facciones».
 - **Cartas nuevas nacen en borrador**; el listado del mantenedor (`/api/admin/vtubers`) incluye
   borradores y ocultos (la ruta pública no).
 - **Carta 3D**: los emblemas de facción van en la cabecera, a la derecha del nombre, sobre un

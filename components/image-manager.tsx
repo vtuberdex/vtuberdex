@@ -27,6 +27,7 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 
 import { api } from '@/lib/api';
+import { canvasABlob, cargarBitmap } from '@/lib/imagen-cliente';
 import type { UploadKind, VtuberDetail } from '@/lib/types';
 import { ToastContainer, useToasts } from '@/components/toast';
 
@@ -122,9 +123,7 @@ async function preparar(file: File, kind: ManagedKind): Promise<Blob> {
    * confuso en vez de degradar al original (que es lo correcto: el servidor ya
    * valida y convierte).
    */
-  if (typeof createImageBitmap !== 'function') return file;
-
-  const bitmap = await createImageBitmap(file).catch(() => null);
+  const bitmap = await cargarBitmap(file);
   if (!bitmap) return file;
 
   if (target) {
@@ -142,8 +141,7 @@ async function preparar(file: File, kind: ManagedKind): Promise<Blob> {
   }
   bitmap.close?.();
 
-  const webp = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', 0.92));
-  return webp ?? file;
+  return (await canvasABlob(canvas, 'image/webp', 0.92)) ?? file;
 }
 
 interface Props {
@@ -178,6 +176,7 @@ function conVersion(path: string, version: number | undefined): string {
 
 export function ImageManager({ token, detail, onUpdated }: Props) {
   const [busy, setBusy] = useState<ManagedKind | null>(null);
+  const [dragging, setDragging] = useState<ManagedKind | null>(null);
   /** Marca de tiempo por tipo para forzar la recarga de la vista previa. */
   const [versions, setVersions] = useState<Partial<Record<ManagedKind, number>>>({});
   const inputs = useRef<Partial<Record<ManagedKind, HTMLInputElement | null>>>({});
@@ -273,7 +272,24 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
           const version = versions[kind];
           const working = busy === kind;
           return (
-            <li key={kind} className="space-y-2 rounded-xl border border-dex-line/70 bg-black/20 p-3">
+            <li
+              key={kind}
+              className={`space-y-2 rounded-xl border p-3 transition ${
+                dragging === kind ? 'border-dex-accent bg-dex-accent/10' : 'border-dex-line/70 bg-black/20'
+              }`}
+              // Arrastrar y soltar: es lo más natural para quien sube su primera imagen.
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragging(kind);
+              }}
+              onDragLeave={() => setDragging((current) => (current === kind ? null : current))}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragging(null);
+                const file = event.dataTransfer.files?.[0];
+                if (file) void upload(kind, file);
+              }}
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-bold uppercase tracking-wide text-dex-text">{label}</span>
                 {info.width ? (
@@ -317,6 +333,7 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
               </div>
 
               <p className="text-[11px] leading-snug text-dex-muted">{hint}</p>
+              <p className="text-[11px] text-dex-muted/80">Arrastra una imagen sobre esta tarjeta o usa el botón.</p>
 
               <div className="flex flex-wrap items-center gap-2">
                 <input

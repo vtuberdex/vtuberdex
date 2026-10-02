@@ -7,7 +7,8 @@ import { useEffect, useState } from 'react';
 
 import { api } from '@/lib/api';
 import type { AdminStatusFilter, VtuberCard } from '@/lib/types';
-import { ghostButton, inputClass, labelClass } from '@/components/admin/ui';
+import { percentOfCard } from '@/components/admin/completeness';
+import { ghostButton, inputClass, labelClass, primaryButton } from '@/components/admin/ui';
 
 const STATUS_LABEL: Record<VtuberCard['status'], string> = {
   published: 'publicado',
@@ -22,12 +23,15 @@ export function VtuberList({
   selectedId,
   refreshKey,
   onOpen,
+  onCreate,
 }: {
   token: string;
   selectedId: number | null;
   /** Cambia tras guardar/crear para volver a pedir la página actual. */
   refreshKey: unknown;
   onOpen: (row: VtuberCard) => void;
+  /** Acción del estado vacío. */
+  onCreate?: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<AdminStatusFilter>('all');
@@ -91,13 +95,31 @@ export function VtuberList({
             >
               <span className="font-mono text-[11px] text-dex-muted">#{String(row.dexNumber).padStart(3, '0')}</span>
               <span className="min-w-0 flex-1 truncate">{row.name}</span>
+              <span className="font-mono text-[10px] text-dex-muted" title="Completitud de la carta" data-testid="row-percent">
+                {percentOfCard(row)}%
+              </span>
               {row.status !== 'published' && (
                 <span className="rounded bg-amber-500/20 px-1.5 text-[10px] text-amber-200">{STATUS_LABEL[row.status]}</span>
               )}
             </button>
           </li>
         ))}
-        {rows.length === 0 && <li className="px-2 py-3 text-xs text-dex-muted">Sin resultados.</li>}
+        {rows.length === 0 && (
+          <li className="space-y-2 px-2 py-3 text-xs text-dex-muted" data-testid="list-empty">
+            {query || status !== 'all' ? (
+              'Ninguna ficha coincide con la búsqueda.'
+            ) : (
+              <>
+                <p>Aún no hay fichas.</p>
+                {onCreate && (
+                  <button type="button" className={primaryButton} onClick={onCreate}>
+                    Crear la primera carta
+                  </button>
+                )}
+              </>
+            )}
+          </li>
+        )}
       </ul>
       {meta.pageCount > 1 && (
         <div className="mt-3 flex items-center justify-between">

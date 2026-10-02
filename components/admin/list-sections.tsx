@@ -13,6 +13,7 @@ import {
   type SocialForm,
   type StatForm,
 } from '@/components/admin/form-model';
+import { placeholderFor } from '@/components/admin/suggestions';
 import { inputClass, labelClass } from '@/components/admin/ui';
 import type { ProfileField } from '@/lib/types';
 
@@ -162,7 +163,7 @@ export function SocialsEditor({ items, onChange }: { items: SocialForm[]; onChan
                 onChange={(event) => update({ url: event.target.value })}
                 aria-invalid={bad}
                 className={`${compact} ${bad ? '!border-red-400' : ''}`}
-                placeholder="https://…"
+                placeholder={placeholderFor(item.platform)}
               />
               {bad && <span className="mt-1 block text-[11px] normal-case tracking-normal text-red-300">Debe empezar con http:// o https://</span>}
             </label>

@@ -149,6 +149,17 @@ export const api = {
     });
   },
   /**
+   * Sube el emblema (PNG) de una facción. Binario crudo, como las imágenes de las fichas;
+   * el servidor valida por contenido (máx. 2 MB en producción) y versiona la URL (`?v=`).
+   */
+  uploadFactionEmblem(token: string, id: number, file: Blob) {
+    return request<{ faction: FactionRow; items: FactionRow[]; asset: unknown }>(`/api/admin/factions/${id}/image`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream' },
+      body: file,
+    });
+  },
+  /**
    * Sube o reemplaza una imagen de un VTuber. El archivo va como binario crudo
    * (el servidor lo valida por contenido y lo convierte a WebP optimizado), así
    * que NO se usa FormData: el `Content-Type` se deja genérico a propósito.
