@@ -1,5 +1,3 @@
-import { Suspense } from 'react';
-
 import { AppHeader } from '@/components/app-header';
 
 /**
@@ -14,15 +12,12 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
     <div className="dex-grid relative min-h-screen">
       <div className="relative z-10">
         <AppHeader />
-        <Suspense
-          fallback={
-            <div className="mx-auto max-w-3xl px-4 py-20 text-center font-mono text-sm text-dex-muted">
-              cargando módulo…
-            </div>
-          }
-        >
-          {children}
-        </Suspense>
+        {/*
+          Sin `Suspense` aquí a propósito: con él Next envía el status 200 junto al esqueleto
+          y un `notFound()` de la ficha ya no puede cambiarlo (soft 404). Cada página que usa
+          `useSearchParams` ya lleva su propio `Suspense` (ver `page.tsx`).
+        */}
+        {children}
       </div>
     </div>
   );
