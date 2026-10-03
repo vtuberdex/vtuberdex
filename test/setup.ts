@@ -1,6 +1,16 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { createElement } from 'react';
+
+// jsdom no tiene WebGL y el producto ya no tiene vista 2D de respaldo: el libro y la ficha
+// montan SIEMPRE un `<Canvas>`. Aquí es una caja inerte (los hijos son mallas de three, no
+// DOM): los tests fijan lo que el usuario hace sin ver la escena. La escena y el shader los
+// cubren sus propios tests (layout, shaders) y la sonda en navegador.
+vi.mock('@react-three/fiber', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@react-three/fiber')>()),
+  Canvas: () => createElement('div', { 'data-testid': 'r3f-canvas' }),
+}));
 
 // jsdom no implementa WebGL: los componentes 3D se prueban por su contrato
 // (props/render del contenedor) y el shader se valida como string.

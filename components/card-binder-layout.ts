@@ -13,7 +13,7 @@
  */
 import { Matrix4, Vector3 } from 'three';
 
-import { BINDER, GEOMETRY } from '@/components/card3d-config';
+import { BINDER, GEOMETRY, RENDER } from '@/components/card3d-config';
 
 export type Side = 'left' | 'right';
 /** Sentido del paso de página: +1 avanza (la hoja derecha gira a la izquierda), -1 retrocede. */
@@ -190,7 +190,8 @@ export function fitCameraZ(aspect: number, fovDeg = GEOMETRY.cameraFov, fill = B
  * tiempo transcurrido y no por marca de inicio.
  */
 export function advanceFlip(progress: number, deltaSeconds: number, ready: boolean): number {
-  const next = progress + (deltaSeconds * 1000) / BINDER.flipMs;
+  // El delta se recorta: tras un frame de reposo (50 ms) o un hipo del hilo la hoja no debe saltar.
+  const next = progress + Math.min(deltaSeconds * 1000, RENDER.maxDeltaMs) / BINDER.flipMs;
   const ceiling = ready ? 1 : BINDER.holdProgress;
   return Math.min(ceiling, next);
 }

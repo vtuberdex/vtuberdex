@@ -16,7 +16,7 @@ import userEvent from '@testing-library/user-event';
 import { CatalogPage } from '@/components/catalog-page';
 import { DetailPage } from '@/components/detail-page';
 import { INTENSITY } from '@/components/card3d-config';
-import { HoloCard, supportsWebGL } from '@/components/holo-card';
+import { HoloCard } from '@/components/holo-card';
 import {
   drawCardFront,
   CARD_TEXTURE_WIDTH,
@@ -106,16 +106,14 @@ describe('CatalogPage', () => {
     );
     renderCatalog();
 
-    await waitFor(() => expect(screen.getAllByTestId('card-tile')).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByTestId('binder-link')).toHaveLength(2));
     expect(screen.getByRole('status')).toHaveTextContent('2 VTubers encontrados');
-    // Las cartas viven dentro del libro (dos hojas), no en una grilla suelta.
+    // Las cartas viven dentro del libro 3D (un solo canvas), no en una grilla suelta.
     expect(screen.getByTestId('card-binder')).toBeInTheDocument();
-    expect(screen.getAllByTestId('binder-page')).toHaveLength(2);
-    // El nombre ya no es texto del DOM: lo dibuja la textura de la carta, así que
-    // la identidad de la tarjeta se comprueba por su enlace y su etiqueta.
-    const cards = screen.getAllByTestId('card-tile');
+    // El nombre lo dibuja la textura de la carta: el DOM expone un enlace accesible por carta.
+    const cards = screen.getAllByTestId('binder-link');
     expect(cards[1]).toHaveAttribute('href', '/v/drawchii');
-    expect(cards[1]).toHaveAttribute('aria-label', 'Drawchii, VTuber número 30');
+    expect(cards[1]).toHaveTextContent('Drawchii, VTuber número 30');
   });
 
   it('envía la búsqueda a la API y refleja el término en la URL', async () => {
@@ -221,13 +219,13 @@ describe('CatalogPage', () => {
       ),
     );
     renderCatalog();
-    await waitFor(() => expect(screen.getAllByTestId('card-tile')[0]).toHaveAttribute('href', '/v/pagina-1'));
+    await waitFor(() => expect(screen.getAllByTestId('binder-link')[0]).toHaveAttribute('href', '/v/pagina-1'));
     // Tras un respiro, la vecina (página 2) ya se pidió sola.
     await waitFor(() => expect(mockedApi.list.mock.calls.some((call) => call[0]?.page === 2)).toBe(true));
     const llamadasAntes = mockedApi.list.mock.calls.length;
 
     await user.click(screen.getByText('Siguiente →'));
-    await waitFor(() => expect(screen.getAllByTestId('card-tile')[0]).toHaveAttribute('href', '/v/pagina-2'));
+    await waitFor(() => expect(screen.getAllByTestId('binder-link')[0]).toHaveAttribute('href', '/v/pagina-2'));
     // Mostrar la página 2 no volvió a pedirla: solo se añadió la precarga de la 3.
     const nuevas = mockedApi.list.mock.calls.slice(llamadasAntes).map((call) => call[0]?.page);
     expect(nuevas).not.toContain(2);
@@ -282,7 +280,7 @@ describe('DetailPage', () => {
     expect(screen.getByText(/Arrocin/)).toBeInTheDocument();
   });
 
-  it('usa rutas absolutas de imagen (no se rompen en /v/:slug)', async () => {
+  it('el arte del personaje es textura de la carta 3D: no hay <img> de respaldo en la ficha', async () => {
     mockedApi.detail.mockResolvedValue({
       ...makeDetail({
         images: {
@@ -298,14 +296,10 @@ describe('DetailPage', () => {
     });
     renderDetail();
 
-    /**
-     * El ARTE del personaje es el que tiene que llevar ruta absoluta: va al `<img>`
-     * de la carta, y una ruta relativa se rompería en `/v/:slug`. Antes esta prueba
-     * miraba el logo del header, que ya no existe (se retiró por duplicar la marca
-     * que la carta 3D ya dibuja).
-     */
-    const arte = await screen.findByAltText('GKuro Monochrome');
-    expect(arte.getAttribute('src')?.startsWith('/images/')).toBe(true);
+    // La carta es el canvas 3D. La ruta ABSOLUTA de las imágenes (que no se rompa en `/v/:slug`) la
+    // fija la API (`server/test/search.test.mjs`); aquí no queda DOM con el arte que comprobar.
+    expect(await screen.findByTestId('r3f-canvas')).toBeInTheDocument();
+    expect(screen.queryByAltText('GKuro Monochrome')).not.toBeInTheDocument();
     // El radar ya no se renderiza como imagen: sus datos los dibuja `StatBars`.
     expect(screen.queryByAltText('Radar de GKuro Monochrome')).not.toBeInTheDocument();
     expect(screen.getByTestId('stat-bars')).toBeInTheDocument();
@@ -382,11 +376,11 @@ describe('DetailPage', () => {
     });
     render(<DetailPage slug="gkuro-monochrome" />);
     await waitFor(() => expect(screen.getByTestId('premium-info')).toBeInTheDocument());
-    // Sin WebGL (jsdom) la carta cae al respaldo 2D, que también lleva su distintivo: dos en pantalla.
+    // La carta es el canvas 3D (la placa lleva su etiqueta en la textura): el DOM solo tiene el distintivo de la info.
     const info = screen.getByTestId('premium-info');
     expect(within(info).getByTestId('premium-badge')).toHaveAttribute('data-grade', '10');
     expect(within(info).getByTestId('premium-badge')).toHaveTextContent('GEM MINT 10');
-    expect(screen.getAllByTestId('premium-badge')).toHaveLength(2);
+    expect(screen.getAllByTestId('premium-badge')).toHaveLength(1);
     expect(screen.getByTestId('premium-info')).toHaveTextContent('VTD-000018');
     expect(screen.getByTestId('premium-info')).toHaveTextContent('Premium desde 2026-05-01');
   });
@@ -426,36 +420,11 @@ describe('DetailPage', () => {
 });
 
 describe('HoloCard', () => {
-  it('sin WebGL cae a la vista 2D con el arte de la carta', () => {
-    // jsdom no implementa WebGL: supportsWebGL() debe decir que no.
-    expect(supportsWebGL()).toBe(false);
-    render(
-      <HoloCard
-        card={makeCard({
-          images: {
-            card: '/images/card/gkuro-monochrome.webp',
-            thumb: '/images/thumb/gkuro-monochrome.webp',
-            logo: null,
-            character: null,
-            radar: null,
-            background: null,
-          },
-        })}
-        className="h-64"
-      />,
-    );
-    const fallback = screen.getByTestId('holo-card-fallback');
-    expect(within(fallback).getByAltText('GKuro Monochrome')).toHaveAttribute(
-      'src',
-      '/images/card/gkuro-monochrome.webp',
-    );
-    expect(within(fallback).getByText('#018')).toBeInTheDocument();
-  });
-
-  it('con active=false no monta el canvas 3D', () => {
-    render(<HoloCard card={makeCard()} active={false} />);
-    expect(screen.queryByTestId('holo-card')).not.toBeInTheDocument();
-    expect(screen.getByTestId('holo-card-fallback')).toBeInTheDocument();
+  it('monta el canvas 3D en su caja y no tiene vista 2D de respaldo', () => {
+    render(<HoloCard card={makeCard()} className="h-64" />);
+    expect(screen.getByTestId('holo-card')).toBeInTheDocument();
+    expect(screen.getByTestId('r3f-canvas')).toBeInTheDocument();
+    expect(screen.queryByTestId('holo-card-fallback')).toBeNull();
   });
 });
 

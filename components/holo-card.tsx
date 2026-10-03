@@ -25,6 +25,8 @@ import * as THREE from 'three';
 import type { VtuberCard } from '@/lib/types';
 import { cardPalette } from '@/lib/color';
 import * as CFG from '@/components/card3d-config';
+import { RenderGovernor } from '@/components/render-governor';
+import { useWebGLRecovery } from '@/components/webgl-recovery';
 import {
   CARD_TEXTURE_HEIGHT,
   CARD_TEXTURE_WIDTH,
@@ -32,7 +34,6 @@ import {
   CARD_TEXTURE_TILE_WIDTH,
 } from '@/components/card-texture';
 import { useCardMaterials, type CardMaterials } from '@/components/card-material';
-import { PremiumBadge } from '@/components/premium-badge';
 import { PremiumSlab } from '@/components/premium-slab';
 
 /** Proporción real de una carta coleccionable (5x7 pulgadas -> 1.4). */
@@ -50,20 +51,6 @@ export const CARD_CAMERA_Z =
  */
 export function cameraZFor(card: Pick<VtuberCard, 'premium'>): number {
   return card.premium ? CARD_CAMERA_Z * ((CARD_H + 2 * CFG.BINDER.pocketPad) / CARD_H) : CARD_CAMERA_Z;
-}
-
-export function supportsWebGL(): boolean {
-  if (typeof document === 'undefined') return false;
-  try {
-    const canvas = document.createElement('canvas');
-    const context = (canvas.getContext('webgl2') ??
-      canvas.getContext('webgl')) as WebGLRenderingContext | null;
-    if (!context) return false;
-    context.getExtension('WEBGL_lose_context')?.loseContext();
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 interface HoloCardSceneProps {
@@ -239,7 +226,6 @@ export function Rig({ accent, cameraZ = CARD_CAMERA_Z }: { accent: string; camer
 
 export interface HoloCardProps extends HoloCardSceneProps {
   className?: string;
-  active?: boolean;
   quality?: 'full' | 'tile' | 'lite';
   dprCap?: number;
 }
@@ -250,38 +236,11 @@ export class WebGLBoundary extends Component<{ fallback: ReactNode; children: Re
     return { failed: true };
   }
   componentDidCatch(error: unknown) {
-    console.warn('[holo-card] WebGL no disponible, se usa la vista 2D', error);
+    console.warn('[holo-card] fallo al dibujar la escena 3D', error);
   }
   render() {
     return this.state.failed ? this.props.fallback : this.props.children;
   }
-}
-
-export function CardFallback({ card, className }: { card: VtuberCard; className?: string }) {
-  const image = card.images.character ?? card.images.card;
-  return (
-    <div className={className} data-testid="holo-card-fallback">
-      <div className="relative h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-dex-panel">
-        {image ? (
-          <img
-            src={image}
-            alt={card.name}
-            className="h-full w-full object-cover"
-            loading="lazy"
-            width={CARD_TEXTURE_WIDTH}
-            height={CARD_TEXTURE_HEIGHT}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-xs text-dex-muted">Sin imagen</div>
-        )}
-        <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 font-mono text-xs text-white">
-          #{String(card.dexNumber).padStart(3, '0')}
-        </span>
-        {/* Sin WebGL no hay placa de acrílico: el distintivo es lo único que dice que la carta es premium. */}
-        {card.premium && <PremiumBadge premium={card.premium} className="absolute bottom-2 left-2 backdrop-blur" />}
-      </div>
-    </div>
-  );
 }
 
 export function HoloCard({
@@ -289,13 +248,12 @@ export function HoloCard({
   holo = CFG.INTENSITY.holo.default,
   gloss = CFG.INTENSITY.gloss.default,
   className,
-  active = true,
   quality = 'full',
   textureWidth,
   dprCap,
 }: HoloCardProps) {
-  const [webgl] = useState(() => supportsWebGL());
-  const [lost, setLost] = useState(false);
+  const recovery = useWebGLRecovery();
+  const [dpr, setDpr] = useState<number | null>(null);
   const palette = useMemo(
     () => cardPalette(card.themeColor, card.secondaryColor),
     [card.themeColor, card.secondaryColor],
@@ -311,10 +269,6 @@ export function HoloCard({
       textureWidth: textureWidth ?? (tile ? CARD_TEXTURE_TILE_WIDTH : CARD_TEXTURE_FULL_WIDTH),
     };
   }, [quality, dprCap, textureWidth]);
-
-  if (!active || !webgl || lost) {
-    return <CardFallback card={card} className={className} />;
-  }
 
   /**
    * `relative` en la raíz y el canvas dentro de una caja POSICIONADA.
@@ -346,23 +300,28 @@ export function HoloCard({
    */
   return (
     <div className={className ? `relative ${className}` : 'relative'} data-testid="holo-card">
-      <WebGLBoundary fallback={<CardFallback card={card} className="absolute inset-0" />}>
-        <div className="absolute inset-0">
-          <Canvas
-            dpr={plan.dpr}
-            gl={{ antialias: plan.antialias, alpha: true, powerPreference: plan.powerPreference }}
-            camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, cameraZFor(card)] }}
-            onCreated={({ gl }) => {
-              gl.domElement.addEventListener('webglcontextlost', (event) => {
-                event.preventDefault();
-                setLost(true);
-              });
-            }}
-          >
-            <Rig accent={palette.accent} cameraZ={cameraZFor(card)} />
-            <CardMesh card={card} holo={holo} gloss={gloss} textureWidth={plan.textureWidth} />
-          </Canvas>
-        </div>
+      <WebGLBoundary fallback={null}>
+        {recovery.canRender && (
+          <div className="absolute inset-0">
+            <Canvas
+              key={recovery.canvasKey}
+              frameloop="demand"
+              dpr={dpr ?? plan.dpr}
+              gl={{ antialias: plan.antialias, alpha: true, powerPreference: plan.powerPreference }}
+              camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, cameraZFor(card)] }}
+              onCreated={({ gl }) => recovery.attach(gl.domElement)}
+            >
+              <RenderGovernor
+                wake={card}
+                idleFps={CFG.RENDER.idleFpsDetail}
+                dprMax={typeof plan.dpr === 'number' ? plan.dpr : plan.dpr[1]}
+                onDpr={setDpr}
+              />
+              <Rig accent={palette.accent} cameraZ={cameraZFor(card)} />
+              <CardMesh card={card} holo={holo} gloss={gloss} textureWidth={plan.textureWidth} />
+            </Canvas>
+          </div>
+        )}
       </WebGLBoundary>
     </div>
   );

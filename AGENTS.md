@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 307 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 363 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 82 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/82/307** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/82/363** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -359,6 +359,45 @@ cada mes que sigue donando, hasta el 10 y luego la **Black Label**. Escala: `8 �
   página. Las etapas emiten `performance.measure` (`textura-rapida:*`,
   `textura-completa:*`, `textura-completa-cpu:*`, `textura-cache`) para leerlas en la
   pestaña Performance sin tocar el código.
+- **NO hay vista 2D de respaldo: el producto asume que quien lo ve tiene GPU.** Se retiraron
+  `BinderFallback`/`FallbackPage`, `CardTile`, `CardFallback`, `supportsWebGL` y la prop `active` de
+  `HoloCard`: eran DOM y un probe de contexto cargados para un caso que no existe. El libro y la ficha
+  montan SIEMPRE un `<Canvas>` (tras hidratar: antes es solo la caja con la proporción del libro). Si el
+  contexto se pierde, `webgl-recovery.ts` remonta; si agota los intentos, el libro muestra
+  `BinderUnavailable` («No se pudo mostrar el libro 3D», botón Recargar). La lista `sr-only` de enlaces
+  (`data-testid="binder-link"`) queda SIEMPRE en el DOM: es la accesibilidad y lo que ve un rastreador.
+  `prefers-reduced-motion` ya no manda al 2D (el tier `static` solo baja textura/DPR y desactiva la
+  precarga). jsdom no tiene WebGL, así que `test/setup.ts` sustituye el `<Canvas>` de R3F por una caja
+  inerte (`data-testid="r3f-canvas"`); lo que se prueba es el contrato de DOM, no la escena.
+- **El canvas NO corre a 60 fps continuos, y un `contextlost` ya no es permanente.** Antes el
+  `<Canvas>` iba en `frameloop="always"` y el primer `webglcontextlost` dejaba un 2D hasta
+  recargar (`setLost(true)` sin vuelta). Hoy (`components/render-governor.tsx`, lógica pura en
+  `render-pacing.ts`, perillas en `RENDER` de `card3d-config.ts`): `frameloop="demand"` y un
+  gobernador que (1) PAUSA del todo fuera de pantalla (IntersectionObserver) o con la pestaña
+  oculta, (2) baja a `idleFps` en reposo y con interacción topa a `RENDER.activeFps` = **60** (se probó 24: en 60 Hz alterna 33/50 ms y se ve menos suave; agenda FIJA `nextSchedule`, porque comparar con el último frame real rinde menos fps que los pedidos), (3) DPR adaptativo AGRESIVO (`RENDER.dpr`: ventana de 24 frames, escalón 0,3, dos escalones si la mediana pasa de 40 ms, mínimo 0,6, sube con calma tras 5 ventanas; `slowMs` 23 queda por encima de los 20,8 ms de 144 Hz con tope 60) si la cadencia de los frames ACTIVOS no se sostiene (nunca midiendo durante un giro: el hilo
+  está saturado por las texturas y realocar el framebuffer a mitad del giro es otro tirón).
+  `advanceFlip` recorta el delta a `RENDER.maxDeltaMs` (70: debe superar el paso de 50 ms del reposo): el primer frame del giro llega tras uno de
+  reposo (50 ms) y adelantaba la hoja de golpe. `webgl-recovery.ts` desmonta el canvas,
+  espera `cooldownMs` y REMONTA un canvas nuevo (`key`); no sigue en sitio tras
+  `webglcontextrestored` porque el PMREM no sobrevive y el metal saldría negro.
+  Trampas: (a) desmontar un Canvas dispara `webglcontextlost` en el canvas viejo
+  (`forceContextLoss`): el hook solo acepta el evento del canvas VIGENTE; (b) el reloj de three
+  sigue corriendo en pausa, así que al reanudar se descarta con `clock.getDelta()` o `advanceFlip`
+  (integra por delta) saltaría el giro; (c) R3F reimpone la prop `dpr` en cada re-render del
+  Canvas, por eso el DPR adaptativo vive en estado de React del dueño y no en un `setDpr` directo;
+  (d) `PerformanceMonitor` de drei NO sirve: contaría el reposo (20 fps a propósito) como lento.
+  Medido en chrome-headless con SwiftShader: fuera de pantalla = 0 frames/s y tras `loseContext()`
+  el canvas vuelve a los ~2,5 s; los topes de fps no se pueden medir ahí (el rasterizador por
+  software satura antes), los cubre `render-pacing.test.ts`. Sin medir aún: GPU real.
+- **El tirón al pasar de página era `getImageData` sobre canvases ACELERADOS.** Las 7 capas de cada carta
+  (`createLayer`, `card-texture/lienzo.ts`) nacían como canvas 2D acelerados por GPU y `completar` las
+  copia a `flat` y lee píxeles para las máscaras: cada lectura es una espera sincrónica GPU -> CPU en el
+  hilo principal, justo mientras las 4 cartas entrantes generan texturas. Perfil de CPU de CDP del giro
+  (mismo flujo): `getImageData` **2.596 ms** acelerado frente a **205 ms** con canvas en CPU; con
+  `willReadFrequently` en `createLayer`, 221 ms, y las tareas largas del primer giro pasaron de 7 (hasta
+  972 ms) a 6 (máx. 141 ms) y el segundo giro quedó sin ninguna. Ojo: `flat` YA lo tenía y no bastaba, porque
+  el coste estaba en LEER las capas de origen. Ningún gate lo ve; para repetirlo, `Profiler.start` por
+  CDP durante el clic en «Página siguiente» y ordenar por tiempo propio. Lo fija `lienzo.test.ts`.
 - **R3F en producción**: la geometría del canto se crea con `useMemo` como
   instancia, NO como elemento JSX. Instanciar la clase desde JSX acaba en
   `Class constructor cannot be invoked without 'new'` en el bundle minificado y
@@ -772,7 +811,7 @@ hay un script por sentido y **tienen reglas que no pueden divergir**:
 2. `npm test` en el paquete que tocaste; si cambiaste el esquema o la búsqueda,
    corre también `server` y, si aplica, `scraper`.
 3. Si tocaste la carta 3D o el shader, **no basta con que compile**: mira la
-   carta renderizada (o al menos confirma que el fallback 2D responde) — los
+   carta renderizada (no existe vista 2D de respaldo: se ve el canvas o no se ve nada) — los
    fallos de WebGL no aparecen en los tests, que corren sin WebGL a propósito
    (`test/setup.ts` anula `getContext`).
 4. Si cambiaste el seed o el scraper, re-ejecuta `verifySeed()` y confirma

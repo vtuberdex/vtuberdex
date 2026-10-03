@@ -15,9 +15,9 @@
  *     de móvil, y ahí se muestra menos carta por pantalla.
  *   · `navigator.connection.saveData` — el usuario pidió ahorrar datos; es una
  *     señal explícita de que quiere menos trabajo, no solo menos red.
- *   · `prefers-reduced-motion` — accesibilidad. Aquí no es solo animación: la
- *     carta se inclina siguiendo el puntero en cada frame, y quien pide menos
- *     movimiento no debería recibir eso. Se sirve la vista 2D.
+ *   · `prefers-reduced-motion` — accesibilidad. La carta se inclina siguiendo el puntero, y
+ *     quien pide menos movimiento no debería recibir tanto. Ya NO se sirve una vista 2D (no
+ *     existe: el producto asume GPU); el nivel `static` solo baja textura y DPR y no precarga.
  *
  * POR QUÉ SIGUE HACIENDO FALTA CON UN SOLO CANVAS
  * -----------------------------------------------
@@ -30,8 +30,8 @@
  *
  * NINGÚN MODO DEJA LA CARTA SIN VER
  * ---------------------------------
- * El peor nivel es la vista 2D con el arte real: se reduce el efecto, nunca el
- * contenido. Degradar a menos carta sería un fallo, no una optimización.
+ * El peor nivel sigue siendo la carta 3D con el arte real: se reduce el efecto (textura,
+ * DPR), nunca el contenido. Degradar a menos carta sería un fallo, no una optimización.
  */
 
 export type CardQuality = 'full' | 'tile' | 'lite' | 'static';

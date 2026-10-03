@@ -9,7 +9,7 @@
 import { Matrix4 } from 'three';
 import { describe, expect, it } from 'vitest';
 
-import { BINDER } from '@/components/card3d-config';
+import { BINDER, RENDER } from '@/components/card3d-config';
 import {
   CARD_H,
   CARD_W,
@@ -229,5 +229,17 @@ describe('reparto de cartas durante el giro', () => {
     const plan = planPlacements([], { dir: 1, outgoing: cards(1) });
     expect(plan).toHaveLength(8);
     expect(plan.every((p) => p.card.id <= 8)).toBe(true);
+  });
+});
+
+describe('advanceFlip: delta recortado', () => {
+  it('un frame con delta enorme (reposo o hipo del hilo) no adelanta la hoja de golpe', () => {
+    const paso = advanceFlip(0, 5, true);
+    expect(paso).toBeCloseTo(RENDER.maxDeltaMs / BINDER.flipMs);
+    expect(paso).toBeLessThan(0.2);
+  });
+
+  it('un delta normal (16 ms) no se toca', () => {
+    expect(advanceFlip(0, 0.016, true)).toBeCloseTo(16 / BINDER.flipMs);
   });
 });

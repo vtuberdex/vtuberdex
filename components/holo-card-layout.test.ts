@@ -46,8 +46,9 @@ describe('layout del canvas', () => {
     expect(render.slice(caja, canvas)).not.toContain('</div>');
   });
 
-  it('la vista 2D de respaldo ocupa la raíz posicionada', () => {
-    expect(render).toContain('fallback={<CardFallback card={card} className="absolute inset-0" />}');
+  it('no hay vista 2D de respaldo: el producto asume GPU', () => {
+    expect(render).not.toContain('CardFallback');
+    expect(fuente).not.toContain('supportsWebGL');
   });
 
   it('el canvas no se declara con tamaño propio (la medida la fija el contenedor)', () => {

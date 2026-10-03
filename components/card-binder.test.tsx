@@ -1,10 +1,10 @@
 /**
  * Tests del libro de cartas por su CONTRATO de DOM.
  *
- * jsdom no tiene WebGL (ver `test/setup.ts`), así que `CardBinder` cae a su respaldo
- * 2D: dos hojas con `CardTile`. Lo que se fija aquí es lo que el usuario puede hacer
- * sin ver la escena: pasar de página con flechas, botones y gesto; y que las 8
- * cartas sigan siendo enlaces accesibles. La geometría del giro 3D la fija
+ * jsdom no tiene WebGL: `test/setup.ts` sustituye el `<Canvas>` de R3F por una caja inerte
+ * (NO hay vista 2D de respaldo: el producto asume GPU). Lo que se fija aquí es lo que el
+ * usuario puede hacer sin ver la escena: pasar de página con flechas, botones y gesto; y que
+ * las cartas sigan siendo enlaces accesibles. La geometría del giro 3D la fija
  * `card-binder-layout.test.ts`.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -28,24 +28,27 @@ const renderBinder = (props: Partial<React.ComponentProps<typeof CardBinder>> = 
   return { onPage };
 };
 
-describe('CardBinder (respaldo 2D)', () => {
-  it('dibuja dos hojas con las 8 cartas enlazadas en orden de lectura', () => {
+describe('CardBinder', () => {
+  it('monta el canvas 3D tras hidratar y NO dibuja ninguna vista 2D de respaldo', async () => {
     renderBinder();
-    const pages = screen.getAllByTestId('binder-page');
-    expect(pages).toHaveLength(2);
-    const tiles = screen.getAllByTestId('card-tile');
-    expect(tiles).toHaveLength(8);
-    expect(tiles[0]).toHaveAttribute('href', '/v/v-0');
-    expect(tiles[4]).toHaveAttribute('href', '/v/v-4');
-    // 4 por hoja: la primera hoja tiene los slots 0..3 y la segunda los 4..7.
-    expect(pages[0].querySelectorAll('[data-testid="card-tile"]')).toHaveLength(BINDER.cardsPerPage);
-    expect(pages[1].querySelectorAll('[data-testid="card-tile"]')).toHaveLength(BINDER.cardsPerPage);
+    expect(await screen.findByTestId('r3f-canvas')).toBeInTheDocument();
+    expect(screen.queryByTestId('binder-page')).toBeNull();
+    expect(screen.queryByTestId('binder-fallback')).toBeNull();
+    expect(screen.queryByTestId('card-tile')).toBeNull();
   });
 
-  it('rellena con fundas vacías cuando la página trae menos de 8 cartas', () => {
+  it('las cartas siguen siendo enlaces accesibles, en orden de lectura', () => {
+    renderBinder();
+    const links = screen.getAllByTestId('binder-link');
+    expect(links).toHaveLength(8);
+    expect(links[0]).toHaveAttribute('href', '/v/v-0');
+    expect(links[4]).toHaveAttribute('href', '/v/v-4');
+    expect(links[0]).toHaveTextContent('VTuber 0, VTuber número 100');
+  });
+
+  it('con menos de 8 cartas lista solo las que hay', () => {
     renderBinder({ items: eightCards().slice(0, 2) });
-    expect(screen.getAllByTestId('card-tile')).toHaveLength(2);
-    expect(screen.getAllByTestId('binder-page')).toHaveLength(2);
+    expect(screen.getAllByTestId('binder-link')).toHaveLength(2);
   });
 
   it('anuncia la página actual', () => {
@@ -119,10 +122,9 @@ describe('CardBinder en celular (una hoja de 4)', () => {
   it('muestra una sola hoja con las 4 cartas de la página', () => {
     renderBinder({ items: fourCards(), single: true, page: 2, pageCount: 10 });
     expect(screen.getByTestId('card-binder')).toHaveAttribute('data-single', 'true');
-    expect(screen.getAllByTestId('binder-page')).toHaveLength(1);
-    const tiles = screen.getAllByTestId('card-tile');
-    expect(tiles).toHaveLength(4);
-    expect(tiles[0]).toHaveAttribute('href', '/v/v-0');
+    const links = screen.getAllByTestId('binder-link');
+    expect(links).toHaveLength(4);
+    expect(links[0]).toHaveAttribute('href', '/v/v-0');
     expect(screen.getByText(/Página 2 de 10/)).toBeInTheDocument();
   });
 

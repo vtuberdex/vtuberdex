@@ -1511,3 +1511,81 @@ export const PREMIUM = {
     } as Record<string, readonly [string, string]>,
   },
 } as const;
+
+/**
+ * RITMO DE RENDER: cuándo se dibuja un frame y a qué resolución.
+ *
+ * POR QUÉ EXISTE
+ * --------------
+ * El `<Canvas>` corría en `frameloop="always"`: 60 fps CONTINUOS aunque el libro estuviera
+ * quieto, fuera de pantalla o en una pestaña oculta. Cada frame son 8 cartas con shader de
+ * ~14 samplers y un framebuffer a DPR 1,8; esa presión sostenida es la que empuja al
+ * navegador a matar el contexto WebGL (`webglcontextlost`) al ir y volver de página.
+ * `components/render-governor.tsx` aplica estos valores; la lógica pura está en
+ * `render-pacing.ts`.
+ *
+ * Nada de esto toca el aspecto de la carta: solo CUÁNDO se pinta y a qué resolución.
+ */
+export const RENDER = {
+  /**
+   * Tope de fps con interacción (0 = SIN tope: un frame por rAF). 60 por decisión del dueño (se
+   * probó 24: en un monitor de 60 Hz alterna 33/50 ms y se ve menos suave). La agenda de frames es
+   * FIJA (`nextSchedule`) y no «desde el último frame»: comparar contra el último real, con rAF
+   * desalineado del tope, rinde menos fps que los pedidos. En 144 Hz, 60 sale en pasos de 3,3,2
+   * ticks (20,8/20,8/13,9 ms): promedio exacto, aunque no perfectamente parejo; los umbrales del
+   * DPR de abajo lo toleran a propósito.
+   */
+  activeFps: 60,
+  /**
+   * Un `delta` mayor se recorta a esto (ms) al integrar el giro de página: el primer frame del
+   * giro llega tras uno de reposo (50 ms a 20 fps) y un hipo del hilo (generar texturas) pesa
+   * cientos; sin el recorte la hoja se adelanta de golpe. Se prefiere ir un poco más lento
+   * en un hipo que saltar. Tiene que quedar POR ENCIMA del paso normal del tope de fps
+   * (50 ms a 20 fps en reposo): con 40 recortaría cada frame de reposo.
+   */
+  maxDeltaMs: 70,
+  /**
+   * fps en reposo (nunca por encima de `activeFps`). Se mantiene un pulso bajo (y no cero) porque el holograma tiene una
+   * componente de tiempo (`uTime`): a 0 fps la lámina quedaría congelada y se leería como imagen.
+   */
+  idleFps: 20,
+  /** La carta suelta del detalle FLOTA sola (movimiento ambiente): a 20 fps se vería a tirones, y es una sola carta. */
+  idleFpsDetail: 30,
+  /** Cuánto tiempo, tras la última señal de actividad, se sigue a `activeFps` (la amortiguación necesita asentarse). */
+  activeMs: 1500,
+  /** Margen (ms) al comparar con el intervalo: el rAF tiene jitter y sin él se saltaría un frame de cada dos a 60 Hz. */
+  toleranceMs: 2,
+  /**
+   * DPR ADAPTATIVO, AGRESIVO. Se mide la cadencia real de los frames ACTIVOS (mediana de
+   * `windowSize`) y se baja un escalón si la mediana supera `slowMs` (~43 fps: no hace falta caer
+   * a 30 para reaccionar); si supera `severeMs` (~25 fps) se bajan DOS de golpe. Se sube solo tras
+   * `recoverWindows` ventanas seguidas bajo `fastMs`: reacciona rápido hacia abajo y sube con calma
+   * (la histéresis 23/18 ms más la espera evitan que oscile). `slowMs` queda por encima de los
+   * 20,8 ms de un monitor de 144 Hz con tope de 60 (pasos 3,3,2 ticks): ahí NO debe bajar.
+   * Antes: ventana de 45 frames (~0,75 s), escalón de 0,25, mínimo 0,75 y umbrales 26/19 ms.
+   */
+  dpr: {
+    min: 0.6,
+    step: 0.3,
+    windowSize: 24,
+    slowMs: 23,
+    fastMs: 18,
+    severeMs: 40,
+    recoverWindows: 5,
+    /** Un intervalo mayor es un hipo del hilo principal (p. ej. generando texturas), no la carga del render: se ignora. */
+    outlierMs: 120,
+  },
+  /**
+   * RECUPERACIÓN DE CONTEXTO. Tras `webglcontextlost` el canvas se desmonta, se espera `cooldownMs` a que el driver respire y se REMONTA uno nuevo. No se espera a
+   * `webglcontextrestored` para seguir en sitio: el PMREM y los render targets no sobreviven a
+   * una restauración (el metal saldría negro) y un canvas nuevo parte de cero. Si tras
+   * `maxAttempts` remontes seguidos sigue cayendo, se avisa y se ofrece recargar (no hay vista 2D). Un contexto sano
+   * durante `healthyMs` devuelve el contador a cero, para que una sesión larga no agote los
+   * intentos. Antes el primer `contextlost` dejaba el 2D hasta recargar la página.
+   */
+  recovery: {
+    cooldownMs: 1000,
+    maxAttempts: 3,
+    healthyMs: 30000,
+  },
+} as const;

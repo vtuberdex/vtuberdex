@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { CardTile } from '@/components/card-tile';
 import { FilterPanel } from '@/components/filter-panel';
 import { Pagination } from '@/components/pagination';
 import { SearchBar } from '@/components/search-bar';
@@ -14,15 +13,8 @@ import { StatBars } from '@/components/stat-bars';
 import { SkillList } from '@/components/skill-list';
 import { SocialLinks } from '@/components/social-links';
 import { DEFAULT_SEARCH } from '@/lib/query';
-import { makeCard, makeFacets } from '@/test/fixtures';
+import { makeFacets } from '@/test/fixtures';
 import { pickCardQuality, __resetCardQuality } from '@/components/card-quality';
-
-/**
- * Ya no hay router que envolver: los `Link` de Next no necesitan contexto y las
- * páginas reciben sus datos por props. Se mantiene el helper para no tocar las
- * llamadas de cada test (el nombre documenta la intención: render "navegable").
- */
-const renderWithRouter = (ui: React.ReactElement) => render(ui);
 
 describe('CountryBadge', () => {
   it('muestra la bandera del país y el nombre accesible', () => {
@@ -165,47 +157,6 @@ describe('SortSelect', () => {
     render(<SortSelect value="dex" onChange={onChange} />);
     await user.selectOptions(screen.getByRole('combobox'), 'power');
     expect(onChange).toHaveBeenCalledWith('power');
-  });
-});
-
-describe('CardTile', () => {
-  it('enlaza al detalle y se identifica por accesibilidad', () => {
-    renderWithRouter(<CardTile card={makeCard()} />);
-    const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/v/gkuro-monochrome');
-    /**
-     * El número, el nombre y el país ya NO viven en el DOM: los dibuja la textura
-     * de la carta (`drawCardFront`), que es la única fuente de esos datos desde que
-     * se quitó el marco exterior que los duplicaba. Lo que la tarjeta sí expone es
-     * el `aria-label`, que es lo que leen los lectores de pantalla.
-     */
-    expect(link).toHaveAttribute('aria-label', 'GKuro Monochrome, VTuber número 18');
-    expect(link).toHaveAttribute('data-dex', '18');
-  });
-
-  it('monta la vista 2D de la carta y no un marco con los mismos datos', () => {
-    renderWithRouter(<CardTile card={makeCard()} />);
-    const link = screen.getByRole('link');
-    // La tarjeta es la vista 2D de la carta (la 3D vive en el libro, `CardBinder`);
-    // lo importante es que NO añada cabecera ni pie propios: el marco exterior que
-    // repetía número/nombre/país/LV ya no existe.
-    expect(link.querySelector('[data-testid="holo-card-fallback"]')).not.toBeNull();
-    expect(screen.queryByRole('heading')).toBeNull();
-  });
-
-  it('muestra el ART del personaje (la misma imagen que la carta 3D usa como textura)', () => {
-    // La tarjeta 2D lleva el personaje en un `<img>`: es el respaldo del libro y lo
-    // que lee un lector de pantalla; en 3D ese mismo arte es la capa 1 de la textura.
-    renderWithRouter(<CardTile card={makeCard()} />);
-    const art = screen.getByAltText('GKuro Monochrome');
-    expect(art).toHaveAttribute('src', 'images/character/gkuro-monochrome.webp');
-  });
-
-  it('tolera cartas sin imagen', () => {
-    renderWithRouter(
-      <CardTile card={makeCard({ images: { card: null, thumb: null, logo: null, character: null, radar: null, background: null } })} />,
-    );
-    expect(screen.getByText('Sin imagen')).toBeInTheDocument();
   });
 });
 

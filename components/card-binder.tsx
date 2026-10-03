@@ -34,9 +34,13 @@
  * arrastre) sobre el libro. Un toque corto sobre una carta abre su ficha (lo decide
  * `delta` del evento de R3F: si el puntero se movió más de `tapSlopPx`, fue un gesto).
  *
- * ACCESIBILIDAD Y RESPALDO: el canvas no expone las cartas al lector de pantalla, así que
- * se añade una lista `sr-only` de enlaces. Sin WebGL (o con `prefers-reduced-motion`) el
- * libro se dibuja en 2D con la misma disposición de dos hojas y `CardTile`.
+ * SIEMPRE 3D: el producto asume un equipo con GPU, así que NO hay vista 2D de respaldo (el
+ * libro en CSS con `CardTile` y la detección de WebGL se retiraron: eran DOM y un probe de
+ * contexto cargados para un caso que no existe). Si el contexto se pierde, el canvas se REMONTA
+ * (`webgl-recovery.ts`); si tras varios intentos no vuelve, se avisa y se ofrece recargar.
+ *
+ * ACCESIBILIDAD: el canvas no expone las cartas al lector de pantalla, así que se añade una lista
+ * `sr-only` de enlaces (también es lo que ve un rastreador sin JS).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -47,9 +51,10 @@ import * as THREE from 'three';
 import type { VtuberCard } from '@/lib/types';
 import * as CFG from '@/components/card3d-config';
 import { BINDER } from '@/components/card3d-config';
-import { CardTile } from '@/components/card-tile';
 import { pickCardQuality } from '@/components/card-quality';
-import { CardMeshes, Rig, WebGLBoundary, supportsWebGL, usePointerTilt } from '@/components/holo-card';
+import { CardMeshes, Rig, WebGLBoundary, usePointerTilt } from '@/components/holo-card';
+import { RenderGovernor } from '@/components/render-governor';
+import { useWebGLRecovery } from '@/components/webgl-recovery';
 import { CardEnvContext, useCardMaterials, useSharedCardEnv, type SharedCardEnv } from '@/components/card-material';
 import {
   CARD_H,
@@ -315,6 +320,9 @@ interface BinderSceneProps {
   textureWidth: number;
   onFlipEnd: (token: number) => void;
   onOpen: (card: VtuberCard) => void;
+  /** DPR de partida del canvas y aviso del DPR adaptativo (ver `render-governor.tsx`). */
+  dprMax: number;
+  onDpr: (dpr: number) => void;
 }
 
 /** Distancia y centro de cámara para el encuadre pedido (libro entero o una hoja). */
@@ -329,7 +337,7 @@ function cameraTarget(focus: Focus, aspect: number) {
   return { x: focus === 'left' ? -pageCenterX : pageCenterX, z: Math.max(byHeight, byWidth) / BINDER.cameraFill };
 }
 
-function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, onOpen }: BinderSceneProps) {
+function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, onOpen, dprMax, onDpr }: BinderSceneProps) {
   const env = useSharedCardEnv();
   const pageTexture = useMemo(() => makePageTexture(), []);
   useEffect(() => () => pageTexture?.dispose(), [pageTexture]);
@@ -417,8 +425,13 @@ function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, 
     }
   });
 
+  // Un giro en curso o una página que aún no llegó no pasan por el puntero: sin esto el libro
+  // los dibujaría a la cadencia de reposo.
+  const busy = useCallback(() => (f.token >= 0 && !f.done) || !f.ready, [f]);
+
   return (
     <CardEnvContext.Provider value={env}>
+      <RenderGovernor busy={busy} wake={placements} dprMax={dprMax} onDpr={onDpr} />
       <Rig accent="#9aa4b8" cameraZ={cameraZ} />
       <group ref={book}>
         <BookBody env={env} pageTexture={pageTexture} />
@@ -437,48 +450,23 @@ function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, 
   );
 }
 
-/* ----------------------------------------------------------------------------
- * Respaldo 2D: el mismo libro, en CSS.
- * ------------------------------------------------------------------------- */
-
-function FallbackPage({ cards, firstIndex }: { cards: VtuberCard[]; firstIndex: number }) {
+/** Último recurso: el contexto no volvió tras los remontes. Recargar crea uno limpio. */
+function BinderUnavailable() {
   return (
     <div
-      data-testid="binder-page"
-      className="grid grid-cols-2 gap-3 rounded-xl p-3"
-      style={{ background: BINDER.pageColor }}
-    >
-      {Array.from({ length: BINDER.cardsPerPage }, (_, i) => {
-        const card = cards[i];
-        return card ? (
-          <CardTile key={card.id} card={card} index={firstIndex + i} />
-        ) : (
-          <div key={`empty-${i}`} aria-hidden className="aspect-[5/7] rounded-2xl" style={{ background: BINDER.pocketColor }} />
-        );
-      })}
-    </div>
-  );
-}
-
-function BinderFallback({ items, single }: { items: VtuberCard[]; single: boolean }) {
-  if (single) {
-    return (
-      <div data-testid="binder-fallback" className="rounded-2xl p-3" style={{ background: BINDER.coverColor }}>
-        <FallbackPage cards={items.slice(0, BINDER.cardsPerPage)} firstIndex={0} />
-      </div>
-    );
-  }
-  const left = <FallbackPage cards={items.slice(0, BINDER.cardsPerPage)} firstIndex={0} />;
-  const right = <FallbackPage cards={items.slice(BINDER.cardsPerPage, CARDS_PER_SPREAD)} firstIndex={BINDER.cardsPerPage} />;
-  return (
-    <div
-      data-testid="binder-fallback"
-      className="grid grid-cols-[1fr_12px_1fr] gap-2 rounded-2xl p-3"
+      role="alert"
+      data-testid="binder-unavailable"
+      className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl text-center text-sm text-dex-muted"
       style={{ background: BINDER.coverColor }}
     >
-      {left}
-      <div aria-hidden className="rounded-full bg-black/60" />
-      {right}
+      <p>No se pudo mostrar el libro 3D.</p>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className="rounded-full border border-dex-line px-4 py-1.5 text-dex-ink hover:border-dex-accent/60"
+      >
+        Recargar
+      </button>
     </div>
   );
 }
@@ -497,16 +485,19 @@ const isTypingTarget = (target: EventTarget | null) => {
 export function CardBinder({ items, page, pageCount, loading, onPage, single = false }: CardBinderProps) {
   const router = useRouter();
   /**
-   * La detección de WebGL se hace en un efecto, no en el estado inicial: el HTML del
-   * servidor (y el primer render del cliente) tienen que coincidir, y en el servidor no
-   * hay canvas. Un frame con el respaldo 2D es el precio de no romper la hidratación.
+   * El canvas se monta tras la hidratación: el HTML del servidor (y el primer render del
+   * cliente) tienen que coincidir y en el servidor no hay GPU. Ese primer instante es la caja
+   * vacía con la proporción del libro, sin nada de respaldo.
    */
-  const [webgl, setWebgl] = useState<boolean | null>(null);
-  useEffect(() => setWebgl(supportsWebGL()), []);
-  const [lost, setLost] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const recovery = useWebGLRecovery();
   const [quality] = useState(() => pickCardQuality());
+  // El DPR lo posee el estado de React: R3F reimpone la prop `dpr` en cada re-render del Canvas,
+  // así que un `setDpr` directo del gobernador se desharía solo.
+  const [dpr, setDpr] = useState(quality.dpr);
   const textureWidth = Math.min(quality.textureWidth, BINDER.textureWidthCap);
-  const threeD = webgl === true && !lost && quality.tier !== 'static';
+  const threeD = mounted && recovery.canRender;
 
   // En una hoja, la cámara mira siempre la derecha: ahí viven las 4 cartas de la página.
   const focus: Focus = single ? 'right' : null;
@@ -616,45 +607,46 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
       >
-        {threeD ? (
-          <WebGLBoundary fallback={<BinderFallback items={items} single={single} />}>
-            {/* Caja posicionada: el canvas no puede participar del layout (ver `holo-card.tsx`). */}
-            <div className="absolute inset-0">
-              <Canvas
-                dpr={quality.dpr}
-                gl={{ antialias: true, alpha: true, powerPreference: quality.tier === 'lite' ? 'default' : 'high-performance' }}
-                camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, fitCameraZ(frameW / pageH)] }}
-                onCreated={({ gl }) => {
-                  gl.domElement.addEventListener('webglcontextlost', (event) => {
-                    event.preventDefault();
-                    setLost(true);
-                  });
-                }}
-              >
-                <BinderScene
-                  placements={placements}
-                  flip={flip}
-                  ready={arrived}
-                  focus={focus}
-                  textureWidth={textureWidth}
-                  onFlipEnd={onFlipEnd}
-                  onOpen={onOpen}
-                />
-              </Canvas>
-            </div>
-            <ul className="sr-only">
-              {items.map((card) => (
-                <li key={card.id}>
-                  <Link href={`/v/${card.slug}`}>
-                    {card.name}, VTuber número {card.dexNumber}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </WebGLBoundary>
+        {recovery.failed ? (
+          <BinderUnavailable />
         ) : (
-          <BinderFallback items={items} single={single} />
+          <WebGLBoundary fallback={<BinderUnavailable />}>
+            {threeD && (
+              /* Caja posicionada: el canvas no puede participar del layout (ver `holo-card.tsx`). */
+              <div className="absolute inset-0">
+                <Canvas
+                  key={recovery.canvasKey}
+                  frameloop="demand"
+                  dpr={dpr}
+                  gl={{ antialias: true, alpha: true, powerPreference: quality.tier === 'lite' ? 'default' : 'high-performance' }}
+                  camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, fitCameraZ(frameW / pageH)] }}
+                  onCreated={({ gl }) => recovery.attach(gl.domElement)}
+                >
+                  <BinderScene
+                    placements={placements}
+                    flip={flip}
+                    ready={arrived}
+                    focus={focus}
+                    textureWidth={textureWidth}
+                    onFlipEnd={onFlipEnd}
+                    onOpen={onOpen}
+                    dprMax={quality.dpr}
+                    onDpr={setDpr}
+                  />
+                </Canvas>
+              </div>
+            )}
+          </WebGLBoundary>
         )}
+        <ul className="sr-only">
+          {items.map((card) => (
+            <li key={card.id}>
+              <Link href={`/v/${card.slug}`} data-testid="binder-link" data-dex={card.dexNumber}>
+                {card.name}, VTuber número {card.dexNumber}
+              </Link>
+            </li>
+          ))}
+        </ul>
 
         <button
           type="button"
