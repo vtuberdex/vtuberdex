@@ -7,12 +7,22 @@
  */
 import type { Metadata, Viewport } from 'next';
 
+import { DESCRIPCION_SITIO, NOMBRE_SITIO, siteUrl } from '@/lib/seo';
+
 import './globals.css';
 
+/**
+ * Metadatos por defecto de TODO el sitio; cada página los afina (`generateMetadata`).
+ * `metadataBase` hace que Next convierta las rutas relativas (canonical, imágenes sociales) en
+ * URLs absolutas, que es lo único que aceptan los buscadores y las vistas previas.
+ */
 export const metadata: Metadata = {
-  title: 'VTuberDex',
-  description:
-    'VTuberDex: catálogo buscable de VTubers hispanohablantes con carta holográfica 3D, ficha, atributos y habilidades.',
+  metadataBase: new URL(siteUrl()),
+  title: { default: NOMBRE_SITIO, template: `%s · ${NOMBRE_SITIO}` },
+  description: DESCRIPCION_SITIO,
+  applicationName: NOMBRE_SITIO,
+  openGraph: { siteName: NOMBRE_SITIO, locale: 'es_CL', type: 'website' },
+  twitter: { card: 'summary_large_image' },
 };
 
 export const viewport: Viewport = {

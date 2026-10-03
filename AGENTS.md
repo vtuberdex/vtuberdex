@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 363 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 387 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 82 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/82/363** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/82/387** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -235,6 +235,24 @@ cada mes que sigue donando, hasta el 10 y luego la **Black Label**. Escala: `8 �
 - **Un re-seed con `--reset` borra las premium** (cascada desde `vtuber`), igual que el resto de ediciones.
 - `madKoding` (dex 16) es premium **grado 10 en la base LOCAL** (`data/vtuberdex.db`, ignorada por git). En
   producción hay que asignarla desde el mantenedor (pestaña Premium), que escribe en el diario de Turso.
+
+## SEO: qué dice el servidor sin JavaScript
+
+El catálogo y la ficha se pintan en el cliente, así que el SEO vive en el `<head>` y en datos
+estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-datos.mjs` lee la base).
+
+- **`/v/:slug`**: `generateMetadata` (título = `<nombre> · VTuberDex`, igual que el `document.title` del
+  cliente; descripción ≤160, canonical al slug VIGENTE, OG/Twitter con el personaje) + JSON-LD
+  (`ProfilePage`/`Person`/migas). Un slug inexistente o en borrador es un **404 real** (`notFound()`).
+- **`(dex)/layout.tsx` NO puede envolver `children` en `Suspense`**: con él Next manda el status 200 junto al
+  esqueleto y el `notFound()` ya no cambia el código (soft 404; medido: 200 con él, 404 sin él). Cada página
+  que usa `useSearchParams` lleva su propio `Suspense`.
+- **`/`**: canonical siempre `/` (filtros y páginas son querystring: no se indexan como páginas aparte) + JSON-LD
+  `WebSite`/`ItemList` (las primeras 24 fichas; la home es estática, se congela en el build).
+- **`/sitemap.xml`** (dinámico, todas las fichas publicadas) y **`/robots.txt`** (bloquea `/api/` y `/admin`).
+- **Dominio**: `SITE_URL` → `VERCEL_PROJECT_PRODUCTION_URL` → localhost. Defínela en Vercel si hay dominio propio;
+  no hay dominio fijado en el código a propósito (un canonical ajeno saca la página del índice).
+- Al probar con `next start` por puerto, mata el proceso VIEJO por PID: un `EADDRINUSE` deja sirviendo el build anterior.
 
 ## Base de datos y migraciones
 
