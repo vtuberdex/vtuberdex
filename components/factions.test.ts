@@ -19,7 +19,7 @@ test('el shader declara los dos slots de facción (máximo de facciones por VTub
       `debe declarar uFactionMap${i}`,
     ).toBeTruthy();
     expect(
-      cardFragmentShader.includes(`texture2D(uFactionMap${i}, fUv)`),
+      cardFragmentShader.includes(`texture2D(uFactionMap${i}, fUvMuestra)`),
       `debe MUESTREAR uFactionMap${i} (declararlo sin usarlo no dibuja nada)`,
     ).toBeTruthy();
   }
@@ -111,15 +111,25 @@ test('las posiciones del shader salen de la config, no de literales sueltos', ()
   }
 });
 
-test('los emblemas se mezclan como LUZ, no como pigmento', () => {
-  // La mezcla debe ser aditiva sobre el arte. Si sustituyera el color, el
-  // emblema "mancharía" la carta en lugar de leerse como holograma.
-  // La mezcla es aditiva y puede llevar una máscara al final (para
-  // suprimirla sobre el logo): lo que importa es que SUME sobre el arte.
-  expect(/base \+= \(base \* facLayer[^;]*\* sinLogo/.test(cardFragmentShader), 'mezcla aditiva multiplicada').toBeTruthy();
-  expect(/base\s*=\s*facLayer/.test(cardFragmentShader), 'no debe sustituir el arte').toBe(false);
+test('los emblemas se COMPONEN con su propio color sobre el engarce, sin sumar luz', () => {
+  // Antes se SUMABAN como luz (base += ... * 1.8) tras un umbral de brillo ancho: el emblema
+  // quedaba en un trazo binario sobreexpuesto y se perdían los grises del interior. Ahora el
+  // color del PNG sustituye al del engarce donde hay trazo (mix), conservando sus tonos.
+  expect(/base\s*=\s*mix\(base, fac\.rgb \* facTint \* facGain[^;]*\* sinLogo\)/.test(cardFragmentShader), 'composición normal').toBeTruthy();
+  expect(/base \+= \(base \* facLayer/.test(cardFragmentShader), 'ya no suma luz encima del arte').toBe(false);
   // Se usa el alfa del emblema (transparencia real del PNG).
   expect(/fac\.a \* facStroke/.test(cardFragmentShader), 'usa el alfa del emblema').toBeTruthy();
+});
+
+test('el muestreo del emblema no depende de una rama divergente', () => {
+  // Muestrear tras un `continue` por UV fuera de rango dejaba las derivadas (que eligen el mip)
+  // indefinidas en el borde del emblema: ruido. El UV se acota y el exterior se enmascara.
+  const bloque = cardFragmentShader.slice(
+    cardFragmentShader.indexOf('CAPA 3: emblemas de FACCIÓN'),
+    cardFragmentShader.indexOf('CAPA 4: HOLOGRAMA DE CONTRASTE'),
+  );
+  expect(bloque).not.toMatch(/fUv\.x < 0\.0[^\n]*continue/);
+  expect(bloque).toMatch(/clamp\(fUv, vec2\(0\.0\), vec2\(1\.0\)\)/);
 });
 
 test('el emblema se filtra por BRILLO, no solo por alfa', () => {

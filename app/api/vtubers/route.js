@@ -19,6 +19,17 @@ import { formatIssues, listQuerySchema } from '../../../server/src/validation.mj
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Caché de BORDE de la respuesta pública: 30 s frescos y 60 s más sirviendo la copia mientras se
+ * renueva. Cada visita pagaba la ida a Turso (clave del diario + reemplazos de imagen) aunque
+ * nada hubiera cambiado; con esto la mayoría la resuelve el CDN. El precio es que una edición
+ * del mantenedor tarda hasta ~30-90 s en verse en el sitio público. Solo las respuestas 200: un
+ * 400 no se cachea. Sin `max-age`: el navegador siempre pregunta al borde.
+ */
+const CACHE_PUBLICA = 'public, max-age=0, s-maxage=30, stale-while-revalidate=60';
+/** TTL de la clave del diario en lecturas públicas (ver `dbConDiario`). */
+const TTL_DIARIO_MS = 2000;
+
 /** El servidor Express acepta `?countries=a,b` además de `?countries=a&countries=b`. */
 function splitCsv(value) {
   return String(value ?? '')
@@ -28,7 +39,7 @@ function splitCsv(value) {
 }
 
 export async function GET(request) {
-  const db = await dbConDiario();
+  const db = await dbConDiario({ ttlMs: TTL_DIARIO_MS });
   // `Object.fromEntries` reproduce lo que Express deja en `req.query`: arrays
   // cuando el parámetro se repite. El esquema zod espera esa forma.
   const raw = Object.fromEntries(new URL(request.url).searchParams);
@@ -55,5 +66,5 @@ export async function GET(request) {
    * Una sola consulta para toda la página (ver `reemplazosDePagina`).
    */
   const conImagenes = await aplicarReemplazosALista(result.items);
-  return Response.json({ ...result, items: conImagenes, facets });
+  return Response.json({ ...result, items: conImagenes, facets }, { headers: { 'cache-control': CACHE_PUBLICA } });
 }

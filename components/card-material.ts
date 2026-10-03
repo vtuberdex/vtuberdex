@@ -28,7 +28,7 @@
  * carta y ancho adaptado a lo que la máquina tarda. Este hook solo convierte los canvases
  * en texturas de three y los conecta a los uniforms.
  */
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -40,7 +40,6 @@ import { LAYER_UNIFORM_NAMES } from '@/components/card3d-config';
 import { live, tocada } from '@/components/card3d-live';
 import { CARD_TEXTURE_FULL_WIDTH, loadImage } from '@/components/card-texture';
 import { cardFragmentShader, cardVertexShader, glowFragmentShader, glowVertexShader } from '@/components/shaders';
-import { buildCardBodyGeometry } from '@/components/card3d-geometry';
 import { iconosDeFaccion } from '@/components/card-texture/facciones';
 import type { ColorPredominante } from '@/components/card-texture/predominante';
 import { anclar, anchoEfectivo, generarTexturas, type TexturasDeCarta } from '@/components/card-texture/fabrica';
@@ -114,8 +113,6 @@ export interface CardMaterialOptions {
   holo?: number;
   gloss?: number;
   textureWidth?: number;
-  /** Geometría del cuerpo compartida (el libro construye una para las 8 cartas). */
-  bodyGeometry?: THREE.BufferGeometry;
 }
 
 export interface CardUniforms {
@@ -129,8 +126,6 @@ export interface CardMaterials {
   uniforms: CardUniforms;
   frontMaterial: THREE.ShaderMaterial;
   glowMaterial: THREE.ShaderMaterial;
-  bodyGeometry: THREE.BufferGeometry;
-  bodyEnvMap: THREE.Texture | null;
   cardWidth: number;
   cardHeight: number;
   /** Actualización por frame: tiempo, puntero (NDC) e inclinación (rad) que ve el shader. */
@@ -141,6 +136,8 @@ interface CardTextures {
   /** Color predominante de la superficie: tiñe el foil del fondo (ver `DOMINANT`). */
   dominant: ColorPredominante;
   layers: THREE.CanvasTexture[];
+  /** Canvas de origen de cada capa: dos etapas que comparten canvas comparten textura. */
+  canvases: HTMLCanvasElement[];
   edge: THREE.CanvasTexture;
   logoMask: THREE.CanvasTexture;
   logoSticker: THREE.CanvasTexture;
@@ -158,65 +155,49 @@ const texturaDeCanvas = (canvas: HTMLCanvasElement, anisotropy: number) => {
   return tex;
 };
 
-/** Convierte los canvases de la fábrica en texturas de three para ESTE renderer. */
-function aTexturasThree(t: TexturasDeCarta, envMap: HTMLImageElement | null): CardTextures {
+/**
+ * Convierte los canvases de la fábrica en texturas de three para ESTE renderer.
+ *
+ * Con `previa` (la etapa rápida ya publicada) se REUTILIZAN las texturas de los canvases que no
+ * cambiaron: la etapa completa reaprovecha superficie, personaje y título (`reutilizar` en
+ * `drawCardLayers`), que son las tres capas grandes. Antes se creaba una textura nueva para
+ * cada una y se subían otra vez a la GPU (con sus mipmaps) aunque el píxel fuera el mismo; el
+ * entorno metálico propio de la carta suelta tampoco cambia entre etapas.
+ */
+function aTexturasThree(t: TexturasDeCarta, envMap: HTMLImageElement | null, previa: CardTextures | null): CardTextures {
   return {
     dominant: t.dominant,
-    layers: t.layers.map((canvas) => texturaDeCanvas(canvas, 8)),
+    layers: t.layers.map((canvas, i) =>
+      previa && previa.canvases[i] === canvas ? previa.layers[i] : texturaDeCanvas(canvas, 8),
+    ),
+    canvases: t.layers,
     edge: texturaDeCanvas(t.edge, 4),
     logoMask: new THREE.CanvasTexture(t.logoMask),
     logoSticker: new THREE.CanvasTexture(t.logoSticker),
-    envMap: envMap ? texturaDeCanvas(envMap as unknown as HTMLCanvasElement, 8) : null,
+    envMap: previa?.envMap ?? (envMap ? texturaDeCanvas(envMap as unknown as HTMLCanvasElement, 8) : null),
     completa: t.completa,
   };
 }
+
+/** Todas las texturas de un juego, para soltarlas o compararlas. */
+const todasLasTexturas = (c: CardTextures): THREE.Texture[] => [
+  ...c.layers,
+  c.edge,
+  c.logoMask,
+  c.logoSticker,
+  ...(c.envMap ? [c.envMap] : []),
+];
 
 export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions = {}): CardMaterials {
   const {
     holo = CFG.INTENSITY.holo.default,
     gloss = CFG.INTENSITY.gloss.default,
     textureWidth,
-    bodyGeometry: sharedBody,
   } = options;
   const shared = useContext(CardEnvContext);
-  const { gl } = useThree();
   const [textures, setTextures] = useState<CardTextures | null>(null);
+  const texturasActuales = useRef<CardTextures | null>(null);
   const palette = useMemo(() => cardPalette(card.themeColor, card.secondaryColor), [card.themeColor, card.secondaryColor]);
-
-  const ownBody = useMemo(() => (sharedBody ? null : buildCardBodyGeometry()), [sharedBody]);
-  useEffect(() => () => ownBody?.dispose(), [ownBody]);
-  const bodyGeometry = sharedBody ?? (ownBody as THREE.BufferGeometry);
-
-  /**
-   * ENTORNO DEL CANTO por PMREM.
-   *
-   * POR QUE NO BASTA PASAR EL WEBP COMO `envMap`
-   * --------------------------------------------
-   * Medido: con `envMap={textura}` el render salia BYTE-IDENTICO al caso sin entorno
-   * (maxdiff 0 en 1,4 M de bytes). La causa esta en three.js: un MeshStandardMaterial solo
-   * usa el mapa de entorno por la via IBL del shader
-   * (envmap_physical_pars_fragment), y ahi `getIBLRadiance`/`getIBLIrradiance` devuelven
-   * vec3(0.0) salvo que la textura sea CubeUV:
-   *
-   *   #ifdef ENVMAP_TYPE_CUBE_UV  ...  #else  return vec3( 0.0 );  #endif
-   *
-   * Una textura equirect de imagen normal NO tiene ese tipo, asi que no aporta NADA. Hay que
-   * prefiltrarla con PMREMGenerator para obtener el CubeUV (y de paso le da los mips que
-   * necesita el desenfoque por rugosidad). Con el PMREM: maxdiff 204, 12062 px cambiados y el
-   * canto pasa de 129.4 a 169.6 de luminancia — se ve el bisel en vez de una pared negra.
-   *
-   * Con entorno COMPARTIDO (el libro) el PMREM ya viene hecho y aquí no se calcula otro.
-   */
-  const ownEnv = shared ? null : textures?.envMap ?? null;
-  const ownBodyEnvMap = useMemo(() => {
-    if (!ownEnv) return null;
-    const pmrem = new THREE.PMREMGenerator(gl);
-    const prefiltrada = pmrem.fromEquirectangular(ownEnv).texture;
-    pmrem.dispose();
-    return prefiltrada;
-  }, [ownEnv, gl]);
-  useEffect(() => () => ownBodyEnvMap?.dispose(), [ownBodyEnvMap]);
-  const bodyEnvMap = shared ? shared.bodyEnvMap : ownBodyEnvMap;
 
   useEffect(() => {
     let cancelled = false;
@@ -238,7 +219,9 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
      */
     const publicar = (t: TexturasDeCarta, envMap: HTMLImageElement | null) => {
       if (cancelled) return;
-      setTextures(aTexturasThree(t, envMap));
+      const siguiente = aTexturasThree(t, envMap, texturasActuales.current);
+      texturasActuales.current = siguiente;
+      setTextures(siguiente);
     };
     entorno.then((envMap) => {
       if (cancelled) return;
@@ -259,15 +242,22 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
     };
   }, [card, textureWidth, shared]);
 
+  /**
+   * Quién libera qué: al cambiar de juego solo se sueltan las texturas que el siguiente NO
+   * reutiliza (las reutilizadas siguen en uso), y al desmontar se suelta el juego vigente.
+   */
   useEffect(
     () => () => {
-      textures?.layers.forEach((t) => t.dispose());
-      textures?.edge.dispose();
-      textures?.logoMask.dispose();
-      textures?.logoSticker.dispose();
-      textures?.envMap?.dispose();
+      const vigentes = new Set(texturasActuales.current ? todasLasTexturas(texturasActuales.current) : []);
+      if (textures) todasLasTexturas(textures).forEach((tex) => !vigentes.has(tex) && tex.dispose());
     },
     [textures],
+  );
+  useEffect(
+    () => () => {
+      if (texturasActuales.current) todasLasTexturas(texturasActuales.current).forEach((tex) => tex.dispose());
+    },
+    [],
   );
 
   const [factionTextures, setFactionTextures] = useState<THREE.Texture[]>([]);
@@ -284,7 +274,8 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
         .map((img) => {
           const tex = new THREE.Texture(img);
           tex.colorSpace = THREE.SRGBColorSpace;
-          tex.anisotropy = 4;
+          // Anisotropía alta: el emblema es diminuto y se ve inclinado con la carta.
+          tex.anisotropy = 8;
           tex.needsUpdate = true;
           return tex;
         });
@@ -552,12 +543,10 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
       uniforms,
       frontMaterial,
       glowMaterial,
-      bodyGeometry,
-      bodyEnvMap,
       cardWidth: CARD_W,
       cardHeight: CARD_H,
       tick,
     }),
-    [textures, uniforms, frontMaterial, glowMaterial, bodyGeometry, bodyEnvMap, tick],
+    [textures, uniforms, frontMaterial, glowMaterial, tick],
   );
 }

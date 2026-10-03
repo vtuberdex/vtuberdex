@@ -966,37 +966,43 @@ ${FACTION_SIZES}
         vec2 centro = vec2(0.5);
         vec2 ajuste = aspecto >= 1.0 ? vec2(1.0, aspecto) : vec2(1.0 / aspecto, 1.0);
         fUv = (fUv - centro) * ajuste + centro;
-        if (fUv.x < 0.0 || fUv.x > 1.0 || fUv.y < 0.0 || fUv.y > 1.0) continue;
+        // FUERA del cuadrado no se sale con continue: se enmascara. Muestrear dentro de una
+        // rama que depende del UV deja las derivadas (que eligen el mip) indefinidas en el
+        // borde del emblema, y ahí aparecía el ruido. Con el UV acotado, el muestreo corre en
+        // flujo uniforme y el mip es el correcto en todo el engarce.
+        vec2 dentro = step(vec2(0.0), fUv) * step(fUv, vec2(1.0));
+        float adentro = dentro.x * dentro.y;
+        vec2 fUvMuestra = clamp(fUv, vec2(0.0), vec2(1.0));
 
         vec4 fac;
-        if (i == 0) fac = texture2D(uFactionMap0, fUv);
-        else fac = texture2D(uFactionMap1, fUv);
+        if (i == 0) fac = texture2D(uFactionMap0, fUvMuestra);
+        else fac = texture2D(uFactionMap1, fUvMuestra);
 
-        // Los emblemas traen el interior en negro OPACO (~30-45% del PNG), así que
-        // usar solo el alfa los hacía invisibles: su color casi negro se multiplica
-        // a sí mismo. Se usa el BRILLO del trazo como intensidad, de modo que las
-        // líneas del emblema lucen y su relleno oscuro no aporta nada.
+        // El relleno negro OPACO del PNG se descarta con un filtro estrecho (solo el negro
+        // casi puro), y el resto conserva su TONO: antes un umbral ancho sobre el brillo
+        // convertía el emblema en un trazo binario y se perdían los grises del interior.
         float facLum = max(max(fac.r, fac.g), fac.b);
         float facStroke = smoothstep(${f(CFG.FACTION.strokeLow)}, ${f(CFG.FACTION.strokeHigh)}, facLum);
-        float facAlpha = fac.a * facStroke * uFactionStrength;
+        float facAlpha = fac.a * facStroke * adentro * uFactionStrength;
         // Intensidad CONSTANTE en reposo (sin latido): el emblema debe leerse siempre igual.
-        float facMask = facAlpha * (
+        float facGain = ${f(CFG.FACTION.gain)} * (
           ${f(CFG.FACTION.maskBase)} + tiltAmount * ${f(CFG.FACTION.maskTilt)} + glare * ${f(CFG.FACTION.maskGlare)}
         );
-        // Tinte iridiscente propio de cada slot.
+        // Un matiz iridiscente leve; con más, el arcoíris sobre un trazo de pocos píxeles se
+        // lee como ruido de color.
         vec3 facTint = mix(
           vec3(1.0),
           spectralFoil(
-            fUv * ${f(CFG.FACTION.tintUvScale)} + uPointer * ${f(CFG.FACTION.tintPointer)}
+            fUvMuestra * ${f(CFG.FACTION.tintUvScale)} + uPointer * ${f(CFG.FACTION.tintPointer)}
               + float(i) * ${f(CFG.FACTION.tintPhase)},
             uTime
           ),
           ${f(CFG.FACTION.tintSpectrumMix)}
         );
-        vec3 facLayer = fac.rgb * facTint * facMask;
-        // Los emblemas son holograma: se suprimen sobre el logo, igual que la
-        // capa de interferencia, para no teñir la marca.
-        base += (base * facLayer * ${f(CFG.FACTION.selfTint)} + facLayer * ${f(CFG.FACTION.addedLight)}) * sinLogo;
+        // COMPOSICIÓN NORMAL sobre el engarce (no suma de luz): el color del emblema sustituye
+        // al del acero donde hay trazo, así los grises se ven como son. Se suprime sobre el
+        // logo, igual que la capa de interferencia, para no teñir la marca.
+        base = mix(base, fac.rgb * facTint * facGain, clamp(facAlpha, 0.0, 1.0) * sinLogo);
       }
     }
 

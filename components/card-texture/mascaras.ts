@@ -94,6 +94,9 @@ interface Preparada {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   src: ImageData;
+  /** Esquina de la región calculada dentro del lienzo (0,0 si es el lienzo entero). */
+  x: number;
+  y: number;
 }
 
 function prepararTinta(art: CanvasImageSource, width: number, height: number): Preparada | HTMLCanvasElement {
@@ -102,13 +105,24 @@ function prepararTinta(art: CanvasImageSource, width: number, height: number): P
   canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas;
+  /**
+   * Si el origen ya es un canvas del tamaño exacto (lo es: `flat` en `completar`), se leen sus
+   * píxeles DIRECTAMENTE. Antes se copiaba a un canvas intermedio con `drawImage` (otro lienzo
+   * completo por carta y una pasada de pintado) solo para poder llamar a `getImageData`, y el
+   * resultado era idéntico: el canvas intermedio no escalaba nada.
+   */
+  const directo =
+    typeof HTMLCanvasElement !== 'undefined' && art instanceof HTMLCanvasElement && art.width === width && art.height === height
+      ? art.getContext('2d')
+      : null;
+  if (directo) return { canvas, ctx, src: directo.getImageData(0, 0, width, height), x: 0, y: 0 };
   const artCanvas = document.createElement('canvas');
   artCanvas.width = width;
   artCanvas.height = height;
   const artCtx = artCanvas.getContext('2d');
   if (!artCtx) return canvas;
   artCtx.drawImage(art, 0, 0, width, height);
-  return { canvas, ctx, src: artCtx.getImageData(0, 0, width, height) };
+  return { canvas, ctx, src: artCtx.getImageData(0, 0, width, height), x: 0, y: 0 };
 }
 
 function prepararCobertura(logo: CanvasImageSource, box: Caja, width: number, height: number): Preparada | HTMLCanvasElement {
@@ -118,20 +132,38 @@ function prepararCobertura(logo: CanvasImageSource, box: Caja, width: number, he
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas;
   const scale = width / CARD_TEXTURE_WIDTH;
+  /**
+   * Solo se lee y se calcula la REGIÓN del logo, no el lienzo entero.
+   *
+   * POR QUÉ: el logo ocupa ~5% de la carta, pero la máscara se leía (`getImageData`), se
+   * copiaba al worker y se escribía a tamaño completo por carta: tres pasadas sobre 367.000
+   * píxeles (a 512) para marcar unos 18.000. Fuera de la caja la cobertura es 0 por
+   * construcción (no hay logo), así que basta con rellenar de negro opaco —que es lo que
+   * `mascaraCobertura` escribe donde el alfa no supera el umbral— y calcular la caja.
+   * La traslación va ANTES de la escala para que el logo caiga en los mismos subpíxeles que
+   * antes: la máscara resultante es idéntica píxel a píxel.
+   */
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, width, height);
+  const x = Math.max(0, Math.floor(box.x * scale) - 1);
+  const y = Math.max(0, Math.floor(box.y * scale) - 1);
+  const w = Math.max(1, Math.min(width, Math.ceil((box.x + box.w) * scale) + 1) - x);
+  const h = Math.max(1, Math.min(height, Math.ceil((box.y + box.h) * scale) + 1) - y);
   const tmp = document.createElement('canvas');
-  tmp.width = width;
-  tmp.height = height;
-  const tmpCtx = tmp.getContext('2d');
+  tmp.width = w;
+  tmp.height = h;
+  const tmpCtx = tmp.getContext('2d', { willReadFrequently: true });
   if (!tmpCtx) return canvas;
+  tmpCtx.translate(-x, -y);
   tmpCtx.scale(scale, scale);
   tmpCtx.drawImage(logo, box.x, box.y, box.w, box.h);
-  return { canvas, ctx, src: tmpCtx.getImageData(0, 0, width, height) };
+  return { canvas, ctx, src: tmpCtx.getImageData(0, 0, w, h), x, y };
 }
 
 function escribir(p: Preparada, pixeles: Uint8ClampedArray): HTMLCanvasElement {
   const out = p.ctx.createImageData(p.src.width, p.src.height);
   out.data.set(pixeles);
-  p.ctx.putImageData(out, 0, 0);
+  p.ctx.putImageData(out, p.x, p.y);
   return p.canvas;
 }
 

@@ -112,7 +112,9 @@ export function usePointerTilt(ref: React.RefObject<THREE.Group | null>, amounts
 }
 
 /**
- * Las TRES mallas de una carta: resplandor, cuerpo y cara. Sin transformaciones
+ * Las DOS mallas de una carta: resplandor y cara. El cuerpo extruido con canto metálico se
+ * retiró: costaba ~2.000 triángulos, un draw call y un PMREM por escena para un canto que
+ * solo se veía al inclinar, y la cara (un plano) lleva todo el efecto. Sin transformaciones
  * propias: quien las monta decide dónde y cómo se mueven (la carta suelta flota; en el
  * libro va plana en su funda).
  */
@@ -121,28 +123,6 @@ export function CardMeshes({ mats }: { mats: CardMaterials }) {
     <>
       <mesh position={[0, 0, CFG.GEOMETRY.glowZ]} material={mats.glowMaterial}>
         <planeGeometry args={[mats.cardWidth * CFG.GEOMETRY.glowSpread, mats.cardHeight * CFG.GEOMETRY.glowSpread]} />
-      </mesh>
-      <mesh geometry={mats.bodyGeometry}>
-        {/*
-          El canto es METAL (metalness 0.92) y ahora recibe su propio entorno.
-
-          POR QUE: un material metálico casi puro no tiene difusa que reflejar — toda su
-          apariencia es el reflejo del entorno. Sin `envMap`, three.js lo resuelve a negro
-          (medido en el harness: el canto salía a luminancia 12-13 sobre un fondo claro), y
-          el bisel que ya existía en la geometría (`bevelRatio`, 4 segmentos) era INVISIBLE:
-          no se puede ver un chaflán que no recibe luz ni refleja nada. Ése era el motivo de
-          que la carta pareciera un slab de canto recto.
-
-          Se le pasa el MISMO cielo que usa el reflejo de espejo de la cara
-          (`components/metal-env.webp`), que es lo coherente: es el entorno de la escena.
-        */}
-        <meshStandardMaterial
-          color={CFG.BODY.color}
-          roughness={CFG.BODY.roughness}
-          metalness={CFG.BODY.metalness}
-          envMap={mats.bodyEnvMap}
-          envMapIntensity={CFG.BODY.envMapIntensity}
-        />
       </mesh>
       <mesh position={[0, 0, CFG.GEOMETRY.cardDepth / 2 + CFG.GEOMETRY.faceZGap]}>
         <planeGeometry args={[mats.cardWidth, mats.cardHeight]} />

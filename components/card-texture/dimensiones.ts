@@ -29,8 +29,12 @@ export const HEADER = { pad: 46, top: 44, height: 116 } as const;
  * `size` es el lado del engarce oscuro que pinta la textura y `margin` lo que se resta a cada lado
  * para el emblema que dibuja el shader. `gap` separa los dos engarces y `inset` los separa del
  * borde derecho de la placa. Son medidas en píxeles del lienzo de 1008 de ancho.
+ *
+ * `size` pasó de 88 a 100 (y `margin` de 7 a 6): el emblema útil de 74 px a 88 px, un 19 % más
+ * grande. A 74 px de 1008 un emblema con detalle mide ~15 px en la grilla y ~25 en la ficha, y
+ * era justo lo que no dejaba verlo. La placa mide 116, así que sobran 8 px por lado.
  */
-export const FACTION_SOCKET = { size: 88, margin: 7, gap: 10, inset: 14 } as const;
+export const FACTION_SOCKET = { size: 100, margin: 6, gap: 10, inset: 12 } as const;
 
 /** Máximo de emblemas en la carta: la regla de negocio es «máximo dos facciones por VTuber». */
 export const MAX_FACTION_EMBLEMS = 2;

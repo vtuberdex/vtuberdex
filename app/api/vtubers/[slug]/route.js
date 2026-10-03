@@ -24,9 +24,13 @@ import { getNeighbors, getVtuberBySlug } from '../../../../server/src/search.mjs
 
 export const dynamic = 'force-dynamic';
 
+/** Caché de borde de la ficha pública; el porqué está en `app/api/vtubers/route.js`. */
+const CACHE_PUBLICA = 'public, max-age=0, s-maxage=30, stale-while-revalidate=60';
+const TTL_DIARIO_MS = 2000;
+
 export async function GET(_request, { params }) {
   const { slug } = await params;
-  const db = await dbConDiario();
+  const db = await dbConDiario({ ttlMs: TTL_DIARIO_MS });
   const card = getVtuberBySlug(db, slug);
   if (!card) return Response.json({ error: 'no_encontrado' }, { status: 404 });
 
@@ -41,5 +45,8 @@ export async function GET(_request, { params }) {
    */
   const reemplazos = await reemplazosDelMantenedor(card.slug, KINDS_GESTIONABLES);
   const conImagenes = aplicarImagenesDelMantenedor(card, reemplazos);
-  return Response.json({ ...conImagenes, neighbors: getNeighbors(db, card.dexNumber) });
+  return Response.json(
+    { ...conImagenes, neighbors: getNeighbors(db, card.dexNumber) },
+    { headers: { 'cache-control': CACHE_PUBLICA } },
+  );
 }
