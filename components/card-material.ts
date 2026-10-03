@@ -274,7 +274,8 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
         .map((img) => {
           const tex = new THREE.Texture(img);
           tex.colorSpace = THREE.SRGBColorSpace;
-          tex.anisotropy = 4;
+          // Anisotropía alta: el emblema es diminuto y se ve inclinado con la carta.
+          tex.anisotropy = 8;
           tex.needsUpdate = true;
           return tex;
         });

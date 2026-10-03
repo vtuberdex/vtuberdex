@@ -891,31 +891,32 @@ export const FACTION = {
    * holograma.
    */
   /**
-   * Filtro del trazo por luminancia (el relleno oscuro del PNG no aporta nada). Umbrales
-   * más bajos que antes (0.10/0.55): el trazo gris de varios emblemas quedaba a medias y el
-   * emblema se veía tenue; ahora cualquier trazo por encima del gris medio cuenta entero.
+   * Filtro del NEGRO OPACO por luminancia. Era 0.06/0.35 y convertía el emblema en un trazo
+   * casi binario: todo gris por debajo de ~0.35 se atenuaba y el interior (grises, relieves,
+   * líneas finas) desaparecía; lo que quedaba, a ~15 px de ancho, se leía como ruido. Ahora
+   * solo se descarta el negro casi puro (el relleno del PNG, que sobre el engarce oscuro es
+   * invisible igualmente) y los demás tonos se componen tal cual.
    */
-  strokeLow: 0.06,
-  strokeHigh: 0.35,
+  strokeLow: 0.01,
+  strokeHigh: 0.08,
+  /**
+   * Ganancia del color del emblema al componerlo sobre el engarce. Compensa que el PNG se
+   * decodifica a lineal (un gris medio queda en ~0.2) y sobre acero oscuro se vería apagado.
+   */
+  gain: 1.45,
   /** Máscara: piso (constante, lo que se ve en reposo), cuánto sube con la inclinación y con el glare. */
   maskBase: 1.0,
   maskTilt: 0.35,
   maskGlare: 0.25,
   /**
-   * Tinte iridiscente propio de cada slot. Bajó de 0.7 a 0.35: con el arcoíris al 70 % el
-   * trazo cambiaba de color al mover la carta y se leía peor; ahora domina el trazo blanco
-   * del emblema y el arcoíris es un matiz.
+   * Tinte iridiscente propio de cada slot. Bajó de 0.7 a 0.35 y ahora a 0.1: sobre un trazo de
+   * pocos píxeles el arcoíris se leía como ruido de color y tapaba el detalle; el emblema
+   * conserva su propio color y el arcoíris es solo un matiz.
    */
-  tintSpectrumMix: 0.35,
+  tintSpectrumMix: 0.1,
   tintUvScale: 0.9,
   tintPointer: 0.1,
   tintPhase: 0.2,
-  /**
-   * Mezcla sobre el arte: tinte del propio color y luz añadida. La luz subió de 1.2 a 1.8
-   * para que el emblema se «note más» sobre el acero oscuro del engarce.
-   */
-  selfTint: 0.45,
-  addedLight: 1.8,
 } as const;
 
 /**

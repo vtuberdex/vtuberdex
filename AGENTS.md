@@ -193,7 +193,12 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   al mover el puntero; lo encaja «contain» con la proporción real del PNG (`uFactionAspect`,
   que `card-material.ts` saca de la imagen) en vez de estirarlo; y no late: la intensidad es
   constante (`FACTION.maskBase`) con un leve realce por inclinación y glare. `factions.test.ts`
-  fija las tres cosas sobre el GLSL generado.
+  fija las tres cosas sobre el GLSL generado. **El emblema se COMPONE (mix) con su color sobre el
+  engarce, no se suma como luz**: la suma con umbral de brillo ancho lo dejaba en un trazo binario
+  sobreexpuesto con ruido iridiscente y sin los grises del interior; hoy solo se descarta el negro
+  casi puro (`strokeLow/High`), el tinte del arcoíris es leve (`tintSpectrumMix`) y el UV se acota
+  (sin `continue` antes de muestrear: derivadas indefinidas = ruido en el borde). El engarce mide
+  100 px del lienzo (`FACTION_SOCKET`) para que el detalle se alcance a ver.
 
 ## Base de datos y migraciones
 
