@@ -206,7 +206,7 @@ export function PremiumSlab({ card, premium, cardWidth, cardHeight, outerPad, gl
   useEffect(() => () => insertTexture.dispose(), [insertTexture]);
 
   return (
-    <group data-premium={premium.grade}>
+    <group userData={{ premium: premium.grade }}>
       {/* Humo brillante: detrás de todo. Mismo material y misma proporción que el de una carta normal. */}
       {glowMaterial && (
         <mesh position={[0, 0, GEOMETRY.glowZ]} material={glowMaterial}>
