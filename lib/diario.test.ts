@@ -209,3 +209,48 @@ describe('el diario se reproduce en una instancia fría', () => {
     expect(detalle?.factionIcons?.[0]?.icon).toBe(`/${ruta}`);
   });
 });
+
+describe('cartas premium en producción', () => {
+  const premiumDe = async (slug: string) =>
+    buscar.getVtuberBySlug(await diario.dbConDiario(), slug, { includeHidden: true })?.premium ?? null;
+
+  test('el premium se guarda en el diario CON sus fechas y otra instancia lo reproduce idéntico', async () => {
+    const id = await idDe('gkuro');
+    await diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { premium: { grade: '10' } } });
+    const guardado = JSON.parse((turso.prepare('SELECT payload FROM cambio ORDER BY seq DESC LIMIT 1').get() as { payload: string }).payload);
+    // El DÍA viaja en la operación: reproducirla otro día no puede mover la antigüedad.
+    expect(guardado.patch.premium.grade).toBe('10');
+    expect(guardado.patch.premium.ahora).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(guardado.patch.premium.since).toBeUndefined();
+
+    const enEstaInstancia = await premiumDe('gkuro');
+    await instanciaFria();
+    const enOtra = await premiumDe('gkuro');
+    expect(enOtra).toEqual(enEstaInstancia);
+    expect(enOtra).toMatchObject({ grade: '10', cert: `VTD-${String(id).padStart(6, '0')}` });
+    expect(await premiumDe('drawchii')).toBeNull();
+  });
+
+  test('subir de grado, y quitarlo, también sobreviven al arranque en frío', async () => {
+    const id = await idDe('drawchii');
+    await diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { premium: { grade: '8', since: '2026-01-10' } } });
+    await diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { premium: { grade: '8.5', gradedAt: '2026-02-10' } } });
+    await instanciaFria();
+    expect(await premiumDe('drawchii')).toMatchObject({ grade: '8.5', since: '2026-01-10', gradedAt: '2026-02-10' });
+    const filtrada = buscar.searchVtubers(await diario.dbConDiario(), { premium: true });
+    expect(filtrada.items.map((item) => item?.slug)).toEqual(['drawchii']);
+
+    await diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { premium: null } });
+    await instanciaFria();
+    expect(await premiumDe('drawchii')).toBeNull();
+  });
+
+  test('un grado inválido NO se escribe en el diario', async () => {
+    const id = await idDe('gkuro');
+    const antes = (turso.prepare('SELECT COUNT(*) AS n FROM cambio').get() as { n: number }).n;
+    await expect(
+      diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { premium: { grade: '7' } } }),
+    ).rejects.toMatchObject({ code: 'grado_invalido' });
+    expect((turso.prepare('SELECT COUNT(*) AS n FROM cambio').get() as { n: number }).n).toBe(antes);
+  });
+});

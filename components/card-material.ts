@@ -42,6 +42,7 @@ import { CARD_TEXTURE_FULL_WIDTH, loadImage } from '@/components/card-texture';
 import { cardFragmentShader, cardVertexShader, glowFragmentShader, glowVertexShader } from '@/components/shaders';
 import { iconosDeFaccion } from '@/components/card-texture/facciones';
 import type { ColorPredominante } from '@/components/card-texture/predominante';
+import { refuerzoDeGrado } from '@/components/premium-boost';
 import { anclar, anchoEfectivo, generarTexturas, type TexturasDeCarta } from '@/components/card-texture/fabrica';
 
 /** Proporción real de una carta coleccionable (5x7 pulgadas -> 1.4). */
@@ -195,6 +196,8 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
     textureWidth,
   } = options;
   const shared = useContext(CardEnvContext);
+  /** Una carta gradeada refuerza su holografía (`PREMIUM.boost`); una normal queda en 1 en todo. */
+  const boost = useMemo(() => refuerzoDeGrado(card.premium?.grade), [card.premium?.grade]);
   const [textures, setTextures] = useState<CardTextures | null>(null);
   const texturasActuales = useRef<CardTextures | null>(null);
   const palette = useMemo(() => cardPalette(card.themeColor, card.secondaryColor), [card.themeColor, card.secondaryColor]);
@@ -425,8 +428,8 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
   }, [factionTextures, uniforms]);
 
   useEffect(() => {
-    uniforms.front.uHolo.value = holo;
-  }, [holo, uniforms]);
+    uniforms.front.uHolo.value = holo * boost.holo;
+  }, [holo, boost, uniforms]);
 
   useEffect(() => {
     uniforms.front.uGloss.value = gloss;
@@ -468,8 +471,8 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
   const tick = useMemo(
     () => (t: number, pointer: { x: number; y: number }, tilt: { x: number; y: number }) => {
       uniforms.front.uTime.value = t;
-      uniforms.front.uLayerWeight.value = live.layerWeight;
-      uniforms.front.uGlareStrength.value = live.glareStrength;
+      uniforms.front.uLayerWeight.value = live.layerWeight * boost.layerWeight;
+      uniforms.front.uGlareStrength.value = live.glareStrength * boost.glare;
       uniforms.front.uSheenStrength.value = live.sheenStrength;
       uniforms.front.uTiltFactor.value = live.tiltFactor;
       uniforms.front.uBaseMask.value = live.baseMask;
@@ -481,8 +484,8 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
       uniforms.front.uGlossSelf.value = live.glossSelf;
       uniforms.front.uHoloSelf.value = live.holoSelf;
       uniforms.front.uHighlightWeight.value = live.highlightWeight;
-      uniforms.front.uBgHolo.value = live.bgHolo;
-      uniforms.front.uBgLayerWeight.value = live.bgLayerWeight;
+      uniforms.front.uBgHolo.value = live.bgHolo * boost.bgHolo;
+      uniforms.front.uBgLayerWeight.value = live.bgLayerWeight * boost.bgLayerWeight;
       uniforms.front.uBgBaseMask.value = live.bgBaseMask;
       uniforms.front.uBgTiltFactor.value = live.bgTiltFactor;
       uniforms.front.uBgArtFloor.value = live.bgArtFloor;
@@ -492,11 +495,11 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
       uniforms.front.uBgFoilViewAngle.value = live.bgFoilViewAngle;
       uniforms.front.uBgFoilDesaturation.value = live.bgFoilDesaturation;
       uniforms.front.uBgDominantMix.value = live.bgDominantMix;
-      if (tocada('holo')) uniforms.front.uHolo.value = live.holo;
+      if (tocada('holo')) uniforms.front.uHolo.value = live.holo * boost.holo;
       if (tocada('gloss')) uniforms.front.uGloss.value = live.gloss;
-      uniforms.front.uEdgeStrength.value = live.edge;
-      uniforms.front.uFactionStrength.value = live.faction;
-      uniforms.glow.uGlowStrength.value = live.glow;
+      uniforms.front.uEdgeStrength.value = live.edge * boost.edge;
+      uniforms.front.uFactionStrength.value = live.faction * boost.faction;
+      uniforms.glow.uGlowStrength.value = live.glow * boost.glow;
       uniforms.glow.uTime.value = t;
       (uniforms.front.uPointer.value as THREE.Vector2).set(pointer.x, pointer.y);
       /**
@@ -534,7 +537,7 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
       (uniforms.front.uParallaxFactors.value as Float32Array)[2] = live.logoParallax;
       (uniforms.front.uTilt.value as THREE.Vector2).set(tilt.x, tilt.y);
     },
-    [uniforms],
+    [uniforms, boost],
   );
 
   return useMemo(

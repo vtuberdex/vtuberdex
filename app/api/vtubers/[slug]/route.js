@@ -18,6 +18,7 @@
  * cuerpo y el cliente redirige: ningún enlace compartido se rompe al renombrar una página.
  */
 import { dbConDiario } from '../../../../lib/diario.mjs';
+import { conExperiencia, contarLikes } from '../../../../lib/likes.mjs';
 import { aplicarImagenesDelMantenedor, reemplazosDelMantenedor } from '../../../../lib/ediciones.mjs';
 import { KINDS_GESTIONABLES } from '../../../../lib/carpetas.mjs';
 import { getNeighbors, getVtuberBySlug } from '../../../../server/src/search.mjs';
@@ -45,8 +46,19 @@ export async function GET(_request, { params }) {
    */
   const reemplazos = await reemplazosDelMantenedor(card.slug, KINDS_GESTIONABLES);
   const conImagenes = aplicarImagenesDelMantenedor(card, reemplazos);
+  /**
+   * Likes y experiencia. La experiencia es función de los likes (`experienciaConLikes`), así que
+   * se calcula aquí al leer. Si el almacén de likes falla NO se tumba la ficha: sale sin likes,
+   * que es lo que había antes de que existieran.
+   */
+  let conLikes = { ...conImagenes, likes: 0 };
+  try {
+    conLikes = conExperiencia(conImagenes, await contarLikes(card.id));
+  } catch (error) {
+    console.error(`[likes] la ficha ${slug} sale sin likes: ${error.message}`);
+  }
   return Response.json(
-    { ...conImagenes, neighbors: getNeighbors(db, card.dexNumber) },
+    { ...conLikes, neighbors: getNeighbors(db, card.dexNumber) },
     { headers: { 'cache-control': CACHE_PUBLICA } },
   );
 }

@@ -344,9 +344,17 @@ async function listarVtubers(request) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'query_invalida', issues: formatIssues(parsed.error) }, { status: 400 });
   }
-  const { q, status, page, perPage } = parsed.data;
+  const { q, status, premium, page, perPage } = parsed.data;
   const db = await dbConDiario();
-  const resultado = searchVtubers(db, { q, page, perPage, includeHidden: true, status: status === 'all' ? null : status, sort: 'dex' });
+  const resultado = searchVtubers(db, {
+    q,
+    page,
+    perPage,
+    includeHidden: true,
+    status: status === 'all' ? null : status,
+    premium: Boolean(premium),
+    sort: 'dex',
+  });
   return NextResponse.json({ ...resultado, items: await aplicarReemplazosALista(resultado.items) });
 }
 

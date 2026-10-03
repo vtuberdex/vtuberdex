@@ -302,7 +302,7 @@ function BinderCard({ placement, frame, textureWidth, onOpen }: BinderCardProps)
       onPointerOver={onPointerOver}
       onPointerOut={onPointerOut}
     >
-      <CardMeshes mats={mats} />
+      <CardMeshes mats={mats} card={placement.card} />
     </group>
   );
 }

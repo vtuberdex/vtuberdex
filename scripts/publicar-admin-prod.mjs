@@ -38,7 +38,7 @@ const opcion = (nombre, porDefecto) => {
 };
 
 const NOMBRE = opcion('env-name', 'VTUBERDEX_ADMIN_PASSWORD_HASH');
-const URL = opcion('url', 'https://vtuberdex-sepia.vercel.app').replace(/\/$/, '');
+const URL = opcion('url', 'https://vtuberdex.com').replace(/\/$/, '');
 const USUARIO = opcion('user', process.env.VTUBERDEX_ADMIN_USER || 'admin');
 const SIN_REDEPLOY = tiene('sin-redeploy');
 const SIN_VERIFICAR = tiene('sin-verificar');

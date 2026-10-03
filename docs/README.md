@@ -136,22 +136,22 @@ Si la IP del host cambia, el script la detecta solo (contenedor en `--network ho
 | Método | Ruta | Descripción |
 | --- | --- | --- |
 | GET | `/api/health` | Estado y conteos publicados |
-| GET | `/api/vtubers` | Búsqueda paginada (`q`, `countries`, `languages`, `groups`, `artists`, `factions`, `sort`, `page`, `perPage`, `facet`) |
+| GET | `/api/vtubers` | Búsqueda paginada (`q`, `countries`, `languages`, `groups`, `artists`, `factions`, `sort`, `premium=1`, `page`, `perPage`, `facet`) |
 | GET | `/api/vtubers/:slug` | Detalle + vecinos de dex |
 | POST | `/api/admin/login` | Sesión del mantenedor |
-| PATCH | `/api/admin/vtubers/:id` | Edición (nombre, color, visibilidad, relaciones) |
+| PATCH | `/api/admin/vtubers/:id` | Edición (nombre, color, visibilidad, relaciones, `premium: { grade } \| null`) |
 | POST | `/api/admin/vtubers/bulk-status` | Visibilidad en lote |
 | GET | `/api/admin/stats`, `/api/admin/audit` | Métricas y auditoría |
 
 ## Tests y lint
 
 ```bash
-npm test                   # 260 tests (vitest): utilidades, componentes, páginas, carta 3D y libro
+npm test                   # 307 tests (vitest): utilidades, componentes, páginas, carta 3D y libro
 npm run lint               # eslint . — cubre también server/ y scraper/
 npm run typecheck          # tsc --noEmit
 npm run check:shaders      # guard de uniforms de GLSL (ni tsc ni los tests lo ven)
 cd scraper && npm test     # 25 tests: parsers y normalización
-cd server  && npm test     # 59 tests: búsqueda, facetas, API HTTP y mantenedor
+cd server  && npm test     # 82 tests: búsqueda, facetas, API HTTP y mantenedor
 ```
 
 Para medir en vez de suponer (ninguno modifica nada):

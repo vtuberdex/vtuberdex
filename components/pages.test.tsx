@@ -9,7 +9,7 @@
  * fallarían por un motivo que no es el del componente. El doble guarda el
  * querystring y notifica a los suscriptores, como haría el router real.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -73,12 +73,17 @@ vi.mock('@/lib/api', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api')>();
   return {
     ...original,
-    api: { list: vi.fn(), detail: vi.fn() },
+    api: { list: vi.fn(), detail: vi.fn(), likeEstado: vi.fn(), darLike: vi.fn() },
   };
 });
 
 const mockedApi = vi.mocked(api);
 const navigation = (await import('next/navigation')) as unknown as { __setQuery: (next: string) => void };
+
+// La ficha pide el estado de los likes al montar: por defecto, un visitante que aún no votó.
+beforeEach(() => {
+  mockedApi.likeEstado.mockResolvedValue({ likes: 0, liked: false, level: 1, experience: { current: 0, max: 100 }, xpPorLike: 10 });
+});
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -227,6 +232,34 @@ describe('CatalogPage', () => {
     const nuevas = mockedApi.list.mock.calls.slice(llamadasAntes).map((call) => call[0]?.page);
     expect(nuevas).not.toContain(2);
   });
+
+  it('el botón Premium filtra las cartas gradeadas y lo deja en la URL', async () => {
+    const user = userEvent.setup();
+    mockedApi.list.mockResolvedValue(makeList());
+    renderCatalog();
+    await waitFor(() => expect(mockedApi.list).toHaveBeenCalled());
+    const boton = screen.getByRole('button', { name: /Premium/ });
+    expect(boton).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByTestId('premium-intro')).not.toBeInTheDocument();
+
+    await user.click(boton);
+    await waitFor(() => expect(mockedApi.list.mock.calls.at(-1)?.[0]?.premium).toBe(true));
+    expect(screen.getByRole('button', { name: /Premium/, pressed: true })).toBeInTheDocument();
+    expect(screen.getByTestId('premium-intro')).toBeInTheDocument();
+
+    // Quitar el chip del filtro lo apaga. La página sin filtro ya estaba en la caché de páginas,
+    // así que no hace falta pedirla otra vez: se comprueba el estado de la interfaz.
+    await user.click(screen.getByText('★ Premium ✕'));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Premium/ })).toHaveAttribute('aria-pressed', 'false'));
+    expect(screen.queryByTestId('premium-intro')).not.toBeInTheDocument();
+  });
+
+  it('parte de la sección premium si la URL trae ?premium=1', async () => {
+    mockedApi.list.mockResolvedValue(makeList());
+    renderCatalog('/?premium=1');
+    await waitFor(() => expect(mockedApi.list.mock.calls.at(-1)?.[0]?.premium).toBe(true));
+    expect(screen.getByRole('button', { name: /Premium/, pressed: true })).toBeInTheDocument();
+  });
 });
 
 describe('DetailPage', () => {
@@ -340,6 +373,49 @@ describe('DetailPage', () => {
     expect(screen.getByTestId('detail-loading')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('VTuber no encontrado')).toBeInTheDocument());
     expect(screen.getByText('Ese slug no existe en el catálogo.')).toBeInTheDocument();
+  });
+
+  it('una carta premium muestra su distintivo, certificado y antigüedad', async () => {
+    mockedApi.detail.mockResolvedValue({
+      ...makeDetail({ premium: { grade: '10', since: '2026-05-01', gradedAt: '2026-09-01', cert: 'VTD-000018' } }),
+      neighbors: { prev: null, next: null },
+    });
+    render(<DetailPage slug="gkuro-monochrome" />);
+    await waitFor(() => expect(screen.getByTestId('premium-info')).toBeInTheDocument());
+    // Sin WebGL (jsdom) la carta cae al respaldo 2D, que también lleva su distintivo: dos en pantalla.
+    const info = screen.getByTestId('premium-info');
+    expect(within(info).getByTestId('premium-badge')).toHaveAttribute('data-grade', '10');
+    expect(within(info).getByTestId('premium-badge')).toHaveTextContent('GEM MINT 10');
+    expect(screen.getAllByTestId('premium-badge')).toHaveLength(2);
+    expect(screen.getByTestId('premium-info')).toHaveTextContent('VTD-000018');
+    expect(screen.getByTestId('premium-info')).toHaveTextContent('Premium desde 2026-05-01');
+  });
+
+  it('la ficha trae el like y el botón de PayPal, y los likes mueven nivel y experiencia', async () => {
+    mockedApi.detail.mockResolvedValue({
+      ...makeDetail({ likes: 3, level: 1, experience: { current: 30, max: 100 } }),
+      neighbors: { prev: null, next: null },
+    });
+    mockedApi.likeEstado.mockResolvedValue({ likes: 3, liked: false, level: 1, experience: { current: 30, max: 100 }, xpPorLike: 10 });
+    mockedApi.darLike.mockResolvedValue({ likes: 10, liked: true, level: 2, experience: { current: 0, max: 150 }, xpPorLike: 10 });
+    const user = userEvent.setup();
+    render(<DetailPage slug="gkuro-monochrome" />);
+    await waitFor(() => expect(screen.getByTestId('like-count')).toHaveTextContent('3'));
+    expect(screen.getByRole('link', { name: /Donar con PayPal/ })).toBeInTheDocument();
+    expect(screen.getByText('NIVEL 1')).toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByTestId('like-button')).toBeEnabled());
+    await user.click(screen.getByTestId('like-button'));
+    // El like sube el nivel de la ficha sin recargarla.
+    await waitFor(() => expect(screen.getByText('NIVEL 2')).toBeInTheDocument());
+    expect(screen.getByTestId('like-count')).toHaveTextContent('10');
+  });
+
+  it('una carta normal no muestra nada de premium', async () => {
+    mockedApi.detail.mockResolvedValue({ ...makeDetail(), neighbors: { prev: null, next: null } });
+    render(<DetailPage slug="gkuro-monochrome" />);
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument());
+    expect(screen.queryByTestId('premium-info')).not.toBeInTheDocument();
   });
 
   it('actualiza el título del documento', async () => {

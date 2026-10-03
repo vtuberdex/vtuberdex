@@ -7,6 +7,10 @@
  * una herramienta interna (sigue en `/admin`, que en producción responde 404 vía
  * `app/api/admin/[...path]`) y la etiqueta era ruido de marketing en una cabecera
  * que ya se explica sola. Sin ese enlace, `usePathname` deja de tener uso.
+ *
+ * Lo único que se añade es el acceso a la sección PREMIUM (`/?premium=1`): las cartas gradeadas
+ * en placa de acrílico. Es el catálogo con un filtro, no una página aparte, así que comparte
+ * libro, buscador y enlaces compartibles.
  */
 import Link from 'next/link';
 
@@ -20,6 +24,14 @@ export function AppHeader() {
           </span>
           <span className="text-sm font-extrabold uppercase tracking-[0.28em] text-dex-ink">VTuberDex</span>
         </Link>
+        <nav aria-label="Secciones" className="ml-auto">
+          <Link
+            href="/?premium=1"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-amber-200 hover:bg-amber-300/10"
+          >
+            <span aria-hidden>★</span> Premium
+          </Link>
+        </nav>
       </div>
     </header>
   );

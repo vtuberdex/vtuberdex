@@ -1385,3 +1385,129 @@ export const TEXTURAS = {
   esperaOciosaMaxMs: 1500,
 } as const;
 
+
+/**
+ * CARTAS PREMIUM: la placa de acrílico (slab) que encierra una carta gradeada, como las de CGC.
+ *
+ * QUÉ SE VE
+ * ---------
+ * Detrás, una HOJA INTERIOR (el «insert») con la ventana donde va la carta y, arriba, la
+ * ETIQUETA con el nombre, el certificado y la nota. Encima de todo, el CUERPO de acrílico:
+ * transparente, con borde biselado que brilla al inclinarlo y una banda de reflejo que lo
+ * cruza. La carta holográfica va DENTRO, a menor escala, y conserva su propio efecto.
+ *
+ * POR QUÉ SOLO UN SHADER PROPIO Y SIN `transmission`
+ * --------------------------------------------------
+ * `MeshPhysicalMaterial` con `transmission` obliga a renderizar la escena entera otra vez en
+ * un framebuffer aparte, y en el libro hay 8 cartas en un solo canvas: ese coste lo pagaría
+ * todo el catálogo por una carta premium. El acrílico es un plano casi transparente cuya
+ * gracia está en el BORDE (fresnel + bisel) y en un reflejo que se mueve con la inclinación:
+ * eso se calcula en un fragment shader mínimo, sin samplers y sin segundo pase.
+ *
+ * LAS MEDIDAS son fracciones del ANCHO de la placa (no unidades de mundo): así la placa
+ * escala igual en el libro (donde cabe en la funda) y en el detalle. El alto de la placa NO se
+ * elige: es el de la funda (carta + 2 x `pocketPad`), y de ahí sale el ancho (`premium-layout`).
+ */
+export const PREMIUM = {
+  layout: {
+    /** Margen entre el borde de la placa y la ventana/etiqueta, como fracción del ancho. */
+    margin: 0.07,
+    /** Alto de la etiqueta de arriba. */
+    labelHeight: 0.23,
+    /** Aire entre la etiqueta y la ventana de la carta. */
+    labelGap: 0.045,
+    /** Radio de las esquinas de la placa, en unidades de mundo. */
+    cornerRadius: 0.11,
+    /** Radio de las esquinas de la ventana, en unidades de mundo (antes de escalar la carta). */
+    windowRadius: 0.07,
+  },
+  body: {
+    /** Cuánto sobresale el acrílico POR DELANTE del plano z = 0 de la placa. */
+    front: 0.13,
+    /** Cuánto queda por DETRÁS (el insert vive entre los dos). */
+    back: 0.07,
+    /** Bisel del canto: es lo que atrapa el reflejo al inclinar. */
+    bevel: 0.03,
+    /** Segmentos de las esquinas y del bisel: bajos a propósito, hay pocas placas a la vez. */
+    curveSegments: 8,
+    bevelSegments: 3,
+  },
+  /**
+   * HOLOGRAFÍA REFORZADA de una carta gradeada. Cada valor MULTIPLICA la perilla normal (la de
+   * `HOLOGRAM`, `BACKGROUND`, `GLOW`…), así que una carta premium es la misma carta con más
+   * lámina, no otro efecto. El factor sube con el grado: `base + porPaso x rango` (8 = rango 0,
+   * 10 = rango 4) y la Black Label suma `extraBlackLabel`.
+   *
+   * Cada perilla tiene su propio techo de seguridad: el velo (la carta que sale lavada) lo ponen
+   * el barniz y la tinta, no el arcoíris, así que NO se sube `gloss` y el arcoíris sí puede crecer
+   * (ver la cabecera de este archivo).
+   *   · layerWeight   color espectral que se SUMA al arte (la saturación de la lámina)
+   *   · bgHolo / bgLayerWeight   lámina propia del FONDO: el humo de color tras el personaje
+   *   · glare         el destello que sigue al puntero
+   *   · edge          tinta/piel
+   *   · faction       holograma de los emblemas
+   *   · glow          el humo brillante que rodea la placa
+   *   · holo          intensidad global de la lámina (uHolo)
+   */
+  boost: {
+    base: 1.45,
+    porPaso: 0.22,
+    extraBlackLabel: 0.35,
+    /** Techo del multiplicador total por perilla (evita quemar el arte con grados altos). */
+    techo: { layerWeight: 2.6, bgHolo: 2.0, bgLayerWeight: 2.4, glare: 2.4, edge: 1.8, faction: 2.2, glow: 2.2, holo: 2.4 },
+  },
+  /** Z de la hoja interior y de la carta, dentro del espacio de la placa. */
+  insertZ: -0.02,
+  cardZ: 0,
+  /**
+   * El ACRÍLICO. Todas son perillas del fragment shader (uniformes), no literales de GLSL.
+   *   · base / maxAlpha    opacidad de la cara plana y tope del resultado
+   *   · fresnel*           brillo del borde según el ángulo de visión (lo que lo hace «vidrio»)
+   *   · edge*              línea brillante del contorno, donde acaba el cuerpo
+   *   · curvature          cuánto se «curva» la cara falsa para que el reflejo VARÍE en el plano
+   *   · shine*             lóbulo especular de la luz fija de la escena
+   *   · band*              banda diagonal de reflejo que barre la placa al inclinarla
+   */
+  acrylic: {
+    base: 0.035,
+    maxAlpha: 0.8,
+    fresnel: 0.5,
+    fresnelPower: 2.6,
+    edge: 0.5,
+    edgeWidth: 0.07,
+    curvature: 0.32,
+    shine: 70,
+    shineStrength: 0.4,
+    bandCenter: 0.16,
+    bandWidth: 0.075,
+    bandStrength: 0.2,
+    tint: '#bcd4ff',
+    light: [-0.45, 0.6, 0.66] as const,
+  },
+  /** La hoja interior (el «insert») que rodea la ventana. */
+  insert: {
+    /** Ancho del lienzo de la hoja, en px. El alto sale de la proporción de la placa. */
+    pxWidth: 640,
+    frame: '#e6e9ef',
+    frameShade: '#c9ced9',
+    windowLine: '#8d95a6',
+  },
+  /**
+   * La ETIQUETA. Cada grado tiene su banda: azul para el 8, acero para el 9, dorada para el 10;
+   * la Black Label (BL) es negra con letra plateada. Dos colores = degradado de la banda.
+   */
+  label: {
+    paper: '#f7f8fb',
+    ink: '#14171f',
+    mutedInk: '#5b6372',
+    black: { paper: '#0b0c10', ink: '#f2f4f8', mutedInk: '#9aa1b0', line: '#c9a24a' },
+    bands: {
+      '8': ['#2f62a8', '#1f4780'],
+      '8.5': ['#2f62a8', '#1f4780'],
+      '9': ['#5d6677', '#3e4654'],
+      '9.5': ['#5d6677', '#3e4654'],
+      '10': ['#d8b44d', '#a8802a'],
+      BL: ['#17181d', '#050507'],
+    } as Record<string, readonly [string, string]>,
+  },
+} as const;

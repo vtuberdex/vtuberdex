@@ -1,0 +1,169 @@
+{
+  "phrase": "Developer, VTuber y VRPlayer. Fan de la IA y gamer tranquilo.",
+  "birthday": "31 de Octubre",
+  "height": "1.70 m",
+  "languages": [
+    "es",
+    "en"
+  ],
+  "factions": [
+    "glitchborn",
+    "machina-revenant"
+  ],
+  "profile": [
+    {
+      "label": "País",
+      "value": "Chile"
+    },
+    {
+      "label": "Cumpleaños",
+      "value": "31 de Octubre"
+    },
+    {
+      "label": "Altura",
+      "value": "1.70 m"
+    },
+    {
+      "label": "Signo Zodiacal",
+      "value": "Escorpio"
+    },
+    {
+      "label": "Debut",
+      "value": "1 de Marzo de 2019"
+    },
+    {
+      "label": "Contenido",
+      "value": "Gaming, realidad virtual y desarrollo de software"
+    },
+    {
+      "label": "Afiliación",
+      "value": "Independiente"
+    },
+    {
+      "label": "Color favorito",
+      "value": "Morado"
+    },
+    {
+      "label": "Modelo",
+      "value": "3D"
+    }
+  ],
+  "socials": [
+    {
+      "platform": "twitch",
+      "label": "Twitch",
+      "url": "https://twitch.tv/madkoding",
+      "icon": "icons/twitch.png"
+    },
+    {
+      "platform": "youtube",
+      "label": "YouTube",
+      "url": "https://www.youtube.com/@madkoding",
+      "icon": "icons/youtube.png"
+    },
+    {
+      "platform": "x",
+      "label": "X",
+      "url": "https://x.com/madkoding",
+      "icon": "icons/x.png"
+    }
+  ],
+  "skills": [
+    {
+      "category": "active",
+      "section": "Active Skills",
+      "type": "Ofensivo",
+      "name": "Kernel Panic",
+      "effect": "Ataque Mágico Base +40; aplica Confusión por 2 turnos.\n\nSi el enemigo ya tiene un estado alterado, el ataque inflige +15 daño adicional."
+    },
+    {
+      "category": "active",
+      "section": "Active Skills",
+      "type": "Defensivo",
+      "name": "Hot Reload",
+      "effect": "Ataque Mágico Base +30.\n\nEl usuario obtiene +10 de Velocidad y +10 de Defensa Mágica por 2 turnos.\n\nSi el usuario tiene menos del 50% de HP, recupera 5% HP."
+    },
+    {
+      "category": "passive",
+      "section": "Passive Skills",
+      "type": "Soporte",
+      "name": "Comfy Setup",
+      "effect": "Al inicio del combate, el usuario obtiene +10 de Defensa durante 2 turnos.\n\nLa primera vez que el HP del usuario desciende por debajo del 50%, recupera 10% HP."
+    },
+    {
+      "category": "passive",
+      "section": "Passive Skills",
+      "type": "Soporte",
+      "name": "Deadline Pressure",
+      "effect": "Cada vez que el usuario inflige daño, obtiene +5 de Crítico (máximo +20).\n\nMientras el HP del usuario esté por debajo del 60%, obtiene +10 Ataque Mágico Base."
+    },
+    {
+      "category": "ultimate",
+      "section": "Ultimate Skill",
+      "type": "Ultimate",
+      "name": "Return to the Virtual World",
+      "effect": "Lanzas 1d5; el resultado determina la cantidad de ataques consecutivos realizados.\nCada ataque equivale a Ataque Mágico Base +15.\n\nObtienes Ascensión y aplicas Confusión durante 2 turnos.\n\nSi el enemigo queda por debajo del 30% de HP, recuperas 10% HP."
+    }
+  ],
+  "stats": [
+    {
+      "label": "HP",
+      "slug": "hp",
+      "value": 1700,
+      "max": 1700
+    },
+    {
+      "label": "MP",
+      "slug": "mp",
+      "value": 1200,
+      "max": 1200
+    },
+    {
+      "label": "Ataque",
+      "slug": "attack",
+      "value": 150
+    },
+    {
+      "label": "Defensa",
+      "slug": "defense",
+      "value": 135
+    },
+    {
+      "label": "Ataque Mágico",
+      "slug": "magicAttack",
+      "value": 235
+    },
+    {
+      "label": "Defensa Mágica",
+      "slug": "magicDefense",
+      "value": 150
+    },
+    {
+      "label": "Velocidad",
+      "slug": "speed",
+      "value": 140
+    },
+    {
+      "label": "Evasión",
+      "slug": "evasion",
+      "value": 70
+    },
+    {
+      "label": "Precisión",
+      "slug": "accuracy",
+      "value": 110
+    },
+    {
+      "label": "Crítico",
+      "slug": "critic",
+      "value": 55
+    },
+    {
+      "label": "Suerte",
+      "slug": "luck",
+      "value": 9
+    }
+  ],
+  "favoriteColor": "Morado",
+  "cardText": "Vivía tranquilamente en el Mundo VR hasta que la magia colapsó. Así fue como llegué al mundo terrenal, donde debo trabajar para poder pagarme el arriendo, la luz e internet para volver al Mundo VR."
+}

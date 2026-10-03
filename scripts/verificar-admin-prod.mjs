@@ -31,7 +31,7 @@ import { formatoDeHash } from '../lib/admin-auth.mjs';
 import { verifyPassword } from '../server/src/auth.mjs';
 
 /** Alias de producción del proyecto. Se puede apuntar a otro con `--url`. */
-const URL_POR_DEFECTO = 'https://vtuberdex-sepia.vercel.app';
+const URL_POR_DEFECTO = 'https://vtuberdex.com';
 
 const args = process.argv.slice(2);
 const opcion = (nombre, porDefecto) => {

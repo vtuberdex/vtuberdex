@@ -25,6 +25,7 @@ export const DEFAULT_SEARCH: SearchParams = {
   factions: [],
   language: null,
   sort: 'dex',
+  premium: false,
   page: 1,
   perPage: DEFAULT_PER_PAGE,
 };
@@ -47,6 +48,7 @@ export function searchParamsToQuery(params: SearchParams): string {
   if (params.artists.length) query.set('artists', params.artists.join(','));
   if (params.factions.length) query.set('factions', params.factions.join(','));
   if (params.language) query.set('language', params.language);
+  if (params.premium) query.set('premium', '1');
   query.set('sort', params.sort);
   query.set('page', String(params.page));
   query.set('perPage', String(params.perPage));
@@ -63,6 +65,7 @@ const searchParamsSchema = z.object({
   factions: z.union([z.string(), z.array(z.string())]).optional(),
   language: z.string().max(10).optional(),
   sort: z.enum(['dex', 'dex-desc', 'name', 'power']).optional(),
+  premium: z.enum(['1', 'true']).optional(),
   page: z.coerce.number().int().min(1).max(10_000).optional(),
   perPage: z.coerce.number().int().min(1).max(100).optional(),
 });
@@ -84,6 +87,7 @@ export function searchParamsFromUrl(search: string): SearchParams {
     factions: listOf(asList(data.factions)),
     language: data.language ?? null,
     sort: SORTS.includes(data.sort as SortKey) ? (data.sort as SortKey) : 'dex',
+    premium: data.premium !== undefined,
     page: data.page ?? 1,
     perPage: data.perPage ?? DEFAULT_PER_PAGE,
   };
@@ -105,6 +109,7 @@ export function searchParamsToUrl(params: SearchParams): string {
   }
   if (params.language) query.set('language', params.language);
   if (params.sort !== 'dex') query.set('sort', params.sort);
+  if (params.premium) query.set('premium', '1');
   if (params.page > 1) query.set('page', String(params.page));
   if (params.perPage !== DEFAULT_PER_PAGE) query.set('perPage', String(params.perPage));
   const suffix = query.toString();
@@ -124,6 +129,7 @@ export function activeFilterCount(params: SearchParams): number {
     params.groups.length +
     params.artists.length +
     params.factions.length +
+    (params.premium ? 1 : 0) +
     (params.q.trim() ? 1 : 0)
   );
 }

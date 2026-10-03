@@ -4,6 +4,8 @@
  */
 import { z } from 'zod';
 
+import { GRADOS } from './premium.mjs';
+
 export const listQuerySchema = z.object({
   q: z.string().max(120).optional().default(''),
   countries: z.string().max(300).optional().default(''),
@@ -15,6 +17,8 @@ export const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(10_000).optional().default(1),
   perPage: z.coerce.number().int().min(1).max(100).optional().default(24),
   language: z.string().max(10).optional(),
+  /** Solo las cartas premium (gradeadas). `1` o `true`; cualquier otra cosa es un 400. */
+  premium: z.enum(['1', 'true']).optional(),
   facet: z.enum(['all', 'countries', 'groups', 'artists', 'factions', 'languages']).optional(),
 });
 
@@ -60,6 +64,20 @@ const socialSchema = z.object({
 /** Máximo de facciones por VTuber. Espejo de `MAX_FACCIONES` (mutations.mjs). */
 const MAX_FACCIONES = 2;
 
+const FECHA = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'fecha AAAA-MM-DD');
+
+/**
+ * Datos premium de una ficha. `null` la devuelve a carta normal. Las fechas son opcionales:
+ * sin ellas el alta y el último ascenso son «hoy» (ver `aplicarPremium` y `sellarPremium`).
+ */
+const premiumSchema = z
+  .object({
+    grade: z.enum(GRADOS),
+    since: FECHA.optional(),
+    gradedAt: FECHA.optional(),
+  })
+  .nullable();
+
 export const vtuberUpdateSchema = z.object({
   name: z.string().trim().min(1).max(160).optional(),
   /** La URL de la ficha (`/v/<slug>`). Se normaliza a ASCII minúscula con guiones al guardar. */
@@ -95,6 +113,8 @@ export const vtuberUpdateSchema = z.object({
   stats: z.array(statSchema).max(30).optional(),
   skills: z.array(skillSchema).max(30).optional(),
   socials: z.array(socialSchema).max(20).optional(),
+  /** Carta premium: grado de la escala 8…BL, o `null` para quitarla. */
+  premium: premiumSchema.optional(),
 });
 
 /** Crear una ficha: lo mismo que editarla, pero el nombre es obligatorio. */
@@ -114,6 +134,8 @@ export const factionUpdateSchema = z.object({
 export const adminListQuerySchema = z.object({
   q: z.string().max(120).optional().default(''),
   status: z.enum(['all', 'published', 'draft', 'hidden']).optional().default('all'),
+  /** Solo las cartas premium: la pestaña «Premium» del mantenedor lista las que ya existen. */
+  premium: z.enum(['1', 'true']).optional(),
   page: z.coerce.number().int().min(1).max(10_000).optional().default(1),
   perPage: z.coerce.number().int().min(1).max(100).optional().default(40),
 });

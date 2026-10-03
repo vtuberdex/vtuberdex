@@ -1,0 +1,55 @@
+/** La experiencia que resulta de los likes: la curva y sus bordes. */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { BASE_NIVEL, PASO_NIVEL, XP_POR_LIKE, experienciaConLikes, umbralDeNivel } from '../src/experiencia.mjs';
+
+test('una ficha sin experiencia parte del nivel 1 con la barra vacía', () => {
+  assert.deepEqual(experienciaConLikes({}, 0), { level: 1, current: 0, max: BASE_NIVEL, likes: 0, xpPorLike: XP_POR_LIKE });
+  assert.deepEqual(experienciaConLikes(null, 0).level, 1);
+});
+
+test('cada like suma XP_POR_LIKE a la barra', () => {
+  const r = experienciaConLikes({ level: 3, current: 65, max: 500 }, 4);
+  assert.deepEqual({ level: r.level, current: r.current, max: r.max }, { level: 3, current: 65 + 4 * XP_POR_LIKE, max: 500 });
+});
+
+test('al llenar la barra sube de nivel, la vacía y el siguiente nivel no pide MENOS', () => {
+  // 100 de max con 10 XP por like: 10 likes llenan el nivel 1.
+  const sube = experienciaConLikes({}, BASE_NIVEL / XP_POR_LIKE);
+  assert.deepEqual({ level: sube.level, current: sube.current, max: sube.max }, { level: 2, current: 0, max: umbralDeNivel(2) });
+  assert.equal(umbralDeNivel(2), BASE_NIVEL + PASO_NIVEL);
+  // Una ficha del scrape con max 500 no baja a 250 al subir.
+  const grande = experienciaConLikes({ level: 3, current: 490, max: 500 }, 1);
+  assert.equal(grande.level, 4);
+  assert.equal(grande.current, 0);
+  assert.ok(grande.max >= 500);
+});
+
+test('puede subir varios niveles de una vez y el total de XP se conserva', () => {
+  const likes = 200;
+  const r = experienciaConLikes({}, likes);
+  let gastado = r.current;
+  for (let nivel = 1; nivel < r.level; nivel += 1) gastado += umbralDeNivel(nivel);
+  assert.equal(gastado, likes * XP_POR_LIKE);
+  assert.ok(r.level > 3);
+  assert.ok(r.current < r.max);
+});
+
+test('entradas absurdas no cuelgan ni dan NaN', () => {
+  for (const base of [{ level: -5, current: -10, max: 0 }, { level: 'x', current: NaN, max: null }, { level: 1, current: 0, max: 1 }]) {
+    const r = experienciaConLikes(base, 1e9);
+    assert.ok(Number.isFinite(r.level) && Number.isFinite(r.current) && r.max > 0, JSON.stringify(base));
+  }
+  assert.equal(experienciaConLikes({}, -3).likes, 0);
+  assert.equal(experienciaConLikes({}, 'abc').likes, 0);
+});
+
+test('es monótona: más likes nunca baja de nivel', () => {
+  let anterior = 0;
+  for (let likes = 0; likes < 300; likes += 1) {
+    const { level } = experienciaConLikes({ level: 2, current: 30, max: 150 }, likes);
+    assert.ok(level >= anterior);
+    anterior = level;
+  }
+});

@@ -48,7 +48,7 @@ export async function GET(request) {
     return Response.json({ error: 'query_invalida', issues: formatIssues(parsed.error) }, { status: 400 });
   }
 
-  const { q, countries, languages, groups, artists, factions, sort, page, perPage, language, facet } = parsed.data;
+  const { q, countries, languages, groups, artists, factions, sort, page, perPage, language, premium, facet } = parsed.data;
   const result = searchVtubers(db, {
     q,
     countries: splitCsv(countries),
@@ -56,6 +56,7 @@ export async function GET(request) {
     groups: splitCsv(groups),
     artists: splitCsv(artists),
     factions: splitCsv(factions),
+    premium: Boolean(premium),
     sort,
     page,
     perPage,

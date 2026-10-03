@@ -194,6 +194,22 @@ CREATE TABLE IF NOT EXISTS asset (
   UNIQUE (vtuber_id, kind)
 );
 
+-- --- cartas premium -----------------------------------------------------------
+-- Una ficha PREMIUM (el VTuber dona al proyecto) se muestra gradeada, dentro de una placa de
+-- acrílico. La escala vive en `premium.mjs` (8, 8.5, 9, 9.5, 10, BL) y NO se repite aquí como
+-- CHECK: SQLite no deja alterar un CHECK, así que ampliar la escala obligaría a reconstruir la
+-- tabla, y la validación de verdad ya está en el mantenedor.
+--   · since     alta como premium (AAAA-MM-DD): de ahí se cuenta la antigüedad.
+--   · graded_at última vez que cambió el grado: el mantenedor la usa para no subir dos veces
+--               en el mismo mes.
+-- Sin fila = carta normal. Borrar la ficha borra su fila (ON DELETE CASCADE).
+CREATE TABLE IF NOT EXISTS premium (
+  vtuber_id INTEGER PRIMARY KEY REFERENCES vtuber (id) ON DELETE CASCADE,
+  grade     TEXT NOT NULL,
+  since     TEXT NOT NULL,
+  graded_at TEXT NOT NULL
+);
+
 -- --- búsqueda full-text (FTS5 + triggers de sincronización) ------------------
 -- Tabla FTS normal (guarda su propia copia del texto) para poder hacer DELETE
 -- por fila al re-importar; `content=''` sería "contentless" y lo prohíbe.

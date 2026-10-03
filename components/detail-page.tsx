@@ -11,7 +11,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { api } from '@/lib/api';
+import { api, type LikeResumen } from '@/lib/api';
 import { cardPalette, gradientCss, mixHex, rgba } from '@/lib/color';
 import type { VtuberDetail, Neighbors } from '@/lib/types';
 import { HoloCard } from '@/components/holo-card';
@@ -20,6 +20,9 @@ import { SkillList } from '@/components/skill-list';
 import { StatBars } from '@/components/stat-bars';
 import { ProfileGrid } from '@/components/profile-grid';
 import { SocialLinks } from '@/components/social-links';
+import { PremiumBadge } from '@/components/premium-badge';
+import { DonatePayPal } from '@/components/donate-paypal';
+import { LikeButton } from '@/components/like-button';
 
 type Payload = (VtuberDetail & { neighbors: Neighbors }) | null;
 
@@ -73,6 +76,12 @@ export function DetailPage({ slug }: { slug: string }) {
       document.title = 'VTuberDex';
     };
   }, [data]);
+
+  /** Tras dar o leer un like: nivel, barra y total se actualizan sin volver a pedir la ficha. */
+  const aplicarLikes = (resumen: LikeResumen) =>
+    setData((actual) =>
+      actual ? { ...actual, likes: resumen.likes, level: resumen.level, experience: resumen.experience } : actual,
+    );
 
   if (loading) {
     return (
@@ -144,6 +153,8 @@ export function DetailPage({ slug }: { slug: string }) {
             />
           </div>
 
+          <DonatePayPal premium={data.premium} card={{ id: data.id, name: data.name }} />
+
           {/*
             Aquí estaba el bloque del RADAR de atributos (una imagen raster del
             sitio). Se eliminó junto con su carpeta: `StatBars` dibuja los MISMOS
@@ -172,6 +183,14 @@ export function DetailPage({ slug }: { slug: string }) {
                   <span aria-hidden>•</span>
                   <span>{data.hasDetail ? 'Ficha completa' : 'Ficha básica'}</span>
                 </p>
+                {data.premium && (
+                  <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-dex-muted" data-testid="premium-info">
+                    <PremiumBadge premium={data.premium} />
+                    <span className="font-mono">{data.premium.cert}</span>
+                    <span aria-hidden>•</span>
+                    <span>Premium desde {data.premium.since}</span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -183,6 +202,10 @@ export function DetailPage({ slug }: { slug: string }) {
               carta y este. Queda uno solo, el de la carta, que es el que lleva el
               acabado de la pieza; este era un duplicado plano sin tratamiento.
             */}
+
+            <div className="mt-4">
+              <LikeButton slug={data.slug} likes={data.likes ?? 0} onChange={aplicarLikes} />
+            </div>
 
             {data.phrase && <p className="mt-4 max-w-3xl text-sm leading-relaxed text-dex-ink/90">{data.phrase}</p>}
 

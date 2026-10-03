@@ -1,4 +1,6 @@
 /** Stats del VTuber en barras normalizadas + nivel y EXP. */
+import { StatRadar } from '@/components/stat-radar';
+import { EJES_DE_RADAR, MIN_EJES, verticesDeRadar } from '@/lib/radar';
 import type { StatRow } from '@/lib/types';
 
 export interface StatBarsProps {
@@ -13,14 +15,15 @@ const REFERENCE_MAX = 400;
 
 export function StatBars({ stats, palette, level, experience }: StatBarsProps) {
   const numeric = stats.filter((stat) => typeof stat.value === 'number');
-  if (numeric.length === 0) {
-    return (
-      <section className="rounded-2xl border border-dex-line bg-dex-panel/60 p-5">
-        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">Atributos</h2>
-        <p className="mt-3 text-sm text-dex-muted">Sin stats publicados para este VTuber.</p>
-      </section>
-    );
-  }
+
+  /**
+   * Con tres o más atributos de combate se dibuja la TELARAÑA y las barras se quedan solo con lo
+   * que la telaraña no puede mostrar (HP, MP y cualquier atributo fuera de sus ejes): repetir los
+   * mismos números en barras debajo del gráfico sería ruido. Con menos de tres, todo en barras.
+   */
+  const enRadar = verticesDeRadar(stats).length >= MIN_EJES;
+  const slugsDelRadar = new Set(EJES_DE_RADAR.map((eje) => eje.slug));
+  const enBarras = enRadar ? numeric.filter((stat) => !slugsDelRadar.has(stat.slug)) : numeric;
 
   const expPercent =
     experience?.current !== null && experience?.current !== undefined && experience?.max
@@ -44,14 +47,30 @@ export function StatBars({ stats, palette, level, experience }: StatBarsProps) {
               {experience.current} / {experience.max}
             </span>
           </div>
-          <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full" style={{ width: `${expPercent}%`, background: palette.accent }} />
+          <div
+            className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10"
+            role="progressbar"
+            aria-label="Experiencia"
+            aria-valuemin={0}
+            aria-valuemax={experience.max ?? 0}
+            aria-valuenow={experience.current ?? 0}
+          >
+            <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${expPercent}%`, background: palette.accent }} />
           </div>
         </div>
       )}
 
+      {/*
+        El nivel y la experiencia se muestran SIEMPRE: salen de los likes (`experienciaConLikes`) y
+        existen aunque la ficha no tenga atributos. Antes, sin stats solo salía «Sin stats
+        publicados» y los likes parecían no hacer nada.
+      */}
+      {numeric.length === 0 && <p className="mt-4 text-sm text-dex-muted">Sin stats publicados para este VTuber.</p>}
+
+      {enRadar && <StatRadar stats={stats} palette={palette} />}
+
       <ul className="mt-4 space-y-3">
-        {numeric.map((stat) => {
+        {enBarras.map((stat) => {
           const max = stat.max ?? REFERENCE_MAX;
           const value = stat.value ?? 0;
           const percent = Math.max(4, Math.min(100, Math.round((value / Math.max(max, 1)) * 100)));

@@ -14,6 +14,7 @@ import { DEFAULT_SEARCH } from '@/lib/query';
 import { CardWizard } from '@/components/admin/card-wizard';
 import { FactionManager } from '@/components/admin/faction-manager';
 import { GettingStarted } from '@/components/admin/getting-started';
+import { PremiumManager } from '@/components/admin/premium-manager';
 import { VtuberList } from '@/components/admin/vtuber-list';
 import type { ChipOption } from '@/components/admin/chip-picker';
 import { primaryButton } from '@/components/admin/ui';
@@ -36,7 +37,7 @@ const FLAG_LABELS: Record<string, string> = {
   'sin-logo': 'Sin logo',
 };
 
-type Section = 'fichas' | 'emblemas';
+type Section = 'fichas' | 'emblemas' | 'premium';
 type View = { kind: 'none' } | { kind: 'create'; n: number } | { kind: 'edit'; detail: VtuberDetail; epoch: number };
 
 export function AdminPage() {
@@ -239,6 +240,7 @@ export function AdminPage() {
   const sections: Array<{ id: Section; label: string }> = [
     { id: 'fichas', label: 'Fichas' },
     { id: 'emblemas', label: 'Emblemas y facciones' },
+    { id: 'premium', label: 'Premium' },
   ];
 
   return (
@@ -341,6 +343,11 @@ export function AdminPage() {
             notify={notify}
           />
         )}
+      </div>
+
+      {/* Premium se monta al abrirla (no antes): pide su propia lista y no debe alterar la carga de las otras. */}
+      <div role="tabpanel" id="section-premium" aria-labelledby="section-tab-premium" hidden={section !== 'premium'}>
+        {token && section === 'premium' && <PremiumManager token={token} notify={notify} onChanged={changed} />}
       </div>
 
       <div role="tabpanel" id="section-fichas" aria-labelledby="section-tab-fichas" hidden={section !== 'fichas'}>

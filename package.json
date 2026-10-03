@@ -25,7 +25,8 @@
     "download:images": "node scripts/descargar-imagenes.mjs",
     "admin:hash": "node scripts/admin-hash.mjs",
     "admin:publicar": "node scripts/publicar-admin-prod.mjs",
-    "admin:verificar": "node scripts/verificar-admin-prod.mjs"
+    "admin:verificar": "node scripts/verificar-admin-prod.mjs",
+    "ficha:prod": "node scripts/aplicar-ficha-prod.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.15.15",

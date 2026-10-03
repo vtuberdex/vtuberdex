@@ -32,6 +32,8 @@ import {
   CARD_TEXTURE_TILE_WIDTH,
 } from '@/components/card-texture';
 import { useCardMaterials, type CardMaterials } from '@/components/card-material';
+import { PremiumBadge } from '@/components/premium-badge';
+import { PremiumSlab } from '@/components/premium-slab';
 
 /** Proporción real de una carta coleccionable (5x7 pulgadas -> 1.4). */
 const ASPECT = CARD_TEXTURE_HEIGHT / CARD_TEXTURE_WIDTH;
@@ -40,6 +42,15 @@ const CARD_H = CARD_W * ASPECT;
 
 export const CARD_CAMERA_Z =
   (CARD_H / CFG.GEOMETRY.cameraFill / 2) / Math.tan((CFG.GEOMETRY.cameraFov * Math.PI) / 180 / 2);
+
+/**
+ * Distancia de cámara para una carta concreta. Una carta PREMIUM va dentro de una placa más alta
+ * que ella (la de la funda del libro: carta + 2 x `pocketPad`), así que la cámara se aleja en la
+ * misma proporción para que la placa entera entre en el mismo encuadre que una carta normal.
+ */
+export function cameraZFor(card: Pick<VtuberCard, 'premium'>): number {
+  return card.premium ? CARD_CAMERA_Z * ((CARD_H + 2 * CFG.BINDER.pocketPad) / CARD_H) : CARD_CAMERA_Z;
+}
 
 export function supportsWebGL(): boolean {
   if (typeof document === 'undefined') return false;
@@ -117,18 +128,40 @@ export function usePointerTilt(ref: React.RefObject<THREE.Group | null>, amounts
  * solo se veía al inclinar, y la cara (un plano) lleva todo el efecto. Sin transformaciones
  * propias: quien las monta decide dónde y cómo se mueven (la carta suelta flota; en el
  * libro va plana en su funda).
+ *
+ * Con `card.premium` la carta va DENTRO de una placa de acrílico (`premium-slab.tsx`), que la
+ * escala para que quepa en su ventana. Sin `card` o sin premium, exactamente lo de siempre.
+ * El HUMO brillante (el resplandor) NO va dentro de la ventana: escalado con la carta se
+ * pintaría sobre la etiqueta y el marco. Se le pasa a la placa, que lo dibuja detrás de TODA ella
+ * con el tamaño de la placa, así que el halo rodea el acrílico como rodea a una carta normal.
  */
-export function CardMeshes({ mats }: { mats: CardMaterials }) {
-  return (
+export function CardMeshes({ mats, card }: { mats: CardMaterials; card?: VtuberCard }) {
+  const premium = card?.premium ?? null;
+  const mallas = (
     <>
-      <mesh position={[0, 0, CFG.GEOMETRY.glowZ]} material={mats.glowMaterial}>
-        <planeGeometry args={[mats.cardWidth * CFG.GEOMETRY.glowSpread, mats.cardHeight * CFG.GEOMETRY.glowSpread]} />
-      </mesh>
+      {!premium && (
+        <mesh position={[0, 0, CFG.GEOMETRY.glowZ]} material={mats.glowMaterial}>
+          <planeGeometry args={[mats.cardWidth * CFG.GEOMETRY.glowSpread, mats.cardHeight * CFG.GEOMETRY.glowSpread]} />
+        </mesh>
+      )}
       <mesh position={[0, 0, CFG.GEOMETRY.cardDepth / 2 + CFG.GEOMETRY.faceZGap]}>
         <planeGeometry args={[mats.cardWidth, mats.cardHeight]} />
         <primitive object={mats.frontMaterial} attach="material" />
       </mesh>
     </>
+  );
+  if (!card || !premium) return mallas;
+  return (
+    <PremiumSlab
+      card={card}
+      premium={premium}
+      cardWidth={mats.cardWidth}
+      cardHeight={mats.cardHeight}
+      outerPad={CFG.BINDER.pocketPad}
+      glowMaterial={mats.glowMaterial}
+    >
+      {mallas}
+    </PremiumSlab>
   );
 }
 
@@ -153,14 +186,15 @@ function CardMesh({
     }
   });
 
+  const cameraZ = cameraZFor(card);
   useEffect(() => {
-    camera.position.set(0, 0, CARD_CAMERA_Z);
+    camera.position.set(0, 0, cameraZ);
     camera.lookAt(0, 0, 0);
-  }, [camera]);
+  }, [camera, cameraZ]);
 
   return (
     <group ref={group}>
-      <CardMeshes mats={mats} />
+      <CardMeshes mats={mats} card={card} />
     </group>
   );
 }
@@ -243,6 +277,8 @@ export function CardFallback({ card, className }: { card: VtuberCard; className?
         <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 font-mono text-xs text-white">
           #{String(card.dexNumber).padStart(3, '0')}
         </span>
+        {/* Sin WebGL no hay placa de acrílico: el distintivo es lo único que dice que la carta es premium. */}
+        {card.premium && <PremiumBadge premium={card.premium} className="absolute bottom-2 left-2 backdrop-blur" />}
       </div>
     </div>
   );
@@ -315,7 +351,7 @@ export function HoloCard({
           <Canvas
             dpr={plan.dpr}
             gl={{ antialias: plan.antialias, alpha: true, powerPreference: plan.powerPreference }}
-            camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, CARD_CAMERA_Z] }}
+            camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, cameraZFor(card)] }}
             onCreated={({ gl }) => {
               gl.domElement.addEventListener('webglcontextlost', (event) => {
                 event.preventDefault();
@@ -323,7 +359,7 @@ export function HoloCard({
               });
             }}
           >
-            <Rig accent={palette.accent} />
+            <Rig accent={palette.accent} cameraZ={cameraZFor(card)} />
             <CardMesh card={card} holo={holo} gloss={gloss} textureWidth={plan.textureWidth} />
           </Canvas>
         </div>

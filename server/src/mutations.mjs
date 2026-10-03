@@ -17,6 +17,7 @@
  * Ninguna abre su propia transacción salvo `aplicarOperacion`: así el llamador decide el alcance
  * (el Express añade la auditoría dentro de la misma; el reproductor de producción una por operación).
  */
+import { GRADOS, esGradoValido, hoy } from './premium.mjs';
 import { normalizeText, slugify } from './text.mjs';
 
 /**
@@ -328,6 +329,64 @@ function cambiarSlug(db, id, actual, nuevo) {
   db.prepare('UPDATE vtuber SET slug = ? WHERE id = ?').run(slug, id);
 }
 
+// ------------------------------------------------------------------ premium
+
+/**
+ * Congela en un parche «qué día es» para el premium, de forma que se pueda guardar en el diario.
+ *
+ * POR QUÉ: el diario de producción se REPRODUCE en cada instancia fría. Si el parche solo dijera
+ * «grado 9» y el día se leyera al aplicarlo, cada reproducción sellaría una fecha distinta y la
+ * antigüedad de la carta cambiaría sola. Quien anota en el diario (`aplicarYAnotar`) llama a esto
+ * ANTES de guardar; el Express local no lo necesita porque aplica una sola vez.
+ *
+ * Solo se guarda el DÍA (`ahora`), no las fechas resultantes: qué fecha le toca a `since` y a
+ * `gradedAt` lo decide `aplicarPremium` con la fila que ya exista. Sellar `since` aquí pisaría la
+ * fecha de alta cada vez que se sube de grado, porque esta función no ve la base.
+ */
+export function sellarPremium(patch, ahora = hoy()) {
+  if (!patch || !patch.premium) return patch;
+  return { ...patch, premium: { ...patch.premium, ahora: patch.premium.ahora ?? ahora } };
+}
+
+/**
+ * Convierte una ficha en premium, cambia su grado, o la devuelve a normal (`null`).
+ *
+ *   · Sin fila previa: se crea con `since` (hoy si no viene) y `gradedAt` (= `since` si no viene).
+ *   · Con fila y OTRO grado: cambia el grado y `gradedAt` (hoy si no viene; el alta no se toca).
+ *   · Con fila y el mismo grado: no se mueve nada, así guardar dos veces no «resetea» la fecha.
+ *   · `since` explícito corrige la fecha de alta (el mantenedor puede registrar a alguien que
+ *     donó antes de que existiera esta función).
+ *   · «Hoy» es `premium.ahora` si el parche vino sellado del diario, o el día real si no.
+ */
+function aplicarPremium(db, vtuberId, premium) {
+  if (premium === null) {
+    db.prepare('DELETE FROM premium WHERE vtuber_id = ?').run(vtuberId);
+    return;
+  }
+  if (!esGradoValido(premium.grade)) {
+    throw new MutationError(400, 'grado_invalido', `el grado debe ser uno de ${GRADOS.join(', ')}`);
+  }
+  const ahora = premium.ahora ?? hoy();
+  const actual = db.prepare('SELECT grade, since, graded_at AS gradedAt FROM premium WHERE vtuber_id = ?').get(vtuberId);
+  if (!actual) {
+    const alta = premium.since ?? ahora;
+    db.prepare('INSERT INTO premium (vtuber_id, grade, since, graded_at) VALUES (?, ?, ?, ?)').run(
+      vtuberId,
+      premium.grade,
+      alta,
+      premium.gradedAt ?? alta,
+    );
+    return;
+  }
+  const cambioGrado = actual.grade !== premium.grade;
+  db.prepare('UPDATE premium SET grade = ?, since = ?, graded_at = ? WHERE vtuber_id = ?').run(
+    premium.grade,
+    premium.since ?? actual.since,
+    cambioGrado ? (premium.gradedAt ?? ahora) : (premium.gradedAt ?? actual.gradedAt),
+    vtuberId,
+  );
+}
+
 const COLUMNAS = {
   name: 'name',
   phrase: 'phrase',
@@ -357,6 +416,11 @@ export function aplicarParche(db, id, patch) {
     sets.push(`${columna} = ?`);
     args.push(patch[campo]);
   }
+  if (patch.cardText !== undefined) {
+    // Un texto escrito o corregido a mano ya no es una lectura OCR: dejar el «OCR 77 %» de la
+    // lectura original sobre un texto corregido mentiría sobre su fiabilidad.
+    sets.push('card_text_confidence = NULL');
+  }
   if (patch.name !== undefined) {
     // El slug NO sigue al nombre: la URL es una decisión propia (campo `slug`). Antes cada cambio
     // de nombre reescribía la URL y rompía los enlaces compartidos sin que nadie lo pidiera.
@@ -374,6 +438,7 @@ export function aplicarParche(db, id, patch) {
   }
   replaceRelations(db, id, patch);
   replaceChildren(db, id, patch);
+  if (patch.premium !== undefined) aplicarPremium(db, id, patch.premium);
   refreshSearchIndex(db, id);
   refreshFacetCounters(db);
   return db.prepare('SELECT slug FROM vtuber WHERE id = ?').get(id).slug;

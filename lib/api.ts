@@ -27,6 +27,17 @@ import { searchParamsToQuery } from '@/lib/query';
  */
 const BASE = (globalThis as { __VTUBERDEX_API_BASE__?: string }).__VTUBERDEX_API_BASE__ ?? '';
 
+/** Estado de los likes de una ficha para el visitante que consulta (ver `app/api/vtubers/[slug]/like`). */
+export interface LikeResumen {
+  likes: number;
+  /** ¿Ya le dio like HOY? */
+  liked: boolean;
+  level: number;
+  experience: { current: number; max: number };
+  /** Experiencia que suma cada like. */
+  xpPorLike: number;
+}
+
 export class ApiError extends Error {
   status: number;
   issues?: unknown;
@@ -69,6 +80,13 @@ export const api = {
   detail(slug: string, signal?: AbortSignal): Promise<VtuberDetail & { neighbors: Neighbors }> {
     return request(`/api/vtubers/${encodeURIComponent(slug)}`, { signal });
   },
+  likeEstado(slug: string, signal?: AbortSignal): Promise<LikeResumen> {
+    return request<LikeResumen>(`/api/vtubers/${encodeURIComponent(slug)}/like`, { signal });
+  },
+  /** Da el like de hoy. Un segundo intento el mismo día responde 409 (`ApiError.status`). */
+  darLike(slug: string): Promise<LikeResumen> {
+    return request<LikeResumen>(`/api/vtubers/${encodeURIComponent(slug)}/like`, { method: 'POST' });
+  },
   /**
    * `GET /api/meta` se retiró (ver `app/api/health/route.js`): las facetas viajan en
    * `api.list()` con `facet=all`, que es lo que el panel de filtros consume de verdad.
@@ -97,12 +115,13 @@ export const api = {
    */
   adminList(
     token: string,
-    params: { q?: string; status?: AdminStatusFilter; page?: number; perPage?: number },
+    params: { q?: string; status?: AdminStatusFilter; premium?: boolean; page?: number; perPage?: number },
     signal?: AbortSignal,
   ) {
     const query = new URLSearchParams();
     if (params.q) query.set('q', params.q);
     query.set('status', params.status ?? 'all');
+    if (params.premium) query.set('premium', '1');
     if (params.page) query.set('page', String(params.page));
     if (params.perPage) query.set('perPage', String(params.perPage));
     return request<AdminListResponse>(`/api/admin/vtubers?${query}`, { headers: bearer(token), signal });

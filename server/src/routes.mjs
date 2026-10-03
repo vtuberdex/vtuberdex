@@ -88,7 +88,7 @@ export function createApiRouter({ db, sessions, imageRoot }) {
       res.status(400).json({ error: 'query_invalida', issues: formatIssues(parsed.error) });
       return;
     }
-    const { q, countries, languages, groups, artists, factions, sort, page, perPage, language, facet } = parsed.data;
+    const { q, countries, languages, groups, artists, factions, sort, page, perPage, language, premium, facet } = parsed.data;
     const result = searchVtubers(db, {
       q,
       countries: splitCsv(countries),
@@ -96,6 +96,7 @@ export function createApiRouter({ db, sessions, imageRoot }) {
       groups: splitCsv(groups),
       artists: splitCsv(artists),
       factions: splitCsv(factions),
+      premium: Boolean(premium),
       sort,
       page,
       perPage,
@@ -176,9 +177,17 @@ export function createApiRouter({ db, sessions, imageRoot }) {
       res.status(400).json({ error: 'query_invalida', issues: formatIssues(parsed.error) });
       return;
     }
-    const { q, status, page, perPage } = parsed.data;
+    const { q, status, premium, page, perPage } = parsed.data;
     res.json(
-      searchVtubers(db, { q, page, perPage, includeHidden: true, status: status === 'all' ? null : status, sort: 'dex' }),
+      searchVtubers(db, {
+        q,
+        page,
+        perPage,
+        includeHidden: true,
+        status: status === 'all' ? null : status,
+        premium: Boolean(premium),
+        sort: 'dex',
+      }),
     );
   });
 

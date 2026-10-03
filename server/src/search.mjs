@@ -8,6 +8,7 @@
  *   · orden configurable (dex, A-Z, poder),
  *   · conteos de facetas calculados en la base, no recorriendo 785 divs.
  */
+import { numeroDeCertificado } from './premium.mjs';
 import { normalizeText } from './text.mjs';
 
 const SORT_SQL = {
@@ -17,8 +18,30 @@ const SORT_SQL = {
   power: 'v.power_score DESC NULLS LAST, v.dex_number ASC',
 };
 
+/**
+ * Columnas y unión del premium. Sin la tabla (base empaquetada anterior a esta función, abierta
+ * en SOLO LECTURA y por tanto sin el esquema nuevo) se devuelven NULL: la carta sale normal en
+ * vez de que la consulta entera falle con `no such table: premium`.
+ */
+const PREMIUM_COLUMNAS = `, pr.grade AS premiumGrade, pr.since AS premiumSince, pr.graded_at AS premiumGradedAt`;
+const PREMIUM_UNION = `LEFT JOIN premium pr ON pr.vtuber_id = v.id`;
+const SIN_PREMIUM_COLUMNAS = `, NULL AS premiumGrade, NULL AS premiumSince, NULL AS premiumGradedAt`;
+
+/**
+ * ¿Tiene esta base la tabla `premium`? Solo se recuerda el SÍ: una base escribible la crea al
+ * abrirse y a partir de ahí no vuelve a preguntarse, pero un NO puede cambiar (otro proceso
+ * aplica el esquema) y cachearlo dejaría la función apagada hasta reiniciar.
+ */
+const conPremium = new WeakSet();
+export function tienePremium(db) {
+  if (conPremium.has(db)) return true;
+  const hay = Boolean(db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'premium'`).get());
+  if (hay) conPremium.add(db);
+  return hay;
+}
+
 /** Expresión SQL que arma el objeto VTuber de la vista de carta. */
-const CARD_SELECT = `
+const armarSelect = (premium) => `
   SELECT
     v.id, v.dex_number AS dexNumber, v.slug, v.name, v.phrase,
     v.card_text AS cardText, v.card_text_confidence AS cardTextConfidence,
@@ -54,6 +77,7 @@ const CARD_SELECT = `
         SELECT value FROM stat WHERE vtuber_id = v.id AND value IS NOT NULL
         ORDER BY position LIMIT 5)) AS statsPreviewJson,
     (SELECT COUNT(*) FROM social WHERE vtuber_id = v.id) AS socialCount
+    ${premium ? PREMIUM_COLUMNAS : SIN_PREMIUM_COLUMNAS}
   FROM vtuber v
   LEFT JOIN asset a_card   ON a_card.vtuber_id = v.id AND a_card.kind = 'card'
   LEFT JOIN asset a_thumb  ON a_thumb.vtuber_id = v.id AND a_thumb.kind = 'thumb'
@@ -61,7 +85,13 @@ const CARD_SELECT = `
   LEFT JOIN asset a_character ON a_character.vtuber_id = v.id AND a_character.kind = 'character'
   LEFT JOIN asset a_background ON a_background.vtuber_id = v.id AND a_background.kind = 'background'
   LEFT JOIN asset a_radar  ON a_radar.vtuber_id = v.id AND a_radar.kind = 'radar'
+  ${premium ? PREMIUM_UNION : ''}
 `;
+
+// Se arman UNA vez: el texto no depende de la consulta, solo de si la base conoce el premium.
+const SELECT_CON_PREMIUM = armarSelect(true);
+const SELECT_SIN_PREMIUM = armarSelect(false);
+const cardSelect = (db) => (tienePremium(db) ? SELECT_CON_PREMIUM : SELECT_SIN_PREMIUM);
 
 const parseJsonArray = (value) => {
   if (!value) return [];
@@ -120,6 +150,18 @@ export function mapCard(row) {
     languages: parseJsonArray(row.languagesJson),
     statsPreview: parseJsonArray(row.statsPreviewJson).filter((value) => typeof value === 'number'),
     socialCount: row.socialCount ?? 0,
+    /**
+     * Carta premium: `null` en una carta normal (la inmensa mayoría). El certificado se DERIVA
+     * del id (`numeroDeCertificado`): un dato recalculable no se guarda.
+     */
+    premium: row.premiumGrade
+      ? {
+          grade: row.premiumGrade,
+          since: row.premiumSince,
+          gradedAt: row.premiumGradedAt,
+          cert: numeroDeCertificado(row.id),
+        }
+      : null,
     images: {
       /**
        * El PERSONAJE normalizado al lienzo de carta. Es lo que deben usar las
@@ -185,6 +227,8 @@ export function searchVtubers(db, params = {}) {
     status = null,
     minPower = null,
     theme = null,
+    /** Solo las cartas premium (gradeadas). */
+    premium = false,
   } = params;
 
   const where = [];
@@ -194,6 +238,10 @@ export function searchVtubers(db, params = {}) {
   else if (status) {
     where.push('v.status = ?');
     args.push(status);
+  }
+  if (premium) {
+    // Sin la tabla no hay ninguna premium: el filtro devuelve vacío en vez de fallar.
+    where.push(tienePremium(db) ? 'EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id)' : '0');
   }
   if (theme) {
     where.push('v.theme_color = ?');
@@ -275,7 +323,7 @@ export function searchVtubers(db, params = {}) {
 
   const total = db.prepare(`SELECT COUNT(*) AS total FROM vtuber v ${whereSql}`).get(...args).total;
   const rows = db
-    .prepare(`${CARD_SELECT} ${whereSql} ORDER BY ${orderSql} LIMIT ? OFFSET ?`)
+    .prepare(`${cardSelect(db)} ${whereSql} ORDER BY ${orderSql} LIMIT ? OFFSET ?`)
     .all(...args, safePerPage, offset);
 
   return {
@@ -393,14 +441,14 @@ function buscarAlias(db, slug) {
 export function getVtuberBySlug(db, slug, { includeHidden = false } = {}) {
   const where = includeHidden ? '' : `AND v.status = 'published'`;
   let row = db
-    .prepare(`${CARD_SELECT} WHERE v.slug = ? ${where}`)
+    .prepare(`${cardSelect(db)} WHERE v.slug = ? ${where}`)
     .get(slug);
   if (!row) {
     // Un slug que la ficha ya no usa (se le cambió la URL) sigue resolviendo: el detalle devuelve
     // la ficha con su slug ACTUAL y el cliente redirige. Sin esto, renombrar una página rompería
     // todos los enlaces compartidos.
     const alias = buscarAlias(db, slug);
-    if (alias) row = db.prepare(`${CARD_SELECT} WHERE v.id = ? ${where}`).get(alias);
+    if (alias) row = db.prepare(`${cardSelect(db)} WHERE v.id = ? ${where}`).get(alias);
   }
   if (!row) return null;
   const card = mapCard(row);

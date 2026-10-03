@@ -39,9 +39,9 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 260 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 307 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
-cd server  && npm test     # 66 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
+cd server  && npm test     # 82 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
 # Linter (raíz; cubre también server/ y scraper/)
 npm run lint               # eslint . — falla con cualquier error
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/66/260** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/82/307** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -199,6 +199,42 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   casi puro (`strokeLow/High`), el tinte del arcoíris es leve (`tintSpectrumMix`) y el UV se acota
   (sin `continue` antes de muestrear: derivadas indefinidas = ruido en el borde). El engarce mide
   100 px del lienzo (`FACTION_SOCKET`) para que el detalle se alcance a ver.
+
+## Cartas premium: grado, placa de acrílico y mantenedor
+
+Un VTuber que dona recibe su carta **gradeada** (como las de CGC): entra en el 8 y sube 0,5 por
+cada mes que sigue donando, hasta el 10 y luego la **Black Label**. Escala: `8 → 8.5 → 9 → 9.5 → 10 → BL`.
+
+- **La escala vive UNA vez**, en `server/src/premium.mjs` (JS puro, sin Node ni DOM). Validación
+  (`validation.mjs`), regla (`mutations.mjs`), búsqueda (`search.mjs`) y cliente (`lib/premium.ts`
+  la reexporta) la importan; no la copies. El grado es **texto** (`'BL'` no es un número).
+- **Datos**: tabla `premium (vtuber_id PK, grade, since, graded_at)`, sin CHECK de la escala (SQLite
+  no deja alterarlo). Sin fila = carta normal. El certificado (`VTD-000017`) se **deriva del id**, no se guarda.
+  Se edita por el mismo PATCH de siempre: `{ premium: { grade } }` o `{ premium: null }` (`aplicarParche`),
+  así que **local (Express) y producción (diario de Turso) comparten la regla** sin código nuevo en las rutas.
+- **El diario sella el DÍA, no las fechas.** `aplicarYAnotar` llama a `sellarPremium`, que guarda
+  `premium.ahora`; qué fecha le toca a `since`/`gradedAt` la decide `aplicarPremium` con la fila que ya
+  existe. La primera versión sellaba `since` y **cada ascenso movía la fecha de alta a «hoy»** (lo cazó
+  `lib/diario.test.ts`). Reproducir el diario otro día no cambia nada.
+- **Una base empaquetada anterior no tiene la tabla** y se abre en SOLO LECTURA (no aplica el esquema):
+  `search.mjs` detecta `premium` (`tienePremium`, solo recuerda el SÍ) y devuelve `premium: null` en vez de
+  fallar con `no such table`. No hace falta regenerar `deploy/data/` para que el sitio siga sirviendo.
+- **Placa 3D** (`premium-slab.tsx`): envoltorio de `CardMeshes` cuando `card.premium` existe. De fuera a
+  dentro: cuerpo de acrílico (shader propio, transparente, `renderOrder` alto, sin `transmission` — un segundo
+  pase de toda la escena lo pagarían las 8 cartas del libro), la carta escalada en la ventana, y la hoja
+  interior con la etiqueta (lienzo 2D, `premium-label.ts`). **El alto de la placa es el de la funda**
+  (carta + 2 × `BINDER.pocketPad`): cabe en su casilla del libro sin tocar `card-binder-layout`. En el detalle
+  la cámara se aleja en esa proporción (`cameraZFor`). Todas las perillas están en `PREMIUM`
+  (`card3d-config.ts`). El resplandor de la carta se omite dentro de la placa (se pintaría sobre la etiqueta).
+- **Trampa del bisel** (ya documentada en la skill de three): `ExtrudeGeometry` con bisel EXPANDE el contorno;
+  `crearCuerpo` insetea la forma y `premium.test.tsx` mide la caja (`layout.width` exacto).
+- **Sección pública**: `?premium=1` es un filtro más (URL = estado): botón «★ Premium» en el catálogo y acceso
+  en la cabecera. **Mantenedor**: pestaña «Premium» (`admin/premium-manager.tsx`): alta, «Subir a …» (el gesto
+  mensual), fijar grado a mano, quitar. Avisa si el grado ya cambió este mes pero deja subir: la donación es
+  un dato que sabe una persona, el mantenedor no la calcula.
+- **Un re-seed con `--reset` borra las premium** (cascada desde `vtuber`), igual que el resto de ediciones.
+- `madKoding` (dex 16) es premium **grado 10 en la base LOCAL** (`data/vtuberdex.db`, ignorada por git). En
+  producción hay que asignarla desde el mantenedor (pestaña Premium), que escribe en el diario de Turso.
 
 ## Base de datos y migraciones
 

@@ -112,6 +112,22 @@ export function CatalogPage() {
                   )}
                 </button>
                 <SortSelect value={params.sort} onChange={(sort) => setParams({ sort, page: 1 })} />
+                {/*
+                  Sección premium: las cartas gradeadas (en placa de acrílico). Es un filtro más,
+                  así que vive en la URL (`?premium=1`) y un enlace compartido la conserva.
+                */}
+                <button
+                  type="button"
+                  aria-pressed={params.premium}
+                  onClick={() => setParams({ premium: !params.premium, page: 1 })}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold ${
+                    params.premium
+                      ? 'border-amber-300/70 bg-amber-300/15 text-amber-200'
+                      : 'border-dex-line bg-dex-panel text-dex-muted hover:border-amber-300/50 hover:text-amber-200'
+                  }`}
+                >
+                  <span aria-hidden>★</span> Premium
+                </button>
               </div>
 
             </div>
@@ -119,6 +135,17 @@ export function CatalogPage() {
             {/* Chips de filtros activos. */}
             {filterCount > 0 && (
               <ul className="flex flex-wrap gap-2">
+                {params.premium && (
+                  <li key="premium">
+                    <button
+                      type="button"
+                      onClick={() => setParams({ premium: false, page: 1 })}
+                      className="rounded-full border border-amber-300/50 bg-amber-300/10 px-3 py-1 text-xs text-amber-200"
+                    >
+                      ★ Premium ✕
+                    </button>
+                  </li>
+                )}
                 {params.q && (
                   <li key="query">
                     <button
@@ -156,6 +183,13 @@ export function CatalogPage() {
               </ul>
             )}
           </div>
+
+          {params.premium && (
+            <p data-testid="premium-intro" className="mb-4 rounded-xl border border-amber-300/30 bg-amber-300/5 px-4 py-3 text-sm text-dex-muted">
+              <span className="font-bold text-amber-200">Cartas premium.</span> VTubers que apoyan el proyecto: su carta se
+              guarda gradeada en una placa de acrílico y sube de grado (8 → 10 → Black Label) mientras siguen apoyando.
+            </p>
+          )}
 
           {error && (
             <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">

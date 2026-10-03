@@ -47,6 +47,23 @@ export interface VtuberImages {
  */
 export type UploadKind = 'character' | 'card' | 'thumb' | 'logo' | 'radar' | 'background';
 
+/** Un grado de la escala premium. Es texto: `'BL'` no es un número (ver `server/src/premium.mjs`). */
+export type PremiumGrade = '8' | '8.5' | '9' | '9.5' | '10' | 'BL';
+
+/**
+ * Datos de una carta PREMIUM (gradeada, dentro de una placa de acrílico). `null`/ausente en una
+ * carta normal, que es la inmensa mayoría.
+ */
+export interface PremiumInfo {
+  grade: PremiumGrade;
+  /** Alta como premium (AAAA-MM-DD). */
+  since: string;
+  /** Último cambio de grado (AAAA-MM-DD). */
+  gradedAt: string;
+  /** Número de certificado, derivado del id (`VTD-000017`). */
+  cert: string;
+}
+
 export interface VtuberCard {
   id: number;
   dexNumber: number;
@@ -79,6 +96,8 @@ export interface VtuberCard {
   statsPreview: number[];
   /** Cantidad de redes enlazadas, mostrada en el pie de la carta. */
   socialCount: number;
+  /** Carta premium: la 3D la dibuja dentro de una placa de acrílico con su etiqueta. */
+  premium?: PremiumInfo | null;
   images: VtuberImages;
 }
 
@@ -130,6 +149,8 @@ export interface VtuberDetail extends VtuberCard {
   socials: SocialRow[];
   assets: AssetRow[];
   experience: { current: number | null; max: number | null } | null;
+  /** Likes recibidos. La experiencia y el nivel ya vienen calculados con ellos (`server/src/experiencia.mjs`). */
+  likes?: number;
 }
 
 export interface FacetBucket {
@@ -182,6 +203,8 @@ export interface SearchParams {
   factions: string[];
   language: string | null;
   sort: SortKey;
+  /** Solo las cartas premium (gradeadas). */
+  premium: boolean;
   page: number;
   perPage: number;
 }
@@ -266,6 +289,8 @@ export interface VtuberPatch {
   stats?: StatInput[];
   skills?: SkillInput[];
   socials?: SocialInput[];
+  /** Carta premium: un grado de la escala, o `null` para devolverla a carta normal. */
+  premium?: { grade: PremiumGrade; since?: string; gradedAt?: string } | null;
 }
 
 /** Alta de una ficha: igual que el parche pero con `name` obligatorio. */
