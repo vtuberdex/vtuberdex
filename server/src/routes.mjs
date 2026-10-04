@@ -192,7 +192,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
         perPage,
         includeHidden: true,
         status: status === 'all' ? null : status,
-        premium: Boolean(premium),
+        premium: premium ? 'todas' : false,
         sort: 'dex',
       }),
     );

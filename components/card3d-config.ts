@@ -1508,8 +1508,55 @@ export const PREMIUM = {
       '9.5': ['#5d6677', '#3e4654'],
       '10': ['#d8b44d', '#a8802a'],
       BL: ['#17181d', '#050507'],
+      // Cartas degradadas: la banda se apaga del ocre al óxido y al gris sucio a medida que baja el grado.
+      '7': ['#7d7a52', '#575431'],
+      '6': ['#7a6b45', '#54482b'],
+      '5': ['#775a3e', '#503a24'],
+      '4': ['#6f4a37', '#4a2f21'],
+      '3': ['#66403a', '#432723'],
+      '2': ['#523b3b', '#342323'],
+      '1': ['#3a3636', '#1d1b1b'],
     } as Record<string, readonly [string, string]>,
   },
+} as const;
+
+/**
+ * DETERIORO de las cartas degradadas (grados 7…1 de `server/src/premium.mjs`).
+ *
+ * La carta de un VTuber dado de baja no se elimina: se rompe. `severidad` va de 1/7 (grado 7) a 1
+ * (grado 1) y cada efecto crece con ella; todos los números salen de aquí para que ajustar «cuánto
+ * se ve roto el 4» sea tocar UNA línea. Se dibujan sobre las capas 2D ANTES de subirlas a la GPU
+ * (`card-texture/deterioro.ts`), así que el shader no sabe que existen y no hay uniformes nuevos.
+ *
+ * Los trozos que faltan en los bordes se pintan del color de la VENTANA de la placa (`window`):
+ * la carta siempre va dentro de una placa, y un hueco ahí se lee como «falta un pedazo». Un hueco
+ * transparente no serviría: el shader rellena una capa 0 sin alfa con el degradado de marca.
+ */
+export const DETERIORO = {
+  /** Color de lo que se ve donde falta un trozo de carta: el de la ventana de la placa (`#0a0b10`). */
+  window: '#0a0b10',
+  /** Blanqueado del canto (el cartón al descubierto), como en una carta manoseada. */
+  whitening: { color: '#e8e4d8', depth: 0.022, alpha: 0.9 },
+  /**
+   * Trozos que faltan en los bordes. `depth` es la profundidad MÁXIMA como fracción del ancho; el
+   * número de mordidas es `count[0] + count[1] x severidad`.
+   */
+  chips: { depth: 0.16, count: [4, 26] as const, minSeverity: 0.12 },
+  /** Rayones: líneas claras (y, desde la mitad, surcos oscuros) que cruzan la carta. */
+  scratches: { count: [2, 46] as const, length: [0.12, 0.7] as const, alpha: [0.18, 0.7] as const, darkFrom: 0.5 },
+  /** Ruido de grano sobre todo el arte: `alpha` es el máximo con severidad 1. */
+  noise: { alpha: 0.78, tile: 192 },
+  /** Desgaste del color: se apaga hacia gris y se oscurece. */
+  fade: { gray: 0.62, dark: 0.35 },
+  /**
+   * Borrosidad/pixelado del personaje y del texto de la cabecera: lado del bloque en px del lienzo
+   * (1 = sin efecto). Por debajo de `pixelFrom` es una pérdida de foco suave; por encima, bloques.
+   */
+  blur: { maxBlock: 110, minSeverity: 0.25, pixelFrom: 0.6 },
+  /** Texto de la cabecera y de la etiqueta: fracción de letras corrompidas = `(s - from) x gain`. */
+  text: { from: 0.1, gain: 1.15, unreadableFrom: 0.95, glyphs: '#%&@*?/\\~=+<>' },
+  /** Con esta severidad la bandera del país ya no se imprime. */
+  hideCountryFrom: 0.55,
 } as const;
 
 /**

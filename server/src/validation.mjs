@@ -4,7 +4,7 @@
  */
 import { z } from 'zod';
 
-import { GRADOS } from './premium.mjs';
+import { TODOS_LOS_GRADOS } from './premium.mjs';
 
 export const listQuerySchema = z.object({
   q: z.string().max(120).optional().default(''),
@@ -72,7 +72,7 @@ const FECHA = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'fecha AAAA-MM-DD');
  */
 const premiumSchema = z
   .object({
-    grade: z.enum(GRADOS),
+    grade: z.enum(TODOS_LOS_GRADOS),
     since: FECHA.optional(),
     gradedAt: FECHA.optional(),
   })

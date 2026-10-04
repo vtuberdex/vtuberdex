@@ -8,6 +8,7 @@ import { drawSurfaceLayer } from './capa-superficie';
 import { drawCharacterLayer } from './capa-personaje';
 import { drawTitleLayer } from './capa-titulo';
 import { drawWordmarkLayer } from './capa-wordmark';
+import { deteriorarArte, deteriorarCabecera, deteriorarCanto, planDeCarta, tarjetaParaTitulo } from './deterioro';
 
 /** Genera todas las capas y la información de layout medida. */
 export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTURE_WIDTH, reutilizar }: CardDrawInfo): CardLayers {
@@ -93,6 +94,23 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
     barY,
   };
 
+  /**
+   * Cartas degradadas (grados 7…1): se estropea lo que se dibuja AQUÍ. Las capas que llegan por
+   * `reutilizar` ya vienen estropeadas de la etapa rápida (`generarRapida`); tocarlas otra vez
+   * duplicaría el daño. El wordmark es la capa de arriba y lleva el canto roto y los rayones.
+   */
+  const plan = planDeCarta(card);
+  const fondo = reutilizar?.background ?? drawSurfaceLayer({ card, background, width });
+  const personaje = reutilizar?.character ?? drawCharacterLayer({ art, width });
+  const titulo = reutilizar?.title ?? drawTitleLayer({ card: tarjetaParaTitulo(card), width });
+  const marca = drawWordmarkLayer({ card, width });
+  if (plan) {
+    if (!reutilizar?.background) deteriorarArte(fondo, plan);
+    if (!reutilizar?.character) deteriorarArte(personaje, plan);
+    if (!reutilizar?.title) deteriorarCabecera(titulo, plan);
+    deteriorarCanto(marca, plan);
+  }
+
   return {
     /**
      * CAPA 0: la SUPERFICIE de la carta, no una capa sobre ella.
@@ -103,8 +121,8 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
      * de la carta seguía siendo el degradado del shader. Ahora el degradado y el arte viven
      * AQUÍ, en el mismo canvas opaco, y el shader los trata como el sustrato de la carta.
      */
-    background: reutilizar?.background ?? drawSurfaceLayer({ card, background, width }),
-    character: reutilizar?.character ?? drawCharacterLayer({ art, width }),
+    background: fondo,
+    character: personaje,
     /**
      * La capa del logo se sirve VACÍA a propósito.
      *
@@ -128,7 +146,7 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
      * existe para no renumerar `uLayer2` ni las posiciones de PARALLAX_LAYERS.
      */
     logo: emptyLayer(),
-    title: reutilizar?.title ?? drawTitleLayer({ card, width }),
+    title: titulo,
     /**
      * CAPAS 4 y 5 VACÍAS: los textos y los tags SALIERON de la carta 3D.
      *
@@ -149,7 +167,7 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
      */
     texts: emptyLayer(),
     tags: emptyLayer(),
-    wordmark: drawWordmarkLayer({ card, width }),
+    wordmark: marca,
     info,
   };
 }

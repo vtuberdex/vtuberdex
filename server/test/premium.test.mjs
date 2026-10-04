@@ -17,13 +17,18 @@ import { searchVtubers, getVtuberBySlug, tienePremium } from '../src/search.mjs'
 import { vtuberUpdateSchema, listQuerySchema } from '../src/validation.mjs';
 import {
   GRADOS,
+  GRADOS_DEGRADADOS,
+  GRADO_DE_BAJA,
   GRADO_INICIAL,
   GRADO_MAXIMO,
+  TODOS_LOS_GRADOS,
   esBlackLabel,
+  esGradoDegradado,
   esGradoValido,
   gradoSiguiente,
   numeroDeCertificado,
   rangoDeGrado,
+  severidadDeGrado,
 } from '../src/premium.mjs';
 
 const vtuber = (dexNumber, slug, name) => ({
@@ -104,7 +109,8 @@ test('gradoSiguiente recorre la escala y se detiene en la Black Label', () => {
   for (let grado = GRADO_INICIAL; grado; grado = gradoSiguiente(grado)) recorrido.push(grado);
   assert.deepEqual(recorrido, [...GRADOS]);
   assert.equal(gradoSiguiente('BL'), null);
-  assert.equal(gradoSiguiente('7'), null, 'un grado que no existe no tiene siguiente');
+  assert.equal(gradoSiguiente('7'), null, 'un grado de deterioro no sube con las donaciones');
+  assert.equal(gradoSiguiente('11'), null, 'un grado que no existe no tiene siguiente');
   assert.equal(esBlackLabel('BL'), true);
   assert.equal(esBlackLabel('10'), false);
   assert.equal(rangoDeGrado('9.5'), 3);
@@ -162,14 +168,39 @@ test('un parche sin `premium` no toca el premium existente', () => {
 
 test('un grado fuera de la escala se rechaza, en la regla y en el esquema', () => {
   assert.throws(
-    () => aplicarParche(db, idDe('otra'), { premium: { grade: '7' } }),
+    () => aplicarParche(db, idDe('otra'), { premium: { grade: '11' } }),
     (error) => error instanceof MutationError && error.status === 400 && error.code === 'grado_invalido',
   );
-  assert.equal(vtuberUpdateSchema.safeParse({ premium: { grade: '7' } }).success, false);
+  assert.equal(vtuberUpdateSchema.safeParse({ premium: { grade: '11' } }).success, false);
+  assert.equal(vtuberUpdateSchema.safeParse({ premium: { grade: '7' } }).success, true, 'el 7 es de la escala de deterioro');
   assert.equal(vtuberUpdateSchema.safeParse({ premium: { grade: 8.5 } }).success, false, 'el grado viaja como texto');
   assert.equal(vtuberUpdateSchema.safeParse({ premium: { grade: 'BL' } }).success, true);
   assert.equal(vtuberUpdateSchema.safeParse({ premium: null }).success, true);
   assert.equal(vtuberUpdateSchema.safeParse({ premium: { grade: '9', since: 'ayer' } }).success, false);
+});
+
+test('la escala de deterioro va del 7 al 1 y severidadDeGrado crece hacia el 1', () => {
+  assert.deepEqual([...GRADOS_DEGRADADOS], ['7', '6', '5', '4', '3', '2', '1']);
+  assert.deepEqual([...TODOS_LOS_GRADOS], ['1', '2', '3', '4', '5', '6', '7', '8', '8.5', '9', '9.5', '10', 'BL']);
+  assert.equal(GRADO_DE_BAJA, '1');
+  assert.equal(severidadDeGrado('10'), 0, 'una premium no tiene daño');
+  assert.equal(severidadDeGrado('1'), 1);
+  const severidades = GRADOS_DEGRADADOS.map(severidadDeGrado);
+  severidades.slice(1).forEach((s, i) => assert.ok(s > severidades[i], 'cada grado está más roto que el anterior'));
+  assert.equal(esGradoDegradado('3'), true);
+  assert.equal(esGradoDegradado('8'), false);
+});
+
+test('una carta degradada se guarda, pero NO sale en la sección pública Premium', () => {
+  aplicarParche(db, idDe('otra'), { premium: { grade: '1' } });
+  try {
+    assert.equal(getVtuberBySlug(db, 'otra').premium.grade, '1');
+    assert.deepEqual(searchVtubers(db, { premium: true }).items.map((i) => i.slug), ['madkoding'], 'el público solo ve las premium');
+    const admin = searchVtubers(db, { premium: 'todas', includeHidden: true }).items.map((i) => i.slug).sort();
+    assert.deepEqual(admin, ['madkoding', 'otra'], 'el mantenedor ve también las degradadas');
+  } finally {
+    aplicarParche(db, idDe('otra'), { premium: null });
+  }
 });
 
 test('el filtro premium devuelve solo las gradeadas y cuenta bien', () => {

@@ -15,7 +15,18 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { api } from '@/lib/api';
 import { idDeCodigo } from '@/lib/donar';
-import { GRADOS, GRADO_INICIAL, gradoSiguiente, leyendaDePremium, mesesEntre, mismoMes } from '@/lib/premium';
+import {
+  GRADOS,
+  GRADOS_DEGRADADOS,
+  GRADO_DE_BAJA,
+  GRADO_INICIAL,
+  esGradoDegradado,
+  gradoSiguiente,
+  leyendaDePremium,
+  mesesEntre,
+  mismoMes,
+  nombreDeGrado,
+} from '@/lib/premium';
 import type { PremiumGrade, VtuberCard } from '@/lib/types';
 import { PremiumBadge } from '@/components/premium-badge';
 import { Reason, ghostButton, inputClass, labelClass, primaryButton } from '@/components/admin/ui';
@@ -42,6 +53,8 @@ export function PremiumManager({
   const [query, setQuery] = useState('');
   const [candidates, setCandidates] = useState<VtuberCard[]>([]);
   const [grade, setGrade] = useState<PremiumGrade>(GRADO_INICIAL);
+  /** Grado con el que se DEGRADA una ficha que no era premium (por defecto el de las bajas). */
+  const [gradeDeterioro, setGradeDeterioro] = useState<PremiumGrade>(GRADO_DE_BAJA);
   const say: Notify = (kind, text) => notify?.(kind, text);
 
   useEffect(() => {
@@ -137,6 +150,24 @@ export function PremiumManager({
             ))}
           </select>
         </label>
+        <label className={labelClass}>
+          Grado de deterioro
+          <select
+            aria-label="Grado de deterioro"
+            value={gradeDeterioro}
+            onChange={(event) => setGradeDeterioro(event.target.value as PremiumGrade)}
+            className={inputClass}
+          >
+            {GRADOS_DEGRADADOS.map((item) => (
+              <option key={item} value={item}>
+                {item === GRADO_DE_BAJA ? '1 · ilegible (baja)' : item} · {nombreDeGrado(item)}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-[11px] normal-case tracking-normal text-dex-muted">
+            «Degradar» deja la carta rota en una placa: el 7 apenas se nota, el 1 solo deja ver el número. Las bajas van al 1.
+          </span>
+        </label>
         <ul className="dex-scroll max-h-72 space-y-1 overflow-y-auto" data-testid="premium-candidates">
           {candidates.map((candidate) => (
             <li key={candidate.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-dex-muted hover:bg-white/5">
@@ -149,6 +180,14 @@ export function PremiumManager({
                 onClick={() => save(candidate, { grade }, `${candidate.name} ya es premium (${grade}).`)}
               >
                 Hacer premium
+              </button>
+              <button
+                type="button"
+                className={ghostButton}
+                disabled={busyId === candidate.id}
+                onClick={() => save(candidate, { grade: gradeDeterioro }, `${candidate.name} queda degradada (${gradeDeterioro}).`)}
+              >
+                Degradar
               </button>
             </li>
           ))}
@@ -171,6 +210,7 @@ export function PremiumManager({
           {rows.map((row) => {
             const premium = row.premium;
             if (!premium) return null;
+            const degradada = esGradoDegradado(premium.grade);
             const siguiente = gradoSiguiente(premium.grade);
             const subioEsteMes = mismoMes(premium.gradedAt);
             const busy = busyId === row.id;
@@ -187,10 +227,20 @@ export function PremiumManager({
                   <PremiumBadge premium={premium} />
                 </div>
                 <p className="mt-2 text-xs text-dex-muted">
-                  {premium.cert} · premium desde {premium.since} ({mesesEntre(premium.since)} meses) · último cambio de grado{' '}
-                  {premium.gradedAt}
+                  {premium.cert} · {degradada ? 'degradada' : 'premium'} desde {premium.since} ({mesesEntre(premium.since)} meses) ·
+                  último cambio de grado {premium.gradedAt}
                 </p>
                 <div className="mt-3 flex flex-wrap items-end gap-3">
+                  {degradada ? (
+                    <button
+                      type="button"
+                      className={ghostButton}
+                      disabled={busy || premium.grade === GRADO_DE_BAJA}
+                      onClick={() => save(row, { grade: GRADO_DE_BAJA }, `${row.name} queda ilegible (grado ${GRADO_DE_BAJA}).`)}
+                    >
+                      {premium.grade === GRADO_DE_BAJA ? 'Ya está en el grado 1' : 'Llevar al grado 1 (baja)'}
+                    </button>
+                  ) : (
                   <button
                     type="button"
                     className={primaryButton}
@@ -201,6 +251,7 @@ export function PremiumManager({
                   >
                     {siguiente ? `Subir a ${siguiente === 'BL' ? 'Black Label' : siguiente}` : 'Grado máximo'}
                   </button>
+                  )}
                   <label className={labelClass}>
                     Fijar grado
                     <select
@@ -212,11 +263,20 @@ export function PremiumManager({
                       }
                       className={`${inputClass} mt-1 w-28`}
                     >
-                      {GRADOS.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
+                      <optgroup label="Deterioro">
+                        {GRADOS_DEGRADADOS.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Premium">
+                        {GRADOS.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
                   </label>
                   {confirmingId === row.id ? (

@@ -7,7 +7,12 @@
  */
 import {
   GRADOS as GRADOS_SERVIDOR,
+  GRADOS_DEGRADADOS as GRADOS_DEGRADADOS_SERVIDOR,
+  GRADO_DE_BAJA as GRADO_DE_BAJA_SERVIDOR,
   GRADO_INICIAL as GRADO_INICIAL_SERVIDOR,
+  TODOS_LOS_GRADOS as TODOS_LOS_GRADOS_SERVIDOR,
+  esGradoDegradado as esGradoDegradadoServidor,
+  severidadDeGrado as severidadDeGradoServidor,
   NOMBRE_DE_GRADO,
   esBlackLabel as esBlackLabelServidor,
   gradoSiguiente as gradoSiguienteServidor,
@@ -23,6 +28,17 @@ export { hoy, numeroDeCertificado, rangoDeGrado };
 /** La escala completa, de menor a mayor. */
 export const GRADOS = GRADOS_SERVIDOR as readonly PremiumGrade[];
 export const GRADO_INICIAL = GRADO_INICIAL_SERVIDOR as PremiumGrade;
+
+/** La escala de deterioro (`7`…`1`), del menos al más dañado. */
+export const GRADOS_DEGRADADOS = GRADOS_DEGRADADOS_SERVIDOR as readonly PremiumGrade[];
+/** Todos los grados que el mantenedor puede fijar, de peor a mejor (`1 … 7 · 8 … BL`). */
+export const TODOS_LOS_GRADOS = TODOS_LOS_GRADOS_SERVIDOR as readonly PremiumGrade[];
+/** El grado de quien se dio de baja. */
+export const GRADO_DE_BAJA = GRADO_DE_BAJA_SERVIDOR as PremiumGrade;
+
+export const esGradoDegradado = (grado: string | null | undefined): boolean => esGradoDegradadoServidor(grado);
+/** 0 en un grado premium; de 1/7 (grado 7) a 1 (grado 1) en uno degradado. */
+export const severidadDeGrado = (grado: string | null | undefined): number => severidadDeGradoServidor(grado);
 
 export const gradoSiguiente = (grado: PremiumGrade): PremiumGrade | null =>
   gradoSiguienteServidor(grado) as PremiumGrade | null;
@@ -42,6 +58,7 @@ export const notaVisible = (grado: PremiumGrade): string => (esBlackLabel(grado)
 /** Leyenda corta para chips: `GEM MINT 10`, `NM/MT 8`, `PRISTINE 10 · BLACK LABEL`. */
 export function leyendaDePremium(premium: Pick<PremiumInfo, 'grade'>): string {
   const { grade } = premium;
+  if (esGradoDegradado(grade)) return `${nombreDeGrado(grade)} ${grade} · DETERIORADA`;
   return esBlackLabel(grade) ? 'PRISTINE 10 · BLACK LABEL' : `${nombreDeGrado(grade)} ${grade}`;
 }
 

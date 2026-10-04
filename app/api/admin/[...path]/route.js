@@ -360,7 +360,7 @@ async function listarVtubers(request) {
     perPage,
     includeHidden: true,
     status: status === 'all' ? null : status,
-    premium: Boolean(premium),
+    premium: premium ? 'todas' : false,
     sort: 'dex',
   });
   return NextResponse.json({ ...resultado, items: await aplicarReemplazosALista(resultado.items) });

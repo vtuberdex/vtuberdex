@@ -12,9 +12,10 @@
  * Sin contexto 2D (los tests de jsdom lo anulan a propósito) se devuelve el lienzo en blanco en
  * vez de fallar: la placa se ve sin rótulo, que es mejor que romper la carta entera.
  */
-import { PREMIUM } from '@/components/card3d-config';
+import { DETERIORO, PREMIUM } from '@/components/card3d-config';
 import type { SlabLayout } from '@/components/premium-layout';
-import { esBlackLabel, nombreDeGrado, notaVisible } from '@/lib/premium';
+import { corromperTexto, semillaDeCarta } from '@/lib/degradado';
+import { esBlackLabel, esGradoDegradado, nombreDeGrado, notaVisible, severidadDeGrado } from '@/lib/premium';
 import type { PremiumInfo } from '@/lib/types';
 
 /** Lo que la etiqueta necesita saber de la carta. */
@@ -160,7 +161,8 @@ function dibujarEtiqueta(ctx: CanvasRenderingContext2D, layout: SlabLayout, dato
   ctx.fillText('VTUBERDEX', x + pad, y + bandaH / 2 + 1);
   ctx.textAlign = 'right';
   ctx.font = `700 ${Math.round(bandaH * 0.4)}px ${FUENTE}`;
-  ctx.fillText(negra ? 'BLACK LABEL' : 'PREMIUM', x + w - pad, y + bandaH / 2 + 1);
+  const degradada = esGradoDegradado(grade);
+  ctx.fillText(negra ? 'BLACK LABEL' : degradada ? 'DETERIORADA' : 'PREMIUM', x + w - pad, y + bandaH / 2 + 1);
 
   // Bloque derecho: la nota en grande y su nombre. Una línea fina lo separa del texto.
   const bloqueDerecho = w * 0.3;
@@ -182,9 +184,18 @@ function dibujarEtiqueta(ctx: CanvasRenderingContext2D, layout: SlabLayout, dato
   const resto = h - bandaH;
   ctx.textAlign = 'left';
   ctx.fillStyle = colores.ink;
-  ctx.fillText(textoAjustado(ctx, datos.name.toUpperCase(), anchoTexto, Math.round(resto * 0.26), '800'), x + pad, y + bandaH + resto * 0.26);
+  /**
+   * En una carta degradada la etiqueta se rompe igual que la carta: el nombre y el país se
+   * corrompen con la MISMA semilla y severidad que la cabecera (`card-texture/deterioro.ts`), y en
+   * el grado 1 solo queda legible el número de dex.
+   */
+  const severidad = severidadDeGrado(grade);
+  const semilla = semillaDeCarta(Number(cert.replace(/\D/g, '')) || 0, grade);
+  const nombre = corromperTexto(datos.name.toUpperCase(), severidad, semilla);
+  const pais = datos.country && severidad >= DETERIORO.hideCountryFrom ? null : datos.country;
+  ctx.fillText(textoAjustado(ctx, nombre, anchoTexto, Math.round(resto * 0.26), '800'), x + pad, y + bandaH + resto * 0.26);
   ctx.fillStyle = colores.mutedInk;
-  const sub = [`#${String(datos.dexNumber).padStart(3, '0')}`, datos.country].filter(Boolean).join(' · ');
+  const sub = [`#${String(datos.dexNumber).padStart(3, '0')}`, pais].filter(Boolean).join(' · ');
   ctx.fillText(textoAjustado(ctx, sub, anchoTexto, Math.round(resto * 0.17), '600'), x + pad, y + bandaH + resto * 0.5);
 
   const barraY = y + bandaH + resto * 0.64;

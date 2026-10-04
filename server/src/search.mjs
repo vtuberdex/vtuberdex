@@ -8,7 +8,7 @@
  *   · orden configurable (dex, A-Z, poder),
  *   · conteos de facetas calculados en la base, no recorriendo 785 divs.
  */
-import { numeroDeCertificado } from './premium.mjs';
+import { GRADOS, numeroDeCertificado } from './premium.mjs';
 import { normalizeText } from './text.mjs';
 
 const SORT_SQL = {
@@ -227,7 +227,10 @@ export function searchVtubers(db, params = {}) {
     status = null,
     minPower = null,
     theme = null,
-    /** Solo las cartas premium (gradeadas). */
+    /**
+     * Solo las cartas premium (gradeadas): `true` = las de la escala premium (8…BL), que es lo que
+     * ve el público; `'todas'` suma las DEGRADADAS (7…1), que solo lista el mantenedor.
+     */
     premium = false,
   } = params;
 
@@ -241,7 +244,12 @@ export function searchVtubers(db, params = {}) {
   }
   if (premium) {
     // Sin la tabla no hay ninguna premium: el filtro devuelve vacío en vez de fallar.
-    where.push(tienePremium(db) ? 'EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id)' : '0');
+    if (!tienePremium(db)) where.push('0');
+    else if (premium === 'todas') where.push('EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id)');
+    else {
+      where.push(`EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id AND p.grade IN (${GRADOS.map(() => '?').join(',')}))`);
+      args.push(...GRADOS);
+    }
   }
   if (theme) {
     where.push('v.theme_color = ?');

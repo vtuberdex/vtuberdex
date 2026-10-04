@@ -39,9 +39,9 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 419 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 428 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
-cd server  && npm test     # 88 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
+cd server  && npm test     # 90 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
 # Linter (raíz; cubre también server/ y scraper/)
 npm run lint               # eslint . — falla con cualquier error
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/88/419** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/90/428** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -260,6 +260,36 @@ cada mes que sigue donando, hasta el 10 y luego la **Black Label**. Escala: `8 �
 - **Un re-seed con `--reset` borra las premium** (cascada desde `vtuber`), igual que el resto de ediciones.
 - `madKoding` (dex 16) es premium **grado 10 en la base LOCAL** (`data/vtuberdex.db`, ignorada por git). En
   producción hay que asignarla desde el mantenedor (pestaña Premium), que escribe en el diario de Turso.
+
+## Cartas degradadas (grados 7…1): las bajas se rompen, no se borran
+
+La contraparte de la premium. Una ficha dada de baja no se elimina (cláusula de salida de `/terminos`): se muestra
+**gradeada en su placa de acrílico, pero rota**. Escala `7` (apenas desgastada) → `1` (ilegible; es el de las bajas).
+Los asigna a mano el mantenedor (pestaña «Premium»: «Degradar», «Fijar grado», «Llevar al grado 1 (baja)»); **nada los
+calcula ni «procesar» una baja los aplica solo**.
+
+- **Misma tabla, misma regla**: `premium.grade` acepta también `'7'…'1'` (`TODOS_LOS_GRADOS` en `server/src/premium.mjs`, que
+  también define `GRADOS_DEGRADADOS`, `esGradoDegradado` y `severidadDeGrado`: 1/7 en el 7, 1 en el 1). `GRADOS` sigue siendo la
+  escala PREMIUM y `gradoSiguiente` no sube una degradada: las donaciones no arreglan una carta rota.
+- **El filtro público `?premium=1` NO lista las degradadas** (`search.mjs`: `premium: true` filtra por `GRADOS`); el mantenedor
+  pide `premium: 'todas'` (rutas `/api/admin/vtubers` de Express y de Next) para verlas.
+- **El daño se pinta en las capas 2D ANTES de subirlas a la GPU** (`card-texture/deterioro.ts`), así que el shader no cambió: ni
+  uniformes ni samplers nuevos. Qué se rompe lo decide `lib/degradado.ts` (puro, probado, DETERMINISTA por id+grado: la carta no
+  «baila» al volver de otra página) y las perillas están en `DETERIORO` (`card3d-config.ts`).
+- **Reparto por capa, a propósito**: los mordiscos de los bordes, el canto blanqueado y los rayones van SOLO en la capa de arriba
+  (wordmark). Las capas se desplazan distinto con el puntero (`PARALLAX_LAYERS`), y el mismo mordisco en todas salía doble y
+  desfasado. Superficie y personaje reciben apagado de color, grano y pérdida de foco/pixelado; la cabecera, nombre corrompido
+  (`corromperTexto`) y **la placa del número de dex queda siempre intacta** (en el grado 1 es lo único que se entiende).
+- **Los huecos se pintan del color de la ventana de la placa** (`DETERIORO.window`), no transparentes: el shader rellena una capa 0
+  sin alfa con el degradado de marca, así que un hueco transparente no se vería como hueco.
+- **El grado va en la clave de la caché de texturas** (`claveDe` en `fabrica.ts`); sin eso el mantenedor seguiría viendo la textura
+  vieja al cambiar el grado. `generarRapida` estropea las capas y `completar` las reutiliza; `drawCardLayers` solo estropea las que
+  dibuja él (no se daña dos veces).
+- La etiqueta de la placa (`premium-label.ts`) corrompe nombre y país con la misma semilla y dice «DETERIORADA»; el foil se apaga
+  (`premium-boost.ts`, nunca por debajo de 0,35 para que siga reaccionando al puntero).
+- **Pendiente deliberado**: solo se degrada la CARTA 3D. El nombre en el DOM (ficha, enlaces `sr-only`, `<title>`) sigue legible.
+- Para ver el resultado sin WebGL ni base de datos: bundlear `drawCardFront` con `esbuild --alias:@=.` y dibujar los grados en
+  Chromium (`/opt/pw-browsers`); es lo que se hizo para calibrar `DETERIORO`.
 
 ## SEO: qué dice el servidor sin JavaScript
 
