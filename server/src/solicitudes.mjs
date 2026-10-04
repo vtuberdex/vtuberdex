@@ -140,6 +140,39 @@ const aceptacion = {
   website: z.string().max(200).optional().default(''),
 };
 
+/**
+ * Los datos de la 2.ª página que son texto corto y OBLIGATORIOS. La clave es la del formulario;
+ * `PERFIL_ETIQUETAS` dice cómo se llama cada uno en la ficha (`profile`) y cuáles tienen columna propia.
+ */
+const perfilObligatorio = Object.fromEntries(
+  [
+    ['height', 40, 'la estatura'],
+    ['birthday', 80, 'el cumpleaños'],
+    ['favoriteFood', 120, 'la comida favorita'],
+    ['dislikedFood', 120, 'la comida que te desagrada'],
+    ['favoriteGame', 120, 'el videojuego favorito'],
+    ['favoriteSeries', 120, 'la serie favorita'],
+    ['favoriteMusic', 120, 'la música favorita'],
+    ['favoriteAnime', 120, 'el anime favorito'],
+    ['favoriteAnimal', 120, 'el animal favorito'],
+    ['favoriteColor', 80, 'el color favorito'],
+    ['modeler', 80, 'quién hizo el modelo'],
+    ['hashtag', 120, 'el hashtag de arte'],
+  ].map(([clave, max, que]) => [clave, texto(max).min(1, `falta ${que}`)]),
+);
+
+/** Campos de la inscripción que no tienen columna en la ficha: van como filas de `profile` (etiqueta → clave). */
+const PERFIL_ETIQUETAS = [
+  ['Comida favorita', 'favoriteFood'],
+  ['Comida que desagrada', 'dislikedFood'],
+  ['Videojuego favorito', 'favoriteGame'],
+  ['Serie favorita', 'favoriteSeries'],
+  ['Música favorita', 'favoriteMusic'],
+  ['Anime favorito', 'favoriteAnime'],
+  ['Animal favorito', 'favoriteAnimal'],
+  ['Signo', 'zodiac'],
+];
+
 export const inscripcionSchema = z.object({
   /** Nombre con el que aparecerá la ficha. */
   name: texto(160).min(1, 'falta el nombre artístico'),
@@ -147,18 +180,23 @@ export const inscripcionSchema = z.object({
   email: correo,
   /** CONFIDENCIAL y opcional. */
   realName: textoOpcional(160),
-  country: texto(60).min(1, 'falta el país'),
+  /** Opcional: se pide en la 2.ª página del formulario. */
+  country: textoOpcional(60),
   languages: z.array(texto(8).min(2)).min(1, 'indica al menos un idioma').max(6),
   phrase: textoOpcional(600),
-  cardText: textoOpcional(4000),
+  /** Lore: la historia que va en la carta. Obligatorio (2.ª página). */
+  cardText: texto(4000).min(1, 'falta el lore'),
+  ...perfilObligatorio,
+  zodiac: textoOpcional(40),
   themeColor: z
     .string()
     .trim()
     .regex(/^#[0-9a-fA-F]{6}$/, 'color hexadecimal #rrggbb')
     .optional()
     .or(z.literal('')),
-  /** Dónde está el arte del personaje: el mantenedor lo descarga y lo sube; el formulario no recibe archivos. */
-  imageUrl: urlHttp.optional().or(z.literal('')),
+  /** Dónde está el avatar (arte del personaje) y el logo: el mantenedor los descarga y los sube; el formulario no recibe archivos. */
+  imageUrl: urlHttp,
+  logoUrl: urlHttp,
   socials: z
     .array(z.object({ platform: texto(40).min(1), url: urlHttp }))
     .min(1, 'indica al menos una red o canal donde se te pueda ver')
@@ -333,5 +371,10 @@ export function fichaDesdeInscripcion(solicitud) {
   if (d.phrase) ficha.phrase = d.phrase;
   if (d.cardText) ficha.cardText = d.cardText;
   if (d.themeColor) ficha.themeColor = d.themeColor;
+  // Estos cuatro tienen columna propia en la ficha; el resto va como filas de `profile`.
+  for (const clave of ['height', 'birthday', 'hashtag', 'favoriteColor']) if (d[clave]) ficha[clave] = d[clave];
+  if (d.modeler) ficha.artists = [d.modeler];
+  const profile = PERFIL_ETIQUETAS.filter(([, clave]) => d[clave]).map(([label, clave]) => ({ label, value: d[clave] }));
+  if (profile.length) ficha.profile = profile;
   return ficha;
 }

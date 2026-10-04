@@ -125,8 +125,22 @@ export function SolicitudesManager({
                     <Dato k="Idiomas" v={Array.isArray(s.datos.languages) ? (s.datos.languages as string[]).join(', ') : ''} />
                     <Dato k="Color" v={texto(s.datos.themeColor)} />
                     <Dato k="Frase" v={texto(s.datos.phrase)} ancho />
-                    <Dato k="Descripción" v={texto(s.datos.cardText)} ancho />
-                    <Dato k="Arte" v={texto(s.datos.imageUrl)} ancho enlace />
+                    <Dato k="Lore" v={texto(s.datos.cardText)} ancho />
+                    <Dato k="Signo" v={texto(s.datos.zodiac)} />
+                    <Dato k="Estatura" v={texto(s.datos.height)} />
+                    <Dato k="Cumpleaños" v={texto(s.datos.birthday)} />
+                    <Dato k="Color favorito" v={texto(s.datos.favoriteColor)} />
+                    <Dato k="Comida favorita" v={texto(s.datos.favoriteFood)} />
+                    <Dato k="Comida que desagrada" v={texto(s.datos.dislikedFood)} />
+                    <Dato k="Videojuego" v={texto(s.datos.favoriteGame)} />
+                    <Dato k="Serie" v={texto(s.datos.favoriteSeries)} />
+                    <Dato k="Música" v={texto(s.datos.favoriteMusic)} />
+                    <Dato k="Anime" v={texto(s.datos.favoriteAnime)} />
+                    <Dato k="Animal" v={texto(s.datos.favoriteAnimal)} />
+                    <Dato k="Modelo (autoría)" v={texto(s.datos.modeler)} />
+                    <Dato k="Hashtag de arte" v={texto(s.datos.hashtag)} />
+                    <Dato k="Avatar" v={texto(s.datos.imageUrl)} ancho enlace />
+                    <Dato k="Logo" v={texto(s.datos.logoUrl)} ancho enlace />
                     {redes.map((r, i) => (
                       <Dato key={i} k={r.platform} v={r.url} ancho enlace />
                     ))}
