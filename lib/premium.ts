@@ -21,6 +21,7 @@ import {
   rangoDeGrado,
 } from '@/server/src/premium.mjs';
 
+import { esFichaDeteriorada as esFichaDeterioradaServidor } from '@/server/src/ficha-deteriorada.mjs';
 import type { PremiumGrade, PremiumInfo } from '@/lib/types';
 
 export { hoy, numeroDeCertificado, rangoDeGrado };
@@ -76,3 +77,7 @@ export function mesesEntre(desde: string, hasta: string = hoy()): number {
 
 /** ¿Es el mismo mes calendario? (`AAAA-MM`). */
 export const mismoMes = (a: string, b: string = hoy()): boolean => a.slice(0, 7) === b.slice(0, 7);
+
+/** ¿Es una ficha deteriorada (grado 1, la de las bajas)? El público no ve sus datos ni su logo. */
+export const esFichaDeteriorada = (cartaOGrado: { premium?: { grade: string } | null } | string | null | undefined): boolean =>
+  esFichaDeterioradaServidor(cartaOGrado);

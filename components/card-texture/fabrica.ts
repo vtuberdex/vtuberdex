@@ -32,6 +32,7 @@ import type { VtuberCard } from '@/lib/types';
 import { TEXTURAS } from '@/components/card3d-config';
 import { CARD_TEXTURE_FULL_WIDTH } from './dimensiones';
 import { drawCardLayers } from './componer';
+import { esFichaDeteriorada } from '@/lib/premium';
 import { deteriorarArte, deteriorarCabecera, planDeCarta, tarjetaParaTitulo } from './deterioro';
 import { drawSurfaceLayer } from './capa-superficie';
 import { drawCharacterLayer } from './capa-personaje';
@@ -225,10 +226,12 @@ export async function completar(card: VtuberCard, fuentes: Fuentes, rapida: Text
   let msCpu = 0;
   let t0 = performance.now();
   const [background, character, , title] = rapida.layers;
+  // Una ficha deteriorada (grado 1) no muestra su logo, ni siquiera donde la API lo devuelve (mantenedor).
+  const logoVisible = esFichaDeteriorada(card) ? null : fuentes.logo;
   const capas = drawCardLayers({
     card,
     art: fuentes.art,
-    logo: fuentes.logo,
+    logo: logoVisible,
     background: fuentes.background,
     width,
     reutilizar: { background, character, title },
@@ -259,8 +262,8 @@ export async function completar(card: VtuberCard, fuentes: Fuentes, rapida: Text
   }
 
   const logoBox = capas.info.logoBox;
-  const conLogo = Boolean(logoBox && fuentes.logo);
-  const sticker = conLogo ? logoSticker(fuentes.logo!, logoBox!, width, height) : emptyLayer();
+  const conLogo = Boolean(logoBox && logoVisible);
+  const sticker = conLogo ? logoSticker(logoVisible!, logoBox!, width, height) : emptyLayer();
   msCpu += performance.now() - t0;
 
   // Las máscaras preparan su origen en este hilo y calculan en el worker: el tiempo de
@@ -268,7 +271,7 @@ export async function completar(card: VtuberCard, fuentes: Fuentes, rapida: Text
   t0 = performance.now();
   const [edge, logoMask] = await Promise.all([
     inkAndSkinMaskAsync(flat, width, height),
-    conLogo ? logoMaskAsync(fuentes.logo!, logoBox!, width, height) : Promise.resolve(emptyLayer()),
+    conLogo ? logoMaskAsync(logoVisible!, logoBox!, width, height) : Promise.resolve(emptyLayer()),
   ]);
   const esperaMascaras = performance.now() - t0;
 

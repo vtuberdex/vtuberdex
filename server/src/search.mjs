@@ -8,7 +8,8 @@
  *   · orden configurable (dex, A-Z, poder),
  *   · conteos de facetas calculados en la base, no recorriendo 785 divs.
  */
-import { GRADOS, numeroDeCertificado } from './premium.mjs';
+import { GRADOS, GRADO_DE_BAJA, numeroDeCertificado } from './premium.mjs';
+import { ocultarFichaDeteriorada } from './ficha-deteriorada.mjs';
 import { normalizeText } from './text.mjs';
 
 const SORT_SQL = {
@@ -276,6 +277,11 @@ export function searchVtubers(db, params = {}) {
       where.push('(v.search_name LIKE ? OR v.card_text LIKE ? OR v.dex_number = ?)');
       args.push(like, like, Number(term) || -1);
     }
+    // Buscar por texto no puede revelar a quien se dio de baja: una ficha deteriorada no sale por su nombre.
+    if (!includeHidden && tienePremium(db)) {
+      where.push('NOT EXISTS (SELECT 1 FROM premium pb WHERE pb.vtuber_id = v.id AND pb.grade = ?)');
+      args.push(GRADO_DE_BAJA);
+    }
   }
 
   const countryList = normalizeCountryFilters(countries);
@@ -335,7 +341,8 @@ export function searchVtubers(db, params = {}) {
     .all(...args, safePerPage, offset);
 
   return {
-    items: rows.map(mapCard),
+    // El público no ve los datos de una ficha deteriorada; el mantenedor (`includeHidden`) sí.
+    items: includeHidden ? rows.map(mapCard) : rows.map((row) => ocultarFichaDeteriorada(mapCard(row))),
     total,
     page: safePage,
     perPage: safePerPage,
@@ -459,6 +466,9 @@ export function getVtuberBySlug(db, slug, { includeHidden = false } = {}) {
     if (alias) row = db.prepare(`${cardSelect(db)} WHERE v.id = ? ${where}`).get(alias);
   }
   if (!row) return null;
+  // Una ficha deteriorada (baja) no tiene página pública: es un 404, igual que un borrador. Así ni el
+  // nombre ni nada de la ficha se puede leer por la URL, ni por la API, ni por un alias antiguo.
+  if (!includeHidden && row.premiumGrade === GRADO_DE_BAJA) return null;
   const card = mapCard(row);
 
   card.profile = db
@@ -487,11 +497,15 @@ export function getVtuberBySlug(db, slug, { includeHidden = false } = {}) {
 
 /** Vecinos de dex de una carta (para navegar sin volver al catálogo). */
 export function getNeighbors(db, dexNumber) {
+  // Los vecinos son enlaces a fichas: una deteriorada no tiene página, así que se salta.
+  const sinBajas = tienePremium(db)
+    ? `AND NOT EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = vtuber.id AND p.grade = '${GRADO_DE_BAJA}')`
+    : '';
   const prev = db
-    .prepare(`SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number < ? AND status = 'published' ORDER BY dex_number DESC LIMIT 1`)
+    .prepare(`SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number < ? AND status = 'published' ${sinBajas} ORDER BY dex_number DESC LIMIT 1`)
     .get(dexNumber);
   const next = db
-    .prepare(`SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number > ? AND status = 'published' ORDER BY dex_number ASC LIMIT 1`)
+    .prepare(`SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number > ? AND status = 'published' ${sinBajas} ORDER BY dex_number ASC LIMIT 1`)
     .get(dexNumber);
   return { prev: plain(prev ?? null), next: plain(next ?? null) };
 }

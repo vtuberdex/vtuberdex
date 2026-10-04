@@ -41,7 +41,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 # Tests (desde la raíz)
 npm test                   # 428 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
-cd server  && npm test     # 90 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
+cd server  && npm test     # 93 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
 # Linter (raíz; cubre también server/ y scraper/)
 npm run lint               # eslint . — falla con cualquier error
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/90/428** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/93/428** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -287,7 +287,14 @@ calcula ni «procesar» una baja los aplica solo**.
   dibuja él (no se daña dos veces).
 - La etiqueta de la placa (`premium-label.ts`) corrompe nombre y país con la misma semilla y dice «DETERIORADA»; el foil se apaga
   (`premium-boost.ts`, nunca por debajo de 0,35 para que siga reaccionando al puntero).
-- **Pendiente deliberado**: solo se degrada la CARTA 3D. El nombre en el DOM (ficha, enlaces `sr-only`, `<title>`) sigue legible.
+- **Grado 1 = SIN FICHA** (`server/src/ficha-deteriorada.mjs` + `search.mjs`). Una ficha de baja no tiene página pública: `getVtuberBySlug`
+  sin `includeHidden` devuelve `null` (404 en `/v/:slug`, en la API, por alias antiguo y en el metadata), `getNeighbors` y
+  `fichasPublicadas` (sitemap y JSON-LD) la saltan, el libro no la enlaza ni responde al toque y buscar su nombre no la encuentra. En el
+  LISTADO sigue saliendo como carta rota, con el nombre ilegible, `slug: deteriorada-<dex>` (la URL real delataría el nombre), sin textos,
+  país, facciones, redes ni **logo** (`images.logo` nulo; la carta 3D tampoco lo pinta, ni en la vista del mantenedor). **El mantenedor
+  (`includeHidden`) la ve entera** y puede devolverla a un grado normal; nada se borra de la base. Solo el grado 1: del 7 al 2 la ficha
+  y su página son normales. Antes se probó una página «Ficha Deteriorada» con los datos vaciados; se descartó porque cualquier ruta que
+  llegue a la ficha (URL, vecino, buscador) es una fuga del nombre.
 - Para ver el resultado sin WebGL ni base de datos: bundlear `drawCardFront` con `esbuild --alias:@=.` y dibujar los grados en
   Chromium (`/opt/pw-browsers`); es lo que se hizo para calibrar `DETERIORO`.
 

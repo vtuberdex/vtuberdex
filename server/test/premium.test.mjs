@@ -13,7 +13,7 @@ import { seedDatabase } from '../src/seed.mjs';
 import { openDatabase } from '../src/db/index.mjs';
 import { hashPassword } from '../src/auth.mjs';
 import { MutationError, aplicarParche, aplicarOperacion, sellarPremium } from '../src/mutations.mjs';
-import { searchVtubers, getVtuberBySlug, tienePremium } from '../src/search.mjs';
+import { searchVtubers, getVtuberBySlug, getNeighbors, tienePremium } from '../src/search.mjs';
 import { vtuberUpdateSchema, listQuerySchema } from '../src/validation.mjs';
 import {
   GRADOS,
@@ -194,10 +194,56 @@ test('la escala de deterioro va del 7 al 1 y severidadDeGrado crece hacia el 1',
 test('una carta degradada se guarda, pero NO sale en la sección pública Premium', () => {
   aplicarParche(db, idDe('otra'), { premium: { grade: '1' } });
   try {
-    assert.equal(getVtuberBySlug(db, 'otra').premium.grade, '1');
+    assert.equal(getVtuberBySlug(db, 'otra', { includeHidden: true }).premium.grade, '1', 'el mantenedor la ve');
     assert.deepEqual(searchVtubers(db, { premium: true }).items.map((i) => i.slug), ['madkoding'], 'el público solo ve las premium');
     const admin = searchVtubers(db, { premium: 'todas', includeHidden: true }).items.map((i) => i.slug).sort();
     assert.deepEqual(admin, ['madkoding', 'otra'], 'el mantenedor ve también las degradadas');
+  } finally {
+    aplicarParche(db, idDe('otra'), { premium: null });
+  }
+});
+
+test('una ficha en grado 1 no tiene página pública: ni nombre, ni URL, ni vecinos; el mantenedor la ve entera', () => {
+  const id = idDe('otra');
+  db.prepare("UPDATE vtuber SET phrase = 'frase privada', card_text = 'historia privada' WHERE id = ?").run(id);
+  aplicarParche(db, id, { premium: { grade: '1' }, socials: [{ platform: 'x', url: 'https://x.com/otra' }] });
+  try {
+    assert.equal(getVtuberBySlug(db, 'otra'), null, 'el detalle público es un 404');
+    assert.equal(getVtuberBySlug(db, 'otra', { includeHidden: false }), null);
+
+    // Tampoco por un alias antiguo de la URL.
+    db.prepare('INSERT INTO slug_alias (slug, vtuber_id) VALUES (?, ?)').run('otra-vieja', id);
+    assert.equal(getVtuberBySlug(db, 'otra-vieja'), null);
+
+    const lista = searchVtubers(db, {}).items.find((i) => i.dexNumber === 31);
+    assert.ok(lista, 'sigue en el catálogo (como carta rota)');
+    assert.notEqual(lista.name, 'Otra');
+    assert.doesNotMatch(lista.name, /[A-Za-z]/);
+    assert.equal(lista.slug, 'deteriorada-31', 'la URL real no sale en el listado');
+    assert.equal(lista.phrase, null);
+    assert.equal(lista.images.logo, null);
+    assert.equal(lista.dexNumber, 31, 'el número de dex se conserva');
+    assert.equal(lista.premium.grade, '1');
+    assert.equal(searchVtubers(db, { q: 'otra' }).total, 0, 'buscar por su nombre no la encuentra');
+
+    assert.equal(getNeighbors(db, 30).next, null, 'no es vecino de nadie: no tiene página a la que ir');
+
+    const admin = getVtuberBySlug(db, 'otra', { includeHidden: true });
+    assert.equal(admin.name, 'Otra', 'el mantenedor la ve entera');
+    assert.equal(admin.phrase, 'frase privada');
+    assert.equal(admin.socials.length, 1);
+    assert.equal(searchVtubers(db, { q: 'otra', includeHidden: true }).total, 1);
+  } finally {
+    db.prepare('DELETE FROM slug_alias WHERE slug = ?').run('otra-vieja');
+    aplicarParche(db, id, { premium: null, socials: [] });
+  }
+  assert.equal(getVtuberBySlug(db, 'otra').name, 'Otra', 'sin el grado 1 vuelve a tener página');
+});
+
+test('en el grado 2 la ficha NO se oculta: solo el 1 es la ficha deteriorada', () => {
+  aplicarParche(db, idDe('otra'), { premium: { grade: '2' } });
+  try {
+    assert.equal(getVtuberBySlug(db, 'otra').name, 'Otra');
   } finally {
     aplicarParche(db, idDe('otra'), { premium: null });
   }
@@ -277,6 +323,34 @@ test('HTTP: el mantenedor asigna y quita el premium y el filtro público lo refl
   assert.equal(quitar.status, 200);
   assert.equal((await quitar.json()).premium, null);
   assert.equal((await (await fetch(`${baseUrl}/api/vtubers?premium=1`)).json()).total, 1);
+});
+
+test('HTTP: una ficha en grado 1 da 404 al público pero el mantenedor sigue pudiendo verla y editarla', async () => {
+  const id = idDe('otra');
+  assert.equal((await admin('PATCH', `/vtubers/${id}`, { premium: { grade: '1' } })).status, 200);
+  try {
+    // Público: sin página, sin datos.
+    assert.equal((await fetch(`${baseUrl}/api/vtubers/otra`)).status, 404);
+    const listado = await (await fetch(`${baseUrl}/api/vtubers?perPage=100`)).json();
+    assert.ok(!JSON.stringify(listado).includes('"Otra"'), 'el nombre real no sale en el listado público');
+
+    // Mantenedor: la ficha sigue ahí, entera.
+    const detalle = await admin('GET', `/vtubers/${id}`);
+    assert.equal(detalle.status, 200);
+    assert.equal((await detalle.json()).name, 'Otra');
+    assert.ok((await (await admin('GET', '/vtubers?q=otra')).json()).items.some((i) => i.name === 'Otra'), 'aparece en su listado');
+
+    // Y se puede seguir editando.
+    const editada = await admin('PATCH', `/vtubers/${id}`, { phrase: 'sigue editable' });
+    assert.equal(editada.status, 200);
+    const cuerpo = await editada.json();
+    assert.equal(cuerpo.name, 'Otra');
+    assert.equal(cuerpo.phrase, 'sigue editable');
+    assert.equal(cuerpo.premium.grade, '1');
+  } finally {
+    await admin('PATCH', `/vtubers/${id}`, { premium: null, phrase: null });
+  }
+  assert.equal((await fetch(`${baseUrl}/api/vtubers/otra`)).status, 200, 'al quitar el grado vuelve a tener página');
 });
 
 test('HTTP: un grado inválido da 400 y no toca la ficha', async () => {

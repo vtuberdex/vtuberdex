@@ -54,6 +54,7 @@ import { BINDER } from '@/components/card3d-config';
 import { pickCardQuality } from '@/components/card-quality';
 import { CardMeshes, Rig, WebGLBoundary, usePointerTilt } from '@/components/holo-card';
 import { RenderGovernor } from '@/components/render-governor';
+import { esFichaDeteriorada } from '@/lib/premium';
 import { useWebGLRecovery } from '@/components/webgl-recovery';
 import { CardEnvContext, useCardMaterials, useSharedCardEnv, type SharedCardEnv } from '@/components/card-material';
 import {
@@ -577,7 +578,8 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
     gesture.current = null;
   };
 
-  const onOpen = useCallback((card: VtuberCard) => router.push(`/v/${card.slug}`), [router]);
+  // Una ficha deteriorada (baja) no tiene página: tocarla no lleva a ninguna parte.
+  const onOpen = useCallback((card: VtuberCard) => !esFichaDeteriorada(card) && router.push(`/v/${card.slug}`), [router]);
 
   // Durante un giro, la página entrante no se muestra hasta que sus datos llegan (otro
   // array de `items` y sin carga en vuelo); sin giro (cambio de filtros) se mantiene lo
@@ -639,7 +641,7 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
           </WebGLBoundary>
         )}
         <ul className="sr-only">
-          {items.map((card) => (
+          {items.filter((card) => !esFichaDeteriorada(card)).map((card) => (
             <li key={card.id}>
               <Link href={`/v/${card.slug}`} data-testid="binder-link" data-dex={card.dexNumber}>
                 {card.name}, VTuber número {card.dexNumber}
