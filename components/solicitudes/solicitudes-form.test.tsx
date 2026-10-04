@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event';
 
 import { BajaForm } from '@/components/solicitudes/baja-form';
 import { InscripcionForm } from '@/components/solicitudes/inscripcion-form';
+import { ModificacionForm } from '@/components/solicitudes/modificacion-form';
 import { ApiError, api } from '@/lib/api';
 import { TERMINOS_VERSION } from '@/lib/terminos';
 
@@ -149,5 +150,60 @@ describe('BajaForm', () => {
     await waitFor(() => expect(enviar).toHaveBeenCalledOnce());
     expect(enviar.mock.calls[0][0]).toMatchObject({ ficha: '/v/luna', aceptaTerminos: true, terminosVersion: TERMINOS_VERSION });
     expect(await screen.findByTestId('baja-enviada')).toBeInTheDocument();
+  });
+});
+
+describe('ModificacionForm', () => {
+  async function identificar() {
+    await userEvent.type(screen.getByLabelText(/^ficha/i), '/v/luna');
+    await userEvent.type(screen.getByLabelText(/correo electrónico/i), 'luna@example.com');
+    await userEvent.type(screen.getByLabelText(/cómo comprobamos/i), 'una marca en mi canal');
+    await userEvent.click(screen.getByRole('button', { name: /siguiente/i }));
+  }
+
+  it('solo pide identificar la ficha: nada de lo ya registrado es obligatorio', async () => {
+    render(<ModificacionForm />);
+    expect(screen.getByTestId('modificacion-paso')).toHaveTextContent(/paso 1 de 3/i);
+    await identificar();
+    expect(screen.getByTestId('modificacion-paso')).toHaveTextContent(/paso 2 de 3/i);
+    for (const etiqueta of [/^estatura/i, /^cumpleaños/i, /^lore/i, /^avatar/i, /^logo/i, /^país/i]) {
+      expect(screen.getByLabelText(etiqueta)).not.toBeRequired();
+    }
+    expect(screen.queryByLabelText(/nombre artístico/i)).toBeNull();
+  });
+
+  it('no deja enviar si no hay ningún cambio', async () => {
+    const enviar = vi.spyOn(api, 'enviarModificacion').mockResolvedValue({ ok: true, estado: 'pendiente', id: 1 });
+    render(<ModificacionForm />);
+    await identificar();
+    await userEvent.click(screen.getByRole('button', { name: /siguiente/i }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /he leído y acepto/i }));
+    await userEvent.click(screen.getByRole('button', { name: /enviar solicitud/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/al menos un cambio/i);
+    expect(enviar).not.toHaveBeenCalled();
+  });
+
+  it('envía solo lo que se cambió, con los términos, y confirma que queda en espera', async () => {
+    const enviar = vi.spyOn(api, 'enviarModificacion').mockResolvedValue({ ok: true, estado: 'pendiente', id: 1 });
+    render(<ModificacionForm />);
+    await identificar();
+    await userEvent.type(screen.getByLabelText(/^estatura/i), '1,70 m');
+    await userEvent.click(screen.getByRole('button', { name: /siguiente/i }));
+    await userEvent.type(screen.getByLabelText(/^anime favorito/i), 'Frieren');
+    await userEvent.click(screen.getByRole('checkbox', { name: /he leído y acepto/i }));
+    await userEvent.click(screen.getByRole('button', { name: /enviar solicitud/i }));
+    await waitFor(() => expect(enviar).toHaveBeenCalledOnce());
+    expect(enviar.mock.calls[0][0]).toMatchObject({
+      ficha: '/v/luna',
+      email: 'luna@example.com',
+      height: '1,70 m',
+      favoriteAnime: 'Frieren',
+      birthday: '',
+      themeColor: '',
+      socials: [],
+      aceptaTerminos: true,
+      terminosVersion: TERMINOS_VERSION,
+    });
+    expect(await screen.findByTestId('modificacion-enviada')).toHaveTextContent(/en espera de revisión/i);
   });
 });

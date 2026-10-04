@@ -66,6 +66,7 @@ import {
   listarSolicitudes,
   resolverSolicitud,
 } from '../../../../server/src/solicitudes.mjs';
+import { prepararModificacion } from '../../../../server/src/modificacion.mjs';
 import { getVtuberBySlug, searchVtubers } from '../../../../server/src/search.mjs';
 import { readWebpSize } from '../../../../server/src/seed.mjs';
 
@@ -596,7 +597,7 @@ async function listarSolicitudesRuta(request) {
   const consulta = new URL(request.url).searchParams;
   const estado = consulta.get('estado') ?? 'pendiente';
   const tipo = consulta.get('tipo');
-  if (!['pendiente', 'aprobada', 'rechazada', 'procesada', 'todas'].includes(estado) || (tipo && !['inscripcion', 'baja'].includes(tipo))) {
+  if (!['pendiente', 'aprobada', 'rechazada', 'procesada', 'todas'].includes(estado) || (tipo && !['inscripcion', 'baja', 'modificacion'].includes(tipo))) {
     return NextResponse.json({ error: 'query_invalida' }, { status: 400 });
   }
   try {
@@ -613,7 +614,9 @@ async function listarSolicitudesRuta(request) {
  *   · `aprobar`  (inscripción): crea la ficha en BORRADOR por el mismo camino que «Nueva carta»
  *     (`vtuber.crear` del diario) y cierra la solicitud. Si la ficha no se puede crear (URL
  *     repetida, país desconocido…) la solicitud sigue pendiente y el error llega tal cual.
- *   · `rechazar` (ambas) y `procesar` (baja): cierran la solicitud. La baja NO borra nada: qué
+ *   · `aprobar`  (modificación): aplica los cambios a la ficha existente (`vtuber.editar`); el avatar y
+ *     el logo, que llegan como enlace, los sube el mantenedor por el gestor de imágenes.
+ *   · `rechazar` (todas) y `procesar` (baja): cierran la solicitud. La baja NO borra nada: qué
  *     se hace con la ficha lo decide el mantenedor aparte, según la cláusula de salida.
  */
 async function resolverSolicitudRuta(request, id, usuario) {
@@ -631,9 +634,22 @@ async function resolverSolicitudRuta(request, id, usuario) {
       return NextResponse.json({ error: 'ya_resuelta', detail: 'esta solicitud ya fue resuelta' }, { status: 409 });
     }
     let vtuberSlug = null;
-    if (accion === 'aprobar') {
+    if (accion === 'aprobar' && solicitud.tipo === 'modificacion') {
+      // Se aplica el parche a la ficha EXISTENTE (`vtuber.editar` del diario); avatar y logo (enlaces)
+      // los sube el mantenedor aparte. La ficha se lee del diario ya reproducido, no de la base empaquetada.
+      const { id: fichaId, slug, patch } = prepararModificacion(await dbConDiario(), solicitud);
+      const datos = vtuberUpdateSchema.safeParse(patch);
+      if (!datos.success) {
+        return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(datos.error) }, { status: 400 });
+      }
+      vtuberSlug = slug;
+      if (Object.keys(datos.data).length) {
+        const { resultado } = await aplicarYAnotar({ tipo: 'vtuber.editar', id: fichaId, patch: datos.data }, usuario.username);
+        vtuberSlug = resultado.slug;
+      }
+    } else if (accion === 'aprobar') {
       if (solicitud.tipo !== 'inscripcion') {
-        return NextResponse.json({ error: 'estado_invalido', detail: 'solo se aprueban inscripciones' }, { status: 400 });
+        return NextResponse.json({ error: 'estado_invalido', detail: 'solo se aprueban inscripciones y modificaciones' }, { status: 400 });
       }
       const datos = vtuberCreateSchema.safeParse(fichaDesdeInscripcion(solicitud));
       if (!datos.success) {

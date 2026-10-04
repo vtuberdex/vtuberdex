@@ -37,6 +37,7 @@ import {
   listarSolicitudes,
   resolverSolicitud,
 } from './solicitudes.mjs';
+import { prepararModificacion } from './modificacion.mjs';
 import { UPLOADABLE_KINDS, MAX_UPLOAD_BYTES, saveUploadedImage, saveFactionEmblem, removeUploadedImage } from './uploads.mjs';
 
 const splitCsv = (value) => String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
@@ -220,7 +221,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
   router.get('/admin/solicitudes', requireAdmin, async (req, res) => {
     const estado = String(req.query.estado ?? 'pendiente');
     const tipo = req.query.tipo ? String(req.query.tipo) : null;
-    if (!['pendiente', 'aprobada', 'rechazada', 'procesada', 'todas'].includes(estado) || (tipo && !['inscripcion', 'baja'].includes(tipo))) {
+    if (!['pendiente', 'aprobada', 'rechazada', 'procesada', 'todas'].includes(estado) || (tipo && !['inscripcion', 'baja', 'modificacion'].includes(tipo))) {
       res.status(400).json({ error: 'query_invalida' });
       return;
     }
@@ -249,9 +250,25 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
         return;
       }
       let vtuberSlug = null;
-      if (accion === 'aprobar') {
+      if (accion === 'aprobar' && solicitud.tipo === 'modificacion') {
+        // Se aplica el parche a la ficha EXISTENTE; avatar y logo (enlaces) los sube el mantenedor aparte.
+        const { id, slug, patch } = prepararModificacion(db, solicitud);
+        const datos = vtuberUpdateSchema.safeParse(patch);
+        if (!datos.success) {
+          res.status(400).json({ error: 'payload_invalido', issues: formatIssues(datos.error) });
+          return;
+        }
+        vtuberSlug = slug;
+        if (Object.keys(datos.data).length) {
+          vtuberSlug = enTransaccion(db, () => {
+            const resultado = aplicarParche(db, id, datos.data);
+            audit(db, req.user.username, 'vtuber', id, 'update', datos.data);
+            return resultado;
+          });
+        }
+      } else if (accion === 'aprobar') {
         if (solicitud.tipo !== 'inscripcion') {
-          res.status(400).json({ error: 'estado_invalido', detail: 'solo se aprueban inscripciones' });
+          res.status(400).json({ error: 'estado_invalido', detail: 'solo se aprueban inscripciones y modificaciones' });
           return;
         }
         const datos = vtuberCreateSchema.safeParse(fichaDesdeInscripcion(solicitud));

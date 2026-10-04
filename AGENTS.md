@@ -39,9 +39,9 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 428 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 451 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
-cd server  && npm test     # 93 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
+cd server  && npm test     # 94 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
 # Linter (raíz; cubre también server/ y scraper/)
 npm run lint               # eslint . — falla con cualquier error
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/93/428** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/94/451** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -202,7 +202,7 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
 
 ## Inscripción, baja y términos: formularios públicos con cola de revisión
 
-Tres páginas públicas (`/inscripcion`, `/baja`, `/terminos`, con enlaces en `components/app-footer.tsx`) y una
+Cuatro páginas públicas (`/inscripcion`, `/modificacion`, `/baja`, `/terminos`, con enlaces en `components/app-footer.tsx`) y una
 pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío es una fila `pendiente` de la tabla
 `solicitud` hasta que el mantenedor la resuelve.
 
@@ -226,6 +226,15 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   modelo, hashtag, estatura, cumpleaños, país, signo, lore), 3) gustos + términos. Obligatorios todos salvo país y signo. Los textos cortos
   salen de `CAMPOS_PERFIL` (cliente) y `perfilObligatorio` (`solicitudes.mjs`): al añadir uno, tócalos a la vez. `fichaDesdeInscripcion`
   mapea estatura/cumpleaños/hashtag/color a sus columnas, el modelador a `artists` y el resto a filas de `profile`.
+- **Modificación de una ficha ya registrada** (`/modificacion`, `components/solicitudes/modificacion-form.tsx`, tipo `modificacion`
+  en la MISMA cola y tabla): misma forma que la inscripción pero solo identifica la ficha (ficha + correo + cómo se comprueba la
+  titularidad, como la baja) y todo lo demás es opcional (en blanco = no cambia; el servidor exige al menos un cambio). Las preguntas
+  salen de `campos-ficha.ts`, compartido con la inscripción. **Aprobar APLICA** el parche a la ficha existente
+  (`server/src/modificacion.mjs`, `prepararModificacion`: lo comparten Express y Next; local escribe con `aplicarParche`, producción
+  con `vtuber.editar` del diario, leyendo la ficha del diario ya reproducido): las redes se SUMAN o actualizan por plataforma, los
+  gustos actualizan su fila de `profile` sin tocar las demás, el modelador pasa al frente de `artists` sin quitar a nadie. El nombre
+  no se cambia por aquí. **Avatar y logo (enlaces) NO se aplican solos**: el mantenedor los sube por «Imágenes» y la cola lo avisa. Si la
+  ficha no se resuelve (nombre ambiguo o inexistente) la solicitud sigue pendiente con `ficha_no_encontrada`.
 - **Antispam**: campo trampa `website`, un solo pendiente por correo y tipo, tope de 5 envíos por red y día. El arte del
   personaje se pide como ENLACE: un formulario público que recibe archivos es una puerta a subir basura.
 - `/api/admin/solicitudes*` sale 404 sin Turso ni proxy local, como el resto del mantenedor.

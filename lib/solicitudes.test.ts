@@ -217,7 +217,7 @@ describe('resolución', () => {
     await resolverSolicitud(ejecutor, i, { estado: 'rechazada', actor: 'admin' });
     const pendientes = await listarSolicitudes(ejecutor, { estado: 'pendiente' });
     expect(pendientes.items).toHaveLength(1);
-    expect(pendientes.pendientes).toEqual({ inscripcion: 0, baja: 1 });
+    expect(pendientes.pendientes).toEqual({ inscripcion: 0, baja: 1, modificacion: 0 });
     expect((await listarSolicitudes(ejecutor, { estado: 'todas' })).items).toHaveLength(2);
   });
 });
