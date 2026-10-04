@@ -325,6 +325,34 @@ test('HTTP: el mantenedor asigna y quita el premium y el filtro público lo refl
   assert.equal((await (await fetch(`${baseUrl}/api/vtubers?premium=1`)).json()).total, 1);
 });
 
+test('HTTP: una ficha en grado 1 da 404 al público pero el mantenedor sigue pudiendo verla y editarla', async () => {
+  const id = idDe('otra');
+  assert.equal((await admin('PATCH', `/vtubers/${id}`, { premium: { grade: '1' } })).status, 200);
+  try {
+    // Público: sin página, sin datos.
+    assert.equal((await fetch(`${baseUrl}/api/vtubers/otra`)).status, 404);
+    const listado = await (await fetch(`${baseUrl}/api/vtubers?perPage=100`)).json();
+    assert.ok(!JSON.stringify(listado).includes('"Otra"'), 'el nombre real no sale en el listado público');
+
+    // Mantenedor: la ficha sigue ahí, entera.
+    const detalle = await admin('GET', `/vtubers/${id}`);
+    assert.equal(detalle.status, 200);
+    assert.equal((await detalle.json()).name, 'Otra');
+    assert.ok((await (await admin('GET', '/vtubers?q=otra')).json()).items.some((i) => i.name === 'Otra'), 'aparece en su listado');
+
+    // Y se puede seguir editando.
+    const editada = await admin('PATCH', `/vtubers/${id}`, { phrase: 'sigue editable' });
+    assert.equal(editada.status, 200);
+    const cuerpo = await editada.json();
+    assert.equal(cuerpo.name, 'Otra');
+    assert.equal(cuerpo.phrase, 'sigue editable');
+    assert.equal(cuerpo.premium.grade, '1');
+  } finally {
+    await admin('PATCH', `/vtubers/${id}`, { premium: null, phrase: null });
+  }
+  assert.equal((await fetch(`${baseUrl}/api/vtubers/otra`)).status, 200, 'al quitar el grado vuelve a tener página');
+});
+
 test('HTTP: un grado inválido da 400 y no toca la ficha', async () => {
   const respuesta = await admin('PATCH', `/vtubers/${idDe('otra')}`, { premium: { grade: '11' } });
   assert.equal(respuesta.status, 400);
