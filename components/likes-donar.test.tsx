@@ -29,7 +29,7 @@ describe('DonatePayPal', () => {
     expect(enlace).toHaveAttribute('target', '_blank');
     expect(enlace.getAttribute('rel')).toContain('noopener');
     expect(enlace.querySelector('svg')).not.toBeNull(); // el logo
-    expect(screen.getByTestId('donate-paypal')).toHaveTextContent('Si quieres gradear y subir de nivel esta carta puedes donar a nuestro PayPal');
+    expect(screen.getByTestId('donate-paypal')).toHaveTextContent('Si quieres apoyar el desarrollo del proyecto, puedes realizar una donación voluntaria');
   });
 
   test('muestra el código de la carta para escribirlo en la nota del pago, y lo copia', async () => {
@@ -52,9 +52,9 @@ describe('DonatePayPal', () => {
     expect(screen.getByTestId('donate-code')).toBeInTheDocument();
   });
 
-  test('en una carta premium habla de subir de grado, y en la Black Label no aparece', () => {
+  test('en una carta premium usa el mismo mensaje voluntario, y en la Black Label no aparece', () => {
     const { rerender } = render(<DonatePayPal premium={premium('9')} />);
-    expect(screen.getByTestId('donate-paypal')).toHaveTextContent('sube de grado');
+    expect(screen.getByTestId('donate-paypal')).toHaveTextContent('futuras expansiones del proyecto');
     rerender(<DonatePayPal premium={premium('BL')} />);
     expect(screen.queryByTestId('donate-paypal')).not.toBeInTheDocument();
   });
