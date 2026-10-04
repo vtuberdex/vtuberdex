@@ -17,7 +17,7 @@
  * Ninguna abre su propia transacción salvo `aplicarOperacion`: así el llamador decide el alcance
  * (el Express añade la auditoría dentro de la misma; el reproductor de producción una por operación).
  */
-import { TODOS_LOS_GRADOS, esGradoValido, hoy } from './premium.mjs';
+import { TODOS_LOS_GRADOS, esGradoPremium, esGradoValido, hoy, mesesCalendario } from './premium.mjs';
 import { normalizeText, slugify } from './text.mjs';
 
 /**
@@ -352,7 +352,9 @@ export function sellarPremium(patch, ahora = hoy()) {
  * Convierte una ficha en premium, cambia su grado, o la devuelve a normal (`null`).
  *
  *   · Sin fila previa: se crea con `since` (hoy si no viene) y `gradedAt` (= `since` si no viene).
- *   · Con fila y OTRO grado: cambia el grado y `gradedAt` (hoy si no viene; el alta no se toca).
+ *   · Con fila y OTRO grado: cambia el grado y `gradedAt` (hoy si no viene). `since` solo se adelanta
+ *     a hoy si era una carta premium y pasó MÁS DE UN MES sin ascenso: la racha se reinicia (el grado no
+ *     baja; ver `rachaDe`). Un `since` explícito siempre manda.
  *   · Con fila y el mismo grado: no se mueve nada, así guardar dos veces no «resetea» la fecha.
  *   · `since` explícito corrige la fecha de alta (el mantenedor puede registrar a alguien que
  *     donó antes de que existiera esta función).
@@ -379,9 +381,14 @@ function aplicarPremium(db, vtuberId, premium) {
     return;
   }
   const cambioGrado = actual.grade !== premium.grade;
+  const rachaRota =
+    cambioGrado &&
+    esGradoPremium(actual.grade) &&
+    esGradoPremium(premium.grade) &&
+    mesesCalendario(actual.gradedAt, premium.gradedAt ?? ahora) > 1;
   db.prepare('UPDATE premium SET grade = ?, since = ?, graded_at = ? WHERE vtuber_id = ?').run(
     premium.grade,
-    premium.since ?? actual.since,
+    premium.since ?? (rachaRota ? (premium.gradedAt ?? ahora) : actual.since),
     cambioGrado ? (premium.gradedAt ?? ahora) : (premium.gradedAt ?? actual.gradedAt),
     vtuberId,
   );

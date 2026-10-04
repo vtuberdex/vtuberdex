@@ -360,3 +360,12 @@ test('HTTP: un grado inválido da 400 y no toca la ficha', async () => {
   const consulta = await fetch(`${baseUrl}/api/vtubers?premium=quizas`);
   assert.equal(consulta.status, 400);
 });
+
+test('rachaDe: cuenta meses seguidos, se apaga si se rompe y no caduca en lo alto', async () => {
+  const { rachaDe } = await import('../src/premium.mjs');
+  assert.equal(rachaDe({ grade: '9', since: '2026-07-10', gradedAt: '2026-09-12' }, '2026-09-20'), 3);
+  assert.equal(rachaDe({ grade: '8', since: '2026-09-10', gradedAt: '2026-09-10' }, '2026-09-20'), 0, 'un mes no es racha');
+  assert.equal(rachaDe({ grade: '9', since: '2026-05-10', gradedAt: '2026-07-12' }, '2026-10-04'), 0, 'rota');
+  assert.equal(rachaDe({ grade: '10', since: '2026-05-10', gradedAt: '2026-09-12' }, '2027-03-01'), 5, 'en el 10 no caduca');
+  assert.equal(rachaDe({ grade: '3', since: '2026-01-01', gradedAt: '2026-09-01' }, '2026-09-20'), 0, 'degradada');
+});

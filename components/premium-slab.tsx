@@ -198,7 +198,7 @@ export function PremiumSlab({ card, premium, cardWidth, cardHeight, outerPad, gl
   const insertTexture = useMemo(
     () => crearTexturaDeHoja(layout, card, premium),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depende de los CAMPOS que se dibujan, no de la identidad del objeto
-    [layout, card.name, card.dexNumber, card.countries[0]?.name, premium.grade, premium.cert, premium.since],
+    [layout, card.name, card.dexNumber, card.countries[0]?.name, premium.grade, premium.cert, premium.since, premium.gradedAt],
   );
 
   useEffect(() => () => body.dispose(), [body]);

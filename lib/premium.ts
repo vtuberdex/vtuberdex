@@ -14,6 +14,7 @@ import {
   esGradoDegradado as esGradoDegradadoServidor,
   severidadDeGrado as severidadDeGradoServidor,
   NOMBRE_DE_GRADO,
+  rachaDe as rachaDeServidor,
   DONACION_POR_GRADO as DONACION_POR_GRADO_SERVIDOR,
   GRADOS_RESERVADOS as GRADOS_RESERVADOS_SERVIDOR,
   esBlackLabel as esBlackLabelServidor,
@@ -88,3 +89,13 @@ export const mismoMes = (a: string, b: string = hoy()): boolean => a.slice(0, 7)
 /** ¿Es una ficha deteriorada (grado 1, la de las bajas)? El público no ve sus datos ni su logo. */
 export const esFichaDeteriorada = (cartaOGrado: { premium?: { grade: string } | null } | string | null | undefined): boolean =>
   esFichaDeterioradaServidor(cartaOGrado);
+
+/** Meses seguidos donando (0 = nada que mostrar). Se calcula al pintar: la home es estática y «hoy» cambia. */
+export const rachaDe = (premium: Pick<PremiumInfo, 'grade' | 'since' | 'gradedAt'>, ahora: string = hoy()): number =>
+  rachaDeServidor(premium, ahora);
+
+/** Texto de la racha para etiqueta e insignia: `5 meses seguidos`, o `null` si no hay. */
+export function textoDeRacha(premium: Pick<PremiumInfo, 'grade' | 'since' | 'gradedAt'>, ahora?: string): string | null {
+  const meses = rachaDe(premium, ahora);
+  return meses > 0 ? `${meses} meses seguidos` : null;
+}

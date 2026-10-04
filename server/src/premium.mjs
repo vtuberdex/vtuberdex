@@ -90,6 +90,11 @@ export function esGradoValido(valor) {
   return typeof valor === 'string' && TODOS_LOS_GRADOS.includes(valor);
 }
 
+/** ¿Es un grado de la escala PREMIUM (`8`…`BL`)? */
+export function esGradoPremium(grado) {
+  return typeof grado === 'string' && GRADOS.includes(grado);
+}
+
 /** ¿Es un grado de la escala de deterioro (`7`…`1`)? */
 export function esGradoDegradado(grado) {
   return typeof grado === 'string' && GRADOS_DEGRADADOS.includes(grado);
@@ -137,4 +142,32 @@ export function numeroDeCertificado(id) {
 /** Fecha de hoy (`AAAA-MM-DD`, UTC). Aislada para que los tests y el diario puedan fijarla. */
 export function hoy(ahora = new Date()) {
   return ahora.toISOString().slice(0, 10);
+}
+
+/** Meses calendario entre dos fechas `AAAA-MM-DD` (por mes, no por día: de enero 31 a febrero 1 hay 1). */
+export function mesesCalendario(desde, hasta) {
+  const [ay, am] = String(desde).split('-').map(Number);
+  const [by, bm] = String(hasta).split('-').map(Number);
+  if (![ay, am, by, bm].every(Number.isFinite)) return 0;
+  return (by - ay) * 12 + (bm - am);
+}
+
+/**
+ * Racha: meses SEGUIDOS donando, derivada de `since` y `gradedAt` (sin columna propia).
+ *
+ * Cada «Subir a…» mensual mueve `gradedAt`, y `aplicarPremium` adelanta `since` al día del ascenso si
+ * pasó más de un mes sin subir: así `since` es el inicio de la racha vigente y la cuenta es
+ * `meses(since → gradedAt) + 1`. Devuelve 0 si no hay racha que mostrar:
+ *   · una racha de un solo mes (aún no es racha) o una carta degradada;
+ *   · una racha ROTA: el último ascenso fue hace más de un mes (ese hueco es el «en pausa»);
+ *   · EXCEPCIÓN: en el `10` y la `BL` no hay más ascensos que contar, así que la racha no caduca
+ *     (se queda en los meses alcanzados) en vez de apagarse sola a quien ya llegó arriba.
+ */
+export function rachaDe(premium, ahora = hoy()) {
+  if (!premium || !GRADOS.includes(premium.grade)) return 0;
+  const meses = mesesCalendario(premium.since, premium.gradedAt) + 1;
+  if (meses < 2) return 0;
+  const enLoAlto = premium.grade === '10' || premium.grade === GRADO_MAXIMO;
+  if (!enLoAlto && mesesCalendario(premium.gradedAt, ahora) > 1) return 0;
+  return meses;
 }
