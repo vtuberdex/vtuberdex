@@ -20,6 +20,14 @@ const resumen = (extra = {}) => ({ likes: 4, liked: false, level: 1, experience:
 const premium = (grade: PremiumInfo['grade']): PremiumInfo => ({ grade, since: '2026-05-01', gradedAt: '2026-09-01', cert: 'VTD-000017' });
 
 describe('DonatePayPal', () => {
+  it('explica en pasos simples cómo funcionan la donación, el grado y la racha', () => {
+    render(<DonatePayPal />);
+    const guia = screen.getByTestId('donate-howto');
+    expect(guia).toHaveTextContent('Cada dólar cubre un mes');
+    expect(guia).toHaveTextContent('20 USD → grado 9.5');
+    expect(guia).toHaveTextContent('conserva su grado');
+  });
+
   test('lleva a la donación de PayPal en una pestaña nueva, sin opener', () => {
     render(<DonatePayPal />);
     const enlace = screen.getByRole('link', { name: /Donar con PayPal/ });
