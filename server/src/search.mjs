@@ -8,7 +8,8 @@
  *   · orden configurable (dex, A-Z, poder),
  *   · conteos de facetas calculados en la base, no recorriendo 785 divs.
  */
-import { GRADOS, numeroDeCertificado } from './premium.mjs';
+import { GRADOS, GRADO_DE_BAJA, numeroDeCertificado } from './premium.mjs';
+import { nombreDeteriorado, ocultarFichaDeteriorada } from './ficha-deteriorada.mjs';
 import { normalizeText } from './text.mjs';
 
 const SORT_SQL = {
@@ -276,6 +277,11 @@ export function searchVtubers(db, params = {}) {
       where.push('(v.search_name LIKE ? OR v.card_text LIKE ? OR v.dex_number = ?)');
       args.push(like, like, Number(term) || -1);
     }
+    // Buscar por texto no puede revelar a quien se dio de baja: una ficha deteriorada no sale por su nombre.
+    if (!includeHidden && tienePremium(db)) {
+      where.push('NOT EXISTS (SELECT 1 FROM premium pb WHERE pb.vtuber_id = v.id AND pb.grade = ?)');
+      args.push(GRADO_DE_BAJA);
+    }
   }
 
   const countryList = normalizeCountryFilters(countries);
@@ -335,7 +341,8 @@ export function searchVtubers(db, params = {}) {
     .all(...args, safePerPage, offset);
 
   return {
-    items: rows.map(mapCard),
+    // El público no ve los datos de una ficha deteriorada; el mantenedor (`includeHidden`) sí.
+    items: includeHidden ? rows.map(mapCard) : rows.map((row) => ocultarFichaDeteriorada(mapCard(row))),
     total,
     page: safePage,
     perPage: safePerPage,
@@ -482,7 +489,7 @@ export function getVtuberBySlug(db, slug, { includeHidden = false } = {}) {
     row.expCurrent === null && row.expMax === null
       ? null
       : { current: row.expCurrent, max: row.expMax };
-  return card;
+  return includeHidden ? card : ocultarFichaDeteriorada(card);
 }
 
 /** Vecinos de dex de una carta (para navegar sin volver al catálogo). */
@@ -493,5 +500,11 @@ export function getNeighbors(db, dexNumber) {
   const next = db
     .prepare(`SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number > ? AND status = 'published' ORDER BY dex_number ASC LIMIT 1`)
     .get(dexNumber);
-  return { prev: plain(prev ?? null), next: plain(next ?? null) };
+  // Un vecino deteriorado no puede delatar su nombre desde la navegación de la ficha de al lado.
+  const sinNombre = (vecino) => {
+    if (!vecino || !tienePremium(db)) return vecino;
+    const ficha = db.prepare(`SELECT v.id, p.grade FROM vtuber v JOIN premium p ON p.vtuber_id = v.id WHERE v.slug = ?`).get(vecino.slug);
+    return ficha?.grade === GRADO_DE_BAJA ? { ...vecino, name: nombreDeteriorado(vecino.name, ficha.id) } : vecino;
+  };
+  return { prev: sinNombre(plain(prev ?? null)), next: sinNombre(plain(next ?? null)) };
 }

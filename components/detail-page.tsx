@@ -21,6 +21,7 @@ import { StatBars } from '@/components/stat-bars';
 import { ProfileGrid } from '@/components/profile-grid';
 import { SocialLinks } from '@/components/social-links';
 import { PremiumBadge } from '@/components/premium-badge';
+import { esFichaDeteriorada } from '@/lib/premium';
 import { DonatePayPal } from '@/components/donate-paypal';
 import { LikeButton } from '@/components/like-button';
 
@@ -71,7 +72,7 @@ export function DetailPage({ slug }: { slug: string }) {
   }, [data, slug]);
 
   useEffect(() => {
-    document.title = data ? `${data.name} · VTuberDex` : 'VTuberDex';
+    document.title = data ? `${esFichaDeteriorada(data) ? 'Ficha Deteriorada' : data.name} · VTuberDex` : 'VTuberDex';
     return () => {
       document.title = 'VTuberDex';
     };
@@ -114,6 +115,8 @@ export function DetailPage({ slug }: { slug: string }) {
 
   const palette = cardPalette(data.themeColor, data.secondaryColor);
   const primary = data.countries[0] ?? null;
+  /** Grado 1 (bajas): la API ya vació los datos; la página no muestra nada de ficha ni invita a donar. */
+  const deteriorada = esFichaDeteriorada(data);
 
   return (
     <article className="mx-auto max-w-[1400px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
@@ -153,7 +156,7 @@ export function DetailPage({ slug }: { slug: string }) {
             />
           </div>
 
-          <DonatePayPal premium={data.premium} card={{ id: data.id, name: data.name }} />
+          {!deteriorada && <DonatePayPal premium={data.premium} card={{ id: data.id, name: data.name }} />}
 
           {/*
             Aquí estaba el bloque del RADAR de atributos (una imagen raster del
@@ -172,7 +175,12 @@ export function DetailPage({ slug }: { slug: string }) {
               </span>
               <div className="min-w-0 flex-1">
                 <h1 className="text-3xl font-extrabold leading-tight text-dex-ink sm:text-4xl">{data.name}</h1>
-                <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-dex-muted">
+                {deteriorada && (
+                  <p className="mt-3 text-lg font-bold uppercase tracking-[0.2em] text-stone-400" data-testid="ficha-deteriorada">
+                    Ficha Deteriorada
+                  </p>
+                )}
+                <p className={`mt-2 flex flex-wrap items-center gap-2 text-sm text-dex-muted ${deteriorada ? 'hidden' : ''}`}>
                   {primary && (
                     <span className="inline-flex items-center gap-1">
                       <span aria-hidden>{primary.flag?.trim() || '🏳️'}</span>
@@ -183,7 +191,7 @@ export function DetailPage({ slug }: { slug: string }) {
                   <span aria-hidden>•</span>
                   <span>{data.hasDetail ? 'Ficha completa' : 'Ficha básica'}</span>
                 </p>
-                {data.premium && (
+                {data.premium && !deteriorada && (
                   <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-dex-muted" data-testid="premium-info">
                     <PremiumBadge premium={data.premium} />
                     <span className="font-mono">{data.premium.cert}</span>
@@ -203,9 +211,11 @@ export function DetailPage({ slug }: { slug: string }) {
               acabado de la pieza; este era un duplicado plano sin tratamiento.
             */}
 
+            {!deteriorada && (
             <div className="mt-4">
               <LikeButton slug={data.slug} likes={data.likes ?? 0} onChange={aplicarLikes} />
             </div>
+            )}
 
             {data.phrase && <p className="mt-4 max-w-3xl text-sm leading-relaxed text-dex-ink/90">{data.phrase}</p>}
 
@@ -265,14 +275,22 @@ export function DetailPage({ slug }: { slug: string }) {
             </div>
           </header>
 
-          <div className="grid gap-6 xl:grid-cols-2">
-            <ProfileGrid profile={data.profile} palette={palette} />
-            <StatBars stats={data.stats} palette={palette} level={data.level} experience={data.experience} />
-          </div>
+          {deteriorada ? (
+            <p className="rounded-2xl border border-dashed border-dex-line px-6 py-10 text-center text-sm text-dex-muted" data-testid="ficha-deteriorada-aviso">
+              Los datos de esta ficha ya no están disponibles.
+            </p>
+          ) : (
+            <>
+              <div className="grid gap-6 xl:grid-cols-2">
+                <ProfileGrid profile={data.profile} palette={palette} />
+                <StatBars stats={data.stats} palette={palette} level={data.level} experience={data.experience} />
+              </div>
 
-          <SkillList skills={data.skills} palette={palette} />
+              <SkillList skills={data.skills} palette={palette} />
 
-          {data.socials.length > 0 && <SocialLinks socials={data.socials} palette={palette} />}
+              {data.socials.length > 0 && <SocialLinks socials={data.socials} palette={palette} />}
+            </>
+          )}
 
           {/* Navegación entre vecinos de la dex. */}
           <nav className="flex items-center justify-between gap-3 border-t border-dex-line pt-5 text-sm">

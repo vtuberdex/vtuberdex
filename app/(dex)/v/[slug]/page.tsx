@@ -17,6 +17,7 @@ import { notFound } from 'next/navigation';
 
 import { DetailPage } from '@/components/detail-page';
 import { fichaPublica } from '@/lib/seo-datos.mjs';
+import { esFichaDeteriorada } from '@/lib/premium';
 import {
   descripcionDeFicha,
   jsonLdDeFicha,
@@ -33,6 +34,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // Sin ficha, `notFound()` de la página decide; aquí solo se evita publicar un título falso.
   if (!card) return { title: 'VTuber no encontrado', robots: { index: false, follow: false } };
 
+  // Ficha deteriorada (baja): sin nombre, sin descripción, sin imagen social y fuera del índice.
+  if (esFichaDeteriorada(card)) {
+    return { title: 'Ficha Deteriorada', description: 'Ficha deteriorada.', robots: { index: false, follow: false } };
+  }
   const titulo = tituloDeFicha(card);
   const descripcion = descripcionDeFicha(card);
   const url = rutaDeFicha(card.slug);
@@ -65,7 +70,7 @@ export default async function DetailRoute({ params }: Props) {
   if (card === null) notFound();
   return (
     <>
-      {card ? (
+      {card && !esFichaDeteriorada(card) ? (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializarJsonLd(jsonLdDeFicha(card)) }}

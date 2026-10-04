@@ -13,7 +13,7 @@ import { seedDatabase } from '../src/seed.mjs';
 import { openDatabase } from '../src/db/index.mjs';
 import { hashPassword } from '../src/auth.mjs';
 import { MutationError, aplicarParche, aplicarOperacion, sellarPremium } from '../src/mutations.mjs';
-import { searchVtubers, getVtuberBySlug, tienePremium } from '../src/search.mjs';
+import { searchVtubers, getVtuberBySlug, getNeighbors, tienePremium } from '../src/search.mjs';
 import { vtuberUpdateSchema, listQuerySchema } from '../src/validation.mjs';
 import {
   GRADOS,
@@ -198,6 +198,50 @@ test('una carta degradada se guarda, pero NO sale en la sección pública Premiu
     assert.deepEqual(searchVtubers(db, { premium: true }).items.map((i) => i.slug), ['madkoding'], 'el público solo ve las premium');
     const admin = searchVtubers(db, { premium: 'todas', includeHidden: true }).items.map((i) => i.slug).sort();
     assert.deepEqual(admin, ['madkoding', 'otra'], 'el mantenedor ve también las degradadas');
+  } finally {
+    aplicarParche(db, idDe('otra'), { premium: null });
+  }
+});
+
+test('una ficha en grado 1 sale SIN datos ni logo para el público, y entera para el mantenedor', () => {
+  const id = idDe('otra');
+  db.prepare("UPDATE vtuber SET phrase = 'frase privada', card_text = 'historia privada' WHERE id = ?").run(id);
+  aplicarParche(db, id, { premium: { grade: '1' }, socials: [{ platform: 'x', url: 'https://x.com/otra' }] });
+  try {
+    const publica = getVtuberBySlug(db, 'otra');
+    assert.notEqual(publica.name, 'Otra', 'el nombre sale ilegible');
+    assert.equal(publica.name.length, 'Otra'.length);
+    assert.doesNotMatch(publica.name, /[A-Za-z]/);
+    assert.equal(publica.phrase, null);
+    assert.equal(publica.cardText, null);
+    assert.deepEqual([publica.countries, publica.languages, publica.socials, publica.stats, publica.skills, publica.profile], [[], [], [], [], [], []]);
+    assert.equal(publica.images.logo, null);
+    assert.equal(publica.dexNumber, 31, 'el número de dex se conserva');
+    assert.equal(publica.premium.grade, '1');
+
+    const lista = searchVtubers(db, {}).items.find((i) => i.dexNumber === 31);
+    assert.notEqual(lista.name, 'Otra');
+    assert.equal(searchVtubers(db, { q: 'otra' }).total, 0, 'buscar por su nombre no la encuentra');
+
+    const vecino = getNeighbors(db, 30).next;
+    assert.equal(vecino.dexNumber, 31);
+    assert.notEqual(vecino.name, 'Otra', 'ni siquiera el vecino delata el nombre');
+
+    const admin = getVtuberBySlug(db, 'otra', { includeHidden: true });
+    assert.equal(admin.name, 'Otra', 'el mantenedor la ve entera');
+    assert.equal(admin.phrase, 'frase privada');
+    assert.equal(admin.socials.length, 1);
+    assert.equal(searchVtubers(db, { q: 'otra', includeHidden: true }).total, 1);
+  } finally {
+    aplicarParche(db, id, { premium: null, socials: [] });
+  }
+  assert.equal(getVtuberBySlug(db, 'otra').name, 'Otra', 'sin el grado 1 vuelve a verse normal');
+});
+
+test('en el grado 2 la ficha NO se oculta: solo el 1 es la ficha deteriorada', () => {
+  aplicarParche(db, idDe('otra'), { premium: { grade: '2' } });
+  try {
+    assert.equal(getVtuberBySlug(db, 'otra').name, 'Otra');
   } finally {
     aplicarParche(db, idDe('otra'), { premium: null });
   }
