@@ -34,6 +34,21 @@ const inscripcion = (extra: Record<string, unknown> = {}) => ({
   country: 'chile',
   languages: ['es'],
   phrase: 'Hola',
+  cardText: 'Una historia',
+  height: '1,60 m',
+  birthday: '12 de marzo',
+  favoriteFood: 'Pizza',
+  dislikedFood: 'Brócoli',
+  favoriteGame: 'Zelda',
+  favoriteSeries: 'Dark',
+  favoriteMusic: 'Rock',
+  favoriteAnime: 'Frieren',
+  favoriteAnimal: 'Gato',
+  favoriteColor: 'Verde',
+  modeler: 'Riko',
+  hashtag: '#LunaArt',
+  imageUrl: 'https://imgs.test/avatar.png',
+  logoUrl: 'https://imgs.test/logo.png',
   socials: [{ platform: 'Twitch', url: 'https://twitch.tv/luna' }],
   aceptaTerminos: true,
   terminosVersion: TERMINOS_VERSION,
@@ -97,7 +112,7 @@ describe('confidencialidad', () => {
     const { id } = await enviar(inscripcion());
     const guardada = await leerSolicitud(ejecutor, id);
     expect(guardada?.contacto).toEqual({ email: 'luna@example.com', realName: 'Persona Real' });
-    expect(JSON.stringify(guardada?.datos)).not.toMatch(/example\.com|Persona Real/);
+    expect(JSON.stringify(guardada?.datos)).not.toMatch(/luna@example\.com|Persona Real/);
     expect(guardada?.datos).not.toHaveProperty('aceptaTerminos');
   });
 
@@ -110,9 +125,18 @@ describe('confidencialidad', () => {
 
   test('la ficha que nace de una inscripción no lleva el contacto y nace en borrador', async () => {
     const { id } = await enviar(inscripcion());
-    const ficha = fichaDesdeInscripcion((await leerSolicitud(ejecutor, id))!);
+    const ficha: Record<string, unknown> = fichaDesdeInscripcion((await leerSolicitud(ejecutor, id))!);
     expect(ficha.status).toBe('draft');
     expect(JSON.stringify(ficha)).not.toMatch(/example\.com|Persona Real/);
+    expect(vtuberCreateSchema.safeParse(ficha).success).toBe(true);
+    expect(ficha).toMatchObject({ height: '1,60 m', hashtag: '#LunaArt', artists: ['Riko'] });
+    expect((ficha as { profile: unknown[] }).profile).toContainEqual({ label: 'Anime favorito', value: 'Frieren' });
+  });
+
+  test('país y signo son opcionales', async () => {
+    const { id } = await enviar(inscripcion({ country: '', zodiac: '' }));
+    const ficha = fichaDesdeInscripcion((await leerSolicitud(ejecutor, id))!);
+    expect(ficha.countries).toEqual([]);
     expect(vtuberCreateSchema.safeParse(ficha).success).toBe(true);
   });
 
@@ -130,7 +154,11 @@ describe('validación', () => {
   test('exige correo válido, país, idioma y una red', async () => {
     for (const mala of [
       inscripcion({ email: 'no-es-correo' }),
-      inscripcion({ country: '' }),
+      inscripcion({ height: '' }),
+      inscripcion({ cardText: '' }),
+      inscripcion({ logoUrl: '' }),
+      inscripcion({ imageUrl: '' }),
+      inscripcion({ modeler: '  ' }),
       inscripcion({ languages: [] }),
       inscripcion({ socials: [] }),
       inscripcion({ socials: [{ platform: 'X', url: 'javascript:alert(1)' }] }),

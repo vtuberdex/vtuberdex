@@ -221,6 +221,11 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   el Express). Si la ficha no se puede crear (URL repetida, país desconocido) la solicitud sigue pendiente.
 - **«Procesar» una baja NO degrada la ficha**: solo cierra la solicitud. La degradación de la cláusula de salida es un
   paso manual aparte (no está automatizada) y el mantenedor lo avisa.
+- **La inscripción es un formulario de 3 pasos** (`inscripcion-form.tsx`; el estado vive en el padre, así que «Volver» no pierde nada y la
+  validación nativa `required` de cada paso corre antes de avanzar): 1) lo básico y el contacto, 2) tu personaje (avatar y logo como ENLACE,
+  modelo, hashtag, estatura, cumpleaños, país, signo, lore), 3) gustos + términos. Obligatorios todos salvo país y signo. Los textos cortos
+  salen de `CAMPOS_PERFIL` (cliente) y `perfilObligatorio` (`solicitudes.mjs`): al añadir uno, tócalos a la vez. `fichaDesdeInscripcion`
+  mapea estatura/cumpleaños/hashtag/color a sus columnas, el modelador a `artists` y el resto a filas de `profile`.
 - **Antispam**: campo trampa `website`, un solo pendiente por correo y tipo, tope de 5 envíos por red y día. El arte del
   personaje se pide como ENLACE: un formulario público que recibe archivos es una puerta a subir basura.
 - `/api/admin/solicitudes*` sale 404 sin Turso ni proxy local, como el resto del mantenedor.

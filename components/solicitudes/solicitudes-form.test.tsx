@@ -16,9 +16,72 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
+const CAMPOS_PASO_2: Array<[RegExp, string]> = [
+  [/^estatura/i, '1,60 m'],
+  [/^cumpleaños/i, '12 de marzo'],
+  [/^modelo/i, 'Riko'],
+  [/^hashtag de arte/i, '#Luna'],
+  [/^lore/i, 'Una historia'],
+  [/^avatar/i, 'https://example.com/a.png'],
+  [/^logo/i, 'https://example.com/l.png'],
+];
+
+const CAMPOS_PASO_3: Array<[RegExp, string]> = [
+  [/^comida favorita/i, 'Pizza'],
+  [/^comida que te desagrada/i, 'Brócoli'],
+  [/^videojuego favorito/i, 'Zelda'],
+  [/^serie favorita/i, 'Dark'],
+  [/^música favorita/i, 'Rock'],
+  [/^anime favorito/i, 'Frieren'],
+  [/^animal favorito/i, 'Gato'],
+  [/^color favorito/i, 'Verde'],
+];
+
+async function llenarPaso1() {
+  await userEvent.type(screen.getByLabelText(/nombre artístico/i), 'Luna');
+  await userEvent.click(screen.getByText('Español'));
+  await userEvent.type(screen.getByLabelText(/correo electrónico/i), 'luna@example.com');
+  await userEvent.type(screen.getByLabelText('Plataforma 1'), 'Twitch');
+  await userEvent.type(screen.getByLabelText('Enlace 1'), 'https://twitch.tv/luna');
+  await userEvent.click(screen.getByRole('button', { name: /siguiente/i }));
+}
+
+async function llenarPaso2() {
+  for (const [etiqueta, valor] of CAMPOS_PASO_2) await userEvent.type(screen.getByLabelText(etiqueta), valor);
+  await userEvent.click(screen.getByRole('button', { name: /siguiente/i }));
+}
+
+async function llenarPaso3() {
+  for (const [etiqueta, valor] of CAMPOS_PASO_3) await userEvent.type(screen.getByLabelText(etiqueta), valor);
+}
+
 describe('InscripcionForm', () => {
+  it('son 3 pasos y los obligatorios de cada uno están marcados', async () => {
+    render(<InscripcionForm />);
+    expect(screen.getByTestId('inscripcion-paso')).toHaveTextContent(/paso 1 de 3/i);
+    expect(screen.queryByRole('button', { name: /enviar inscripción/i })).toBeNull();
+    await llenarPaso1();
+    expect(screen.getByTestId('inscripcion-paso')).toHaveTextContent(/paso 2 de 3/i);
+    // País y signo son opcionales; el resto, no.
+    expect(screen.getByLabelText(/^país/i)).not.toBeRequired();
+    expect(screen.getByLabelText(/^signo/i)).not.toBeRequired();
+    for (const [etiqueta] of CAMPOS_PASO_2) expect(screen.getByLabelText(etiqueta)).toBeRequired();
+    await llenarPaso2();
+    expect(screen.getByTestId('inscripcion-paso')).toHaveTextContent(/paso 3 de 3/i);
+    for (const [etiqueta] of CAMPOS_PASO_3) expect(screen.getByLabelText(etiqueta)).toBeRequired();
+  });
+
+  it('«Volver» conserva lo escrito en el paso 1', async () => {
+    render(<InscripcionForm />);
+    await llenarPaso1();
+    await userEvent.click(screen.getByRole('button', { name: /volver/i }));
+    expect(screen.getByLabelText(/nombre artístico/i)).toHaveValue('Luna');
+  });
+
   it('no deja enviar sin aceptar los términos y enlaza a la página de términos', async () => {
     render(<InscripcionForm />);
+    await llenarPaso1();
+    await llenarPaso2();
     const enviar = screen.getByRole('button', { name: /enviar inscripción/i });
     expect(enviar).toBeDisabled();
     const enlace = screen.getAllByRole('link', { name: /términos y condiciones/i })[0];
@@ -30,12 +93,9 @@ describe('InscripcionForm', () => {
   it('envía con la versión de los términos y confirma que queda en espera', async () => {
     const enviar = vi.spyOn(api, 'enviarInscripcion').mockResolvedValue({ ok: true, estado: 'pendiente', id: 1 });
     render(<InscripcionForm />);
-    await userEvent.type(screen.getByLabelText(/nombre artístico/i), 'Luna');
-    await userEvent.type(screen.getByLabelText(/^país/i), 'chile');
-    await userEvent.click(screen.getByText('Español'));
-    await userEvent.type(screen.getByLabelText(/correo electrónico/i), 'luna@example.com');
-    await userEvent.type(screen.getByLabelText('Plataforma 1'), 'Twitch');
-    await userEvent.type(screen.getByLabelText('Enlace 1'), 'https://twitch.tv/luna');
+    await llenarPaso1();
+    await llenarPaso2();
+    await llenarPaso3();
     await userEvent.click(screen.getByRole('checkbox', { name: /he leído y acepto/i }));
     await userEvent.click(screen.getByRole('button', { name: /enviar inscripción/i }));
     await waitFor(() => expect(enviar).toHaveBeenCalledOnce());
@@ -43,6 +103,12 @@ describe('InscripcionForm', () => {
       name: 'Luna',
       email: 'luna@example.com',
       languages: ['es'],
+      height: '1,60 m',
+      favoriteAnime: 'Frieren',
+      modeler: 'Riko',
+      cardText: 'Una historia',
+      imageUrl: 'https://example.com/a.png',
+      logoUrl: 'https://example.com/l.png',
       aceptaTerminos: true,
       terminosVersion: TERMINOS_VERSION,
       website: '',
@@ -53,12 +119,9 @@ describe('InscripcionForm', () => {
   it('muestra el error del servidor', async () => {
     vi.spyOn(api, 'enviarInscripcion').mockRejectedValue(new ApiError('ya hay una solicitud tuya en espera de revisión', 409));
     render(<InscripcionForm />);
-    await userEvent.type(screen.getByLabelText(/nombre artístico/i), 'Luna');
-    await userEvent.type(screen.getByLabelText(/^país/i), 'chile');
-    await userEvent.click(screen.getByText('Español'));
-    await userEvent.type(screen.getByLabelText(/correo electrónico/i), 'luna@example.com');
-    await userEvent.type(screen.getByLabelText('Plataforma 1'), 'Twitch');
-    await userEvent.type(screen.getByLabelText('Enlace 1'), 'https://twitch.tv/luna');
+    await llenarPaso1();
+    await llenarPaso2();
+    await llenarPaso3();
     await userEvent.click(screen.getByRole('checkbox', { name: /he leído y acepto/i }));
     await userEvent.click(screen.getByRole('button', { name: /enviar inscripción/i }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/en espera de revisión/);

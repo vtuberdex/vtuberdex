@@ -31,6 +31,33 @@ const IDIOMAS_RESPALDO: Opcion[] = [
 
 const MAX_REDES = 10;
 
+const SIGNOS = ['Aries', 'Tauro', 'Géminis', 'Cáncer', 'Leo', 'Virgo', 'Libra', 'Escorpio', 'Sagitario', 'Capricornio', 'Acuario', 'Piscis'];
+
+/**
+ * Los datos de la 2.ª página que son TEXTO corto y obligatorios. Una sola lista alimenta el estado, el
+ * render y el envío: añadir uno es una línea aquí (y su campo en `inscripcionSchema` del servidor).
+ */
+const CAMPOS_PERFIL = [
+  // Paso 2: tu personaje (lo que más se quiere contar, con la cabeza fresca).
+  { paso: 2, clave: 'modeler', etiqueta: 'Modelo (quién lo hizo)', ejemplo: 'Nombre de quien hizo tu modelo', max: 80 },
+  { paso: 2, clave: 'hashtag', etiqueta: 'Hashtag de arte', ejemplo: '#MiHashtag', max: 120 },
+  { paso: 2, clave: 'height', etiqueta: 'Estatura', ejemplo: '1,60 m', max: 40 },
+  { paso: 2, clave: 'birthday', etiqueta: 'Cumpleaños', ejemplo: '12 de marzo', max: 80 },
+  // Paso 3: gustos. Respuestas de una palabra, por eso van al final y juntas.
+  { paso: 3, clave: 'favoriteFood', etiqueta: 'Comida favorita', ejemplo: '', max: 120 },
+  { paso: 3, clave: 'dislikedFood', etiqueta: 'Comida que te desagrada', ejemplo: '', max: 120 },
+  { paso: 3, clave: 'favoriteGame', etiqueta: 'Videojuego favorito', ejemplo: '', max: 120 },
+  { paso: 3, clave: 'favoriteSeries', etiqueta: 'Serie favorita', ejemplo: '', max: 120 },
+  { paso: 3, clave: 'favoriteMusic', etiqueta: 'Música favorita', ejemplo: '', max: 120 },
+  { paso: 3, clave: 'favoriteAnime', etiqueta: 'Anime favorito', ejemplo: '', max: 120 },
+  { paso: 3, clave: 'favoriteAnimal', etiqueta: 'Animal favorito', ejemplo: '', max: 120 },
+  { paso: 3, clave: 'favoriteColor', etiqueta: 'Color favorito', ejemplo: '', max: 80 },
+] as const;
+
+const TITULOS_PASO = { 1: 'Lo básico y tu contacto', 2: 'Tu personaje', 3: 'Tus gustos' } as const;
+type Paso = 1 | 2 | 3;
+type ClavePerfil = (typeof CAMPOS_PERFIL)[number]['clave'];
+
 interface Red {
   platform: string;
   url: string;
@@ -45,9 +72,15 @@ export function InscripcionForm() {
   const [country, setCountry] = useState('');
   const [languages, setLanguages] = useState<string[]>([]);
   const [phrase, setPhrase] = useState('');
+  const [paso, setPaso] = useState<Paso>(1);
+  const [perfil, setPerfil] = useState<Record<ClavePerfil, string>>(() =>
+    Object.fromEntries(CAMPOS_PERFIL.map((c) => [c.clave, ''])) as Record<ClavePerfil, string>,
+  );
+  const [zodiac, setZodiac] = useState('');
   const [cardText, setCardText] = useState('');
   const [themeColor, setThemeColor] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
   const [socials, setSocials] = useState<Red[]>([{ platform: '', url: '' }]);
   const [acepta, setAcepta] = useState(false);
   const [website, setWebsite] = useState('');
@@ -75,6 +108,13 @@ export function InscripcionForm() {
   const enviar = async (evento: React.FormEvent) => {
     evento.preventDefault();
     setError(null);
+    // La validación nativa (`required`) de la página 1 corre antes de este `submit`: si llegamos aquí
+    // los datos de este paso están completos y solo falta pasar al siguiente.
+    if (paso < 3) {
+      setPaso((paso + 1) as Paso);
+      window.scrollTo({ top: 0 });
+      return;
+    }
     if (!acepta) {
       setError('Debes aceptar los términos y condiciones para enviar la inscripción.');
       return;
@@ -91,6 +131,9 @@ export function InscripcionForm() {
         cardText,
         themeColor,
         imageUrl,
+        logoUrl,
+        zodiac,
+        ...perfil,
         socials: socials.filter((r) => r.platform.trim() || r.url.trim()),
         aceptaTerminos: true,
         terminosVersion: TERMINOS_VERSION,
@@ -103,6 +146,20 @@ export function InscripcionForm() {
       setEnviando(false);
     }
   };
+
+  const camposDelPaso = (n: Paso) =>
+    CAMPOS_PERFIL.filter((c) => c.paso === n).map((campo) => (
+      <Campo key={campo.clave} etiqueta={campo.etiqueta} obligatorio>
+        <input
+          className={claseInput}
+          required
+          maxLength={campo.max}
+          placeholder={campo.ejemplo}
+          value={perfil[campo.clave]}
+          onChange={(e) => setPerfil((actual) => ({ ...actual, [campo.clave]: e.target.value }))}
+        />
+      </Campo>
+    ));
 
   if (enviada) {
     return (
@@ -120,36 +177,33 @@ export function InscripcionForm() {
 
   return (
     <form onSubmit={enviar} className="relative space-y-6" data-testid="inscripcion-form" noValidate={false}>
+      <div>
+        <p className="text-xs uppercase tracking-[0.14em] text-dex-muted" data-testid="inscripcion-paso" aria-live="polite">
+          Paso {paso} de 3 · {TITULOS_PASO[paso]}
+        </p>
+        <div className="mt-2 flex gap-1.5" aria-hidden>
+          {[1, 2, 3].map((n) => (
+            <span key={n} className={`h-1 flex-1 rounded-full ${n <= paso ? 'bg-dex-accent' : 'bg-dex-line'}`} />
+          ))}
+        </div>
+      </div>
+
+      {paso === 1 && (
+        <>
       <fieldset className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-5">
         <legend className="px-2 text-sm font-bold text-dex-ink">Tu ficha (datos públicos)</legend>
         <Campo etiqueta="Nombre artístico" obligatorio>
           <input className={claseInput} required maxLength={160} value={name} onChange={(e) => setName(e.target.value)} />
         </Campo>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Campo etiqueta="País" obligatorio>
-            {paises.length ? (
-              <select className={claseInput} required value={country} onChange={(e) => setCountry(e.target.value)}>
-                <option value="">Elige…</option>
-                {paises.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input className={claseInput} required maxLength={60} value={country} onChange={(e) => setCountry(e.target.value)} />
-            )}
-          </Campo>
-          <Campo etiqueta="Color de marca" ayuda="Opcional. Tiñe tu carta.">
-            <input
-              type="color"
-              aria-label="Color de marca"
-              className="mt-1 h-10 w-full cursor-pointer rounded-lg border border-dex-line bg-dex-void p-1"
-              value={themeColor || '#5eead4'}
-              onChange={(e) => setThemeColor(e.target.value)}
-            />
-          </Campo>
-        </div>
+        <Campo etiqueta="Color de marca" ayuda="Opcional. Tiñe tu carta.">
+          <input
+            type="color"
+            aria-label="Color de marca"
+            className="mt-1 h-10 w-full cursor-pointer rounded-lg border border-dex-line bg-dex-void p-1 sm:w-48"
+            value={themeColor || '#5eead4'}
+            onChange={(e) => setThemeColor(e.target.value)}
+          />
+        </Campo>
         <fieldset>
           <legend className="text-xs uppercase tracking-[0.14em] text-dex-muted">
             Idiomas <span className="text-rose-300" aria-hidden>*</span>
@@ -170,12 +224,6 @@ export function InscripcionForm() {
         </fieldset>
         <Campo etiqueta="Frase" ayuda="Una línea que te presente (máx. 600 caracteres).">
           <input className={claseInput} maxLength={600} value={phrase} onChange={(e) => setPhrase(e.target.value)} />
-        </Campo>
-        <Campo etiqueta="Descripción / historia" ayuda="Aparece en tu carta. No incluyas datos personales aquí: este campo es público.">
-          <textarea className={`${claseInput} min-h-28`} maxLength={4000} value={cardText} onChange={(e) => setCardText(e.target.value)} />
-        </Campo>
-        <Campo etiqueta="Enlace al arte de tu personaje" ayuda="Una URL (Drive, Imgur, tu sitio…). El arte debe ser tuyo o contar con permiso de su autoría.">
-          <input type="url" className={claseInput} maxLength={500} placeholder="https://" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
         </Campo>
         <div>
           <p className="text-xs uppercase tracking-[0.14em] text-dex-muted">
@@ -242,15 +290,89 @@ export function InscripcionForm() {
         </Campo>
       </fieldset>
 
-      <CampoTrampa valor={website} alCambiar={setWebsite} />
-      <AceptaTerminos idUnico="acepta-terminos-inscripcion" marcada={acepta} alCambiar={setAcepta} />
+        </>
+      )}
+
+      {paso === 2 && (
+        <>
+          <fieldset className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-5" data-testid="inscripcion-paso-2">
+            <legend className="px-2 text-sm font-bold text-dex-ink">Imágenes (enlaces)</legend>
+            <p className="text-xs text-dex-muted">
+              Pega un enlace (Drive, Imgur, tu sitio…): el formulario no recibe archivos. El arte debe ser tuyo o contar con permiso de su autoría.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Campo etiqueta="Avatar" obligatorio ayuda="Tu personaje completo: la imagen de la carta.">
+                <input type="url" className={claseInput} required maxLength={500} placeholder="https://" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
+              </Campo>
+              <Campo etiqueta="Logo" obligatorio>
+                <input type="url" className={claseInput} required maxLength={500} placeholder="https://" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
+              </Campo>
+            </div>
+          </fieldset>
+
+          <fieldset className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-5">
+            <legend className="px-2 text-sm font-bold text-dex-ink">Tu personaje</legend>
+            <p className="text-xs text-dex-muted">
+              Los campos con <span className="text-rose-300">*</span> son obligatorios. Todo esto se publica en tu ficha si el mantenedor la aprueba.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {camposDelPaso(2)}
+              <Campo etiqueta="País">
+                {paises.length ? (
+                  <select className={claseInput} value={country} onChange={(e) => setCountry(e.target.value)}>
+                    <option value="">Elige…</option>
+                    {paises.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input className={claseInput} maxLength={60} value={country} onChange={(e) => setCountry(e.target.value)} />
+                )}
+              </Campo>
+              <Campo etiqueta="Signo">
+                <select className={claseInput} value={zodiac} onChange={(e) => setZodiac(e.target.value)}>
+                  <option value="">Elige…</option>
+                  {SIGNOS.map((signo) => (
+                    <option key={signo} value={signo}>
+                      {signo}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+            </div>
+            <Campo etiqueta="Lore" obligatorio ayuda="Tu historia. Aparece en tu carta. No incluyas datos personales: este campo es público.">
+              <textarea className={`${claseInput} min-h-28`} required maxLength={4000} value={cardText} onChange={(e) => setCardText(e.target.value)} />
+            </Campo>
+          </fieldset>
+        </>
+      )}
+
+      {paso === 3 && (
+        <>
+          <fieldset className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-5" data-testid="inscripcion-paso-3">
+            <legend className="px-2 text-sm font-bold text-dex-ink">Tus gustos</legend>
+            <p className="text-xs text-dex-muted">Último paso: respuestas cortas, una línea basta. Todos son obligatorios.</p>
+            <div className="grid gap-4 sm:grid-cols-2">{camposDelPaso(3)}</div>
+          </fieldset>
+
+          <CampoTrampa valor={website} alCambiar={setWebsite} />
+          <AceptaTerminos idUnico="acepta-terminos-inscripcion" marcada={acepta} alCambiar={setAcepta} />
+        </>
+      )}
 
       {error && <Aviso tipo="error">{error}</Aviso>}
-      <div className="flex items-center gap-4">
-        <button type="submit" className={claseBoton} disabled={enviando || !acepta}>
-          {enviando ? 'Enviando…' : 'Enviar inscripción'}
+      <div className="flex flex-wrap items-center gap-4">
+        {paso > 1 && (
+          <button type="button" className="rounded-xl border border-dex-line px-5 py-2.5 text-sm text-dex-muted hover:text-dex-ink" onClick={() => setPaso((paso - 1) as Paso)}>
+            ← Volver
+          </button>
+        )}
+        <button type="submit" className={claseBoton} disabled={enviando || (paso === 3 && !acepta)}>
+          {paso < 3 ? 'Siguiente →' : enviando ? 'Enviando…' : 'Enviar inscripción'}
         </button>
-        <span className="text-xs text-dex-muted">Quedará en espera hasta que el mantenedor la revise.</span>
+        {paso === 3 && <span className="text-xs text-dex-muted">Quedará en espera hasta que el mantenedor la revise.</span>}
       </div>
     </form>
   );
