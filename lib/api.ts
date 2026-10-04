@@ -38,10 +38,10 @@ export interface LikeResumen {
   xpPorLike: number;
 }
 
-/** Una solicitud de la cola del mantenedor (inscripción o baja). El contacto es confidencial: solo llega con sesión. */
+/** Una solicitud de la cola del mantenedor (inscripción, baja o modificación). El contacto es confidencial: solo llega con sesión. */
 export interface SolicitudAdmin {
   id: number;
-  tipo: 'inscripcion' | 'baja';
+  tipo: 'inscripcion' | 'baja' | 'modificacion';
   estado: 'pendiente' | 'aprobada' | 'rechazada' | 'procesada';
   datos: Record<string, unknown>;
   contacto: { email?: string; realName?: string } | null;
@@ -231,9 +231,13 @@ export const api = {
   enviarBaja(body: Record<string, unknown>) {
     return request<{ ok: true; estado: 'pendiente'; id: number | null }>('/api/bajas', { method: 'POST', body: JSON.stringify(body) });
   },
-  solicitudes(token: string, estado: string = 'pendiente', tipo?: 'inscripcion' | 'baja') {
+  /** Formulario público para pedir cambios en una ficha ya registrada. Mismos términos y misma cola. */
+  enviarModificacion(body: Record<string, unknown>) {
+    return request<{ ok: true; estado: 'pendiente'; id: number | null }>('/api/modificaciones', { method: 'POST', body: JSON.stringify(body) });
+  },
+  solicitudes(token: string, estado: string = 'pendiente', tipo?: 'inscripcion' | 'baja' | 'modificacion') {
     const query = new URLSearchParams({ estado, ...(tipo ? { tipo } : {}) });
-    return request<{ items: SolicitudAdmin[]; pendientes: { inscripcion: number; baja: number } }>(`/api/admin/solicitudes?${query}`, {
+    return request<{ items: SolicitudAdmin[]; pendientes: { inscripcion: number; baja: number; modificacion: number } }>(`/api/admin/solicitudes?${query}`, {
       headers: bearer(token),
     });
   },

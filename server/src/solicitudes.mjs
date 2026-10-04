@@ -38,7 +38,7 @@ import { TERMINOS_VERSION } from './terminos-version.mjs';
 export { TERMINOS_VERSION };
 
 /** Tipos y estados de una solicitud. */
-export const TIPOS = ['inscripcion', 'baja'];
+export const TIPOS = ['inscripcion', 'baja', 'modificacion'];
 export const ESTADOS = ['pendiente', 'aprobada', 'rechazada', 'procesada'];
 
 /**
@@ -141,25 +141,25 @@ const aceptacion = {
 };
 
 /**
- * Los datos de la 2.ª página que son texto corto y OBLIGATORIOS. La clave es la del formulario;
- * `PERFIL_ETIQUETAS` dice cómo se llama cada uno en la ficha (`profile`) y cuáles tienen columna propia.
+ * Los textos cortos de la ficha que pide el formulario: `[clave, máximo, cómo se nombra en el mensaje]`.
+ * La inscripción los exige todos; la modificación los acepta en blanco (en blanco = no cambia).
  */
-const perfilObligatorio = Object.fromEntries(
-  [
-    ['height', 40, 'la estatura'],
-    ['birthday', 80, 'el cumpleaños'],
-    ['favoriteFood', 120, 'la comida favorita'],
-    ['dislikedFood', 120, 'la comida que te desagrada'],
-    ['favoriteGame', 120, 'el videojuego favorito'],
-    ['favoriteSeries', 120, 'la serie favorita'],
-    ['favoriteMusic', 120, 'la música favorita'],
-    ['favoriteAnime', 120, 'el anime favorito'],
-    ['favoriteAnimal', 120, 'el animal favorito'],
-    ['favoriteColor', 80, 'el color favorito'],
-    ['modeler', 80, 'quién hizo el modelo'],
-    ['hashtag', 120, 'el hashtag de arte'],
-  ].map(([clave, max, que]) => [clave, texto(max).min(1, `falta ${que}`)]),
-);
+const PERFIL_CAMPOS = [
+  ['height', 40, 'la estatura'],
+  ['birthday', 80, 'el cumpleaños'],
+  ['favoriteFood', 120, 'la comida favorita'],
+  ['dislikedFood', 120, 'la comida que te desagrada'],
+  ['favoriteGame', 120, 'el videojuego favorito'],
+  ['favoriteSeries', 120, 'la serie favorita'],
+  ['favoriteMusic', 120, 'la música favorita'],
+  ['favoriteAnime', 120, 'el anime favorito'],
+  ['favoriteAnimal', 120, 'el animal favorito'],
+  ['favoriteColor', 80, 'el color favorito'],
+  ['modeler', 80, 'quién hizo el modelo'],
+  ['hashtag', 120, 'el hashtag de arte'],
+];
+const perfilObligatorio = Object.fromEntries(PERFIL_CAMPOS.map(([clave, max, que]) => [clave, texto(max).min(1, `falta ${que}`)]));
+const perfilOpcional = Object.fromEntries(PERFIL_CAMPOS.map(([clave, max]) => [clave, textoOpcional(max)]));
 
 /** Campos de la inscripción que no tienen columna en la ficha: van como filas de `profile` (etiqueta → clave). */
 const PERFIL_ETIQUETAS = [
@@ -215,6 +215,49 @@ export const bajaSchema = z.object({
   ...aceptacion,
 });
 
+/** Lo que una modificación puede cambiar: si todo viene en blanco no hay nada que revisar. */
+const CAMPOS_MODIFICABLES = ['phrase', 'cardText', 'themeColor', 'country', 'zodiac', 'imageUrl', 'logoUrl', ...PERFIL_CAMPOS.map(([clave]) => clave)];
+
+/**
+ * Pedir cambios en una ficha YA registrada. Se identifica como la baja (ficha + correo + cómo se
+ * comprueba la titularidad) y todo lo demás es opcional: solo se tocan los campos que vengan con
+ * valor. El nombre no se puede cambiar por aquí (mueve la URL y tiene sus propias reglas).
+ */
+export const modificacionSchema = z
+  .object({
+    /** Nombre o URL (`/v/<slug>`) de la ficha que se quiere modificar. */
+    ficha: texto(300).min(1, 'indica qué ficha quieres modificar'),
+    /** CONFIDENCIAL. */
+    email: correo,
+    /** Cómo demostrar que quien pide el cambio es el titular (igual que en la baja). */
+    prueba: texto(500).min(5, 'indica cómo podemos comprobar que eres el titular'),
+    phrase: textoOpcional(600),
+    cardText: textoOpcional(4000),
+    themeColor: z
+      .string()
+      .trim()
+      .regex(/^#[0-9a-fA-F]{6}$/, 'color hexadecimal #rrggbb')
+      .optional()
+      .or(z.literal('')),
+    country: textoOpcional(60),
+    zodiac: textoOpcional(40),
+    ...perfilOpcional,
+    languages: z.array(texto(8).min(2)).max(6).optional().default([]),
+    imageUrl: urlHttp.optional().or(z.literal('')),
+    logoUrl: urlHttp.optional().or(z.literal('')),
+    /** Se SUMAN o actualizan por plataforma; no reemplazan las que ya tiene la ficha. */
+    socials: z.array(z.object({ platform: texto(40).min(1), url: urlHttp })).max(10).optional().default([]),
+    /** Para el mantenedor: qué cambió y por qué. */
+    nota: textoOpcional(2000),
+    ...aceptacion,
+  })
+  .refine((d) => CAMPOS_MODIFICABLES.some((clave) => d[clave]) || d.languages.length > 0 || d.socials.length > 0, {
+    message: 'indica al menos un cambio',
+    path: ['(cambios)'],
+  });
+
+const ESQUEMAS = { inscripcion: inscripcionSchema, baja: bajaSchema, modificacion: modificacionSchema };
+
 /* ------------------------------------------------------------------ operaciones */
 
 const aJson = (valor) => JSON.stringify(valor);
@@ -238,7 +281,7 @@ export function hashearRed(ip, sal = process.env.VTUBERDEX_LIKES_SAL ?? 'vtuberd
  */
 export async function crearSolicitud(ejecutor, entrada, { tipo, ip, ahora = new Date() }) {
   if (!TIPOS.includes(tipo)) throw new SolicitudError(400, 'tipo_invalido', tipo);
-  const esquema = tipo === 'inscripcion' ? inscripcionSchema : bajaSchema;
+  const esquema = ESQUEMAS[tipo];
   const parsed = esquema.safeParse(entrada ?? {});
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => ({ path: i.path.join('.') || '(root)', message: i.message }));
@@ -313,7 +356,7 @@ export async function listarSolicitudes(ejecutor, { estado = 'pendiente', tipo =
   const donde = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
   const { rows } = await e.execute(`SELECT * FROM solicitud ${donde} ORDER BY id ASC LIMIT 500`, args);
   const { rows: cuentas } = await e.execute("SELECT tipo, COUNT(*) AS n FROM solicitud WHERE estado = 'pendiente' GROUP BY tipo");
-  const pendientes = { inscripcion: 0, baja: 0 };
+  const pendientes = { inscripcion: 0, baja: 0, modificacion: 0 };
   for (const c of cuentas) pendientes[c.tipo] = Number(c.n);
   return { items: rows.map(mapear), pendientes };
 }
@@ -339,11 +382,11 @@ export async function resolverSolicitud(ejecutor, id, { estado, actor, nota = ''
   const e = await conTablas(ejecutor);
   const actual = await leerSolicitud(e, id);
   if (!actual) throw new SolicitudError(404, 'no_encontrado', `no existe la solicitud ${id}`);
-  const permitido = actual.tipo === 'inscripcion' ? ['aprobada', 'rechazada'] : ['procesada', 'rechazada'];
+  const permitido = actual.tipo === 'baja' ? ['procesada', 'rechazada'] : ['aprobada', 'rechazada'];
   if (!permitido.includes(estado)) {
     throw new SolicitudError(400, 'estado_invalido', `una ${actual.tipo} no puede quedar «${estado}»`);
   }
-  const conservaContacto = actual.tipo === 'inscripcion' && estado === 'aprobada';
+  const conservaContacto = actual.tipo !== 'baja' && estado === 'aprobada';
   const cambio = await e.execute(
     `UPDATE solicitud
         SET estado = ?, resuelto = ?, resuelto_por = ?, nota = ?, vtuber_slug = ?,
@@ -368,13 +411,22 @@ export function fichaDesdeInscripcion(solicitud) {
     languages: d.languages ?? [],
     socials: (d.socials ?? []).map((s) => ({ platform: s.platform, url: s.url })),
   };
-  if (d.phrase) ficha.phrase = d.phrase;
-  if (d.cardText) ficha.cardText = d.cardText;
-  if (d.themeColor) ficha.themeColor = d.themeColor;
-  // Estos cuatro tienen columna propia en la ficha; el resto va como filas de `profile`.
-  for (const clave of ['height', 'birthday', 'hashtag', 'favoriteColor']) if (d[clave]) ficha[clave] = d[clave];
-  if (d.modeler) ficha.artists = [d.modeler];
-  const profile = PERFIL_ETIQUETAS.filter(([, clave]) => d[clave]).map(([label, clave]) => ({ label, value: d[clave] }));
-  if (profile.length) ficha.profile = profile;
+  const { columnas, modeler, perfil } = camposDeFicha(d);
+  Object.assign(ficha, columnas);
+  if (modeler) ficha.artists = [modeler];
+  if (perfil.length) ficha.profile = perfil;
   return ficha;
+}
+
+/**
+ * Lo que los datos de un formulario aportan a la ficha, igual para la inscripción y la modificación:
+ * las columnas propias, el modelador (va a `artists`) y las filas de `profile`. Solo lo que trae valor.
+ */
+export function camposDeFicha(d) {
+  const columnas = {};
+  for (const clave of ['phrase', 'cardText', 'themeColor', 'height', 'birthday', 'hashtag', 'favoriteColor']) {
+    if (d[clave]) columnas[clave] = d[clave];
+  }
+  const perfil = PERFIL_ETIQUETAS.filter(([, clave]) => d[clave]).map(([label, clave]) => ({ label, value: d[clave] }));
+  return { columnas, modeler: d.modeler || '', perfil };
 }

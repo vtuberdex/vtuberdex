@@ -9,54 +9,18 @@
  * subir basura al almacenamiento; el mantenedor lo descarga y lo sube por su gestor de imágenes.
  */
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { ApiError, api } from '@/lib/api';
-import { DEFAULT_SEARCH } from '@/lib/query';
-import { facetValue } from '@/lib/types';
 import { TERMINOS_VERSION } from '@/lib/terminos';
+import { useOpcionesFicha } from '@/components/solicitudes/use-opciones-ficha';
+import { CAMPOS_PERFIL, SIGNOS, type ClavePerfil } from '@/components/solicitudes/campos-ficha';
 import { AceptaTerminos, Aviso, Campo, CampoTrampa, claseBoton, claseInput } from '@/components/solicitudes/campos';
-
-interface Opcion {
-  value: string;
-  label: string;
-}
-
-/** Respaldo si las facetas no llegan: el formulario sigue siendo utilizable. */
-const IDIOMAS_RESPALDO: Opcion[] = [
-  { value: 'es', label: 'Español' },
-  { value: 'en', label: 'Inglés' },
-  { value: 'pt', label: 'Portugués' },
-];
 
 const MAX_REDES = 10;
 
-const SIGNOS = ['Aries', 'Tauro', 'Géminis', 'Cáncer', 'Leo', 'Virgo', 'Libra', 'Escorpio', 'Sagitario', 'Capricornio', 'Acuario', 'Piscis'];
-
-/**
- * Los datos de la 2.ª página que son TEXTO corto y obligatorios. Una sola lista alimenta el estado, el
- * render y el envío: añadir uno es una línea aquí (y su campo en `inscripcionSchema` del servidor).
- */
-const CAMPOS_PERFIL = [
-  // Paso 2: tu personaje (lo que más se quiere contar, con la cabeza fresca).
-  { paso: 2, clave: 'modeler', etiqueta: 'Modelo (quién lo hizo)', ejemplo: 'Nombre de quien hizo tu modelo', max: 80 },
-  { paso: 2, clave: 'hashtag', etiqueta: 'Hashtag de arte', ejemplo: '#MiHashtag', max: 120 },
-  { paso: 2, clave: 'height', etiqueta: 'Estatura', ejemplo: '1,60 m', max: 40 },
-  { paso: 2, clave: 'birthday', etiqueta: 'Cumpleaños', ejemplo: '12 de marzo', max: 80 },
-  // Paso 3: gustos. Respuestas de una palabra, por eso van al final y juntas.
-  { paso: 3, clave: 'favoriteFood', etiqueta: 'Comida favorita', ejemplo: '', max: 120 },
-  { paso: 3, clave: 'dislikedFood', etiqueta: 'Comida que te desagrada', ejemplo: '', max: 120 },
-  { paso: 3, clave: 'favoriteGame', etiqueta: 'Videojuego favorito', ejemplo: '', max: 120 },
-  { paso: 3, clave: 'favoriteSeries', etiqueta: 'Serie favorita', ejemplo: '', max: 120 },
-  { paso: 3, clave: 'favoriteMusic', etiqueta: 'Música favorita', ejemplo: '', max: 120 },
-  { paso: 3, clave: 'favoriteAnime', etiqueta: 'Anime favorito', ejemplo: '', max: 120 },
-  { paso: 3, clave: 'favoriteAnimal', etiqueta: 'Animal favorito', ejemplo: '', max: 120 },
-  { paso: 3, clave: 'favoriteColor', etiqueta: 'Color favorito', ejemplo: '', max: 80 },
-] as const;
-
 const TITULOS_PASO = { 1: 'Lo básico y tu contacto', 2: 'Tu personaje', 3: 'Tus gustos' } as const;
 type Paso = 1 | 2 | 3;
-type ClavePerfil = (typeof CAMPOS_PERFIL)[number]['clave'];
 
 interface Red {
   platform: string;
@@ -64,8 +28,7 @@ interface Red {
 }
 
 export function InscripcionForm() {
-  const [paises, setPaises] = useState<Opcion[]>([]);
-  const [idiomas, setIdiomas] = useState<Opcion[]>(IDIOMAS_RESPALDO);
+  const { paises, idiomas } = useOpcionesFicha();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [realName, setRealName] = useState('');
@@ -87,17 +50,6 @@ export function InscripcionForm() {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviada, setEnviada] = useState(false);
-
-  useEffect(() => {
-    api
-      .list({ ...DEFAULT_SEARCH, perPage: 1 })
-      .then((respuesta) => {
-        setPaises((respuesta.facets?.countries ?? []).map((b) => ({ value: facetValue(b), label: b.name })));
-        const delServidor = (respuesta.facets?.languages ?? []).map((b) => ({ value: facetValue(b), label: b.name }));
-        if (delServidor.length) setIdiomas(delServidor);
-      })
-      .catch(() => undefined);
-  }, []);
 
   const cambiarRed = (indice: number, cambio: Partial<Red>) =>
     setSocials((actuales) => actuales.map((r, i) => (i === indice ? { ...r, ...cambio } : r)));

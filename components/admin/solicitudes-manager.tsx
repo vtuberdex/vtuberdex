@@ -1,6 +1,6 @@
 'use client';
 /**
- * Cola de SOLICITUDES del mantenedor: las inscripciones y bajas que llegaron por los formularios
+ * Cola de SOLICITUDES del mantenedor: las inscripciones, modificaciones y bajas que llegaron por los formularios
  * públicos y esperan revisión.
  *
  *   · Inscripción → «Aprobar» crea la ficha en BORRADOR (hay que publicarla aparte, desde «Fichas»)
@@ -42,7 +42,7 @@ export function SolicitudesManager({
 }) {
   const [filtro, setFiltro] = useState<Filtro>('pendiente');
   const [items, setItems] = useState<SolicitudAdmin[]>([]);
-  const [pendientes, setPendientes] = useState({ inscripcion: 0, baja: 0 });
+  const [pendientes, setPendientes] = useState({ inscripcion: 0, baja: 0, modificacion: 0 });
   const [cargada, setCargada] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ocupada, setOcupada] = useState<number | null>(null);
@@ -69,7 +69,7 @@ export function SolicitudesManager({
     setOcupada(solicitud.id);
     try {
       await api.resolverSolicitud(token, solicitud.id, accion, notas[solicitud.id] ?? '');
-      notify?.('ok', accion === 'aprobar' ? 'Ficha creada en borrador' : accion === 'procesar' ? 'Baja marcada como procesada' : 'Solicitud rechazada');
+      notify?.('ok', accion === 'aprobar' ? (solicitud.tipo === 'modificacion' ? 'Cambios aplicados a la ficha' : 'Ficha creada en borrador') : accion === 'procesar' ? 'Baja marcada como procesada' : 'Solicitud rechazada');
       await cargar();
       if (accion === 'aprobar') onChanged?.();
     } catch (causa) {
@@ -96,7 +96,7 @@ export function SolicitudesManager({
           </button>
         ))}
         <span className="ml-auto text-xs text-dex-muted" data-testid="solicitudes-contador">
-          En espera: {pendientes.inscripcion} inscripciones · {pendientes.baja} bajas
+          En espera: {pendientes.inscripcion} inscripciones · {pendientes.modificacion} modificaciones · {pendientes.baja} bajas
         </span>
       </div>
 
@@ -106,21 +106,25 @@ export function SolicitudesManager({
       <ul className="space-y-3">
         {items.map((s) => {
           const esInscripcion = s.tipo === 'inscripcion';
+          const esModificacion = s.tipo === 'modificacion';
+          const apruebaCambios = esInscripcion || esModificacion;
           const redes = Array.isArray(s.datos.socials) ? (s.datos.socials as Array<{ platform: string; url: string }>) : [];
           return (
             <li key={s.id} className="rounded-2xl border border-dex-line bg-dex-panel/70 p-4" data-testid={`solicitud-${s.id}`}>
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className={`rounded px-2 py-0.5 font-bold uppercase ${esInscripcion ? 'bg-dex-accent/20 text-dex-accent' : 'bg-amber-300/20 text-amber-200'}`}>
-                  {esInscripcion ? 'Inscripción' : 'Baja'}
+                <span className={`rounded px-2 py-0.5 font-bold uppercase ${apruebaCambios ? 'bg-dex-accent/20 text-dex-accent' : 'bg-amber-300/20 text-amber-200'}`}>
+                  {esInscripcion ? 'Inscripción' : esModificacion ? 'Modificación' : 'Baja'}
                 </span>
                 <span className="text-dex-muted">#{s.id} · {new Date(s.creado).toLocaleString('es-CL')} · estado: {s.estado}</span>
                 <span className="ml-auto text-dex-muted" title="Versión de los términos aceptada">términos {s.terminosVersion}</span>
               </div>
 
               <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-                {esInscripcion ? (
+                {apruebaCambios ? (
                   <>
-                    <Dato k="Nombre" v={texto(s.datos.name)} />
+                    {esModificacion && <Dato k="Ficha" v={texto(s.datos.ficha)} ancho />}
+                    {esModificacion && <Dato k="Comprobación de titularidad" v={texto(s.datos.prueba)} ancho />}
+                    {esInscripcion && <Dato k="Nombre" v={texto(s.datos.name)} />}
                     <Dato k="País" v={texto(s.datos.country)} />
                     <Dato k="Idiomas" v={Array.isArray(s.datos.languages) ? (s.datos.languages as string[]).join(', ') : ''} />
                     <Dato k="Color" v={texto(s.datos.themeColor)} />
@@ -141,6 +145,7 @@ export function SolicitudesManager({
                     <Dato k="Hashtag de arte" v={texto(s.datos.hashtag)} />
                     <Dato k="Avatar" v={texto(s.datos.imageUrl)} ancho enlace />
                     <Dato k="Logo" v={texto(s.datos.logoUrl)} ancho enlace />
+                    {esModificacion && <Dato k="Nota" v={texto(s.datos.nota)} ancho />}
                     {redes.map((r, i) => (
                       <Dato key={i} k={r.platform} v={r.url} ancho enlace />
                     ))}
@@ -161,12 +166,23 @@ export function SolicitudesManager({
                 </p>
               )}
 
-              {!esInscripcion && s.estado === 'pendiente' && (
+              {esModificacion && s.estado === 'pendiente' && (
+                <p className="mt-3 text-xs text-amber-200">
+                  Solo se aplican los campos con valor. Las redes se suman a las existentes. {texto(s.datos.imageUrl) || texto(s.datos.logoUrl)
+                    ? 'El avatar y el logo vienen como enlace: descárgalos y súbelos desde «Imágenes» (no se aplican solos).'
+                    : ''}
+                </p>
+              )}
+              {!apruebaCambios && s.estado === 'pendiente' && (
                 <p className="mt-3 text-xs text-amber-200">
                   «Marcar procesada» solo cierra la solicitud: la degradación de la ficha (cláusula de salida) se aplica aparte, desde «Fichas».
                 </p>
               )}
-              {s.vtuberSlug && <p className="mt-3 text-xs text-dex-muted">Ficha creada: /v/{s.vtuberSlug} (en borrador)</p>}
+              {s.vtuberSlug && (
+                <p className="mt-3 text-xs text-dex-muted">
+                  {esModificacion ? `Ficha modificada: /v/${s.vtuberSlug}` : `Ficha creada: /v/${s.vtuberSlug} (en borrador)`}
+                </p>
+              )}
               {s.nota && s.estado !== 'pendiente' && <p className="mt-2 text-xs text-dex-muted">Nota: {s.nota}</p>}
 
               {s.estado === 'pendiente' && (
@@ -182,9 +198,9 @@ export function SolicitudesManager({
                     type="button"
                     className={primaryButton}
                     disabled={ocupada === s.id}
-                    onClick={() => void resolver(s, esInscripcion ? 'aprobar' : 'procesar')}
+                    onClick={() => void resolver(s, apruebaCambios ? 'aprobar' : 'procesar')}
                   >
-                    {esInscripcion ? 'Aprobar (crear borrador)' : 'Marcar procesada'}
+                    {esInscripcion ? 'Aprobar (crear borrador)' : esModificacion ? 'Aprobar y aplicar cambios' : 'Marcar procesada'}
                   </button>
                   <button type="button" className={ghostButton} disabled={ocupada === s.id} onClick={() => void resolver(s, 'rechazar')}>
                     Rechazar

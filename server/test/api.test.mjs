@@ -460,3 +460,57 @@ test('OPTIONS responde 204 para preflight', async () => {
   const response = await fetch(`${baseUrl}/api/admin/vtubers/1`, { method: 'OPTIONS' });
   assert.equal(response.status, 204);
 });
+
+test('una solicitud de modificación aprobada se aplica a la ficha existente', async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const { crearSolicitud, ejecutorSqlite, TERMINOS_VERSION } = await import('../src/solicitudes.mjs');
+  // La cola es el MISMO archivo que abre el Express (`solicitudes.db`, junto a la base): así llegan
+  // las solicitudes desde los formularios públicos de Next.
+  const cola = new DatabaseSync(path.join(path.dirname(dbPath), 'solicitudes.db'));
+  const { id } = await crearSolicitud(
+    ejecutorSqlite(cola),
+    {
+      ficha: '/v/drawchii',
+      email: 'drawchii@example.com',
+      prueba: 'una marca en mi canal',
+      height: '1,70 m',
+      favoriteAnime: 'Frieren',
+      imageUrl: 'https://x.test/avatar.png',
+      aceptaTerminos: true,
+      terminosVersion: TERMINOS_VERSION,
+    },
+    { tipo: 'modificacion', ip: '9.9.9.9' },
+  );
+  cola.close();
+  const headers = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
+
+  // Ya llegó a la cola como modificación.
+  const lista = await (await fetch(`${baseUrl}/api/admin/solicitudes?tipo=modificacion`, { headers })).json();
+  assert.equal(lista.pendientes.modificacion, 1);
+  assert.equal(lista.items[0].tipo, 'modificacion');
+
+  const resuelta = await fetch(`${baseUrl}/api/admin/solicitudes/${id}/resolver`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ accion: 'aprobar' }),
+  });
+  assert.equal(resuelta.status, 200);
+  assert.equal((await resuelta.json()).solicitud.vtuberSlug, 'drawchii');
+
+  const ficha = await get('/api/vtubers/drawchii');
+  assert.equal(ficha.body.height, '1,70 m');
+  assert.ok(ficha.body.profile.some((fila) => fila.label === 'Anime favorito' && fila.value === 'Frieren'));
+  assert.equal(ficha.body.name, 'Drawchii');
+
+  // Una ficha que no existe deja la solicitud pendiente y el error llega tal cual.
+  const cola2 = new DatabaseSync(path.join(path.dirname(dbPath), 'solicitudes.db'));
+  const otra = await crearSolicitud(
+    ejecutorSqlite(cola2),
+    { ficha: '/v/nadie', email: 'x@example.com', prueba: 'una marca en mi canal', height: '1', aceptaTerminos: true, terminosVersion: TERMINOS_VERSION },
+    { tipo: 'modificacion', ip: '9.9.9.9' },
+  );
+  cola2.close();
+  const fallida = await fetch(`${baseUrl}/api/admin/solicitudes/${otra.id}/resolver`, { method: 'POST', headers, body: JSON.stringify({ accion: 'aprobar' }) });
+  assert.equal(fallida.status, 404);
+  assert.equal((await fallida.json()).error, 'ficha_no_encontrada');
+});
