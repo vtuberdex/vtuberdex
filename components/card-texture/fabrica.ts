@@ -32,6 +32,7 @@ import type { VtuberCard } from '@/lib/types';
 import { TEXTURAS } from '@/components/card3d-config';
 import { CARD_TEXTURE_FULL_WIDTH } from './dimensiones';
 import { drawCardLayers } from './componer';
+import { deteriorarArte, deteriorarCabecera, planDeCarta, tarjetaParaTitulo } from './deterioro';
 import { drawSurfaceLayer } from './capa-superficie';
 import { drawCharacterLayer } from './capa-personaje';
 import { drawTitleLayer } from './capa-titulo';
@@ -185,10 +186,19 @@ async function cargarFuentes(card: VtuberCard): Promise<Fuentes> {
 export function generarRapida(card: VtuberCard, fuentes: Fuentes, width: number): TexturasDeCarta {
   const background = drawSurfaceLayer({ card, background: fuentes.background, width });
   const character = drawCharacterLayer({ art: fuentes.art, width });
-  const title = drawTitleLayer({ card, width });
+  const title = drawTitleLayer({ card: tarjetaParaTitulo(card), width });
   const vacia = emptyLayer();
+  // El color predominante se mide ANTES de estropear la superficie: una carta degradada conserva
+  // el matiz de su foil aunque el arte ya se vea gris.
+  const dominant = colorPredominante(background);
+  const plan = planDeCarta(card);
+  if (plan) {
+    deteriorarArte(background, plan);
+    deteriorarArte(character, plan);
+    deteriorarCabecera(title, plan);
+  }
   return {
-    dominant: colorPredominante(background),
+    dominant,
     layers: [background, character, vacia, title, vacia, vacia, vacia],
     edge: vacia,
     logoMask: vacia,
@@ -292,7 +302,13 @@ interface Entrada {
 const cache = new Map<string, Entrada>();
 let pixelesEnCache = 0;
 
-const claveDe = (card: VtuberCard, width: number) => `${card.id}|${width}|${urlsDeCarta(card).join('|')}`;
+/**
+ * El grado va en la clave: subir o bajar el grado cambia el dibujo (una degradada se rompe) y con
+ * la clave anterior el mantenedor seguiría viendo la textura vieja hasta recargar. Va ANTES de las
+ * URLs porque `buscarEnCache` compara prefijo (`id|`) y sufijo (URLs) para encontrar otro ancho.
+ */
+const claveDe = (card: VtuberCard, width: number) => `${card.id}|${width}|${gradoDeCarta(card)}|${urlsDeCarta(card).join('|')}`;
+const gradoDeCarta = (card: VtuberCard) => card.premium?.grade ?? '';
 
 const pixelesDe = (t: TexturasDeCarta) =>
   [...t.layers, t.edge, t.logoMask, t.logoSticker].reduce((suma, c) => suma + c.width * c.height, 0);
@@ -315,7 +331,7 @@ export function buscarEnCache(card: VtuberCard, width: number): TexturasDeCarta 
     return exacta.texturas;
   }
   const prefijo = `${card.id}|`;
-  const sufijo = `|${urlsDeCarta(card).join('|')}`;
+  const sufijo = `|${gradoDeCarta(card)}|${urlsDeCarta(card).join('|')}`;
   for (const [clave, entrada] of cache) {
     if (clave.startsWith(prefijo) && clave.endsWith(sufijo)) return entrada.texturas;
   }

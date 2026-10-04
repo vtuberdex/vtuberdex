@@ -3,6 +3,7 @@
  */
 import path from 'node:path';
 import fs from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
 import express from 'express';
@@ -10,6 +11,7 @@ import express from 'express';
 import { openDatabase } from './db/index.mjs';
 import { createSessionStore } from './auth.mjs';
 import { createApiRouter } from './routes.mjs';
+import { ejecutorSqlite } from './solicitudes.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
@@ -38,7 +40,10 @@ export function createApp({ dbPath, imageRoot = path.join(ROOT, 'data', 'images'
   });
 
   app.use('/images', express.static(imageRoot, { maxAge: '7d', immutable: false }));
-  app.use('/api', createApiRouter({ db, sessions, imageRoot }));
+  // La cola de solicitudes vive junto a la base (`data/solicitudes.db`): es el MISMO archivo en
+  // el que escriben los formularios públicos desde Next. Sin `dbPath` (tests) va en memoria.
+  const solicitudes = ejecutorSqlite(new DatabaseSync(dbPath ? path.join(path.dirname(path.resolve(dbPath)), 'solicitudes.db') : ':memory:'));
+  app.use('/api', createApiRouter({ db, sessions, imageRoot, solicitudes }));
 
   if (fs.existsSync(webRoot)) {
     app.use(express.static(webRoot, { maxAge: '1h' }));

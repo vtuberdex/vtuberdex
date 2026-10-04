@@ -17,6 +17,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const fichas = await fichasPublicadas().catch(() => []);
   return [
     { url: urlAbsoluta('/'), changeFrequency: 'daily', priority: 1 },
+    { url: urlAbsoluta('/inscripcion'), changeFrequency: 'yearly' as const, priority: 0.3 },
+    { url: urlAbsoluta('/terminos'), changeFrequency: 'yearly' as const, priority: 0.2 },
     ...fichas.map((f: { slug: string }) => ({
       url: urlAbsoluta(rutaDeFicha(f.slug)),
       changeFrequency: 'weekly' as const,

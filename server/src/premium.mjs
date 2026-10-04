@@ -23,8 +23,22 @@
  * formulario, y el orden lo da la POSICIÓN en `GRADOS`, no una comparación numérica.
  */
 
-/** La escala completa, de menor a mayor. La posición es el rango. */
+/** La escala PREMIUM, de menor a mayor. La posición es el rango. Es la que sube con las donaciones. */
 export const GRADOS = Object.freeze(['8', '8.5', '9', '9.5', '10', 'BL']);
+
+/**
+ * La escala de DETERIORO, del menos al más dañado: `7` apenas desgastada, `1` ilegible. Es la
+ * contraparte de la premium: una carta de un VTuber dado de baja no se elimina, se degrada
+ * (cláusula de salida de los términos) y se muestra gradeada igual que una premium, pero rota.
+ * El grado `1` es el de las bajas. Los asigna a mano el mantenedor; nada los calcula.
+ */
+export const GRADOS_DEGRADADOS = Object.freeze(['7', '6', '5', '4', '3', '2', '1']);
+
+/** El grado con el que queda la ficha de quien se dio de baja: la carta ya no se entiende. */
+export const GRADO_DE_BAJA = '1';
+
+/** Todos los grados que se pueden fijar, de peor a mejor: `1 … 7 · 8 … BL`. */
+export const TODOS_LOS_GRADOS = Object.freeze([...[...GRADOS_DEGRADADOS].reverse(), ...GRADOS]);
 
 /** Grado con el que entra una carta nueva: el mínimo de la escala. */
 export const GRADO_INICIAL = GRADOS[0];
@@ -43,10 +57,33 @@ export const NOMBRE_DE_GRADO = Object.freeze({
   9.5: 'MINT+',
   10: 'GEM MINT',
   BL: 'PRISTINE',
+  // Escala de deterioro, con los nombres de las categorías bajas de las certificadoras.
+  7: 'NM',
+  6: 'EX/NM',
+  5: 'EX',
+  4: 'VG/EX',
+  3: 'VG',
+  2: 'GD',
+  1: 'POOR',
 });
 
 export function esGradoValido(valor) {
-  return typeof valor === 'string' && GRADOS.includes(valor);
+  return typeof valor === 'string' && TODOS_LOS_GRADOS.includes(valor);
+}
+
+/** ¿Es un grado de la escala de deterioro (`7`…`1`)? */
+export function esGradoDegradado(grado) {
+  return typeof grado === 'string' && GRADOS_DEGRADADOS.includes(grado);
+}
+
+/**
+ * Cuánto está dañada la carta, de 0 (intacta: cualquier grado premium) a 1 (el grado `1`).
+ * Lineal en el grado: `7` = 1/7, `4` = 4/7, `1` = 1. Es lo único que el dibujo de la carta necesita
+ * saber del grado; las perillas de cada efecto viven en `DETERIORO` (`card3d-config.ts`).
+ */
+export function severidadDeGrado(grado) {
+  if (!esGradoDegradado(grado)) return 0;
+  return (8 - Number(grado)) / 7;
 }
 
 /** Posición del grado en la escala (0 = el más bajo), o -1 si no es un grado. */

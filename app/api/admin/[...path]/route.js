@@ -58,6 +58,14 @@ import {
   vtuberUpdateSchema,
 } from '../../../../server/src/validation.mjs';
 import { MutationError, listarFacciones, ultimoDex } from '../../../../server/src/mutations.mjs';
+import { ejecutorDeSolicitudes } from '../../../../lib/solicitudes.mjs';
+import {
+  SolicitudError,
+  fichaDesdeInscripcion,
+  leerSolicitud,
+  listarSolicitudes,
+  resolverSolicitud,
+} from '../../../../server/src/solicitudes.mjs';
 import { getVtuberBySlug, searchVtubers } from '../../../../server/src/search.mjs';
 import { readWebpSize } from '../../../../server/src/seed.mjs';
 
@@ -352,7 +360,7 @@ async function listarVtubers(request) {
     perPage,
     includeHidden: true,
     status: status === 'all' ? null : status,
-    premium: Boolean(premium),
+    premium: premium ? 'todas' : false,
     sort: 'dex',
   });
   return NextResponse.json({ ...resultado, items: await aplicarReemplazosALista(resultado.items) });
@@ -580,6 +588,71 @@ async function estadoMasivo(request, usuario) {
 }
 
 /** Respuesta común cuando no hay ningún backend de escritura. */
+/**
+ * `GET /api/admin/solicitudes?estado=&tipo=` — la cola de inscripciones y bajas que llegaron
+ * por los formularios públicos. Trae el contacto confidencial: solo se sirve con sesión.
+ */
+async function listarSolicitudesRuta(request) {
+  const consulta = new URL(request.url).searchParams;
+  const estado = consulta.get('estado') ?? 'pendiente';
+  const tipo = consulta.get('tipo');
+  if (!['pendiente', 'aprobada', 'rechazada', 'procesada', 'todas'].includes(estado) || (tipo && !['inscripcion', 'baja'].includes(tipo))) {
+    return NextResponse.json({ error: 'query_invalida' }, { status: 400 });
+  }
+  try {
+    return NextResponse.json(await listarSolicitudes(await ejecutorDeSolicitudes(), { estado, tipo }));
+  } catch (error) {
+    console.error('[admin] no se pudo leer la cola de solicitudes', error);
+    return NextResponse.json({ error: 'solicitudes_no_disponibles', detail: error.message }, { status: 503 });
+  }
+}
+
+/**
+ * `POST /api/admin/solicitudes/:id/resolver` con `{ accion, nota? }`.
+ *
+ *   · `aprobar`  (inscripción): crea la ficha en BORRADOR por el mismo camino que «Nueva carta»
+ *     (`vtuber.crear` del diario) y cierra la solicitud. Si la ficha no se puede crear (URL
+ *     repetida, país desconocido…) la solicitud sigue pendiente y el error llega tal cual.
+ *   · `rechazar` (ambas) y `procesar` (baja): cierran la solicitud. La baja NO borra nada: qué
+ *     se hace con la ficha lo decide el mantenedor aparte, según la cláusula de salida.
+ */
+async function resolverSolicitudRuta(request, id, usuario) {
+  const cuerpo = await request.json().catch(() => null);
+  const accion = cuerpo?.accion;
+  if (!['aprobar', 'rechazar', 'procesar'].includes(accion)) {
+    return NextResponse.json({ error: 'payload_invalido', detail: 'accion: aprobar | rechazar | procesar' }, { status: 400 });
+  }
+  const nota = typeof cuerpo?.nota === 'string' ? cuerpo.nota : '';
+  try {
+    const ejecutor = await ejecutorDeSolicitudes();
+    const solicitud = await leerSolicitud(ejecutor, id);
+    if (!solicitud) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+    if (solicitud.estado !== 'pendiente') {
+      return NextResponse.json({ error: 'ya_resuelta', detail: 'esta solicitud ya fue resuelta' }, { status: 409 });
+    }
+    let vtuberSlug = null;
+    if (accion === 'aprobar') {
+      if (solicitud.tipo !== 'inscripcion') {
+        return NextResponse.json({ error: 'estado_invalido', detail: 'solo se aprueban inscripciones' }, { status: 400 });
+      }
+      const datos = vtuberCreateSchema.safeParse(fichaDesdeInscripcion(solicitud));
+      if (!datos.success) {
+        return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(datos.error) }, { status: 400 });
+      }
+      const { resultado } = await aplicarYAnotar({ tipo: 'vtuber.crear', datos: datos.data }, usuario.username);
+      vtuberSlug = resultado.slug;
+    }
+    const estado = accion === 'aprobar' ? 'aprobada' : accion === 'procesar' ? 'procesada' : 'rechazada';
+    const resuelta = await resolverSolicitud(ejecutor, id, { estado, actor: usuario.username, nota, vtuberSlug });
+    return NextResponse.json({ solicitud: resuelta });
+  } catch (error) {
+    if (error instanceof SolicitudError) {
+      return NextResponse.json({ error: error.code, detail: error.detail }, { status: error.status });
+    }
+    return responderError(error);
+  }
+}
+
 function sinBackend() {
   return noDisponible('el mantenedor solo existe en local: en Vercel hace falta TURSO_DATABASE_URL');
 }
@@ -602,6 +675,7 @@ export async function GET(request, context) {
   if (partes[0] === 'vtubers' && partes[1] && partes.length === 2) return detalleVtuber(partes[1]);
   if (sufijo === 'dex/next') return siguienteDex();
   if (sufijo === 'factions') return listaDeFacciones();
+  if (sufijo === 'solicitudes') return listarSolicitudesRuta(request);
   return noDisponible(`ruta del mantenedor no soportada en producción: ${sufijo}`);
 }
 
@@ -632,6 +706,7 @@ export async function POST(request, context) {
   if (partes[0] === 'vtubers' && partes[1] && partes[2] === 'image' && partes[3]) {
     return subirImagen(request, partes[1], partes[3]);
   }
+  if (partes[0] === 'solicitudes' && partes[1] && partes[2] === 'resolver') return resolverSolicitudRuta(request, partes[1], usuario);
   if (partes[0] === 'factions' && partes.length === 1) return crearFaccionRuta(request, usuario);
   if (partes[0] === 'factions' && partes[1] && partes[2] === 'image') return subirEmblema(request, partes[1], usuario);
   return noDisponible(`ruta del mantenedor no soportada en producción: ${partes.join('/')}`);

@@ -249,7 +249,7 @@ describe('cartas premium en producción', () => {
     const id = await idDe('gkuro');
     const antes = (turso.prepare('SELECT COUNT(*) AS n FROM cambio').get() as { n: number }).n;
     await expect(
-      diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { premium: { grade: '7' } } }),
+      diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { premium: { grade: '11' } } }),
     ).rejects.toMatchObject({ code: 'grado_invalido' });
     expect((turso.prepare('SELECT COUNT(*) AS n FROM cambio').get() as { n: number }).n).toBe(antes);
   });

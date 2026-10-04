@@ -17,7 +17,7 @@
  * Ninguna abre su propia transacción salvo `aplicarOperacion`: así el llamador decide el alcance
  * (el Express añade la auditoría dentro de la misma; el reproductor de producción una por operación).
  */
-import { GRADOS, esGradoValido, hoy } from './premium.mjs';
+import { TODOS_LOS_GRADOS, esGradoValido, hoy } from './premium.mjs';
 import { normalizeText, slugify } from './text.mjs';
 
 /**
@@ -364,7 +364,7 @@ function aplicarPremium(db, vtuberId, premium) {
     return;
   }
   if (!esGradoValido(premium.grade)) {
-    throw new MutationError(400, 'grado_invalido', `el grado debe ser uno de ${GRADOS.join(', ')}`);
+    throw new MutationError(400, 'grado_invalido', `el grado debe ser uno de ${TODOS_LOS_GRADOS.join(', ')}`);
   }
   const ahora = premium.ahora ?? hoy();
   const actual = db.prepare('SELECT grade, since, graded_at AS gradedAt FROM premium WHERE vtuber_id = ?').get(vtuberId);

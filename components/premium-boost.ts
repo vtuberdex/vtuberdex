@@ -5,7 +5,7 @@
  * WebGL. Una carta normal devuelve todo en 1, así que el camino sin premium no cambia.
  */
 import { PREMIUM } from '@/components/card3d-config';
-import { esBlackLabel, rangoDeGrado } from '@/lib/premium';
+import { esBlackLabel, esGradoDegradado, rangoDeGrado, severidadDeGrado } from '@/lib/premium';
 import type { PremiumGrade } from '@/lib/types';
 
 export interface HoloBoost {
@@ -40,6 +40,12 @@ export function factorDeGrado(grado: PremiumGrade): number {
 
 export function refuerzoDeGrado(grado: PremiumGrade | null | undefined): HoloBoost {
   if (!grado) return SIN_REFUERZO;
+  if (esGradoDegradado(grado)) {
+    // Una carta rota brilla MENOS que una normal: el foil se apaga con el deterioro. Nunca a cero,
+    // o el grado 1 dejaría de reaccionar al puntero y parecería una imagen congelada.
+    const apagado = Math.max(0.35, 1 - 0.55 * severidadDeGrado(grado));
+    return { layerWeight: apagado, bgHolo: apagado, bgLayerWeight: apagado, glare: apagado, edge: apagado, faction: apagado, glow: apagado, holo: apagado };
+  }
   const factor = factorDeGrado(grado);
   const { techo } = PREMIUM.boost;
   const tope = (clave: keyof HoloBoost, multiplicador: number) => Math.min(techo[clave], multiplicador);
