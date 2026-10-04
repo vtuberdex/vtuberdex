@@ -14,6 +14,7 @@ import { DEFAULT_SEARCH } from '@/lib/query';
 import { CardWizard } from '@/components/admin/card-wizard';
 import { FactionManager } from '@/components/admin/faction-manager';
 import { GettingStarted } from '@/components/admin/getting-started';
+import { PremiumRates } from '@/components/admin/premium-rates';
 import { PremiumManager } from '@/components/admin/premium-manager';
 import { SolicitudesManager } from '@/components/admin/solicitudes-manager';
 import { VtuberList } from '@/components/admin/vtuber-list';
@@ -38,7 +39,7 @@ const FLAG_LABELS: Record<string, string> = {
   'sin-logo': 'Sin logo',
 };
 
-type Section = 'fichas' | 'emblemas' | 'premium' | 'solicitudes';
+type Section = 'fichas' | 'emblemas' | 'premium' | 'tarifas' | 'solicitudes';
 type View = { kind: 'none' } | { kind: 'create'; n: number } | { kind: 'edit'; detail: VtuberDetail; epoch: number };
 
 export function AdminPage() {
@@ -242,6 +243,7 @@ export function AdminPage() {
     { id: 'fichas', label: 'Fichas' },
     { id: 'emblemas', label: 'Emblemas y facciones' },
     { id: 'premium', label: 'Premium' },
+    { id: 'tarifas', label: 'Tarifas' },
     { id: 'solicitudes', label: 'Solicitudes' },
   ];
 
@@ -350,6 +352,10 @@ export function AdminPage() {
       {/* Premium se monta al abrirla (no antes): pide su propia lista y no debe alterar la carga de las otras. */}
       <div role="tabpanel" id="section-premium" aria-labelledby="section-tab-premium" hidden={section !== 'premium'}>
         {token && section === 'premium' && <PremiumManager token={token} notify={notify} onChanged={changed} />}
+      </div>
+
+      <div role="tabpanel" id="section-tarifas" aria-labelledby="section-tab-tarifas" hidden={section !== 'tarifas'}>
+        {section === 'tarifas' && <PremiumRates />}
       </div>
 
       <div role="tabpanel" id="section-solicitudes" aria-labelledby="section-tab-solicitudes" hidden={section !== 'solicitudes'}>

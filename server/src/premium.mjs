@@ -67,6 +67,25 @@ export const NOMBRE_DE_GRADO = Object.freeze({
   1: 'POOR',
 });
 
+/**
+ * Donación (USD) que corresponde a cada grado premium. Es REFERENCIA para el mantenedor: nada la
+ * cobra ni la valida (la donación la registra una persona, ver `premium-manager.tsx`).
+ *
+ * `null` = todavía sin monto definido. El `BL` no tiene monto porque NO se vende: está reservado
+ * y lo otorga el mantenedor. Al fijar un monto nuevo, se cambia aquí y la pestaña «Tarifas» lo muestra.
+ */
+export const DONACION_POR_GRADO = Object.freeze({
+  8: null,
+  8.5: null,
+  9: null,
+  9.5: 20,
+  10: null,
+  BL: null,
+});
+
+/** Grados que nadie puede obtener donando: los otorga el mantenedor. */
+export const GRADOS_RESERVADOS = Object.freeze(['BL']);
+
 export function esGradoValido(valor) {
   return typeof valor === 'string' && TODOS_LOS_GRADOS.includes(valor);
 }

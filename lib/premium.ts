@@ -14,6 +14,8 @@ import {
   esGradoDegradado as esGradoDegradadoServidor,
   severidadDeGrado as severidadDeGradoServidor,
   NOMBRE_DE_GRADO,
+  DONACION_POR_GRADO as DONACION_POR_GRADO_SERVIDOR,
+  GRADOS_RESERVADOS as GRADOS_RESERVADOS_SERVIDOR,
   esBlackLabel as esBlackLabelServidor,
   gradoSiguiente as gradoSiguienteServidor,
   hoy,
@@ -29,6 +31,11 @@ export { hoy, numeroDeCertificado, rangoDeGrado };
 /** La escala completa, de menor a mayor. */
 export const GRADOS = GRADOS_SERVIDOR as readonly PremiumGrade[];
 export const GRADO_INICIAL = GRADO_INICIAL_SERVIDOR as PremiumGrade;
+
+/** Donación en USD por grado premium (`null` = aún sin definir). Referencia del mantenedor. */
+export const DONACION_POR_GRADO = DONACION_POR_GRADO_SERVIDOR as Readonly<Record<string, number | null>>;
+/** Grados que no se obtienen donando (Black Label). */
+export const GRADOS_RESERVADOS = GRADOS_RESERVADOS_SERVIDOR as readonly PremiumGrade[];
 
 /** La escala de deterioro (`7`…`1`), del menos al más dañado. */
 export const GRADOS_DEGRADADOS = GRADOS_DEGRADADOS_SERVIDOR as readonly PremiumGrade[];
