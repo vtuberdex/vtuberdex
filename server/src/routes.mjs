@@ -30,6 +30,13 @@ import {
   refreshFacetCounters,
   ultimoDex,
 } from './mutations.mjs';
+import {
+  SolicitudError,
+  fichaDesdeInscripcion,
+  leerSolicitud,
+  listarSolicitudes,
+  resolverSolicitud,
+} from './solicitudes.mjs';
 import { UPLOADABLE_KINDS, MAX_UPLOAD_BYTES, saveUploadedImage, saveFactionEmblem, removeUploadedImage } from './uploads.mjs';
 
 const splitCsv = (value) => String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
@@ -67,7 +74,7 @@ function enTransaccion(db, fn) {
  * Construye el router de la API.
  * @param {{db: import('node:sqlite').DatabaseSync, sessions: object, imageRoot: string}} deps
  */
-export function createApiRouter({ db, sessions, imageRoot }) {
+export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
   const router = express.Router();
 
   // ---------------------------------------------------------------- catálogo
@@ -205,6 +212,69 @@ export function createApiRouter({ db, sessions, imageRoot }) {
   /** El siguiente número libre al final de la dex, para el botón "al final". */
   router.get('/admin/dex/next', requireAdmin, (req, res) => {
     res.json({ next: ultimoDex(db) + 1 });
+  });
+
+  // ------------------------------------------------- solicitudes (formularios públicos)
+  // La cola vive en `solicitudes` (un ejecutor SQLite); los formularios públicos escriben en el
+  // mismo archivo desde Next. Las reglas son las de `solicitudes.mjs`, iguales a las de producción.
+  router.get('/admin/solicitudes', requireAdmin, async (req, res) => {
+    const estado = String(req.query.estado ?? 'pendiente');
+    const tipo = req.query.tipo ? String(req.query.tipo) : null;
+    if (!['pendiente', 'aprobada', 'rechazada', 'procesada', 'todas'].includes(estado) || (tipo && !['inscripcion', 'baja'].includes(tipo))) {
+      res.status(400).json({ error: 'query_invalida' });
+      return;
+    }
+    try {
+      res.json(await listarSolicitudes(solicitudes, { estado, tipo }));
+    } catch (error) {
+      res.status(503).json({ error: 'solicitudes_no_disponibles', detail: error.message });
+    }
+  });
+
+  router.post('/admin/solicitudes/:id/resolver', requireAdmin, async (req, res) => {
+    const accion = req.body?.accion;
+    if (!['aprobar', 'rechazar', 'procesar'].includes(accion)) {
+      res.status(400).json({ error: 'payload_invalido', detail: 'accion: aprobar | rechazar | procesar' });
+      return;
+    }
+    const nota = typeof req.body?.nota === 'string' ? req.body.nota : '';
+    try {
+      const solicitud = await leerSolicitud(solicitudes, req.params.id);
+      if (!solicitud) {
+        res.status(404).json({ error: 'no_encontrado' });
+        return;
+      }
+      if (solicitud.estado !== 'pendiente') {
+        res.status(409).json({ error: 'ya_resuelta', detail: 'esta solicitud ya fue resuelta' });
+        return;
+      }
+      let vtuberSlug = null;
+      if (accion === 'aprobar') {
+        if (solicitud.tipo !== 'inscripcion') {
+          res.status(400).json({ error: 'estado_invalido', detail: 'solo se aprueban inscripciones' });
+          return;
+        }
+        const datos = vtuberCreateSchema.safeParse(fichaDesdeInscripcion(solicitud));
+        if (!datos.success) {
+          res.status(400).json({ error: 'payload_invalido', issues: formatIssues(datos.error) });
+          return;
+        }
+        const creada = enTransaccion(db, () => {
+          const resultado = crearFicha(db, datos.data);
+          audit(db, req.user.username, 'vtuber', resultado.id, 'create', datos.data);
+          return resultado;
+        });
+        vtuberSlug = creada.slug;
+      }
+      const estado = accion === 'aprobar' ? 'aprobada' : accion === 'procesar' ? 'procesada' : 'rechazada';
+      res.json({ solicitud: await resolverSolicitud(solicitudes, req.params.id, { estado, actor: req.user.username, nota, vtuberSlug }) });
+    } catch (error) {
+      if (error instanceof SolicitudError) {
+        res.status(error.status).json({ error: error.code, detail: error.detail });
+        return;
+      }
+      responderError(res, error);
+    }
   });
 
   router.post('/admin/vtubers', requireAdmin, (req, res) => {

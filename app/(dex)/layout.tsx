@@ -1,3 +1,4 @@
+import { AppFooter } from '@/components/app-footer';
 import { AppHeader } from '@/components/app-header';
 
 /**
@@ -18,6 +19,7 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
           `useSearchParams` ya lleva su propio `Suspense` (ver `page.tsx`).
         */}
         {children}
+        <AppFooter />
       </div>
     </div>
   );

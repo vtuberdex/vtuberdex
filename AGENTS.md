@@ -39,9 +39,9 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 390 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 419 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
-cd server  && npm test     # 82 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
+cd server  && npm test     # 88 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
 # Linter (raíz; cubre también server/ y scraper/)
 npm run lint               # eslint . — falla con cualquier error
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/82/390** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/88/419** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -199,6 +199,31 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
   casi puro (`strokeLow/High`), el tinte del arcoíris es leve (`tintSpectrumMix`) y el UV se acota
   (sin `continue` antes de muestrear: derivadas indefinidas = ruido en el borde). El engarce mide
   100 px del lienzo (`FACTION_SOCKET`) para que el detalle se alcance a ver.
+
+## Inscripción, baja y términos: formularios públicos con cola de revisión
+
+Tres páginas públicas (`/inscripcion`, `/baja`, `/terminos`, con enlaces en `components/app-footer.tsx`) y una
+pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío es una fila `pendiente` de la tabla
+`solicitud` hasta que el mantenedor la resuelve.
+
+- **Las reglas viven UNA vez** en `server/src/solicitudes.mjs` (JS puro; recibe un EJECUTOR `{ execute, exec }` con la
+  forma del cliente de Turso). `lib/solicitudes.mjs` elige el ejecutor del entorno igual que los likes: Turso en
+  producción, `data/solicitudes.db` sin él; el Express local abre el MISMO archivo junto a la base. No van al diario de
+  cambios: son una cola de entrada, no ediciones del catálogo.
+- **Términos obligatorios, comprobados en el servidor** (`aceptaTerminos: z.literal(true)`), no solo con `required` de
+  HTML. Cada solicitud guarda `terminos_version` y la fecha de aceptación. Si cambias el texto de `lib/terminos.ts`,
+  **sube `TERMINOS_VERSION`** (`server/src/terminos-version.mjs`, sin imports para que el cliente no arrastre
+  `node:crypto`): los formularios abiertos con la versión vieja se rechazan con `terminos_desactualizados`.
+- **Confidencialidad por estructura**: el correo y el nombre civil van en la columna `contacto`; la ficha que nace de una
+  inscripción aprobada (`fichaDesdeInscripcion`) solo lee `datos`, así que no puede copiarlos. El contacto se borra al
+  rechazar o procesar; se conserva en una inscripción aprobada. De la red solo se guarda un hash.
+- **Aprobar crea la ficha en BORRADOR** por el camino de siempre (`vtuber.crear` del diario en producción, `crearFicha` en
+  el Express). Si la ficha no se puede crear (URL repetida, país desconocido) la solicitud sigue pendiente.
+- **«Procesar» una baja NO degrada la ficha**: solo cierra la solicitud. La degradación de la cláusula de salida es un
+  paso manual aparte (no está automatizada) y el mantenedor lo avisa.
+- **Antispam**: campo trampa `website`, un solo pendiente por correo y tipo, tope de 5 envíos por red y día. El arte del
+  personaje se pide como ENLACE: un formulario público que recibe archivos es una puerta a subir basura.
+- `/api/admin/solicitudes*` sale 404 sin Turso ni proxy local, como el resto del mantenedor.
 
 ## Cartas premium: grado, placa de acrílico y mantenedor
 

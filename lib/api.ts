@@ -38,6 +38,22 @@ export interface LikeResumen {
   xpPorLike: number;
 }
 
+/** Una solicitud de la cola del mantenedor (inscripción o baja). El contacto es confidencial: solo llega con sesión. */
+export interface SolicitudAdmin {
+  id: number;
+  tipo: 'inscripcion' | 'baja';
+  estado: 'pendiente' | 'aprobada' | 'rechazada' | 'procesada';
+  datos: Record<string, unknown>;
+  contacto: { email?: string; realName?: string } | null;
+  terminosVersion: string;
+  terminosAceptadosEn: string;
+  creado: string;
+  resuelto: string | null;
+  resueltoPor: string | null;
+  nota: string | null;
+  vtuberSlug: string | null;
+}
+
 export class ApiError extends Error {
   status: number;
   issues?: unknown;
@@ -206,6 +222,27 @@ export const api = {
       `/api/admin/vtubers/${id}/image/${kind}`,
       { method: 'DELETE', headers: { authorization: `Bearer ${token}` } },
     );
+  },
+  /** Formulario público de inscripción: deja una solicitud pendiente, no crea la ficha. */
+  enviarInscripcion(body: Record<string, unknown>) {
+    return request<{ ok: true; estado: 'pendiente'; id: number | null }>('/api/inscripciones', { method: 'POST', body: JSON.stringify(body) });
+  },
+  /** Formulario público de baja. Mismos términos que la inscripción. */
+  enviarBaja(body: Record<string, unknown>) {
+    return request<{ ok: true; estado: 'pendiente'; id: number | null }>('/api/bajas', { method: 'POST', body: JSON.stringify(body) });
+  },
+  solicitudes(token: string, estado: string = 'pendiente', tipo?: 'inscripcion' | 'baja') {
+    const query = new URLSearchParams({ estado, ...(tipo ? { tipo } : {}) });
+    return request<{ items: SolicitudAdmin[]; pendientes: { inscripcion: number; baja: number } }>(`/api/admin/solicitudes?${query}`, {
+      headers: bearer(token),
+    });
+  },
+  resolverSolicitud(token: string, id: number, accion: 'aprobar' | 'rechazar' | 'procesar', nota = '') {
+    return request<{ solicitud: SolicitudAdmin }>(`/api/admin/solicitudes/${id}/resolver`, {
+      method: 'POST',
+      headers: bearer(token),
+      body: JSON.stringify({ accion, nota }),
+    });
   },
   adminStats(token: string) {
     return request<{
