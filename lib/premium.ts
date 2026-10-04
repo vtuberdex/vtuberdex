@@ -15,6 +15,7 @@ import {
   severidadDeGrado as severidadDeGradoServidor,
   NOMBRE_DE_GRADO,
   rachaDe as rachaDeServidor,
+  desgasteLeveDeGrado as desgasteLeveDeGradoServidor,
   DONACION_POR_GRADO as DONACION_POR_GRADO_SERVIDOR,
   GRADOS_RESERVADOS as GRADOS_RESERVADOS_SERVIDOR,
   esBlackLabel as esBlackLabelServidor,
@@ -99,3 +100,6 @@ export function textoDeRacha(premium: Pick<PremiumInfo, 'grade' | 'since' | 'gra
   const meses = rachaDe(premium, ahora);
   return meses > 0 ? `${meses} meses seguidos` : null;
 }
+
+/** Desgaste leve de 0 a 1 (1 = carta suelta sin gradear; 0 = del 8 en adelante o degradada). */
+export const desgasteLeveDeGrado = (grado: string | null | undefined): number => desgasteLeveDeGradoServidor(grado);

@@ -1508,9 +1508,12 @@ export const PREMIUM = {
       '9.5': ['#5d6677', '#3e4654'],
       '10': ['#d8b44d', '#a8802a'],
       BL: ['#17181d', '#050507'],
-      // Cartas degradadas: la banda se apaga del ocre al óxido y al gris sucio a medida que baja el grado.
+      // Entrada de la escala premium (6…7,5): bandas apagadas de ocre, que ganan color hasta el azul del 8.
+      '7.5': ['#6d7a6a', '#4a5648'],
       '7': ['#7d7a52', '#575431'],
+      '6.5': ['#7b7249', '#554d2d'],
       '6': ['#7a6b45', '#54482b'],
+      // Cartas degradadas: la banda se apaga del óxido al gris sucio a medida que baja el grado.
       '5': ['#775a3e', '#503a24'],
       '4': ['#6f4a37', '#4a2f21'],
       '3': ['#66403a', '#432723'],
@@ -1521,9 +1524,9 @@ export const PREMIUM = {
 } as const;
 
 /**
- * DETERIORO de las cartas degradadas (grados 7…1 de `server/src/premium.mjs`).
+ * DETERIORO de las cartas degradadas (grados 5…1 de `server/src/premium.mjs`).
  *
- * La carta de un VTuber dado de baja no se elimina: se rompe. `severidad` va de 1/7 (grado 7) a 1
+ * La carta de un VTuber dado de baja no se elimina: se rompe. `severidad` va de 3/7 (grado 5) a 1
  * (grado 1) y cada efecto crece con ella; todos los números salen de aquí para que ajustar «cuánto
  * se ve roto el 4» sea tocar UNA línea. Se dibujan sobre las capas 2D ANTES de subirlas a la GPU
  * (`card-texture/deterioro.ts`), así que el shader no sabe que existen y no hay uniformes nuevos.
@@ -1557,6 +1560,24 @@ export const DETERIORO = {
   text: { from: 0.1, gain: 1.15, unreadableFrom: 0.95, glyphs: '#%&@*?/\\~=+<>' },
   /** Con esta severidad la bandera del país ya no se imprime. */
   hideCountryFrom: 0.55,
+} as const;
+
+/**
+ * DESGASTE LEVE: el uso «de vida real» de una carta que NO está degradada: la carta suelta (sin
+ * gradear, la mayoría) y las premium de entrada (6…7,5). Es mucho más suave que el deterioro y
+ * NUNCA toca el texto ni el foco: solo blanquea apenas el canto, ensucia con grano y pone unas
+ * rayitas. `severidad` es el techo (carta suelta); cada grado lo escala (`desgasteLeveDeGrado`).
+ * Va por el mismo camino que `DETERIORO` (`planDeCarta`), así que no hay uniformes nuevos.
+ */
+export const DESGASTE_LEVE = {
+  /** Severidad equivalente de una carta suelta (en la escala de `DETERIORO`, donde 1 es la baja). */
+  severidad: 0.28,
+  /** Cuánto del apagado de color de `DETERIORO.fade` se aplica (1 = todo). */
+  grisFactor: 0.5,
+  /** Rayitas en la carta suelta; el grado las reduce. */
+  rayones: 6,
+  /** Opacidad de las rayitas (ya salen tenues: no son surcos). */
+  rayonAlfa: [0.14, 0.34] as const,
 } as const;
 
 /**

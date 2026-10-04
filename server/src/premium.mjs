@@ -4,10 +4,11 @@
  * QUÉ ES
  * ------
  * Un VTuber que dona al proyecto recibe su carta «gradeada», como las que certifica CGC: la carta
- * se muestra dentro de una placa de acrílico con su etiqueta y su nota. Parte del grado 8 y sube
- * 0,5 por cada mes que sigue donando, hasta el 10 y, por encima de él, la Black Label (`BL`).
+ * se muestra dentro de una placa de acrílico con su etiqueta y su nota. Parte del grado 6 y sube
+ * medio punto a medida que acumula donación (ver `DONACION_POR_GRADO`), hasta el 10 y, por encima de él,
+ * la Black Label (`BL`).
  *
- *   8 → 8,5 → 9 → 9,5 → 10 → BL
+ *   6 → 6,5 → 7 → 7,5 → 8 → 8,5 → 9 → 9,5 → 10 → BL
  *
  * POR QUÉ ES UN MÓDULO APARTE
  * ---------------------------
@@ -24,7 +25,7 @@
  */
 
 /** La escala PREMIUM, de menor a mayor. La posición es el rango. Es la que sube con las donaciones. */
-export const GRADOS = Object.freeze(['8', '8.5', '9', '9.5', '10', 'BL']);
+export const GRADOS = Object.freeze(['6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', 'BL']);
 
 /**
  * La escala de DETERIORO, del menos al más dañado: `7` apenas desgastada, `1` ilegible. Es la
@@ -32,7 +33,7 @@ export const GRADOS = Object.freeze(['8', '8.5', '9', '9.5', '10', 'BL']);
  * (cláusula de salida de los términos) y se muestra gradeada igual que una premium, pero rota.
  * El grado `1` es el de las bajas. Los asigna a mano el mantenedor; nada los calcula.
  */
-export const GRADOS_DEGRADADOS = Object.freeze(['7', '6', '5', '4', '3', '2', '1']);
+export const GRADOS_DEGRADADOS = Object.freeze(['5', '4', '3', '2', '1']);
 
 /** El grado con el que queda la ficha de quien se dio de baja: la carta ya no se entiende. */
 export const GRADO_DE_BAJA = '1';
@@ -57,9 +58,12 @@ export const NOMBRE_DE_GRADO = Object.freeze({
   9.5: 'MINT+',
   10: 'GEM MINT',
   BL: 'PRISTINE',
-  // Escala de deterioro, con los nombres de las categorías bajas de las certificadoras.
-  7: 'NM',
+  // Entrada de la escala premium: cartas con algo de desgaste (el 6 es la primera donación).
   6: 'EX/NM',
+  6.5: 'EX/NM+',
+  7: 'NM',
+  7.5: 'NM+',
+  // Escala de deterioro, con los nombres de las categorías bajas de las certificadoras.
   5: 'EX',
   4: 'VG/EX',
   3: 'VG',
@@ -75,13 +79,29 @@ export const NOMBRE_DE_GRADO = Object.freeze({
  * y lo otorga el mantenedor. Al fijar un monto nuevo, se cambia aquí y la pestaña «Tarifas» lo muestra.
  */
 export const DONACION_POR_GRADO = Object.freeze({
-  8: null,
-  8.5: null,
-  9: null,
+  6: 1,
+  6.5: 2,
+  7: 3,
+  7.5: 4,
+  8: 5,
+  8.5: 7,
+  9: 10,
   9.5: 20,
-  10: null,
+  10: 50,
   BL: null,
 });
+
+/**
+ * Cuánto desgaste LEVE lleva una carta, de 0 (limpia) a 1 (la carta suelta, sin gradear). Es el
+ * «como en la vida real»: una carta sin certificar viene con uso y gradearla (donar) la deja mejor
+ * a cada paso. Solo cubre lo que NO está degradado: del 8 hacia arriba no hay desgaste, y las
+ * degradadas (5…1) siguen su propia escala rota (`severidadDeGrado`).
+ */
+export function desgasteLeveDeGrado(grado) {
+  if (grado === null || grado === undefined || grado === '') return 1;
+  const rango = ['6', '6.5', '7', '7.5'].indexOf(grado);
+  return rango < 0 ? 0 : 0.8 - rango * 0.2;
+}
 
 /** Grados que nadie puede obtener donando: los otorga el mantenedor. */
 export const GRADOS_RESERVADOS = Object.freeze(['BL']);

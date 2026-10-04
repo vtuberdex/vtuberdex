@@ -11,16 +11,16 @@ import { DONACION_POR_GRADO, GRADOS, GRADOS_RESERVADOS, nombreDeGrado } from '@/
 export function PremiumRates() {
   return (
     <section className="max-w-xl" data-testid="premium-rates">
-      <h2 className="text-lg font-bold text-dex-ink">Tarifas de gradeado</h2>
+      <h2 className="text-lg font-bold text-dex-ink">Donación sugerida por grado</h2>
       <p className="mb-4 text-sm text-dex-muted">
-        Donación (USD) que corresponde a cada grado. Es una referencia: el mantenedor registra la donación a mano.
+        Cada dólar donado cubre un mes de racha, y lo acumulado da el grado. La carta sin donar se ve suelta, con un desgaste mínimo y sin placa. Es una referencia: el mantenedor registra la donación a mano.
       </p>
       <table className="w-full overflow-hidden rounded-xl border border-dex-line text-sm">
         <thead className="bg-dex-panel/60 text-left text-xs uppercase text-dex-muted">
           <tr>
             <th className="px-3 py-2">Grado</th>
             <th className="px-3 py-2">Nombre</th>
-            <th className="px-3 py-2">Donación</th>
+            <th className="px-3 py-2">Donación acumulada</th>
           </tr>
         </thead>
         <tbody>

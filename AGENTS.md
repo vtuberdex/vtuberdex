@@ -275,7 +275,19 @@ cada mes que sigue donando, hasta el 10 y luego la **Black Label**. Escala: `8 �
 - `madKoding` (dex 16) es premium **grado 10 en la base LOCAL** (`data/vtuberdex.db`, ignorada por git). En
   producción hay que asignarla desde el mantenedor (pestaña Premium), que escribe en el diario de Turso.
 
-## Cartas degradadas (grados 7…1): las bajas se rompen, no se borran
+## Escala premium 6…BL, donación y desgaste leve
+
+La escala premium es `6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10, BL` (`GRADOS` en `server/src/premium.mjs`; el grado inicial es el 6).
+`DONACION_POR_GRADO` (misma archivo) es la tabla de referencia en USD ACUMULADOS (1 USD = 1 mes de racha): 6=1, 6.5=2, 7=3,
+7.5=4, 8=5, 8.5=7, 9=10, 9.5=20, 10=50; la BL no se vende. La muestra la pestaña «Tarifas» del mantenedor (`premium-rates.tsx`),
+solo lectura: el grado lo sigue fijando el mantenedor a mano (no hay aún «cubierto hasta» ni ascenso automático).
+- **Racha** (`rachaDe`): meses seguidos, derivada de `since`/`gradedAt`; `aplicarPremium` adelanta `since` si pasó más de un mes sin
+  ascenso (el grado no baja). Se ve en la etiqueta de la placa y en `PremiumBadge`.
+- **Desgaste leve** (`DESGASTE_LEVE`, `planDeDesgasteLeve`): la carta SIN premium se pinta con uso mínimo (canto, grano, rayitas) y las
+  premium 6…7,5 con menos; del 8 hacia arriba, limpia. Nunca toca texto ni foco. Calibrado mirando la carta renderizada.
+- Las degradadas pasaron a `5…1` (antes `7…1`): cualquier fila local con grado `6` o `7` se lee ahora como premium de entrada.
+
+## Cartas degradadas (grados 5…1): las bajas se rompen, no se borran
 
 La contraparte de la premium. Una ficha dada de baja no se elimina (cláusula de salida de `/terminos`): se muestra
 **gradeada en su placa de acrílico, pero rota**. Escala `7` (apenas desgastada) → `1` (ilegible; es el de las bajas).

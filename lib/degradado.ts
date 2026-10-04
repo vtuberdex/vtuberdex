@@ -8,8 +8,8 @@
  * los mismos sitios, en el libro, en el detalle y en cada recarga. Con `Math.random` la carta
  * «bailaría» al volver de otra página.
  */
-import { DETERIORO } from '@/components/card3d-config';
-import { severidadDeGrado } from '@/lib/premium';
+import { DESGASTE_LEVE, DETERIORO } from '@/components/card3d-config';
+import { desgasteLeveDeGrado, severidadDeGrado } from '@/lib/premium';
 
 /** Generador pseudoaleatorio con semilla (mulberry32): mismo número de entrada, misma secuencia. */
 export function crearAzar(semilla: number): () => number {
@@ -179,6 +179,38 @@ export function planDeDeterioro(grado: string | null | undefined, cartaId: numbe
     gris: fade.gray * s,
     oscuridad: fade.dark * s,
     canto: W * whitening.depth * (0.5 + s),
+  };
+}
+
+/**
+ * Desgaste LEVE de una carta que no está degradada: la suelta (`grado` vacío) y las premium 6…7,5.
+ * Solo canto blanqueado, un grano discreto y unas rayitas: sin mordidas, sin pérdida de foco y sin
+ * tocar el texto (`severidad` baja a propósito: ningún umbral de `DETERIORO` se activa). Devuelve
+ * `null` si no hay nada que pintar (del 8 hacia arriba).
+ */
+export function planDeDesgasteLeve(grado: string | null | undefined, cartaId: number, W: number, H: number): PlanDeDeterioro | null {
+  const factor = desgasteLeveDeGrado(grado);
+  if (factor <= 0) return null;
+  const s = DESGASTE_LEVE.severidad * factor;
+  const semilla = semillaDeCarta(cartaId, grado || 'suelta');
+  const azar = crearAzar(semilla);
+  const rayones: Rayon[] = [];
+  const cuantos = Math.round(DESGASTE_LEVE.rayones * factor);
+  for (let i = 0; i < cuantos; i += 1) {
+    const r = rayonAleatorio(s, azar, W, H);
+    rayones.push({ ...r, grosor: 1, alfa: interpolar(DESGASTE_LEVE.rayonAlfa, azar()), oscuro: false });
+  }
+  return {
+    severidad: s,
+    semilla,
+    mordidas: [],
+    rayones,
+    bloque: 1,
+    pixelar: false,
+    ruido: DETERIORO.noise.alpha * s ** 1.3,
+    gris: DETERIORO.fade.gray * s * DESGASTE_LEVE.grisFactor,
+    oscuridad: DETERIORO.fade.dark * s * DESGASTE_LEVE.grisFactor,
+    canto: W * DETERIORO.whitening.depth * (0.3 + s),
   };
 }
 
