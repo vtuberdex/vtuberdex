@@ -9,7 +9,7 @@
  *   · conteos de facetas calculados en la base, no recorriendo 785 divs.
  */
 import { GRADOS, GRADO_DE_BAJA, numeroDeCertificado } from './premium.mjs';
-import { nombreDeteriorado, ocultarFichaDeteriorada } from './ficha-deteriorada.mjs';
+import { ocultarFichaDeteriorada } from './ficha-deteriorada.mjs';
 import { normalizeText } from './text.mjs';
 
 const SORT_SQL = {
@@ -466,6 +466,9 @@ export function getVtuberBySlug(db, slug, { includeHidden = false } = {}) {
     if (alias) row = db.prepare(`${cardSelect(db)} WHERE v.id = ? ${where}`).get(alias);
   }
   if (!row) return null;
+  // Una ficha deteriorada (baja) no tiene página pública: es un 404, igual que un borrador. Así ni el
+  // nombre ni nada de la ficha se puede leer por la URL, ni por la API, ni por un alias antiguo.
+  if (!includeHidden && row.premiumGrade === GRADO_DE_BAJA) return null;
   const card = mapCard(row);
 
   card.profile = db
@@ -489,22 +492,20 @@ export function getVtuberBySlug(db, slug, { includeHidden = false } = {}) {
     row.expCurrent === null && row.expMax === null
       ? null
       : { current: row.expCurrent, max: row.expMax };
-  return includeHidden ? card : ocultarFichaDeteriorada(card);
+  return card;
 }
 
 /** Vecinos de dex de una carta (para navegar sin volver al catálogo). */
 export function getNeighbors(db, dexNumber) {
+  // Los vecinos son enlaces a fichas: una deteriorada no tiene página, así que se salta.
+  const sinBajas = tienePremium(db)
+    ? `AND NOT EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = vtuber.id AND p.grade = '${GRADO_DE_BAJA}')`
+    : '';
   const prev = db
-    .prepare(`SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number < ? AND status = 'published' ORDER BY dex_number DESC LIMIT 1`)
+    .prepare(`SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number < ? AND status = 'published' ${sinBajas} ORDER BY dex_number DESC LIMIT 1`)
     .get(dexNumber);
   const next = db
-    .prepare(`SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number > ? AND status = 'published' ORDER BY dex_number ASC LIMIT 1`)
+    .prepare(`SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number > ? AND status = 'published' ${sinBajas} ORDER BY dex_number ASC LIMIT 1`)
     .get(dexNumber);
-  // Un vecino deteriorado no puede delatar su nombre desde la navegación de la ficha de al lado.
-  const sinNombre = (vecino) => {
-    if (!vecino || !tienePremium(db)) return vecino;
-    const ficha = db.prepare(`SELECT v.id, p.grade FROM vtuber v JOIN premium p ON p.vtuber_id = v.id WHERE v.slug = ?`).get(vecino.slug);
-    return ficha?.grade === GRADO_DE_BAJA ? { ...vecino, name: nombreDeteriorado(vecino.name, ficha.id) } : vecino;
-  };
-  return { prev: sinNombre(plain(prev ?? null)), next: sinNombre(plain(next ?? null)) };
+  return { prev: plain(prev ?? null), next: plain(next ?? null) };
 }

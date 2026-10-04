@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 429 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 428 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 92 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -73,7 +73,7 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 ```
 
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
-las reales son **25/92/429** (medidas; el CI corre las tres) y las imágenes viven en
+las reales son **25/92/428** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Arquitectura: las reglas que no se negocian
@@ -287,14 +287,14 @@ calcula ni «procesar» una baja los aplica solo**.
   dibuja él (no se daña dos veces).
 - La etiqueta de la placa (`premium-label.ts`) corrompe nombre y país con la misma semilla y dice «DETERIORADA»; el foil se apaga
   (`premium-boost.ts`, nunca por debajo de 0,35 para que siga reaccionando al puntero).
-- **Grado 1 = «Ficha Deteriorada»** (`server/src/ficha-deteriorada.mjs`). La API PÚBLICA deja de servir sus datos: el nombre sale
-  ilegible (letras → símbolos, dígitos y espacios intactos), sin frase, historia, redes, perfil, atributos, habilidades, países,
-  facciones, idiomas ni **logo** (`images.logo` nulo). Se aplica en `searchVtubers`/`getVtuberBySlug` cuando NO hay `includeHidden`:
-  **el mantenedor sigue viendo la ficha entera** y nada se borra de la base. Buscar por texto no la encuentra y el vecino de la dex no
-  delata su nombre. La página `/v/:slug` muestra «Ficha Deteriorada», sin likes, sin donación y sin JSON-LD (título y `<title>`
-  genéricos, `noindex`). La carta 3D tampoco pinta el logo en el grado 1 (`completar`, también en la vista del mantenedor). Solo el
-  grado 1: del 7 al 2 la ficha se ve normal. **Límite conocido**: el `slug` de la URL no se toca y puede delatar el nombre; si importa,
-  el mantenedor debe renombrarlo.
+- **Grado 1 = SIN FICHA** (`server/src/ficha-deteriorada.mjs` + `search.mjs`). Una ficha de baja no tiene página pública: `getVtuberBySlug`
+  sin `includeHidden` devuelve `null` (404 en `/v/:slug`, en la API, por alias antiguo y en el metadata), `getNeighbors` y
+  `fichasPublicadas` (sitemap y JSON-LD) la saltan, el libro no la enlaza ni responde al toque y buscar su nombre no la encuentra. En el
+  LISTADO sigue saliendo como carta rota, con el nombre ilegible, `slug: deteriorada-<dex>` (la URL real delataría el nombre), sin textos,
+  país, facciones, redes ni **logo** (`images.logo` nulo; la carta 3D tampoco lo pinta, ni en la vista del mantenedor). **El mantenedor
+  (`includeHidden`) la ve entera** y puede devolverla a un grado normal; nada se borra de la base. Solo el grado 1: del 7 al 2 la ficha
+  y su página son normales. Antes se probó una página «Ficha Deteriorada» con los datos vaciados; se descartó porque cualquier ruta que
+  llegue a la ficha (URL, vecino, buscador) es una fuga del nombre.
 - Para ver el resultado sin WebGL ni base de datos: bundlear `drawCardFront` con `esbuild --alias:@=.` y dibujar los grados en
   Chromium (`/opt/pw-browsers`); es lo que se hizo para calibrar `DETERIORO`.
 

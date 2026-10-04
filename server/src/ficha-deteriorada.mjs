@@ -9,8 +9,9 @@
  * SOLO PARA LECTURAS PÚBLICAS. El mantenedor pide `includeHidden` y recibe la ficha entera: tiene
  * que poder verla, editarla o devolverla a un grado normal. Nada se borra de la base.
  *
- * LÍMITE CONOCIDO: el `slug` (la URL `/v/<slug>`) no se toca. Cambiarlo rompería el enlace y el
- * redireccionamiento de alias; si la URL delata el nombre, el mantenedor puede renombrarla.
+ * NO TIENE PÁGINA: `getVtuberBySlug` devuelve `null` para el público (404), `getNeighbors` y el sitemap
+ * la saltan y el catálogo no la enlaza. Por eso el listado tampoco puede dejar el `slug` real: la URL
+ * `/v/<slug>` delataría el nombre; sale un identificador genérico con el número de dex.
  *
  * JS puro (sin Node ni DOM), como `premium.mjs`: lo importan el buscador y, para saber de qué grado
  * se trata, también la interfaz.
@@ -40,7 +41,7 @@ export function nombreDeteriorado(nombre, id) {
 }
 
 /**
- * La ficha tal como la ve el público si está deteriorada; la misma tarjeta, sin tocar, si no.
+ * La TARJETA del listado tal como la ve el público si está deteriorada; la misma, sin tocar, si no.
  * Conserva lo que hace falta para pintar la carta rota (id, número de dex, color, personaje) y vacía
  * el resto. No muta la entrada.
  */
@@ -49,6 +50,7 @@ export function ocultarFichaDeteriorada(card) {
   const oculta = {
     ...card,
     name: nombreDeteriorado(card.name, card.id),
+    slug: `deteriorada-${card.dexNumber}`,
     phrase: null,
     cardText: null,
     cardTextConfidence: null,
@@ -71,7 +73,5 @@ export function ocultarFichaDeteriorada(card) {
     // Sin logo: la marca del VTuber deja de aparecer en su carta.
     images: { ...card.images, logo: null, background: null },
   };
-  // Las listas del detalle solo existen en `getVtuberBySlug`.
-  if ('profile' in card) Object.assign(oculta, { profile: [], stats: [], skills: [], socials: [], assets: [], experience: null });
   return oculta;
 }

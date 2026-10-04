@@ -194,7 +194,7 @@ test('la escala de deterioro va del 7 al 1 y severidadDeGrado crece hacia el 1',
 test('una carta degradada se guarda, pero NO sale en la sección pública Premium', () => {
   aplicarParche(db, idDe('otra'), { premium: { grade: '1' } });
   try {
-    assert.equal(getVtuberBySlug(db, 'otra').premium.grade, '1');
+    assert.equal(getVtuberBySlug(db, 'otra', { includeHidden: true }).premium.grade, '1', 'el mantenedor la ve');
     assert.deepEqual(searchVtubers(db, { premium: true }).items.map((i) => i.slug), ['madkoding'], 'el público solo ve las premium');
     const admin = searchVtubers(db, { premium: 'todas', includeHidden: true }).items.map((i) => i.slug).sort();
     assert.deepEqual(admin, ['madkoding', 'otra'], 'el mantenedor ve también las degradadas');
@@ -203,29 +203,30 @@ test('una carta degradada se guarda, pero NO sale en la sección pública Premiu
   }
 });
 
-test('una ficha en grado 1 sale SIN datos ni logo para el público, y entera para el mantenedor', () => {
+test('una ficha en grado 1 no tiene página pública: ni nombre, ni URL, ni vecinos; el mantenedor la ve entera', () => {
   const id = idDe('otra');
   db.prepare("UPDATE vtuber SET phrase = 'frase privada', card_text = 'historia privada' WHERE id = ?").run(id);
   aplicarParche(db, id, { premium: { grade: '1' }, socials: [{ platform: 'x', url: 'https://x.com/otra' }] });
   try {
-    const publica = getVtuberBySlug(db, 'otra');
-    assert.notEqual(publica.name, 'Otra', 'el nombre sale ilegible');
-    assert.equal(publica.name.length, 'Otra'.length);
-    assert.doesNotMatch(publica.name, /[A-Za-z]/);
-    assert.equal(publica.phrase, null);
-    assert.equal(publica.cardText, null);
-    assert.deepEqual([publica.countries, publica.languages, publica.socials, publica.stats, publica.skills, publica.profile], [[], [], [], [], [], []]);
-    assert.equal(publica.images.logo, null);
-    assert.equal(publica.dexNumber, 31, 'el número de dex se conserva');
-    assert.equal(publica.premium.grade, '1');
+    assert.equal(getVtuberBySlug(db, 'otra'), null, 'el detalle público es un 404');
+    assert.equal(getVtuberBySlug(db, 'otra', { includeHidden: false }), null);
+
+    // Tampoco por un alias antiguo de la URL.
+    db.prepare('INSERT INTO slug_alias (slug, vtuber_id) VALUES (?, ?)').run('otra-vieja', id);
+    assert.equal(getVtuberBySlug(db, 'otra-vieja'), null);
 
     const lista = searchVtubers(db, {}).items.find((i) => i.dexNumber === 31);
+    assert.ok(lista, 'sigue en el catálogo (como carta rota)');
     assert.notEqual(lista.name, 'Otra');
+    assert.doesNotMatch(lista.name, /[A-Za-z]/);
+    assert.equal(lista.slug, 'deteriorada-31', 'la URL real no sale en el listado');
+    assert.equal(lista.phrase, null);
+    assert.equal(lista.images.logo, null);
+    assert.equal(lista.dexNumber, 31, 'el número de dex se conserva');
+    assert.equal(lista.premium.grade, '1');
     assert.equal(searchVtubers(db, { q: 'otra' }).total, 0, 'buscar por su nombre no la encuentra');
 
-    const vecino = getNeighbors(db, 30).next;
-    assert.equal(vecino.dexNumber, 31);
-    assert.notEqual(vecino.name, 'Otra', 'ni siquiera el vecino delata el nombre');
+    assert.equal(getNeighbors(db, 30).next, null, 'no es vecino de nadie: no tiene página a la que ir');
 
     const admin = getVtuberBySlug(db, 'otra', { includeHidden: true });
     assert.equal(admin.name, 'Otra', 'el mantenedor la ve entera');
@@ -233,9 +234,10 @@ test('una ficha en grado 1 sale SIN datos ni logo para el público, y entera par
     assert.equal(admin.socials.length, 1);
     assert.equal(searchVtubers(db, { q: 'otra', includeHidden: true }).total, 1);
   } finally {
+    db.prepare('DELETE FROM slug_alias WHERE slug = ?').run('otra-vieja');
     aplicarParche(db, id, { premium: null, socials: [] });
   }
-  assert.equal(getVtuberBySlug(db, 'otra').name, 'Otra', 'sin el grado 1 vuelve a verse normal');
+  assert.equal(getVtuberBySlug(db, 'otra').name, 'Otra', 'sin el grado 1 vuelve a tener página');
 });
 
 test('en el grado 2 la ficha NO se oculta: solo el 1 es la ficha deteriorada', () => {

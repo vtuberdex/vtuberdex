@@ -280,38 +280,6 @@ describe('DetailPage', () => {
     expect(screen.getByText(/Arrocin/)).toBeInTheDocument();
   });
 
-  it('una ficha deteriorada (grado 1) dice «Ficha Deteriorada» y no muestra datos, likes ni donación', async () => {
-    mockedApi.detail.mockResolvedValue({
-      ...makeDetail({
-        name: '#%&@*? /\\~=+<>',
-        phrase: null,
-        cardText: null,
-        factions: [],
-        groups: [],
-        artists: [],
-        countries: [],
-        profile: [],
-        stats: [],
-        skills: [],
-        socials: [],
-        premium: { grade: '1', since: '2026-05-01', gradedAt: '2026-10-01', cert: 'VTD-000018' },
-      }),
-      neighbors: { prev: null, next: null },
-    });
-    renderDetail();
-
-    expect(await screen.findByTestId('ficha-deteriorada')).toHaveTextContent('Ficha Deteriorada');
-    expect(screen.getByRole('heading', { level: 1 })).not.toHaveTextContent('GKuro');
-    expect(screen.getByTestId('ficha-deteriorada-aviso')).toBeInTheDocument();
-    for (const id of ['donate-paypal', 'profile-grid', 'stat-bars', 'social-links']) {
-      expect(screen.queryByTestId(id)).not.toBeInTheDocument();
-    }
-    expect(screen.queryByRole('button', { name: /like/i })).not.toBeInTheDocument();
-    expect(document.title).toBe('Ficha Deteriorada · VTuberDex');
-    // El número de dex sigue ahí: es lo único que se conserva.
-    expect(screen.getAllByText('#018').length).toBeGreaterThanOrEqual(1);
-  });
-
   it('el arte del personaje es textura de la carta 3D: no hay <img> de respaldo en la ficha', async () => {
     mockedApi.detail.mockResolvedValue({
       ...makeDetail({
