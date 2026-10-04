@@ -4,6 +4,7 @@
  */
 import { describe, expect, test } from 'vitest';
 
+import { tarjetaParaTitulo } from '@/components/card-texture/deterioro';
 import { corromperTexto, planDeDesgasteLeve, planDeDeterioro, semillaDeCarta } from '@/lib/degradado';
 import { GRADOS, GRADOS_DEGRADADOS } from '@/lib/premium';
 import { refuerzoDeGrado } from '@/components/premium-boost';
@@ -99,13 +100,19 @@ describe('brillo de una carta degradada', () => {
 });
 
 describe('desgaste leve', () => {
-  it('la carta suelta tiene algo de uso, pero sin mordidas, sin foco perdido y sin tocar el texto', () => {
+  it('no toca el texto: la cabecera solo se corrompe en las degradadas', () => {
+    const base = { id: 17, name: 'MadKoding', countries: [{ name: 'Chile' }] } as never;
+    expect(tarjetaParaTitulo(base)).toBe(base);
+    const premium6 = { id: 17, name: 'MadKoding', countries: [], premium: { grade: '6' } } as never;
+    expect(tarjetaParaTitulo(premium6)).toBe(premium6);
+  });
+
+  it('la carta suelta tiene algo de uso, pero sin mordidas, sin foco perdido', () => {
     const suelta = planDeDesgasteLeve(null, 17, W, H)!;
     expect(suelta.mordidas).toHaveLength(0);
     expect(suelta.bloque).toBe(1);
     expect(suelta.canto).toBeGreaterThan(0);
     expect(suelta.rayones.length).toBeGreaterThan(0);
-    expect(corromperTexto('MADKODING', suelta.severidad, 5)).toBe('MADKODING');
   });
 
   it('mejora al gradear y desaparece del 8 en adelante', () => {
