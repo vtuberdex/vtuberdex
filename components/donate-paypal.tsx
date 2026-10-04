@@ -7,8 +7,7 @@
  * Quien no lo escriba obliga a adivinar por el nombre del pagador, y el mantenedor tiene que
  * poder avisar de eso.
  *
- * Dice para qué sirve el dinero en términos de la carta: gradearla (entra en la placa de
- * acrílico) y subirla de nivel. El enlace abre PayPal en una pestaña nueva y SIN `opener`.
+ * Dice que la donación es voluntaria y que los fondos van al desarrollo del proyecto (no a lucro). El enlace abre PayPal en una pestaña nueva y SIN `opener`.
  * El logo es una marca simplificada en los azules de PayPal, en línea para no sumar otra petición
  * ni depender de una imagen externa.
  */
@@ -42,9 +41,10 @@ export function DonatePayPal({ premium, card }: { premium?: PremiumInfo | null; 
   const [copiado, setCopiado] = useState<boolean | null>(null);
   // Una carta en Black Label ya está en lo más alto: no hay nada que subir con una donación.
   if (premium?.grade === 'BL') return null;
-  const texto = premium
-    ? 'Esta carta ya es premium: cada mes que nos apoyes por PayPal sube de grado, hasta la Black Label.'
-    : 'Si quieres gradear y subir de nivel esta carta puedes donar a nuestro PayPal.';
+  // Mensaje único y sin promesas de contraprestación: antes hablaba de «gradear y subir de nivel», y
+  // se leía como una venta. La donación es voluntaria y va al desarrollo del proyecto.
+  const texto =
+    'Si quieres apoyar el desarrollo del proyecto, puedes realizar una donación voluntaria. Los fondos se destinan al desarrollo y futuras expansiones del proyecto.';
   return (
     <section aria-label="Donar" data-testid="donate-paypal" className="mt-4 rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
       <p className="text-sm leading-relaxed text-dex-ink/90">{texto}</p>
