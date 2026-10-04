@@ -21,7 +21,7 @@ import * as servidor from '@/server/src/premium.mjs';
 describe('la escala', () => {
   test('el cliente usa la MISMA escala que el servidor (una sola definición)', () => {
     expect([...GRADOS]).toEqual([...servidor.GRADOS]);
-    expect(GRADO_INICIAL).toBe('8');
+    expect(GRADO_INICIAL).toBe('6');
   });
 
   test('cada grado tiene nombre y la Black Label se lee como un 10 pristino', () => {

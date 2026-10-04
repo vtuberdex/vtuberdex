@@ -49,7 +49,7 @@ export type UploadKind = 'character' | 'card' | 'thumb' | 'logo' | 'radar' | 'ba
 
 /** Un grado de la escala premium. Es texto: `'BL'` no es un número (ver `server/src/premium.mjs`). */
 /** Escala premium (8…BL) y de deterioro (7…1): ver `server/src/premium.mjs`. */
-export type PremiumGrade = '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '8.5' | '9' | '9.5' | '10' | 'BL';
+export type PremiumGrade = '1' | '2' | '3' | '4' | '5' | '6' | '6.5' | '7' | '7.5' | '8' | '8.5' | '9' | '9.5' | '10' | 'BL';
 
 /**
  * Datos de una carta PREMIUM (gradeada, dentro de una placa de acrílico). `null`/ausente en una

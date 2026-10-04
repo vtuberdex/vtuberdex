@@ -181,7 +181,7 @@ describe('hoja interior y etiqueta', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(grabador.ctx as never);
     dibujarHojaInterior(layout, datos(premium({ grade: '10' })));
     expect(grabador.textos).toEqual(
-      expect.arrayContaining(['VTUBERDEX', 'PREMIUM', 'MADKODING', '#016 · Chile', '10', 'GEM MINT', 'VTD-000017 · 2026']),
+      expect.arrayContaining(['VTUBERDEX', 'PREMIUM', 'MADKODING', expect.stringMatching(/^#016 · Chile · \d+ meses seguidos$/), '10', 'GEM MINT', 'VTD-000017 · 2026']),
     );
     expect(grabador.textos).not.toContain('BLACK LABEL');
     expect(grabador.rellenos(), 'banda, divisor y barras del código').toBeGreaterThan(3);
@@ -417,5 +417,13 @@ describe('holografía reforzada por grado', () => {
       }
       expect(refuerzo.edge).toBeLessThan(refuerzo.layerWeight);
     }
+  });
+});
+
+describe('racha', () => {
+  it('textoDeRacha muestra los meses seguidos y se apaga si se rompió', async () => {
+    const { textoDeRacha } = await import('@/lib/premium');
+    expect(textoDeRacha({ grade: '9', since: '2026-07-10', gradedAt: '2026-09-12' }, '2026-09-20')).toBe('3 meses seguidos');
+    expect(textoDeRacha({ grade: '9', since: '2026-05-10', gradedAt: '2026-07-12' }, '2026-10-04')).toBeNull();
   });
 });

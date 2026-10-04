@@ -4,7 +4,8 @@
  */
 import { describe, expect, test } from 'vitest';
 
-import { corromperTexto, planDeDeterioro, semillaDeCarta } from '@/lib/degradado';
+import { tarjetaParaTitulo } from '@/components/card-texture/deterioro';
+import { corromperTexto, planDeDesgasteLeve, planDeDeterioro, semillaDeCarta } from '@/lib/degradado';
 import { GRADOS, GRADOS_DEGRADADOS } from '@/lib/premium';
 import { refuerzoDeGrado } from '@/components/premium-boost';
 
@@ -74,13 +75,12 @@ describe('texto corrompido', () => {
     expect(roto).toContain('42');
   });
 
-  test('el 7 casi no toca el nombre y los grados siguientes lo rompen cada vez más', () => {
+  test('los grados degradados rompen el nombre cada vez más hasta dejarlo ilegible', () => {
     const base = 'MADKODING ESTUDIO';
     const rotas = GRADOS_DEGRADADOS.map((g) => {
       const roto = corromperTexto(base, plan(g).severidad, 5);
       return [...roto].filter((c, i) => c !== base[i]).length;
     });
-    expect(rotas[0]).toBeLessThanOrEqual(2);
     expect(rotas[rotas.length - 1]).toBe(base.replace(/\s/g, '').length);
     rotas.slice(1).forEach((n, i) => expect(n).toBeGreaterThanOrEqual(rotas[i]));
   });
@@ -96,5 +96,34 @@ describe('brillo de una carta degradada', () => {
     brillos.forEach((b) => expect(b).toBeLessThan(1));
     brillos.slice(1).forEach((b, i) => expect(b).toBeLessThanOrEqual(brillos[i]));
     expect(brillos[brillos.length - 1]).toBeGreaterThan(0);
+  });
+});
+
+describe('desgaste leve', () => {
+  it('no toca el texto: la cabecera solo se corrompe en las degradadas', () => {
+    const base = { id: 17, name: 'MadKoding', countries: [{ name: 'Chile' }] } as never;
+    expect(tarjetaParaTitulo(base)).toBe(base);
+    const premium6 = { id: 17, name: 'MadKoding', countries: [], premium: { grade: '6' } } as never;
+    expect(tarjetaParaTitulo(premium6)).toBe(premium6);
+  });
+
+  it('la carta suelta tiene algo de uso, pero sin mordidas, sin foco perdido', () => {
+    const suelta = planDeDesgasteLeve(null, 17, W, H)!;
+    expect(suelta.mordidas).toHaveLength(0);
+    expect(suelta.bloque).toBe(1);
+    expect(suelta.canto).toBeGreaterThan(0);
+    expect(suelta.rayones.length).toBeGreaterThan(0);
+  });
+
+  it('mejora al gradear y desaparece del 8 en adelante', () => {
+    const cantos = ['6', '6.5', '7', '7.5'].map((g) => planDeDesgasteLeve(g, 17, W, H)!.canto);
+    cantos.slice(1).forEach((c, i) => expect(c).toBeLessThan(cantos[i]));
+    expect(planDeDesgasteLeve(null, 17, W, H)!.canto).toBeGreaterThan(cantos[0]);
+    expect(planDeDesgasteLeve('8', 17, W, H)).toBeNull();
+    expect(planDeDesgasteLeve('2', 17, W, H)).toBeNull();
+  });
+
+  it('es determinista', () => {
+    expect(planDeDesgasteLeve(null, 17, W, H)).toEqual(planDeDesgasteLeve(null, 17, W, H));
   });
 });

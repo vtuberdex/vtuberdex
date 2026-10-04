@@ -20,16 +20,19 @@
  * Nada de esto usa `Math.random`: todo sale del plan, que sale de la semilla de la carta.
  */
 import { DETERIORO } from '../card3d-config';
-import { corromperTexto, crearAzar, planDeDeterioro, type PlanDeDeterioro } from '@/lib/degradado';
+import { corromperTexto, crearAzar, planDeDesgasteLeve, planDeDeterioro, type PlanDeDeterioro } from '@/lib/degradado';
 import { esGradoDegradado } from '@/lib/premium';
 import type { VtuberCard } from '@/lib/types';
 import { CARD_TEXTURE_HEIGHT, CARD_TEXTURE_WIDTH, HEADER } from './dimensiones';
 
-/** Plan de la carta, o `null` si no está degradada (el camino de siempre no paga nada). */
+/**
+ * Plan de la carta: el deterioro si está degradada (5…1), el desgaste LEVE si es suelta o premium de
+ * entrada (6…7,5), y `null` del 8 hacia arriba (el camino de siempre no paga nada).
+ */
 export function planDeCarta(card: VtuberCard): PlanDeDeterioro | null {
   const grado = card.premium?.grade;
-  if (!grado || !esGradoDegradado(grado)) return null;
-  return planDeDeterioro(grado, card.id, CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT);
+  if (grado && esGradoDegradado(grado)) return planDeDeterioro(grado, card.id, CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT);
+  return planDeDesgasteLeve(grado, card.id, CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT);
 }
 
 /**

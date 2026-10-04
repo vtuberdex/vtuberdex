@@ -95,11 +95,11 @@ const admin = (method, ruta, cuerpo) =>
     body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
   });
 
-test('la escala va de 8 a la Black Label en saltos de medio punto', () => {
-  assert.deepEqual([...GRADOS], ['8', '8.5', '9', '9.5', '10', 'BL']);
-  assert.equal(GRADO_INICIAL, '8');
+test('la escala va de 6 a la Black Label en saltos de medio punto', () => {
+  assert.deepEqual([...GRADOS], ['6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', 'BL']);
+  assert.equal(GRADO_INICIAL, '6');
   assert.equal(GRADO_MAXIMO, 'BL');
-  // Cada paso numérico es de 0,5: la regla de negocio («sube 0,5 por mes»).
+  // Cada paso numérico es de 0,5: la regla de negocio (la escala de donación).
   const numericos = GRADOS.filter((g) => g !== 'BL').map(Number);
   numericos.slice(1).forEach((nota, i) => assert.equal(nota - numericos[i], 0.5));
 });
@@ -109,11 +109,11 @@ test('gradoSiguiente recorre la escala y se detiene en la Black Label', () => {
   for (let grado = GRADO_INICIAL; grado; grado = gradoSiguiente(grado)) recorrido.push(grado);
   assert.deepEqual(recorrido, [...GRADOS]);
   assert.equal(gradoSiguiente('BL'), null);
-  assert.equal(gradoSiguiente('7'), null, 'un grado de deterioro no sube con las donaciones');
+  assert.equal(gradoSiguiente('3'), null, 'un grado de deterioro no sube con las donaciones');
   assert.equal(gradoSiguiente('11'), null, 'un grado que no existe no tiene siguiente');
   assert.equal(esBlackLabel('BL'), true);
   assert.equal(esBlackLabel('10'), false);
-  assert.equal(rangoDeGrado('9.5'), 3);
+  assert.equal(rangoDeGrado('9.5'), 7);
   assert.equal(esGradoValido('8.5'), true);
   assert.equal(esGradoValido(8.5), false, 'el grado es texto: 8.5 numérico no es la clave');
   assert.equal(esGradoValido('11'), false);
@@ -179,9 +179,9 @@ test('un grado fuera de la escala se rechaza, en la regla y en el esquema', () =
   assert.equal(vtuberUpdateSchema.safeParse({ premium: { grade: '9', since: 'ayer' } }).success, false);
 });
 
-test('la escala de deterioro va del 7 al 1 y severidadDeGrado crece hacia el 1', () => {
-  assert.deepEqual([...GRADOS_DEGRADADOS], ['7', '6', '5', '4', '3', '2', '1']);
-  assert.deepEqual([...TODOS_LOS_GRADOS], ['1', '2', '3', '4', '5', '6', '7', '8', '8.5', '9', '9.5', '10', 'BL']);
+test('la escala de deterioro va del 5 al 1 y severidadDeGrado crece hacia el 1', () => {
+  assert.deepEqual([...GRADOS_DEGRADADOS], ['5', '4', '3', '2', '1']);
+  assert.deepEqual([...TODOS_LOS_GRADOS], ['1', '2', '3', '4', '5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', 'BL']);
   assert.equal(GRADO_DE_BAJA, '1');
   assert.equal(severidadDeGrado('10'), 0, 'una premium no tiene daño');
   assert.equal(severidadDeGrado('1'), 1);
@@ -359,4 +359,26 @@ test('HTTP: un grado inválido da 400 y no toca la ficha', async () => {
   assert.equal((await respuesta.json()).error, 'payload_invalido');
   const consulta = await fetch(`${baseUrl}/api/vtubers?premium=quizas`);
   assert.equal(consulta.status, 400);
+});
+
+test('rachaDe: cuenta meses seguidos, se apaga si se rompe y no caduca en lo alto', async () => {
+  const { rachaDe } = await import('../src/premium.mjs');
+  assert.equal(rachaDe({ grade: '9', since: '2026-07-10', gradedAt: '2026-09-12' }, '2026-09-20'), 3);
+  assert.equal(rachaDe({ grade: '8', since: '2026-09-10', gradedAt: '2026-09-10' }, '2026-09-20'), 0, 'un mes no es racha');
+  assert.equal(rachaDe({ grade: '9', since: '2026-05-10', gradedAt: '2026-07-12' }, '2026-10-04'), 0, 'rota');
+  assert.equal(rachaDe({ grade: '10', since: '2026-05-10', gradedAt: '2026-09-12' }, '2027-03-01'), 5, 'en el 10 no caduca');
+  assert.equal(rachaDe({ grade: '3', since: '2026-01-01', gradedAt: '2026-09-01' }, '2026-09-20'), 0, 'degradada');
+});
+
+test('desgasteLeveDeGrado: la carta suelta lleva el máximo y baja hasta 0 en el 8; las degradadas no usan este camino', async () => {
+  const { desgasteLeveDeGrado, DONACION_POR_GRADO } = await import('../src/premium.mjs');
+  assert.equal(desgasteLeveDeGrado(null), 1);
+  const leves = ['6', '6.5', '7', '7.5'].map(desgasteLeveDeGrado);
+  leves.slice(1).forEach((v, i) => assert.ok(v < leves[i]));
+  assert.ok(leves[0] < 1);
+  for (const g of ['8', '10', 'BL', '3']) assert.equal(desgasteLeveDeGrado(g), 0, g);
+  const montos = GRADOS.filter((g) => g !== 'BL').map((g) => DONACION_POR_GRADO[g]);
+  montos.slice(1).forEach((m, i) => assert.ok(m > montos[i], 'cada grado pide más que el anterior'));
+  assert.equal(DONACION_POR_GRADO['9.5'], 20);
+  assert.equal(DONACION_POR_GRADO.BL, null);
 });

@@ -15,6 +15,7 @@
 import { useState } from 'react';
 
 import { PAYPAL_DONATE_URL, codigoDeReferencia } from '@/lib/donar';
+import { DONACION_POR_GRADO } from '@/lib/premium';
 import type { PremiumInfo } from '@/lib/types';
 
 export function PayPalLogo({ className = 'h-6 w-6' }: { className?: string }) {
@@ -37,6 +38,32 @@ async function copiar(texto: string): Promise<boolean> {
   }
 }
 
+/**
+ * Instrucciones «de champú»: pocos pasos, una frase cada uno. Los montos salen de
+ * `DONACION_POR_GRADO` para que la ficha, el mantenedor y la regla digan siempre lo mismo.
+ * Redactado como reconocimiento (no como precio): ver cláusulas 9.2 y 9.5 de los términos.
+ */
+const GRADOS_DE_EJEMPLO = ['6', '8', '9.5', '10'] as const;
+
+function ComoFunciona() {
+  const ejemplo = GRADOS_DE_EJEMPLO.map((g) => `${DONACION_POR_GRADO[g]} USD → grado ${g}`).join(' · ');
+  return (
+    <details className="group mt-3 rounded-xl border border-dex-line px-3 py-2 text-xs text-dex-muted" data-testid="donate-howto">
+      {/* Colapsado por defecto: la guía es para quien la busca, no ruido para quien solo quiere donar. */}
+      <summary className="cursor-pointer select-none font-semibold text-dex-ink marker:text-dex-muted">Cómo funcionan las donaciones</summary>
+      <ol className="mt-2 list-decimal space-y-1 pl-4">
+        <li>Dona desde 1 USD. Cada dólar cubre un mes.</li>
+        <li>Escribe el código de tu carta en la nota del pago.</li>
+        <li>Lo que llevas donado sube el grado de tu carta, de a medio punto.</li>
+        <li>Si donas cada mes sin saltarte ninguno, tu racha crece.</li>
+        <li>Si dejas de donar, tu carta conserva su grado. Solo se pausa la racha.</li>
+      </ol>
+      <p className="mt-1.5">En total: {ejemplo}. La Black Label está reservada.</p>
+      <p className="mt-1.5 text-[11px]">Donar es voluntario; el grado es un reconocimiento decorativo.</p>
+    </details>
+  );
+}
+
 export function DonatePayPal({ premium, card }: { premium?: PremiumInfo | null; card?: { id: number; name: string } }) {
   const [copiado, setCopiado] = useState<boolean | null>(null);
   // Una carta en Black Label ya está en lo más alto: no hay nada que subir con una donación.
@@ -48,6 +75,7 @@ export function DonatePayPal({ premium, card }: { premium?: PremiumInfo | null; 
   return (
     <section aria-label="Donar" data-testid="donate-paypal" className="mt-4 rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
       <p className="text-sm leading-relaxed text-dex-ink/90">{texto}</p>
+      <ComoFunciona />
       {card && (
         <div className="mt-3 rounded-xl border border-dashed border-dex-line px-3 py-2.5" data-testid="donate-reference">
           <p className="text-xs text-dex-muted">

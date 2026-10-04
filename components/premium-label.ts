@@ -15,7 +15,7 @@
 import { DETERIORO, PREMIUM } from '@/components/card3d-config';
 import type { SlabLayout } from '@/components/premium-layout';
 import { corromperTexto, semillaDeCarta } from '@/lib/degradado';
-import { esBlackLabel, esGradoDegradado, nombreDeGrado, notaVisible, severidadDeGrado } from '@/lib/premium';
+import { esBlackLabel, esGradoDegradado, nombreDeGrado, notaVisible, severidadDeGrado, textoDeRacha } from '@/lib/premium';
 import type { PremiumInfo } from '@/lib/types';
 
 /** Lo que la etiqueta necesita saber de la carta. */
@@ -195,7 +195,8 @@ function dibujarEtiqueta(ctx: CanvasRenderingContext2D, layout: SlabLayout, dato
   const pais = datos.country && severidad >= DETERIORO.hideCountryFrom ? null : datos.country;
   ctx.fillText(textoAjustado(ctx, nombre, anchoTexto, Math.round(resto * 0.26), '800'), x + pad, y + bandaH + resto * 0.26);
   ctx.fillStyle = colores.mutedInk;
-  const sub = [`#${String(datos.dexNumber).padStart(3, '0')}`, pais].filter(Boolean).join(' · ');
+  const racha = textoDeRacha(datos.premium);
+  const sub = [`#${String(datos.dexNumber).padStart(3, '0')}`, pais, racha].filter(Boolean).join(' · ');
   ctx.fillText(textoAjustado(ctx, sub, anchoTexto, Math.round(resto * 0.17), '600'), x + pad, y + bandaH + resto * 0.5);
 
   const barraY = y + bandaH + resto * 0.64;
