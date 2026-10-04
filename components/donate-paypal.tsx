@@ -48,9 +48,10 @@ const GRADOS_DE_EJEMPLO = ['6', '8', '9.5', '10'] as const;
 function ComoFunciona() {
   const ejemplo = GRADOS_DE_EJEMPLO.map((g) => `${DONACION_POR_GRADO[g]} USD → grado ${g}`).join(' · ');
   return (
-    <div className="mt-3 rounded-xl border border-dex-line px-3 py-2.5 text-xs text-dex-muted" data-testid="donate-howto">
-      <p className="font-semibold text-dex-ink">Cómo funciona</p>
-      <ol className="mt-1.5 list-decimal space-y-1 pl-4">
+    <details className="group mt-3 rounded-xl border border-dex-line px-3 py-2 text-xs text-dex-muted" data-testid="donate-howto">
+      {/* Colapsado por defecto: la guía es para quien la busca, no ruido para quien solo quiere donar. */}
+      <summary className="cursor-pointer select-none font-semibold text-dex-ink marker:text-dex-muted">Cómo funcionan las donaciones</summary>
+      <ol className="mt-2 list-decimal space-y-1 pl-4">
         <li>Dona desde 1 USD. Cada dólar cubre un mes.</li>
         <li>Escribe el código de tu carta en la nota del pago.</li>
         <li>Lo que llevas donado sube el grado de tu carta, de a medio punto.</li>
@@ -59,7 +60,7 @@ function ComoFunciona() {
       </ol>
       <p className="mt-1.5">En total: {ejemplo}. La Black Label está reservada.</p>
       <p className="mt-1.5 text-[11px]">Donar es voluntario; el grado es un reconocimiento decorativo.</p>
-    </div>
+    </details>
   );
 }
 

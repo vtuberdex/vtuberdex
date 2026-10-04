@@ -23,6 +23,9 @@ describe('DonatePayPal', () => {
   it('explica en pasos simples cómo funcionan la donación, el grado y la racha', () => {
     render(<DonatePayPal />);
     const guia = screen.getByTestId('donate-howto');
+    expect(guia.tagName).toBe('DETAILS');
+    expect(guia).not.toHaveAttribute('open');
+    expect(screen.getByText('Cómo funcionan las donaciones')).toBeInTheDocument();
     expect(guia).toHaveTextContent('Cada dólar cubre un mes');
     expect(guia).toHaveTextContent('20 USD → grado 9.5');
     expect(guia).toHaveTextContent('conserva su grado');
