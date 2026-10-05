@@ -11,6 +11,9 @@
  * que solo entra en el bundle de las funciones.
  */
 const nextConfig = {
+  // Build autocontenido para servir con `node server.js` detrás de nginx
+  // (scripts/release.sh). Es opt-in: Vercel empaqueta por su cuenta y no lo necesita.
+  ...(process.env.VTUBERDEX_STANDALONE ? { output: 'standalone' } : {}),
   outputFileTracingIncludes: {
     '/api/**': ['./deploy/data/**'],
     '/images/**': ['./deploy/data/**'],

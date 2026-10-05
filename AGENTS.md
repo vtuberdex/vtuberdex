@@ -911,6 +911,33 @@ hay un script por sentido y **tienen reglas que no pueden divergir**:
   *sensitive* en Vercel y no se pueden releer; las de *development* apuntan a la MISMA base, así
   que sirven igual.
 
+## Despliegue en VPS (nginx + base local, sin Turso)
+
+`test.vtuberdex.com` corre en una VPS, no en Vercel. `TURSO_DATABASE_URL` admite una URL `file:`
+(`@libsql/client` abre un SQLite local con el MISMO código), así que no hay rama aparte.
+
+- **Release**: `./scripts/release.sh` hace el build con `VTUBERDEX_STANDALONE=1` (`output: 'standalone'`,
+  opt-in para no afectar a Vercel), lo copia a `~/releases/vtuberdex/<fecha>/` (con `.next/static` y
+  `deploy/data`, que el trazado no copia), apunta `/var/www/test.vtuberdex.com` a él con `ln -sfn` y
+  reinicia el servicio `vtuberdex-test` (`node server.js` en 127.0.0.1:3100). Volver atrás = repuntar el enlace.
+- **nginx**: `/etc/nginx/conf.d/00-a-test.vtuberdex.com.conf` (server_name exacto: gana al regex del multidominio,
+  que solo sirve estáticos). Cachea `/images/` (clave con `?v=`) y `/_next/static/`. **No** usar `alias` hacia
+  el release: `www-data` no lee `/home/madkoding`. Al activarse HTTPS, `ssl-dominios` genera un 443 ESTÁTICO que
+  hay que reemplazar por uno con `proxy_pass`.
+- **Entorno** en `/etc/vtuberdex-test.env` (600): URL `file:` de la base, usuario y hash del mantenedor, sal de likes.
+- **Base**: `~/data/vtuberdex/turso-local.db` (WAL). `npm run copiar:turso` la rellena desde Turso (una vez; lotes
+  de 5 filas en `asset_remoto`, porque Turso cortaba la conexión con lotes grandes de BLOB). `lib/ediciones.mjs`
+  aplica pragmas (WAL, `busy_timeout`, `mmap`) solo para URLs `file:`.
+- **Respaldo**: `scripts/respaldo-db.mjs` (`VACUUM INTO`, consistente con WAL) vía `/etc/cron.d/vtuberdex-respaldo`,
+  03:30, 7 copias en `~/backups/vtuberdex/`. No copies solo el `.db`: pierdes lo que está en el `-wal`.
+- **Trampa de imports de imagen**: en Next, `import x from './a.webp'` da un OBJETO `{ src }`, no una cadena.
+  El mapa del metal se pedía como `/[object Object]` (404) y NUNCA cargaba, sin error visible; vitest sí da
+  cadena, por eso ningún test lo vio (`card-material.ts`, `metalEnvUrl`).
+- **Medición del libro (VPS, CPU, Chromium + SwiftShader)**: texturas ~46 ms rápida / ~110 ms completa por carta;
+  el pico de 1,3-1,5 s al primer giro es compilación/enlazado de shaders (`getProgramInfoLog`) y `texSubImage2D`,
+  no las texturas. Se probó `debug.checkShaderErrors = false` en producción: solo movió la espera a
+  `getProgramParameter`, sin ganancia medible, y se revirtió. Medir en GPU real antes de tocar más.
+
 ## Verificación antes de decir "listo"
 
 1. `npm run lint && npm run typecheck && npm run check:shaders && npm run build` (el build es el gate real).

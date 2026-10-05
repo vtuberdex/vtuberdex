@@ -33,11 +33,22 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import type { VtuberCard } from '@/lib/types';
-import metalEnvUrl from './metal-env.webp';
+import metalEnvImport from './metal-env.webp';
 import { cardPalette } from '@/lib/color';
 import * as CFG from '@/components/card3d-config';
 import { LAYER_UNIFORM_NAMES } from '@/components/card3d-config';
 import { live, tocada } from '@/components/card3d-live';
+
+/**
+ * URL del mapa de entorno del metal. En Next, importar una imagen da un OBJETO
+ * (`{ src, width, height }`), no una cadena; el `as unknown as string` anterior lo pasaba
+ * a `new Image().src` tal cual, que lo convierte en `"[object Object]"`: pedía
+ * `/[object Object]` (404), el entorno nunca cargaba y el metal salía sin reflejo, sin
+ * ningún error visible. Vitest sí entrega la cadena, por eso ningún test lo vio.
+ */
+const metalEnvUrl: string = typeof metalEnvImport === 'string'
+  ? metalEnvImport
+  : (metalEnvImport as { src: string }).src;
 import { CARD_TEXTURE_FULL_WIDTH, loadImage } from '@/components/card-texture';
 import { cardFragmentShader, cardVertexShader, glowFragmentShader, glowVertexShader } from '@/components/shaders';
 import { iconosDeFaccion } from '@/components/card-texture/facciones';
@@ -72,7 +83,7 @@ export function useSharedCardEnv(): SharedCardEnv {
 
   useEffect(() => {
     let cancelled = false;
-    loadImage(metalEnvUrl as unknown as string)
+    loadImage(metalEnvUrl)
       .then((img) => {
         if (cancelled || !img) return;
         const tex = new THREE.CanvasTexture(img);
@@ -213,7 +224,7 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
      */
     const entorno: Promise<HTMLImageElement | null> = shared
       ? Promise.resolve(null)
-      : loadImage(metalEnvUrl as unknown as string).catch(() => null);
+      : loadImage(metalEnvUrl).catch(() => null);
 
     /**
      * Dos etapas: la rápida muestra la carta en cuanto existe (superficie, personaje y
