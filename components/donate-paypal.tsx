@@ -2,7 +2,7 @@
  * Invitación a donar por PayPal, en la ficha.
  *
  * EL ENLACE DE PAGO ES FIJO (el mismo para todos los VTubers), así que PayPal no sabe a qué carta
- * va la donación. La ficha muestra el CÓDIGO de la carta (`VTD-000017`) con un botón de copiar, y
+ * va la donación. La ficha muestra el CÓDIGO de la carta (`VTD-016`) con un botón de copiar, y
  * pide escribirlo en la nota del pago: es lo que permite al mantenedor saber a quién gradear.
  * Quien no lo escriba obliga a adivinar por el nombre del pagador, y el mantenedor tiene que
  * poder avisar de eso.
@@ -14,7 +14,8 @@
 'use client';
 import { useState } from 'react';
 
-import { PAYPAL_DONATE_URL, codigoDeReferencia } from '@/lib/donar';
+import { useI18n } from '@/lib/i18n';
+import { PAYPAL_MERCHANT_ID, codigoDeReferencia, urlDeDonacion } from '@/lib/donar';
 import { DONACION_POR_GRADO } from '@/lib/premium';
 import type { PremiumInfo } from '@/lib/types';
 
@@ -28,14 +29,48 @@ export function PayPalLogo({ className = 'h-6 w-6' }: { className?: string }) {
   );
 }
 
-/** Copia al portapapeles; sin permiso (HTTP, navegador antiguo) devuelve `false` y el código sigue visible para copiarlo a mano. */
+/**
+ * Copia con un `<textarea>` temporal y `execCommand('copy')`. Es el respaldo para cuando
+ * `navigator.clipboard` NO existe: los navegadores solo la ofrecen en contextos seguros (HTTPS o
+ * localhost), así que en un sitio servido por HTTP —como `test.vtuberdex.com` antes de tener
+ * certificado— la copia fallaba siempre con «No se pudo copiar». `execCommand` está en desuso pero lo
+ * soportan todos y no exige HTTPS; solo funciona dentro de un gesto del usuario (aquí, un clic).
+ */
+function copiarConSeleccion(texto: string): boolean {
+  const area = document.createElement('textarea');
+  area.value = texto;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  area.style.pointerEvents = 'none';
+  document.body.appendChild(area);
+  area.select();
+  area.setSelectionRange(0, texto.length);
+  let copiado = false;
+  try {
+    copiado = document.execCommand('copy');
+  } catch {
+    copiado = false;
+  }
+  area.remove();
+  return copiado;
+}
+
+/**
+ * Copia al portapapeles. Primero la API moderna; si no existe (contexto no seguro) o la rechaza
+ * (permiso denegado), el respaldo. Si tampoco hay, devuelve `false` y el código sigue visible para
+ * copiarlo a mano.
+ */
 async function copiar(texto: string): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(texto);
-    return true;
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(texto);
+      return true;
+    }
   } catch {
-    return false;
+    /* cae al respaldo */
   }
+  return copiarConSeleccion(texto);
 }
 
 /**
@@ -46,65 +81,85 @@ async function copiar(texto: string): Promise<boolean> {
 const GRADOS_DE_EJEMPLO = ['6', '8', '9.5', '10'] as const;
 
 function ComoFunciona() {
-  const ejemplo = GRADOS_DE_EJEMPLO.map((g) => `${DONACION_POR_GRADO[g]} USD → grado ${g}`).join(' · ');
+  const { t } = useI18n();
+  const ejemplo = GRADOS_DE_EJEMPLO.map((g) => t('donar.ejemploGrado', { usd: DONACION_POR_GRADO[g] ?? 0, grado: g })).join(' · ');
   return (
     <details className="group mt-3 rounded-xl border border-dex-line px-3 py-2 text-xs text-dex-muted" data-testid="donate-howto">
       {/* Colapsado por defecto: la guía es para quien la busca, no ruido para quien solo quiere donar. */}
-      <summary className="cursor-pointer select-none font-semibold text-dex-ink marker:text-dex-muted">Cómo funcionan las donaciones</summary>
+      <summary className="cursor-pointer select-none font-semibold text-dex-ink marker:text-dex-muted">{t('donar.comoFunciona')}</summary>
       <ol className="mt-2 list-decimal space-y-1 pl-4">
-        <li>Dona desde 1 USD. Cada dólar cubre un mes.</li>
-        <li>Escribe el código de tu carta en la nota del pago.</li>
-        <li>Lo que llevas donado sube el grado de tu carta, de a medio punto.</li>
-        <li>Si donas cada mes sin saltarte ninguno, tu racha crece.</li>
-        <li>Si dejas de donar, tu carta conserva su grado. Solo se pausa la racha.</li>
+        <li>{t('donar.paso1')}</li>
+        <li>{t('donar.paso2')}</li>
+        <li>{t('donar.paso3')}</li>
+        <li>{t('donar.paso4')}</li>
+        <li>{t('donar.paso5')}</li>
       </ol>
-      <p className="mt-1.5">En total: {ejemplo}. La Black Label está reservada.</p>
-      <p className="mt-1.5 text-[11px]">Donar es voluntario; el grado es un reconocimiento decorativo.</p>
+      <p className="mt-1.5">{t('donar.resumen', { ejemplo })}</p>
+      <p className="mt-1.5 text-[11px]">{t('donar.voluntario')}</p>
     </details>
   );
 }
 
-export function DonatePayPal({ premium, card }: { premium?: PremiumInfo | null; card?: { id: number; name: string } }) {
+export function DonatePayPal({
+  premium,
+  card,
+  merchantId = PAYPAL_MERCHANT_ID,
+}: {
+  premium?: PremiumInfo | null;
+  card?: { dexNumber: number; name: string };
+  /** Solo para probar el formato con referencia; por defecto, el de `lib/donar.ts`. */
+  merchantId?: string;
+}) {
+  const { t } = useI18n();
   const [copiado, setCopiado] = useState<boolean | null>(null);
   // Una carta en Black Label ya está en lo más alto: no hay nada que subir con una donación.
   if (premium?.grade === 'BL') return null;
+  /** Con ID de comerciante el código va en el propio enlace (`item_number`); sin él, hay que pegarlo. */
+  const viajaConElPago = Boolean(merchantId);
   // Mensaje único y sin promesas de contraprestación: antes hablaba de «gradear y subir de nivel», y
   // se leía como una venta. La donación es voluntaria y va al desarrollo del proyecto.
-  const texto =
-    'Si quieres apoyar el desarrollo del proyecto, puedes realizar una donación voluntaria. Los fondos se destinan al desarrollo y futuras expansiones del proyecto.';
+  const texto = t('donar.texto');
   return (
-    <section aria-label="Donar" data-testid="donate-paypal" className="mt-4 rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
+    <section aria-label={t('donar.etiqueta')} data-testid="donate-paypal" className="mt-4 rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
       <p className="text-sm leading-relaxed text-dex-ink/90">{texto}</p>
       <ComoFunciona />
       {card && (
         <div className="mt-3 rounded-xl border border-dashed border-dex-line px-3 py-2.5" data-testid="donate-reference">
           <p className="text-xs text-dex-muted">
-            Escribe este código en la <strong className="text-dex-ink">nota del pago</strong> para que sepamos a qué carta ({card.name}) va tu
-            donación:
+            {viajaConElPago ? (
+              t('donar.codigoViaja', { nombre: card.name })
+            ) : (
+              t('donar.codigoNota', { nombre: card.name })
+            )}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <code className="rounded-md bg-black/40 px-2 py-1 font-mono text-sm font-bold text-dex-ink" data-testid="donate-code">
-              {codigoDeReferencia(card.id)}
+              {codigoDeReferencia(card.dexNumber)}
             </code>
             <button
               type="button"
-              onClick={async () => setCopiado(await copiar(codigoDeReferencia(card.id)))}
+              onClick={async () => setCopiado(await copiar(codigoDeReferencia(card.dexNumber)))}
               className="rounded-lg border border-dex-line px-2.5 py-1 text-xs text-dex-muted hover:text-dex-ink"
             >
-              {copiado === true ? 'Copiado ✓' : 'Copiar código'}
+              {copiado === true ? t('donar.copiado') : t('donar.copiar')}
             </button>
-            {copiado === false && <span className="text-[11px] text-amber-200">No se pudo copiar: selecciónalo a mano.</span>}
+            {copiado === false && <span className="text-[11px] text-amber-200">{t('donar.noCopio')}</span>}
           </div>
         </div>
       )}
       <a
-        href={PAYPAL_DONATE_URL}
+        href={urlDeDonacion(card, merchantId)}
         target="_blank"
+        // Con el enlace fijo, el código no viaja: se copia al pulsar (el clic es el gesto que el
+        // portapapeles exige) para pegarlo en la nota. No bloquea ni cambia la navegación.
+        onClick={() => {
+          if (card && !viajaConElPago) void copiar(codigoDeReferencia(card.dexNumber)).then(setCopiado);
+        }}
         rel="noopener noreferrer"
         className="mt-3 inline-flex items-center gap-2.5 rounded-xl bg-[#ffc439] px-4 py-2.5 text-sm font-bold text-[#003087] shadow hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dex-accent"
       >
         <PayPalLogo />
-        Donar con PayPal
+        {t('donar.boton')}
       </a>
     </section>
   );

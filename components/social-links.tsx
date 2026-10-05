@@ -1,4 +1,6 @@
+'use client';
 /** Redes sociales del VTuber, con icono por plataforma. */
+import { useI18n } from '@/lib/i18n';
 import type { SocialRow } from '@/lib/types';
 
 export interface SocialLinksProps {
@@ -23,9 +25,10 @@ function iconFor(platform: string): string {
 }
 
 export function SocialLinks({ socials, palette }: SocialLinksProps) {
+  const { t } = useI18n();
   return (
     <section className="rounded-2xl border border-dex-line bg-dex-panel/60 p-5" data-testid="social-links">
-      <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">Redes</h2>
+      <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">{t('redes.titulo')}</h2>
       <ul className="mt-3 flex flex-wrap gap-2">
         {socials.map((social) => (
           <li key={`${social.platform}-${social.url}`}>

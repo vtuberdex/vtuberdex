@@ -151,12 +151,19 @@ export function esBlackLabel(grado) {
 }
 
 /**
- * Número de certificado: derivado del id de la ficha, no guardado. Un dato que se puede
- * recalcular no puede quedar desincronizado, y así la placa de una misma carta lleva siempre
- * el mismo número en local, en producción y en cada instancia que reproduce el diario.
+ * Número de certificado y código de donación: derivado del NÚMERO DE DEX de la ficha, no guardado.
+ *
+ * POR QUÉ EL DEX Y NO EL ID: era `VTD-` + el id interno de la fila, que nadie ve. La carta dice
+ * `#016` y su código decía `VTD-000017` (633 de 797 fichas desfasadas en uno; las nuevas, de
+ * `VTD-100001` en adelante, sin relación alguna). Ahora `#016` ⇒ `VTD-016`.
+ *
+ * Formato CORTO a propósito (3 dígitos mínimo, 4 para el dex 1000+): los códigos antiguos tenían 6
+ * dígitos, así que `dexDeCodigo` (lib/donar.ts) los RECHAZA en vez de leer `VTD-000014` como el dex 14,
+ * que es otra ficha. Contrapartida conocida: si el mantenedor mueve el número de dex de una ficha,
+ * su código cambia con él.
  */
-export function numeroDeCertificado(id) {
-  return `VTD-${String(Math.max(0, Number(id) || 0)).padStart(6, '0')}`;
+export function numeroDeCertificado(dexNumber) {
+  return `VTD-${String(Math.max(0, Number(dexNumber) || 0)).padStart(3, '0')}`;
 }
 
 /** Fecha de hoy (`AAAA-MM-DD`, UTC). Aislada para que los tests y el diario puedan fijarla. */

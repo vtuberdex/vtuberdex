@@ -14,6 +14,8 @@
  */
 import Link from 'next/link';
 
+import { LanguageSwitcher } from '@/components/language-switcher';
+
 export function AppHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-dex-line/80 bg-dex-void/85 backdrop-blur">
@@ -22,16 +24,9 @@ export function AppHeader() {
           <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-dex-accent/60 bg-dex-accent/10">
             <span className="h-2.5 w-2.5 rounded-full bg-dex-accent" style={{ boxShadow: '0 0 12px var(--color-dex-accent)' }} />
           </span>
-          <span className="text-sm font-extrabold uppercase tracking-[0.28em] text-dex-ink">VTuberDex</span>
+          <span className="font-heading text-base uppercase tracking-[0.2em] text-dex-ink">VTuberDex</span>
         </Link>
-        <nav aria-label="Secciones" className="ml-auto">
-          <Link
-            href="/?premium=1"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300/40 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-amber-200 hover:bg-amber-300/10"
-          >
-            <span aria-hidden>★</span> Premium
-          </Link>
-        </nav>
+        <LanguageSwitcher />
       </div>
     </header>
   );

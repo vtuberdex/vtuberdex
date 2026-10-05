@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { DonatePayPal } from '@/components/donate-paypal';
 import { LikeButton } from '@/components/like-button';
-import { PAYPAL_DONATE_URL, PAYPAL_PAYMENT_ID, codigoDeReferencia, idDeCodigo } from '@/lib/donar';
+import { PAYPAL_DONATE_URL, PAYPAL_PAYMENT_ID, codigoDeReferencia, dexDeCodigo, urlDeDonacion } from '@/lib/donar';
 import type { PremiumInfo } from '@/lib/types';
 
 const mocks = vi.hoisted(() => ({ likeEstado: vi.fn(), darLike: vi.fn() }));
@@ -46,18 +46,65 @@ describe('DonatePayPal', () => {
   test('muestra el código de la carta para escribirlo en la nota del pago, y lo copia', async () => {
     const escribir = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: escribir }, configurable: true });
-    render(<DonatePayPal card={{ id: 17, name: 'madKoding' }} />);
-    expect(screen.getByTestId('donate-code')).toHaveTextContent('VTD-000017');
+    render(<DonatePayPal card={{ dexNumber: 16, name: 'madKoding' }} />);
+    expect(screen.getByTestId('donate-code')).toHaveTextContent('VTD-016');
     expect(screen.getByTestId('donate-reference')).toHaveTextContent('nota del pago');
     expect(screen.getByTestId('donate-reference')).toHaveTextContent('madKoding');
     fireEvent.click(screen.getByRole('button', { name: 'Copiar código' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Copiado ✓' })).toBeInTheDocument());
-    expect(escribir).toHaveBeenCalledWith('VTD-000017');
+    expect(escribir).toHaveBeenCalledWith('VTD-016');
+  });
+
+  test('con el enlace fijo, al pulsar «Donar con PayPal» el código se copia solo (para pegarlo en la nota)', async () => {
+    const escribir = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: escribir }, configurable: true });
+    render(<DonatePayPal card={{ dexNumber: 16, name: 'madKoding' }} />);
+    const enlace = screen.getByRole('link', { name: /Donar con PayPal/ });
+    expect(enlace).toHaveAttribute('href', PAYPAL_DONATE_URL);
+    fireEvent.click(enlace);
+    await waitFor(() => expect(escribir).toHaveBeenCalledWith('VTD-016'));
+    expect(screen.getByTestId('donate-reference')).toHaveTextContent('nota del pago');
+  });
+
+  test('con ID de comerciante, el código VIAJA en el enlace y ya no hace falta pegarlo', async () => {
+    const escribir = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: escribir }, configurable: true });
+    render(<DonatePayPal card={{ dexNumber: 16, name: 'madKoding' }} merchantId="ABC123MERCHANT" />);
+    const enlace = screen.getByRole('link', { name: /Donar con PayPal/ });
+    const url = new URL(enlace.getAttribute('href') as string);
+    expect(url.origin + url.pathname).toBe('https://www.paypal.com/donate');
+    expect(url.searchParams.get('business')).toBe('ABC123MERCHANT');
+    expect(url.searchParams.get('item_number')).toBe('VTD-016');
+    expect(url.searchParams.get('item_name')).toBe('VTuberDex VTD-016 · madKoding');
+    expect(screen.getByTestId('donate-reference')).toHaveTextContent('viaja con tu pago');
+    fireEvent.click(enlace);
+    expect(escribir).not.toHaveBeenCalled(); // no se pisa el portapapeles sin necesidad
+  });
+
+  test('en HTTP (sin navigator.clipboard) copia igual con el respaldo del textarea', async () => {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    const execCommand = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, 'execCommand', { value: execCommand, configurable: true });
+    render(<DonatePayPal card={{ dexNumber: 16, name: 'madKoding' }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar código' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Copiado ✓' })).toBeInTheDocument());
+    expect(execCommand).toHaveBeenCalledWith('copy');
+    expect(document.querySelector('textarea')).toBeNull(); // no deja basura en la página
+  });
+
+  test('si el permiso del portapapeles se deniega, también prueba el respaldo', async () => {
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockRejectedValue(new Error('denegado')) }, configurable: true });
+    const execCommand = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, 'execCommand', { value: execCommand, configurable: true });
+    render(<DonatePayPal card={{ dexNumber: 16, name: 'madKoding' }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar código' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Copiado ✓' })).toBeInTheDocument());
   });
 
   test('si no se puede copiar, avisa y el código sigue a la vista', async () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockRejectedValue(new Error('denegado')) }, configurable: true });
-    render(<DonatePayPal card={{ id: 17, name: 'madKoding' }} />);
+    Object.defineProperty(document, 'execCommand', { value: vi.fn().mockReturnValue(false), configurable: true });
+    render(<DonatePayPal card={{ dexNumber: 16, name: 'madKoding' }} />);
     fireEvent.click(screen.getByRole('button', { name: 'Copiar código' }));
     await waitFor(() => expect(screen.getByText(/No se pudo copiar/)).toBeInTheDocument());
     expect(screen.getByTestId('donate-code')).toBeInTheDocument();
@@ -72,16 +119,49 @@ describe('DonatePayPal', () => {
 });
 
 describe('código de referencia', () => {
-  test('es el número de certificado de la carta y se puede leer de vuelta', () => {
-    expect(codigoDeReferencia(17)).toBe('VTD-000017');
-    expect(codigoDeReferencia(100_001)).toBe('VTD-100001');
-    expect(idDeCodigo('VTD-000017')).toBe(17);
-    expect(idDeCodigo('  vtd-17 ')).toBe(17);
-    expect(idDeCodigo('VTD-100001')).toBe(100_001);
+  test('es el número de dex de la carta (#016 ⇒ VTD-016) y se puede leer de vuelta', () => {
+    expect(codigoDeReferencia(16)).toBe('VTD-016');
+    expect(codigoDeReferencia(0)).toBe('VTD-000'.slice(0, 7)); // el dex 0 existe: Porygon-Z
+    expect(codigoDeReferencia(1005)).toBe('VTD-1005'); // 4 dígitos a partir del 1000
+    expect(dexDeCodigo('VTD-016')).toBe(16);
+    expect(dexDeCodigo('  vtd-16 ')).toBe(16);
+    expect(dexDeCodigo('VTD-1005')).toBe(1005);
+    expect(dexDeCodigo('VTD-000')).toBe(0);
   });
 
-  test('lo que no es un código no da id', () => {
-    for (const texto of ['', 'madkoding', 'VTD-', 'VTD-0', 'VTD-12a', '17', 'XVTD-17', 'VTD-1234567890']) expect(idDeCodigo(texto), texto).toBeNull();
+  test('el código es lo que ve la gente: ida y vuelta para cualquier dex', () => {
+    for (const dex of [0, 1, 16, 99, 100, 777, 999, 1000, 1005]) expect(dexDeCodigo(codigoDeReferencia(dex))).toBe(dex);
+  });
+
+  test('los códigos ANTIGUOS de 6 dígitos (el id interno) se rechazan, no se leen como otro dex', () => {
+    for (const viejo of ['VTD-000017', 'VTD-000014', 'VTD-100001', 'VTD-000000']) expect(dexDeCodigo(viejo), viejo).toBeNull();
+  });
+
+  test('lo que no es un código no da dex', () => {
+    for (const texto of ['', 'madkoding', 'VTD-', 'VTD-12a', '17', 'XVTD-17', 'VTD-1234567890', 'VTD--5']) expect(dexDeCodigo(texto), texto).toBeNull();
+  });
+});
+
+describe('urlDeDonacion', () => {
+  const card = { dexNumber: 347, name: 'Helen Creth' };
+
+  test('sin ID de comerciante o sin ficha, es el enlace fijo', () => {
+    expect(urlDeDonacion(card, '')).toBe(PAYPAL_DONATE_URL);
+    expect(urlDeDonacion(null, 'ABC')).toBe(PAYPAL_DONATE_URL);
+    expect(urlDeDonacion(undefined, 'ABC')).toBe(PAYPAL_DONATE_URL);
+  });
+
+  test('con ID de comerciante lleva el código del dex, no un id interno', () => {
+    const url = new URL(urlDeDonacion(card, 'ABC'));
+    expect(url.searchParams.get('item_number')).toBe('VTD-347');
+    expect(url.searchParams.get('currency_code')).toBe('USD');
+    expect(url.searchParams.has('amount')).toBe(false); // el donante elige cuánto
+  });
+
+  test('un nombre con caracteres raros no rompe la URL', () => {
+    const url = new URL(urlDeDonacion({ dexNumber: 5, name: 'A&B=C #1 ñandú' }, 'ABC'));
+    expect(url.searchParams.get('item_name')).toBe('VTuberDex VTD-005 · A&B=C #1 ñandú');
+    expect([...url.searchParams.keys()].sort()).toEqual(['business', 'currency_code', 'item_name', 'item_number', 'no_recurring']);
   });
 });
 

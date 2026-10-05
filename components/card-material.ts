@@ -54,7 +54,7 @@ import { cardFragmentShader, cardVertexShader, glowFragmentShader, glowVertexSha
 import { iconosDeFaccion } from '@/components/card-texture/facciones';
 import type { ColorPredominante } from '@/components/card-texture/predominante';
 import { refuerzoDeGrado } from '@/components/premium-boost';
-import { anclar, anchoEfectivo, generarTexturas, type TexturasDeCarta } from '@/components/card-texture/fabrica';
+import { anclar, generarTexturas, type TexturasDeCarta } from '@/components/card-texture/fabrica';
 
 /** Proporción real de una carta coleccionable (5x7 pulgadas -> 1.4). */
 const CARD_W = CFG.GEOMETRY.cardWidth;
@@ -215,7 +215,7 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
 
   useEffect(() => {
     let cancelled = false;
-    const width = anchoEfectivo(textureWidth ?? CARD_TEXTURE_FULL_WIDTH);
+    const width = textureWidth ?? CARD_TEXTURE_FULL_WIDTH;
     let soltar: () => void = () => undefined;
     /**
      * El MAPA DE ENTORNO del reflejo de espejo se carga aparte del fondo a propósito: el

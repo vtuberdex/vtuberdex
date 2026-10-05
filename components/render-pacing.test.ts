@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RENDER } from '@/components/card3d-config';
-import { createDprController, nextSchedule, shouldRender } from '@/components/render-pacing';
+import * as pacing from '@/components/render-pacing';
+import { nextSchedule, shouldRender } from '@/components/render-pacing';
 
 describe('shouldRender', () => {
   it('activo sin tope: dibuja en CADA rAF, también a 144 Hz (un tope fijo daba cadencia desigual)', () => {
@@ -129,73 +130,10 @@ describe('tope de 24 fps con agenda fija (nextSchedule)', () => {
   });
 });
 
-describe('createDprController', () => {
-  const alimentar = (ctl: ReturnType<typeof createDprController>, ms: number, n: number) => {
-    let ultimo: number | null = null;
-    for (let i = 0; i < n; i += 1) ultimo = ctl.sample(ms) ?? ultimo;
-    return ultimo;
-  };
-  const ventana = RENDER.dpr.windowSize;
-
-  it('baja un escalón con una mediana lenta y respeta el mínimo', () => {
-    const ctl = createDprController(1.8);
-    expect(alimentar(ctl, 30, ventana)).toBeCloseTo(1.5);
-    for (let i = 0; i < 10; i += 1) alimentar(ctl, 30, ventana);
-    expect(ctl.dpr).toBe(RENDER.dpr.min);
-  });
-
-  it('con una mediana MUY lenta baja dos escalones de golpe (agresivo)', () => {
-    const ctl = createDprController(1.8);
-    expect(alimentar(ctl, 70, ventana)).toBeCloseTo(1.2);
-  });
-
-  it('reacciona con una ventana corta (24 frames, ~0,4 s a 60 fps)', () => {
-    expect(RENDER.dpr.windowSize).toBeLessThanOrEqual(24);
-    const ctl = createDprController(1.8);
-    for (let i = 0; i < RENDER.dpr.windowSize - 1; i += 1) expect(ctl.sample(30)).toBeNull();
-    expect(ctl.sample(30)).not.toBeNull();
-  });
-
-  it('no baja con frames sanos a 60 fps', () => {
-    const ctl = createDprController(1.8);
-    expect(alimentar(ctl, 16.7, ventana * 3)).toBeNull();
-    expect(ctl.dpr).toBe(1.8);
-  });
-
-  it('un monitor de 144 Hz con tope de 60 (pasos 20,8/20,8/13,9 ms) NO pierde resolución', () => {
-    const ctl = createDprController(1.8);
-    const pasos = [20.8, 20.8, 13.9];
-    for (let i = 0; i < ventana * 6; i += 1) ctl.sample(pasos[i % 3]);
-    expect(ctl.dpr).toBe(1.8);
-  });
-
-  it('ignora los hipos del hilo principal (no son carga del render)', () => {
-    const ctl = createDprController(1.8);
-    expect(alimentar(ctl, RENDER.dpr.outlierMs + 50, ventana * 3)).toBeNull();
-    expect(ctl.dpr).toBe(1.8);
-  });
-
-  it('una mediana buena con unos pocos picos no cuenta como lenta', () => {
-    const ctl = createDprController(1.8);
-    for (let i = 0; i < ventana; i += 1) ctl.sample(i % 5 === 0 ? 60 : 16);
-    expect(ctl.dpr).toBe(1.8);
-  });
-
-  it('recupera con calma: tras varias ventanas rápidas seguidas y nunca por encima del techo', () => {
-    const ctl = createDprController(1.8);
-    alimentar(ctl, 30, ventana);
-    expect(ctl.dpr).toBeCloseTo(1.5);
-    expect(alimentar(ctl, 12, ventana * (RENDER.dpr.recoverWindows - 1))).toBeNull();
-    expect(alimentar(ctl, 12, ventana)).toBeCloseTo(1.8);
-    alimentar(ctl, 12, ventana * 10);
-    expect(ctl.dpr).toBe(1.8);
-  });
-
-  it('una ventana lenta en medio reinicia la cuenta de recuperación', () => {
-    const ctl = createDprController(1.8);
-    alimentar(ctl, 30, ventana);
-    alimentar(ctl, 12, ventana * 2);
-    alimentar(ctl, 30, ventana);
-    expect(alimentar(ctl, 12, ventana * 2)).toBeNull();
+describe('sin DPR adaptativo', () => {
+  it('no hay controlador de resolución ni perillas para medir la cadencia', () => {
+    // Se retiró: medía cada frame activo y cambiaba el DPR (realocaba el framebuffer) en mitad del uso.
+    expect(Object.keys(pacing)).not.toContain('createDprController');
+    expect(RENDER).not.toHaveProperty('dpr');
   });
 });

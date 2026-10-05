@@ -154,10 +154,11 @@ describe('CatalogPage', () => {
     await waitFor(() => expect(screen.getByText(/No se pudo cargar el catálogo/)).toBeInTheDocument());
   });
 
-  it('muestra esqueletos mientras carga la primera página', () => {
+  it('no dibuja preloader ni libro mientras carga la primera página', () => {
     mockedApi.list.mockReturnValue(new Promise(() => undefined));
     renderCatalog();
-    expect(screen.getByTestId('skeleton-grid')).toBeInTheDocument();
+    expect(screen.queryByTestId('skeleton-grid')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('card-binder')).not.toBeInTheDocument();
   });
 
   it('los chips de filtros activos se pueden quitar', async () => {
@@ -278,6 +279,21 @@ describe('DetailPage', () => {
     expect(screen.getByTestId('stat-bars')).toBeInTheDocument();
     expect(screen.getByTestId('social-links')).toBeInTheDocument();
     expect(screen.getByText(/Arrocin/)).toBeInTheDocument();
+  });
+
+  it('«← Catálogo» vuelve a la página y los filtros donde se estaba, no a la primera página', async () => {
+    window.sessionStorage.setItem('vtuberdex:catalogo', 'page=3&countries=chile');
+    mockedApi.detail.mockResolvedValue({ ...makeDetail(), neighbors: { prev: null, next: null } });
+    renderDetail();
+    await waitFor(() => expect(screen.getByTestId('volver-catalogo')).toHaveAttribute('href', '/?page=3&countries=chile'));
+    window.sessionStorage.clear();
+  });
+
+  it('«← Catálogo» sin pasado en el catálogo (enlace directo) vuelve a la raíz', async () => {
+    window.sessionStorage.clear();
+    mockedApi.detail.mockResolvedValue({ ...makeDetail(), neighbors: { prev: null, next: null } });
+    renderDetail();
+    await waitFor(() => expect(screen.getByTestId('volver-catalogo')).toHaveAttribute('href', '/'));
   });
 
   it('el arte del personaje es textura de la carta 3D: no hay <img> de respaldo en la ficha', async () => {

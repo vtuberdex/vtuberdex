@@ -6,7 +6,7 @@
  *   · **LOCAL** (`VTUBERDEX_ADMIN_URL`): se reenvía al servidor Express, que es el
  *     único que escribe sobre el SQLite de `data/` —subida de imágenes con `sharp`,
  *     cuerpo de 12 MB, auditoría—. Es como se ha trabajado siempre y no cambia.
- *   · **PRODUCCIÓN (Vercel)** (`TURSO_DATABASE_URL`): el sistema de archivos es
+ *   · **PRODUCCIÓN (Vercel)** (`VTUBERDEX_DB_URL`): el sistema de archivos es
  *     inmutable y la base viaja empaquetada, así que aquí NO se puede escribir en
  *     SQLite. Las ediciones y las imágenes van a Turso (`lib/ediciones.mjs`), y el
  *     catálogo se sigue leyendo del bundle. No es una degradación: es el único modo que
@@ -67,6 +67,7 @@ import {
   resolverSolicitud,
 } from '../../../../server/src/solicitudes.mjs';
 import { prepararModificacion } from '../../../../server/src/modificacion.mjs';
+import { vistaPrevia } from '../../../../server/src/solicitud-vista.mjs';
 import { getVtuberBySlug, searchVtubers } from '../../../../server/src/search.mjs';
 import { readWebpSize } from '../../../../server/src/seed.mjs';
 
@@ -608,8 +609,28 @@ async function listarSolicitudesRuta(request) {
   }
 }
 
+/** Lo que el mantenedor puede escribir como dirección de una ficha: letras, números y guiones. */
+const SLUG_DE_FICHA = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 /**
- * `POST /api/admin/solicitudes/:id/resolver` con `{ accion, nota? }`.
+ * `GET /api/admin/solicitudes/:id/vista-previa?ficha=<slug>` — qué pasaría al aprobar, SIN escribir nada: si se
+ * puede, qué cambia (antes → después), a qué ficha afecta y, si la ficha no se encontró, candidatas para elegir.
+ * `ficha` elige a mano la ficha de una modificación (la misma que luego se manda al aprobar).
+ */
+async function vistaPreviaRuta(request, id) {
+  const fichaSlug = new URL(request.url).searchParams.get('ficha');
+  if (fichaSlug !== null && !SLUG_DE_FICHA.test(fichaSlug)) return NextResponse.json({ error: 'query_invalida' }, { status: 400 });
+  try {
+    const solicitud = await leerSolicitud(await ejecutorDeSolicitudes(), id);
+    if (!solicitud) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+    return NextResponse.json(vistaPrevia(await dbConDiario(), solicitud, { fichaSlug }), { headers: { 'cache-control': 'no-store' } });
+  } catch (error) {
+    return responderError(error);
+  }
+}
+
+/**
+ * `POST /api/admin/solicitudes/:id/resolver` con `{ accion, nota?, fichaSlug? }` (`fichaSlug`: la ficha elegida a mano en una modificación).
  *
  *   · `aprobar`  (inscripción): crea la ficha en BORRADOR por el mismo camino que «Nueva carta»
  *     (`vtuber.crear` del diario) y cierra la solicitud. Si la ficha no se puede crear (URL
@@ -637,7 +658,14 @@ async function resolverSolicitudRuta(request, id, usuario) {
     if (accion === 'aprobar' && solicitud.tipo === 'modificacion') {
       // Se aplica el parche a la ficha EXISTENTE (`vtuber.editar` del diario); avatar y logo (enlaces)
       // los sube el mantenedor aparte. La ficha se lee del diario ya reproducido, no de la base empaquetada.
-      const { id: fichaId, slug, patch } = prepararModificacion(await dbConDiario(), solicitud);
+      const db = await dbConDiario();
+      // El mantenedor puede haber ELEGIDO la ficha cuando lo escrito en el formulario no se resolvía solo.
+      let elegida = null;
+      if (typeof cuerpo?.fichaSlug === 'string' && cuerpo.fichaSlug) {
+        elegida = SLUG_DE_FICHA.test(cuerpo.fichaSlug) ? getVtuberBySlug(db, cuerpo.fichaSlug, { includeHidden: true }) : null;
+        if (!elegida) return NextResponse.json({ error: 'ficha_no_encontrada', detail: 'la ficha elegida no existe' }, { status: 404 });
+      }
+      const { id: fichaId, slug, patch } = prepararModificacion(db, solicitud, { ficha: elegida });
       const datos = vtuberUpdateSchema.safeParse(patch);
       if (!datos.success) {
         return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(datos.error) }, { status: 400 });
@@ -670,7 +698,7 @@ async function resolverSolicitudRuta(request, id, usuario) {
 }
 
 function sinBackend() {
-  return noDisponible('el mantenedor solo existe en local: en Vercel hace falta TURSO_DATABASE_URL');
+  return noDisponible('el mantenedor solo existe en local: hace falta VTUBERDEX_DB_URL (la base del mantenedor)');
 }
 
 export async function GET(request, context) {
@@ -692,6 +720,7 @@ export async function GET(request, context) {
   if (sufijo === 'dex/next') return siguienteDex();
   if (sufijo === 'factions') return listaDeFacciones();
   if (sufijo === 'solicitudes') return listarSolicitudesRuta(request);
+  if (partes[0] === 'solicitudes' && partes[1] && partes[2] === 'vista-previa' && partes.length === 3) return vistaPreviaRuta(request, partes[1]);
   return noDisponible(`ruta del mantenedor no soportada en producción: ${sufijo}`);
 }
 

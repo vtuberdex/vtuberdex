@@ -54,6 +54,33 @@ export interface SolicitudAdmin {
   vtuberSlug: string | null;
 }
 
+/** Resumen de una ficha en la vista previa de una solicitud. */
+export interface FichaResumen {
+  id: number;
+  slug: string;
+  name: string;
+  dexNumber: number;
+  status: string;
+  grado: string | null;
+}
+
+/** Lo que pasaría si se aprueba una solicitud (ver `server/src/solicitud-vista.mjs`). */
+export interface VistaPreviaSolicitud {
+  tipo: 'inscripcion' | 'baja' | 'modificacion';
+  estado: string;
+  puedeAprobar: boolean;
+  problema: { codigo: string; mensaje: string; detalles?: Array<{ path: string; message: string }> } | null;
+  avisos: string[];
+  /** Inscripción: la ficha que nacería. */
+  creara?: { name: string; slug: string; estado: string };
+  /** Modificación y baja: la ficha afectada. */
+  ficha?: FichaResumen | null;
+  cambios?: Array<{ campo: string; antes: string; despues: string; nuevo: boolean }>;
+  imagenes?: { imageUrl?: string; logoUrl?: string };
+  /** Modificación sin ficha resuelta: fichas parecidas para elegir. */
+  candidatas?: FichaResumen[];
+}
+
 export class ApiError extends Error {
   status: number;
   issues?: unknown;
@@ -241,12 +268,17 @@ export const api = {
       headers: bearer(token),
     });
   },
-  resolverSolicitud(token: string, id: number, accion: 'aprobar' | 'rechazar' | 'procesar', nota = '') {
+  resolverSolicitud(token: string, id: number, accion: 'aprobar' | 'rechazar' | 'procesar', nota = '', fichaSlug?: string) {
     return request<{ solicitud: SolicitudAdmin }>(`/api/admin/solicitudes/${id}/resolver`, {
       method: 'POST',
       headers: bearer(token),
-      body: JSON.stringify({ accion, nota }),
+      body: JSON.stringify({ accion, nota, ...(fichaSlug ? { fichaSlug } : {}) }),
     });
+  },
+  /** Qué pasaría al aprobar (sin escribir nada). `ficha` elige a mano la ficha de una modificación. */
+  vistaPreviaSolicitud(token: string, id: number, ficha?: string) {
+    const query = ficha ? `?${new URLSearchParams({ ficha })}` : '';
+    return request<VistaPreviaSolicitud>(`/api/admin/solicitudes/${id}/vista-previa${query}`, { headers: bearer(token) });
   },
   adminStats(token: string) {
     return request<{

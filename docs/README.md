@@ -167,8 +167,8 @@ dataset de ejemplo: no tocan la base real ni la red.
 
 Todo esto —más `npm run build` y las 32 comprobaciones de `npm run verify`— lo
 corre GitHub Actions en cada push y cada PR (`.github/workflows/ci.yml`), sin
-necesitar ningún secreto. El deploy a producción es otro workflow (`deploy.yml`,
-solo `master`).
+necesitar ningún secreto. Es el único workflow: no despliega nada. Producción es una VPS y se publica con
+`scripts/release.sh` (ver `AGENTS.md`, «Despliegue en VPS»).
 
 ## Decisiones de diseño
 

@@ -1,18 +1,21 @@
 'use client';
 /** Selector de orden (dex, nombre, poder). */
+import { useI18n } from '@/lib/i18n';
+import type { Clave } from '@/lib/i18n/mensajes';
 import type { SortKey } from '@/lib/types';
 
-const OPTIONS: Array<{ value: SortKey; label: string }> = [
-  { value: 'dex', label: 'Número (asc.)' },
-  { value: 'dex-desc', label: 'Número (desc.)' },
-  { value: 'name', label: 'Nombre (A-Z)' },
-  { value: 'power', label: 'Poder (mayor)' },
+const OPTIONS: Array<{ value: SortKey; label: Clave }> = [
+  { value: 'dex', label: 'orden.dex' },
+  { value: 'dex-desc', label: 'orden.dexDesc' },
+  { value: 'name', label: 'orden.nombre' },
+  { value: 'power', label: 'orden.poder' },
 ];
 
 export function SortSelect({ value, onChange }: { value: SortKey; onChange: (value: SortKey) => void }) {
+  const { t } = useI18n();
   return (
     <label className="inline-flex items-center gap-2 text-xs text-dex-muted">
-      <span className="uppercase tracking-[0.14em]">Orden</span>
+      <span className="uppercase tracking-[0.14em]">{t('orden.etiqueta')}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as SortKey)}
@@ -20,7 +23,7 @@ export function SortSelect({ value, onChange }: { value: SortKey; onChange: (val
       >
         {OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
-            {option.label}
+            {t(option.label)}
           </option>
         ))}
       </select>

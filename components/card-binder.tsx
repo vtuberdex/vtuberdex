@@ -45,22 +45,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+
+import { marcarAbriendo } from '@/lib/abriendo-detalle';
+import { useI18n } from '@/lib/i18n';
 import { Canvas, useFrame, useThree, type RootState, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import type { VtuberCard } from '@/lib/types';
 import * as CFG from '@/components/card3d-config';
 import { BINDER } from '@/components/card3d-config';
-import { pickCardQuality } from '@/components/card-quality';
 import { CardMeshes, Rig, WebGLBoundary, usePointerTilt } from '@/components/holo-card';
 import { RenderGovernor } from '@/components/render-governor';
 import { esFichaDeteriorada } from '@/lib/premium';
 import { useWebGLRecovery } from '@/components/webgl-recovery';
-import { CardEnvContext, useCardMaterials, useSharedCardEnv, type SharedCardEnv } from '@/components/card-material';
+import { CardEnvContext, useCardMaterials, useSharedCardEnv } from '@/components/card-material';
 import {
-  CARD_H,
-  CARD_W,
-  CARDS_PER_SPREAD,
   advanceFlip,
   bookDimensions,
   fitCameraZ,
@@ -71,11 +70,11 @@ import {
   sheetMatrix,
   slotPosition,
   staticCardMatrix,
-  turningSide,
   type FlipDir,
   type Placement,
   type Side,
 } from '@/components/card-binder-layout';
+import { ShaderWarmup } from '@/components/shader-warmup';
 
 export interface CardBinderProps {
   items: VtuberCard[];
@@ -130,109 +129,12 @@ interface BinderFrame {
  * Escena.
  * ------------------------------------------------------------------------- */
 
-/**
- * Textura del papel de una hoja con sus 4 fundas, una vez por escena. Las dos hojas y
- * la que gira usan la MISMA: la disposición es simétrica respecto del centro de la
- * hoja, así que al verla por detrás (espejada) sigue coincidiendo con las cartas.
+/*
+ * No hay cuerpo del libro: ni tapa, ni anillas, ni hojas con fundas. Las cartas flotan sobre el
+ * fondo del sitio y el «giro de página» es solo el movimiento de las cartas de la hoja
+ * (`frame.sheet`), sin papel que las acompañe. Las fundas (un contorno redondeado exterior
+ * pintado en la hoja) se retiraron por ser un segundo marco detrás de la carta.
  */
-function makePageTexture(): THREE.CanvasTexture | null {
-  if (typeof document === 'undefined') return null;
-  const { pageW, pageH, pageCenterX } = bookDimensions();
-  const width = 768;
-  const height = Math.round((width * pageH) / pageW);
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  const scale = width / pageW;
-  ctx.fillStyle = BINDER.pageColor;
-  ctx.fillRect(0, 0, width, height);
-
-  const pocketW = (CARD_W + 2 * BINDER.pocketPad) * scale;
-  const pocketH = (CARD_H + 2 * BINDER.pocketPad) * scale;
-  const radius = (CFG.GEOMETRY.cornerRadius + BINDER.pocketPad) * scale;
-  for (let slot = BINDER.cardsPerPage; slot < CARDS_PER_SPREAD; slot += 1) {
-    const { x, y } = slotPosition(slot);
-    const cx = (x - pageCenterX + pageW / 2) * scale;
-    const cy = (pageH / 2 - y) * scale;
-    ctx.beginPath();
-    ctx.roundRect(cx - pocketW / 2, cy - pocketH / 2, pocketW, pocketH, radius);
-    const grad = ctx.createLinearGradient(0, cy - pocketH / 2, 0, cy + pocketH / 2);
-    grad.addColorStop(0, BINDER.pocketColor);
-    grad.addColorStop(1, BINDER.pageColor);
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = BINDER.pocketLine;
-    ctx.stroke();
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-function BookBody({ env, pageTexture }: { env: SharedCardEnv; pageTexture: THREE.Texture | null }) {
-  const { pageW, pageH, spreadW, pageCenterX } = bookDimensions();
-  return (
-    <>
-      <mesh position={[0, 0, BINDER.coverZ]}>
-        <planeGeometry args={[spreadW + 2 * BINDER.coverMargin, pageH + 2 * BINDER.coverMargin]} />
-        <meshStandardMaterial color={BINDER.coverColor} roughness={0.92} metalness={0.05} />
-      </mesh>
-      {(['left', 'right'] as const).map((side) => (
-        <mesh key={side} position={[side === 'left' ? -pageCenterX : pageCenterX, 0, 0]}>
-          <planeGeometry args={[pageW, pageH]} />
-          <meshStandardMaterial map={pageTexture} color={pageTexture ? '#ffffff' : BINDER.pageColor} roughness={0.85} />
-        </mesh>
-      ))}
-      {BINDER.ringOffsets.map((offset) => (
-        <mesh key={offset} position={[0, pageH * offset, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[BINDER.ringRadius, BINDER.ringTube, 12, 36]} />
-          <meshStandardMaterial
-            color="#cfd5e0"
-            roughness={0.25}
-            metalness={0.9}
-            envMap={env.bodyEnvMap}
-            envMapIntensity={CFG.BODY.envMapIntensity}
-          />
-        </mesh>
-      ))}
-    </>
-  );
-}
-
-/** La hoja que gira: un plano de papel que acompaña a sus cartas. */
-function TurningSheet({ frame, dir, pageTexture }: { frame: BinderFrame; dir: FlipDir; pageTexture: THREE.Texture | null }) {
-  const mesh = useRef<THREE.Mesh>(null);
-  const { pageW, pageH, pageCenterX } = bookDimensions();
-  const local = useMemo(() => {
-    const x = turningSide(dir) === 'left' ? -pageCenterX : pageCenterX;
-    return new THREE.Matrix4().makeTranslation(x, 0, BINDER.sheetZ);
-  }, [dir, pageCenterX]);
-
-  useFrame((state, delta) => {
-    frame.advance(state, delta);
-    const m = mesh.current;
-    if (!m) return;
-    m.matrix.multiplyMatrices(frame.sheet, local);
-    m.matrixWorldNeedsUpdate = true;
-  });
-
-  return (
-    <mesh ref={mesh} matrixAutoUpdate={false}>
-      <planeGeometry args={[pageW, pageH]} />
-      <meshStandardMaterial
-        map={pageTexture}
-        color={pageTexture ? '#ffffff' : BINDER.pageColor}
-        roughness={0.85}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
-  );
-}
 
 interface BinderCardProps {
   placement: Placement<VtuberCard>;
@@ -281,7 +183,9 @@ function BinderCard({ placement, frame, textureWidth, onOpen }: BinderCardProps)
     }
     g.matrixWorldNeedsUpdate = true;
     g.visible = visible;
-    mats.tick(frame.time, frame.pointer, { x: frame.book.x, y: tiltY });
+    // Una carta oculta no se dibuja: actualizar sus uniforms en cada frame es trabajo perdido.
+    // Al volver a ser visible se actualiza ese mismo frame, antes de pintarse.
+    if (visible) mats.tick(frame.time, frame.pointer, { x: frame.book.x, y: tiltY });
   });
 
   const onClick = (event: ThreeEvent<MouseEvent>) => {
@@ -322,8 +226,6 @@ interface BinderSceneProps {
   onFlipEnd: (token: number) => void;
   onOpen: (card: VtuberCard) => void;
   /** DPR de partida del canvas y aviso del DPR adaptativo (ver `render-governor.tsx`). */
-  dprMax: number;
-  onDpr: (dpr: number) => void;
 }
 
 /** Distancia y centro de cámara para el encuadre pedido (libro entero o una hoja). */
@@ -338,10 +240,8 @@ function cameraTarget(focus: Focus, aspect: number) {
   return { x: focus === 'left' ? -pageCenterX : pageCenterX, z: Math.max(byHeight, byWidth) / BINDER.cameraFill };
 }
 
-function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, onOpen, dprMax, onDpr }: BinderSceneProps) {
+function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, onOpen }: BinderSceneProps) {
   const env = useSharedCardEnv();
-  const pageTexture = useMemo(() => makePageTexture(), []);
-  useEffect(() => () => pageTexture?.dispose(), [pageTexture]);
 
   const book = useRef<THREE.Group>(null);
   const pointer = usePointerTilt(book, {
@@ -432,11 +332,10 @@ function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, 
 
   return (
     <CardEnvContext.Provider value={env}>
-      <RenderGovernor busy={busy} wake={placements} dprMax={dprMax} onDpr={onDpr} />
+      <RenderGovernor busy={busy} wake={placements} />
       <Rig accent="#9aa4b8" cameraZ={cameraZ} />
       <group ref={book}>
-        <BookBody env={env} pageTexture={pageTexture} />
-        {flip && <TurningSheet frame={f} dir={flip.dir} pageTexture={pageTexture} />}
+        <ShaderWarmup />
         {placements.map((placement) => (
           <BinderCard
             key={placement.card.id}
@@ -453,6 +352,7 @@ function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, 
 
 /** Último recurso: el contexto no volvió tras los remontes. Recargar crea uno limpio. */
 function BinderUnavailable() {
+  const { t } = useI18n();
   return (
     <div
       role="alert"
@@ -460,13 +360,13 @@ function BinderUnavailable() {
       className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl text-center text-sm text-dex-muted"
       style={{ background: BINDER.coverColor }}
     >
-      <p>No se pudo mostrar el libro 3D.</p>
+      <p>{t('libro.noDisponible')}</p>
       <button
         type="button"
         onClick={() => window.location.reload()}
         className="rounded-full border border-dex-line px-4 py-1.5 text-dex-ink hover:border-dex-accent/60"
       >
-        Recargar
+        {t('libro.recargar')}
       </button>
     </div>
   );
@@ -483,7 +383,13 @@ const isTypingTarget = (target: EventTarget | null) => {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true;
 };
 
+/** Alto que ocupan cabecera, buscador, paginación y pie. Es una variable CSS (`globals.css`) porque en celular la barra de búsqueda se parte en dos filas. */
+const BINDER_CHROME = 'var(--binder-chrome)';
+/** Ancho mínimo del libro cuando el viewport es muy bajo. */
+const BINDER_MIN_WIDTH = 'var(--binder-min-width)';
+
 export function CardBinder({ items, page, pageCount, loading, onPage, single = false }: CardBinderProps) {
+  const { t } = useI18n();
   const router = useRouter();
   /**
    * El canvas se monta tras la hidratación: el HTML del servidor (y el primer render del
@@ -493,11 +399,8 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const recovery = useWebGLRecovery();
-  const [quality] = useState(() => pickCardQuality());
-  // El DPR lo posee el estado de React: R3F reimpone la prop `dpr` en cada re-render del Canvas,
-  // así que un `setDpr` directo del gobernador se desharía solo.
-  const [dpr, setDpr] = useState(quality.dpr);
-  const textureWidth = Math.min(quality.textureWidth, BINDER.textureWidthCap);
+  // Calidad FIJA: ancho de textura constante y `dpr={[1, RENDER.dprMax]}` (el DPR del dispositivo, acotado). Sin medición.
+  const textureWidth = CFG.TEXTURAS.ancho;
   const threeD = mounted && recovery.canRender;
 
   // En una hoja, la cámara mira siempre la derecha: ahí viven las 4 cartas de la página.
@@ -579,7 +482,16 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
   };
 
   // Una ficha deteriorada (baja) no tiene página: tocarla no lleva a ninguna parte.
-  const onOpen = useCallback((card: VtuberCard) => !esFichaDeteriorada(card) && router.push(`/v/${card.slug}`), [router]);
+  // Al abrir una carta se levanta «Accediendo al detalle» (`components/abriendo-detalle.tsx`, en el
+  // layout: este libro se desmonta al navegar y se llevaría el aviso consigo).
+  const onOpen = useCallback(
+    (card: VtuberCard) => {
+      if (esFichaDeteriorada(card)) return;
+      marcarAbriendo();
+      router.push(`/v/${card.slug}`);
+    },
+    [router],
+  );
 
   // Durante un giro, la página entrante no se muestra hasta que sus datos llegan (otro
   // array de `items` y sin carga en vuelo); sin giro (cambio de filtros) se mantiene lo
@@ -597,14 +509,21 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
 
   return (
     <section
-      aria-label={`Libro de cartas, página ${page} de ${pageCount}`}
+      aria-label={t('libro.etiqueta', { page, total: pageCount })}
       data-testid="card-binder"
       data-flipping={flip ? 'true' : 'false'}
       data-single={single ? 'true' : 'false'}
     >
       <div
-        className="relative select-none"
-        style={{ aspectRatio: `${frameW} / ${pageH}`, touchAction: 'pan-y', opacity: loading && !flip ? 0.6 : 1, transition: 'opacity 200ms' }}
+        className="relative mx-auto select-none"
+        style={{
+          aspectRatio: `${frameW} / ${pageH}`,
+          // El libro se limita por ALTURA además de por ancho: con el viewport ancho y bajo
+          // (portátil 1440×900) el libro entero crecía hasta empujar la paginación fuera de la
+          // pantalla. `BINDER_CHROME` reserva cabecera, buscador y paginación; el mínimo evita
+          // que en una ventana muy baja las cartas queden ilegibles (ahí manda el scroll).
+          width: `min(100%, max(${BINDER_MIN_WIDTH}, calc((100dvh - ${BINDER_CHROME}) * ${frameW / pageH})))`,
+          touchAction: 'pan-y', opacity: loading && !flip ? 0.6 : 1, transition: 'opacity 200ms' }}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
@@ -619,8 +538,8 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
                 <Canvas
                   key={recovery.canvasKey}
                   frameloop="demand"
-                  dpr={dpr}
-                  gl={{ antialias: true, alpha: true, powerPreference: quality.tier === 'lite' ? 'default' : 'high-performance' }}
+                  dpr={[1, CFG.RENDER.dprMax]}
+                  gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
                   camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, fitCameraZ(frameW / pageH)] }}
                   onCreated={({ gl }) => recovery.attach(gl.domElement)}
                 >
@@ -632,8 +551,6 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
                     textureWidth={textureWidth}
                     onFlipEnd={onFlipEnd}
                     onOpen={onOpen}
-                    dprMax={quality.dpr}
-                    onDpr={setDpr}
                   />
                 </Canvas>
               </div>
@@ -655,7 +572,7 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
           className={`${arrowClass} left-1`}
           onClick={() => go(-1)}
           disabled={!canGo(-1)}
-          aria-label="Página anterior"
+          aria-label={t('libro.anterior')}
         >
           ‹
         </button>
@@ -664,13 +581,13 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
           className={`${arrowClass} right-1`}
           onClick={() => go(1)}
           disabled={!canGo(1)}
-          aria-label="Página siguiente"
+          aria-label={t('libro.siguiente')}
         >
           ›
         </button>
       </div>
-      <p className="mt-3 text-center font-mono text-xs text-dex-muted">
-        Página {page} de {pageCount}
+      <p className="mt-1 text-center font-mono text-xs text-dex-muted">
+        {t('libro.pagina', { page, total: pageCount })}
         <span className="hidden sm:inline"> · ← → o desliza para pasar de página</span>
       </p>
     </section>

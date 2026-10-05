@@ -18,7 +18,7 @@
  * suelta: su cámara, su inclinación hacia el puntero y su flotación. Los efectos se
  * activan desde `card3d-config.ts` y `card-texture.ts` sin ensuciar el shader.
  */
-import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Component, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -31,7 +31,6 @@ import {
   CARD_TEXTURE_HEIGHT,
   CARD_TEXTURE_WIDTH,
   CARD_TEXTURE_FULL_WIDTH,
-  CARD_TEXTURE_TILE_WIDTH,
 } from '@/components/card-texture';
 import { useCardMaterials, type CardMaterials } from '@/components/card-material';
 import { PremiumSlab } from '@/components/premium-slab';
@@ -226,8 +225,6 @@ export function Rig({ accent, cameraZ = CARD_CAMERA_Z }: { accent: string; camer
 
 export interface HoloCardProps extends HoloCardSceneProps {
   className?: string;
-  quality?: 'full' | 'tile' | 'lite';
-  dprCap?: number;
 }
 
 export class WebGLBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
@@ -248,27 +245,16 @@ export function HoloCard({
   holo = CFG.INTENSITY.holo.default,
   gloss = CFG.INTENSITY.gloss.default,
   className,
-  quality = 'full',
   textureWidth,
-  dprCap,
 }: HoloCardProps) {
   const recovery = useWebGLRecovery();
-  const [dpr, setDpr] = useState<number | null>(null);
   const palette = useMemo(
     () => cardPalette(card.themeColor, card.secondaryColor),
     [card.themeColor, card.secondaryColor],
   );
-  const plan = useMemo(() => {
-    const tile = quality !== 'full';
-    const lite = quality === 'lite';
-    return {
-      tile,
-      antialias: true,
-      dpr: (dprCap ?? (tile ? 1 : 1.8)) as number | [number, number],
-      powerPreference: (lite ? 'default' : 'high-performance') as WebGLPowerPreference,
-      textureWidth: textureWidth ?? (tile ? CARD_TEXTURE_TILE_WIDTH : CARD_TEXTURE_FULL_WIDTH),
-    };
-  }, [quality, dprCap, textureWidth]);
+  // Calidad FIJA, sin medición: el detalle es UNA carta a tamaño grande. `dpr={[1, dprMax]}` es el rango estándar de
+  // R3F (el DPR del dispositivo, acotado); textura de ancho completo.
+  const plan = { dpr: [1, CFG.RENDER.dprMax] as [number, number], textureWidth: textureWidth ?? CARD_TEXTURE_FULL_WIDTH };
 
   /**
    * `relative` en la raíz y el canvas dentro de una caja POSICIONADA.
@@ -306,17 +292,12 @@ export function HoloCard({
             <Canvas
               key={recovery.canvasKey}
               frameloop="demand"
-              dpr={dpr ?? plan.dpr}
-              gl={{ antialias: plan.antialias, alpha: true, powerPreference: plan.powerPreference }}
+              dpr={plan.dpr}
+              gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
               camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, cameraZFor(card)] }}
               onCreated={({ gl }) => recovery.attach(gl.domElement)}
             >
-              <RenderGovernor
-                wake={card}
-                idleFps={CFG.RENDER.idleFpsDetail}
-                dprMax={typeof plan.dpr === 'number' ? plan.dpr : plan.dpr[1]}
-                onDpr={setDpr}
-              />
+              <RenderGovernor wake={card} idleFps={CFG.RENDER.idleFpsDetail} />
               <Rig accent={palette.accent} cameraZ={cameraZFor(card)} />
               <CardMesh card={card} holo={holo} gloss={gloss} textureWidth={plan.textureWidth} />
             </Canvas>

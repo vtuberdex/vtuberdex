@@ -14,7 +14,6 @@ import { SkillList } from '@/components/skill-list';
 import { SocialLinks } from '@/components/social-links';
 import { DEFAULT_SEARCH } from '@/lib/query';
 import { makeFacets } from '@/test/fixtures';
-import { pickCardQuality, __resetCardQuality } from '@/components/card-quality';
 
 describe('CountryBadge', () => {
   it('muestra la bandera del país y el nombre accesible', () => {
@@ -62,7 +61,14 @@ describe('SearchBar', () => {
 });
 
 describe('FilterPanel', () => {
-  it('muestra los contadores reales de cada faceta', () => {
+  it('arranca con todos los grupos colapsados', () => {
+    render(<FilterPanel facets={makeFacets()} params={DEFAULT_SEARCH} onChange={vi.fn()} onReset={vi.fn()} />);
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: /País/ })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('muestra los contadores reales de cada faceta', async () => {
+    const user = userEvent.setup();
     render(
       <FilterPanel
         facets={makeFacets()}
@@ -71,6 +77,8 @@ describe('FilterPanel', () => {
         onReset={vi.fn()}
       />,
     );
+    await user.click(screen.getByRole('button', { name: /País/ }));
+    await user.click(screen.getByRole('button', { name: /Idioma/ }));
     expect(screen.getByText('Chile')).toBeInTheDocument();
     expect(screen.getByText('137')).toBeInTheDocument();
     expect(screen.getByText('232')).toBeInTheDocument();
@@ -82,6 +90,7 @@ describe('FilterPanel', () => {
     render(
       <FilterPanel facets={makeFacets()} params={{ ...DEFAULT_SEARCH, page: 3 }} onChange={onChange} onReset={vi.fn()} />,
     );
+    await user.click(screen.getByRole('button', { name: /País/ }));
     const checkboxes = screen.getAllByRole('checkbox');
     await user.click(checkboxes[0]);
     expect(onChange).toHaveBeenCalledWith({ countries: ['chile'], page: 1 });
@@ -98,6 +107,7 @@ describe('FilterPanel', () => {
         onReset={vi.fn()}
       />,
     );
+    await user.click(screen.getByRole('button', { name: /País/ }));
     await user.click(screen.getAllByRole('checkbox')[0]);
     expect(onChange).toHaveBeenCalledWith({ countries: ['mexico'], page: 1 });
   });
@@ -122,6 +132,7 @@ describe('FilterPanel', () => {
       />,
     );
 
+    await user.click(screen.getByRole('button', { name: /Idioma/ }));
     const japanese = screen.getByRole('checkbox', { name: /日本語/ });
     expect(japanese).toBeChecked();
 
@@ -266,94 +277,3 @@ describe('SocialLinks', () => {
   });
 });
 
-/**
- * Plan de calidad por dispositivo.
- *
- * Se simulan las señales del navegador porque son justo lo que decide el plan: en
- * jsdom no existen, y sin simularlas el test solo comprobaría la rama por defecto.
- * Lo que se valida en cada caso es lo que importa de verdad — que un equipo corto
- * NO reciba el mismo trabajo que uno amplio, y que ninguno se quede sin carta.
- */
-describe('pickCardQuality', () => {
-  /** Sustituye las señales del dispositivo y devuelve el plan resultante. */
-  function planPara(señales: {
-    cores?: number;
-    memory?: number;
-    coarse?: boolean;
-    saveData?: boolean;
-    reducedMotion?: boolean;
-  }) {
-    const original = {
-      cores: Object.getOwnPropertyDescriptor(Navigator.prototype, 'hardwareConcurrency'),
-      mem: Object.getOwnPropertyDescriptor(Navigator.prototype, 'deviceMemory'),
-      match: window.matchMedia,
-    };
-    Object.defineProperty(navigator, 'hardwareConcurrency', { value: señales.cores, configurable: true });
-    Object.defineProperty(navigator, 'deviceMemory', { value: señales.memory, configurable: true });
-    (navigator as { connection?: unknown }).connection = { saveData: señales.saveData ?? false };
-    window.matchMedia = ((query: string) => ({
-      matches: query.includes('reduced-motion')
-        ? Boolean(señales.reducedMotion)
-        : query.includes('coarse')
-          ? Boolean(señales.coarse)
-          : false,
-      media: query,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    })) as typeof window.matchMedia;
-
-    __resetCardQuality();
-    const plan = pickCardQuality();
-
-    Object.defineProperty(navigator, 'hardwareConcurrency', original.cores ?? { value: 4, configurable: true });
-    Object.defineProperty(navigator, 'deviceMemory', original.mem ?? { value: undefined, configurable: true });
-    window.matchMedia = original.match;
-    __resetCardQuality();
-    return plan;
-  }
-
-  it('en un equipo modesto baja textura y contextos', () => {
-    const plan = planPara({ cores: 2, memory: 2 });
-    expect(plan.tier).toBe('lite');
-    expect(plan.textureWidth).toBe(256);
-    expect(plan.maxContexts).toBeLessThanOrEqual(4);
-  });
-
-  it('en un móvil usa la textura de grilla y pocos contextos', () => {
-    const plan = planPara({ cores: 8, memory: 8, coarse: true });
-    expect(plan.tier).toBe('tile');
-    expect(plan.dpr).toBe(1);
-    // Menos que un escritorio: el techo de contextos del navegador es menor en móvil.
-    expect(plan.maxContexts).toBeLessThan(planPara({ cores: 8, memory: 8 }).maxContexts);
-  });
-
-  it('en un equipo amplio sí usa la textura completa', () => {
-    const plan = planPara({ cores: 16, memory: 16 });
-    expect(plan.tier).toBe('full');
-    expect(plan.textureWidth).toBe(1008);
-  });
-
-  it('respeta prefers-reduced-motion aunque el equipo sea potente', () => {
-    // La carta se inclina siguiendo el puntero en cada frame: quien pide menos
-    // movimiento no debe recibirlo, por mucha GPU que tenga.
-    const plan = planPara({ cores: 16, memory: 16, reducedMotion: true });
-    expect(plan.tier).toBe('static');
-    expect(plan.maxContexts).toBe(0);
-  });
-
-  it('respeta el ahorro de datos como señal de «menos trabajo»', () => {
-    const plan = planPara({ cores: 16, memory: 16, saveData: true });
-    expect(plan.tier).toBe('lite');
-  });
-
-  it('sin señales del navegador no deja la carta sin pintar', () => {
-    // SSR y navegadores viejos: el plan debe seguir existiendo y ser el más liviano.
-    const plan = planPara({ cores: undefined, memory: undefined });
-    expect(plan.tier).toBeTruthy();
-    expect(plan.textureWidth).toBeGreaterThan(0);
-  });
-});

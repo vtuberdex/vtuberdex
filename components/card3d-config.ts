@@ -109,7 +109,7 @@ export const GEOMETRY = {
   /** Campo de visión de la cámara, en grados. */
   cameraFov: 42,
   /** Plano del resplandor: cuántas veces la carta mide de lado. */
-  glowSpread: 1.36,
+  glowSpread: 1.5,
   /** Z del plano del resplandor (negativo: detrás de la cara). */
   glowZ: -0.09,
   /** Desfase de la cara respecto de `cardDepth / 2` (antes evitaba el z-fighting con el cuerpo). */
@@ -1107,42 +1107,57 @@ export const LAYER_PARALLAX_FACTORS: number[] = PARALLAX_LAYERS.map((l) => l.fac
  */
 export const GLOW = {
   strength: 1.14,
-  /** Caída exponencial desde el canto, que es como decae la luz. */
-  falloffRate: 11.5,
-  falloffWeight: 0.6,
-  /** Filo más brillante pegado a la silueta. */
-  coreRate: 34.0,
-  coreWeight: 0.5,
+  /**
+   * VELO de marca pegado a la carta (ya no es el protagonista: antes `falloffRate` 11,5 y pesos
+   * 0,6 / 0,5 dibujaban un neón fino que se leía como rayo de luz). Más ancho y mucho más tenue.
+   */
+  falloffRate: 6.0,
+  falloffWeight: 0.16,
+  coreRate: 30.0,
+  coreWeight: 0.05,
   /** Suavizado del recorte, en píxeles (fwidth) con cota inferior. */
   aaPixels: 1.2,
   aaMin: 0.002,
-  /** Apagado en el borde del propio plano, para que no se vea el rectángulo. */
-  edgeFadeFrom: 0.80,
+  /** Apagado en el borde del propio plano (más cerca del centro: el plano es mayor, ver `glowSpread`). */
+  edgeFadeFrom: 0.5,
   /**
-   * HUMO ESPECTRAL: vapor sutil que se sumerge en el resplandor exterior.
+   * HUMO ESPECTRAL: volutas que suben y se enroscan alrededor de la carta.
    *
-   * Se calcula con ruido procedural de valor (hash + octavas) que MODULA la
-   * intensidad y el tinte del brillo existente — no deforma la distancia al
-   * borde, que era lo que expandía el halo en una nube condensada. Así el
-   * resplandor original se conserva y el humo lo atraviesa como neblina.
+   * Ruido de valor (interpolación quíntica, octavas rotadas) con DOBLE distorsión de dominio: el
+   * campo se deforma a sí mismo, de ahí las volutas. El viento SUBE (`smokeRise`) y se balancea
+   * (`smokeSway` amplitud, `smokeSwayRate` frecuencia). El primer humo derivaba en RADIAL desde el
+   * centro con un warp escalonado por celdas: producía rayos que salían de la carta (god rays).
    *
-   * `smokeScale` frecuencia del ruido; `smokeSpeed` velocidad de la deriva;
-   * `smokeAmp` cuánto modula la intensidad (0.1 = susurro, 0.3 = respiración);
-   * `smokeOctaves` detalle del fractal; `smokeWarp` fuerza del domain warping
-   * (0 = nube uniforme, 1 = volutas caóticas como humo de cigarro).
-   * `spectralScale` densidad de franjas; `spectralSpeed` velocidad del arcoíris;
-   * `spectralMix` peso del tinte respecto al color de marca; `spectralDistort`
-   * cuánto el ruido desplaza el espectro (0 = arcoíris por anillo, 1 = por voluta).
+   * `smokeScale` tamaño de las volutas (menor = más grandes); `smokeSpeed` velocidad;
+   * `smokeOctaves` detalle; `smokeWarp` cuánto se enroscan (0 = nube, 3+ = remolinos);
+   * `smokeLow/High` umbral y suavidad de la densidad (bajar = más lleno, subir = más ralo);
+   * `smokeReach` caída con la distancia a la carta; `smokeLift` sesgo hacia arriba;
+   * `smokeWeight` intensidad. Tinte: `spectralScale/Speed/Mix` y `spectralDistort` (cuánto la fase
+   * depende del campo de humo: sube para que el color siga a las volutas y no a anillos).
    */
-  smokeScale: 4.5,
-  smokeSpeed: 0.8,
-  smokeAmp: 0.22,
-  smokeOctaves: 4,
-  smokeWarp: 0.6,
-  spectralScale: 3.0,
-  spectralSpeed: 0.7,
-  spectralMix: 0.45,
-  spectralDistort: 0.4,
+  smokeScale: 3.2,
+  smokeSpeed: 0.5,
+  smokeOctaves: 5,
+  smokeWarp: 2.6,
+  smokeRise: 1.0,
+  smokeSway: 0.35,
+  smokeSwayRate: 0.6,
+  /** Cuánto se curva el balanceo con la altura. */
+  smokeSwayBend: 0.7,
+  /** Velocidad a la que cada campo de la distorsión deriva sobre el otro (da el enroscado). */
+  smokeFlowA: 0.35,
+  smokeFlowB: 0.2,
+  smokeLow: 0.46,
+  smokeHigh: 0.88,
+  smokeReach: 5.0,
+  smokeLift: 0.5,
+  smokeWeight: 0.6,
+  spectralScale: 2.2,
+  spectralSpeed: 0.45,
+  spectralMix: 0.4,
+  spectralDistort: 1.6,
+  /** Cuánto se aclara el humo hacia blanco (0 = color puro, 1 = blanco): lo vuelve pálido y fantasmal. */
+  smokeGhost: 0.2,
 } as const;
 
 /** Recorte de la silueta en el shader de la cara. */
@@ -1223,8 +1238,8 @@ export const BINDER = {
   /** Hueco entre fundas y margen interior de cada hoja. */
   gap: 0.3,
   padding: 0.36,
-  /** Ancho del lomo entre las dos hojas: ahí van las anillas. */
-  spine: 0.62,
+  /** Ancho del lomo entre las dos hojas (sin anillas: era espacio perdido para las cartas). */
+  spine: 0.12,
   /** Cuánto sobresale la funda dibujada alrededor de la carta. */
   pocketPad: 0.09,
   /**
@@ -1240,18 +1255,11 @@ export const BINDER = {
    * mayor dejaría una rendija visible entre las dos hojas durante el giro.
    */
   sheetZ: 0.012,
-  /** Tapa del álbum, detrás de las dos hojas. */
-  coverMargin: 0.3,
-  coverZ: -0.04,
-  /** Colores del papel, la funda y la tapa (superficies neutras: el color lo pone la carta). */
-  pageColor: '#121722',
-  pocketColor: '#1a2030',
-  pocketLine: 'rgba(255, 255, 255, 0.09)',
+  /**
+   * No hay tapa, hojas ni fundas: las cartas flotan sobre el fondo del sitio. `coverColor`
+   * queda solo como fondo del aviso «No se pudo mostrar el libro 3D».
+   */
   coverColor: '#080b11',
-  /** Anillas del lomo: radio, grosor del aro y posición vertical (fracción del alto). */
-  ringRadius: 0.24,
-  ringTube: 0.035,
-  ringOffsets: [-0.34, 0, 0.34],
   /** Duración del paso de página, en ms (una hoja de cartón, sin curvarse). */
   flipMs: 1100,
   /**
@@ -1289,12 +1297,6 @@ export const BINDER = {
   /** Umbrales de gesto: desplazamiento mínimo para pasar página y holgura de un toque. */
   swipeMinPx: 48,
   tapSlopPx: 8,
-  /**
-   * Techo del ancho de textura por carta en el libro. En pantalla cada carta mide
-   * ~200 px (8 en una fila de 1000 px), así que 1008 px sería 5x la resolución útil con
-   * 8 cartas a la vez: aquí el nivel «full» también se queda en 512.
-   */
-  textureWidthCap: 512,
 } as const;
 
 /**
@@ -1361,18 +1363,11 @@ export const DOMINANT = {
  */
 export const TEXTURAS = {
   /**
-   * Anchos de textura por los que se baja cuando la máquina es lenta (de mayor a menor).
-   * 256 es el piso: por debajo el nombre de la cabecera deja de leerse en el libro.
+   * Ancho FIJO de las texturas de una carta en el catálogo (el detalle usa `CARD_TEXTURE_FULL_WIDTH`).
+   * Antes bajaba solo a 384 y 256 si la máquina era lenta: se retiró para que la carta se vea igual
+   * en todos los equipos. 512 px alcanzan para las ~330 px que mide una carta del libro (x2 de DPR).
    */
-  anchos: [512, 384, 256],
-  /**
-   * Umbral (ms de generación COMPLETA de una carta, en el hilo principal) a partir del
-   * cual se baja un escalón. 120 ms son ~7 frames a 60 fps: con 8 cartas en cola es un
-   * segundo de tirones; por debajo la cola los reparte sin que se note.
-   */
-  lentoMs: 120,
-  /** Mediciones que hacen falta antes de decidir (la primera suele pagar el calentamiento del JIT). */
-  muestras: 2,
+  ancho: 512,
   /**
    * Presupuesto de la caché de texturas, en PÍXELES de canvas retenidos. Una carta a
    * 512 px son ~3,7 Mpx (8 lienzos de 512x717); 60 Mpx son ~16 cartas: la página actual
@@ -1621,28 +1616,14 @@ export const RENDER = {
   idleFpsDetail: 30,
   /** Cuánto tiempo, tras la última señal de actividad, se sigue a `activeFps` (la amortiguación necesita asentarse). */
   activeMs: 1500,
+  /**
+   * Techo de la resolución del canvas, FIJO: `dpr={[1, dprMax]}` usa el DPR del dispositivo acotado a 1..dprMax.
+   * No hay DPR adaptativo (se retiró: medía cada frame y realocaba el framebuffer). Bájalo a 1.5 o 1 si una GPU
+   * modesta sufre en pantallas de alta densidad: es el único mando de resolución que queda.
+   */
+  dprMax: 2,
   /** Margen (ms) al comparar con el intervalo: el rAF tiene jitter y sin él se saltaría un frame de cada dos a 60 Hz. */
   toleranceMs: 2,
-  /**
-   * DPR ADAPTATIVO, AGRESIVO. Se mide la cadencia real de los frames ACTIVOS (mediana de
-   * `windowSize`) y se baja un escalón si la mediana supera `slowMs` (~43 fps: no hace falta caer
-   * a 30 para reaccionar); si supera `severeMs` (~25 fps) se bajan DOS de golpe. Se sube solo tras
-   * `recoverWindows` ventanas seguidas bajo `fastMs`: reacciona rápido hacia abajo y sube con calma
-   * (la histéresis 23/18 ms más la espera evitan que oscile). `slowMs` queda por encima de los
-   * 20,8 ms de un monitor de 144 Hz con tope de 60 (pasos 3,3,2 ticks): ahí NO debe bajar.
-   * Antes: ventana de 45 frames (~0,75 s), escalón de 0,25, mínimo 0,75 y umbrales 26/19 ms.
-   */
-  dpr: {
-    min: 0.6,
-    step: 0.3,
-    windowSize: 24,
-    slowMs: 23,
-    fastMs: 18,
-    severeMs: 40,
-    recoverWindows: 5,
-    /** Un intervalo mayor es un hipo del hilo principal (p. ej. generando texturas), no la carga del render: se ignora. */
-    outlierMs: 120,
-  },
   /**
    * RECUPERACIÓN DE CONTEXTO. Tras `webglcontextlost` el canvas se desmonta, se espera `cooldownMs` a que el driver respire y se REMONTA uno nuevo. No se espera a
    * `webglcontextrestored` para seguir en sitio: el PMREM y los render targets no sobreviven a

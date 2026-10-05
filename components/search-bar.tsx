@@ -6,6 +6,8 @@
  */
 import { useEffect, useRef, useState } from 'react';
 
+import { useI18n } from '@/lib/i18n';
+
 export interface SearchBarProps {
   value: string;
   onChange: (value: string) => void;
@@ -18,6 +20,7 @@ export interface SearchBarProps {
 const DEBOUNCE_MS = 260;
 
 export function SearchBar({ value, onChange, total, loading = false, placeholder }: SearchBarProps) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
   const onChangeRef = useRef(onChange);
@@ -63,8 +66,8 @@ export function SearchBar({ value, onChange, total, loading = false, placeholder
           onKeyDown={(event) => {
             if (event.key === 'Escape') setDraft('');
           }}
-          placeholder={placeholder ?? 'Busca por nombre, número, grupo o frase…'}
-          aria-label="Buscar VTuber"
+          placeholder={placeholder ?? t('buscador.placeholder')}
+          aria-label={t('buscador.etiqueta')}
           className="min-w-0 flex-1 bg-transparent text-base text-dex-ink outline-none placeholder:text-dex-muted/70"
         />
         {draft && (
@@ -72,9 +75,9 @@ export function SearchBar({ value, onChange, total, loading = false, placeholder
             type="button"
             onClick={() => setDraft('')}
             className="rounded-md px-2 py-1 text-xs text-dex-muted hover:bg-white/5 hover:text-dex-ink"
-            aria-label="Limpiar búsqueda"
+            aria-label={t('buscador.limpiarEtiqueta')}
           >
-            limpiar
+            {t('buscador.limpiar')}
           </button>
         )}
         <span className="hidden shrink-0 font-mono text-xs text-dex-muted sm:block" aria-hidden>
@@ -82,7 +85,7 @@ export function SearchBar({ value, onChange, total, loading = false, placeholder
         </span>
       </div>
       <p className="mt-2 px-1 text-xs text-dex-muted" role="status" aria-live="polite">
-        {loading ? 'Buscando…' : `${total} VTuber${total === 1 ? '' : 's'} encontrado${total === 1 ? '' : 's'}`}
+        {loading ? t('buscador.buscando') : t('buscador.encontrados', { n: total })}
       </p>
     </div>
   );

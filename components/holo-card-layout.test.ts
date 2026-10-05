@@ -77,7 +77,7 @@ describe('layout del canvas del libro', () => {
     expect(canvas).toBeGreaterThan(caja);
     expect(fuenteLibro.slice(caja, canvas)).not.toContain('</div>');
     // La raíz que lo contiene es la superficie de gestos, posicionada.
-    expect(fuenteLibro).toMatch(/className="relative select-none"/);
+    expect(fuenteLibro).toMatch(/className="relative mx-auto select-none"/);
   });
 
   it('el canvas del libro no se declara con tamaño propio', () => {

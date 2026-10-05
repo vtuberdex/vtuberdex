@@ -61,7 +61,7 @@ export interface PremiumInfo {
   since: string;
   /** Último cambio de grado (AAAA-MM-DD). */
   gradedAt: string;
-  /** Número de certificado, derivado del id (`VTD-000017`). */
+  /** Número de certificado y código de donación, derivado del número de dex (`VTD-016` para la carta `#016`). */
   cert: string;
 }
 

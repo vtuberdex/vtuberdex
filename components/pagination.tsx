@@ -1,5 +1,7 @@
 'use client';
 /** Paginación simple con ventana de páginas. */
+import { useI18n } from '@/lib/i18n';
+
 export interface PaginationProps {
   page: number;
   pageCount: number;
@@ -15,6 +17,7 @@ function windowedPages(page: number, pageCount: number, span = 2): number[] {
 }
 
 export function Pagination({ page, pageCount, onPage }: PaginationProps) {
+  const { t } = useI18n();
   if (pageCount <= 1) return null;
   const pages = windowedPages(page, pageCount);
 
@@ -26,9 +29,9 @@ export function Pagination({ page, pageCount, onPage }: PaginationProps) {
     }`;
 
   return (
-    <nav className="mt-8 flex flex-wrap items-center justify-center gap-2" aria-label="Paginación de resultados">
+    <nav className="mt-4 flex flex-wrap items-center justify-center gap-2" aria-label={t('paginacion.etiqueta')}>
       <button type="button" onClick={() => onPage(page - 1)} disabled={page <= 1} className={buttonClass(false)}>
-        ← Anterior
+        {t('paginacion.anterior')}
       </button>
       {pages[0] > 1 && (
         <>
@@ -58,7 +61,7 @@ export function Pagination({ page, pageCount, onPage }: PaginationProps) {
         </>
       )}
       <button type="button" onClick={() => onPage(page + 1)} disabled={page >= pageCount} className={buttonClass(false)}>
-        Siguiente →
+        {t('paginacion.siguiente')}
       </button>
     </nav>
   );

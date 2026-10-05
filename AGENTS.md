@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 451 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 692 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 94 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -235,6 +235,18 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   gustos actualizan su fila de `profile` sin tocar las demás, el modelador pasa al frente de `artists` sin quitar a nadie. El nombre
   no se cambia por aquí. **Avatar y logo (enlaces) NO se aplican solos**: el mantenedor los sube por «Imágenes» y la cola lo avisa. Si la
   ficha no se resuelve (nombre ambiguo o inexistente) la solicitud sigue pendiente con `ficha_no_encontrada`.
+- **La cola del mantenedor** (`admin/solicitudes-manager.tsx`) es lista + detalle, no una tarjeta por solicitud con 30 campos en
+  un muro de texto. La lista es una línea por solicitud (tipo, nombre, «hace 5 min»), la más antigua primero (la cola se atiende en
+  orden); el detalle agrupa por secciones. **Antes de aprobar se sabe qué pasará**: `GET /api/admin/solicitudes/:id/vista-previa`
+  (`server/src/solicitud-vista.mjs`) calcula, SIN escribir, si se puede, qué ficha afecta y, en una modificación, **qué cambia
+  (antes → después)**. La simulación ejecuta las mismas `crearFicha`/`aplicarParche` que aprobar dentro de un `BEGIN … ROLLBACK`
+  (node:sqlite es síncrono: nada más usa la conexión en medio), así que «la regla lo rechaza» sale idéntico en ambos sitios. Si la ficha
+  de una modificación no se resuelve, el mantenedor la ELIGE (candidatas o búsqueda) y el resolver acepta `fichaSlug`. «Aprobar» queda
+  deshabilitado mientras se comprueba o si la regla lo rechaza; rechazar pide confirmación (borra el contacto). La vista previa solo
+  existe en la ruta de Next: el Express local no la tiene y la pantalla degrada (botón habilitado, datos crudos).
+- **La ficha de una modificación se escribe a mano** (campo libre) y la gente copia `#486 NOMBRE` del catálogo: `fichaDeLaSolicitud`
+  acepta ese formato (el número desempata, nunca manda sobre un nombre que coincide con otra ficha). Antes quedaba atascada con
+  `ficha_no_encontrada`.
 - **Antispam**: campo trampa `website`, un solo pendiente por correo y tipo, tope de 5 envíos por red y día. El arte del
   personaje se pide como ENLACE: un formulario público que recibe archivos es una puerta a subir basura.
 - `/api/admin/solicitudes*` sale 404 sin Turso ni proxy local, como el resto del mantenedor.
@@ -248,7 +260,7 @@ cada mes que sigue donando, hasta el 10 y luego la **Black Label**. Escala: `8 �
   (`validation.mjs`), regla (`mutations.mjs`), búsqueda (`search.mjs`) y cliente (`lib/premium.ts`
   la reexporta) la importan; no la copies. El grado es **texto** (`'BL'` no es un número).
 - **Datos**: tabla `premium (vtuber_id PK, grade, since, graded_at)`, sin CHECK de la escala (SQLite
-  no deja alterarlo). Sin fila = carta normal. El certificado (`VTD-000017`) se **deriva del id**, no se guarda.
+  no deja alterarlo). Sin fila = carta normal. El certificado y el código de donación (`VTD-016` para la carta `#016`) se **derivan del número de dex**, no se guardan (antes del id interno, que no coincidía con lo visible; los códigos viejos de 6 dígitos se rechazan a propósito).
   Se edita por el mismo PATCH de siempre: `{ premium: { grade } }` o `{ premium: null }` (`aplicarParche`),
   así que **local (Express) y producción (diario de Turso) comparten la regla** sin código nuevo en las rutas.
 - **El diario sella el DÍA, no las fechas.** `aplicarYAnotar` llama a `sellarPremium`, que guarda
@@ -268,8 +280,16 @@ cada mes que sigue donando, hasta el 10 y luego la **Black Label**. Escala: `8 �
 - **Trampa del bisel** (ya documentada en la skill de three): `ExtrudeGeometry` con bisel EXPANDE el contorno;
   `crearCuerpo` insetea la forma y `premium.test.tsx` mide la caja (`layout.width` exacto).
 - **Sección pública**: `?premium=1` es un filtro más (URL = estado): botón «★ Premium» en el catálogo y acceso
-  en la cabecera. **Mantenedor**: pestaña «Premium» (`admin/premium-manager.tsx`): alta, «Subir a …» (el gesto
-  mensual), fijar grado a mano, quitar. Avisa si el grado ya cambió este mes pero deja subir: la donación es
+  en la cabecera. **Mantenedor**: pestaña «Premium» (`admin/premium-manager.tsx`). Es una LISTA de una línea por carta, no
+  tarjetas: la versión anterior apilaba una tarjeta alta con 5 controles por carta y con decenas era una sábana (además
+  cortaba en 100 sin avisar; ahora trae todas las páginas). Qué hay: filtros por tramo CON contadores (`6–7,5`, `8–9,5`,
+  `10`, `Black Label`, `Deterioradas`) y **«Por subir este mes»** (el trabajo mensual: premium que pueden subir y aún no
+  cambiaron de grado este mes; la donación la sabe una persona, nada sube solo), búsqueda en la lista (sin tildes; por
+  nombre, `#NNN` o `VTD-…`), orden y paginación de 20. El botón relleno «Subir a …» solo lo lleva quien está por revisar;
+  quien ya subió se ve en contorno y el grado máximo en gris. Lo raro (corregir grado, degradar, quitar) va en «Más», bajo la
+  fila, de una a la vez. El alta es un panel que abre «+ Nueva premium» (abierto solo si no hay ninguna). El deterioro
+  arranca en el grado MÁS LEVE y el 1 (baja: ficha sin página pública) pide confirmación. La lógica pura está en
+  `admin/premium-lista.ts` (probada); `PremiumBadge` tiene `compacto` para listas. Avisa si el grado ya cambió este mes pero deja subir: la donación es
   un dato que sabe una persona, el mantenedor no la calcula.
 - **Un re-seed con `--reset` borra las premium** (cascada desde `vtuber`), igual que el resto de ediciones.
 - `madKoding` (dex 16) es premium **grado 10 en la base LOCAL** (`data/vtuberdex.db`, ignorada por git). En
@@ -323,6 +343,32 @@ calcula ni «procesar» una baja los aplica solo**.
   llegue a la ficha (URL, vecino, buscador) es una fuga del nombre.
 - Para ver el resultado sin WebGL ni base de datos: bundlear `drawCardFront` con `esbuild --alias:@=.` y dibujar los grados en
   Chromium (`/opt/pw-browsers`); es lo que se hizo para calibrar `DETERIORO`.
+
+## Idiomas (es / en / ja) y traducción de la historia
+
+La interfaz pública es trilingüe, **español por defecto**. Código en `lib/i18n/` (JS/TS puro, probado).
+
+- **Sin prefijo en la URL** (la URL es el estado de la búsqueda, regla 6) y **sin leer `Accept-Language` en el
+  servidor** (haría dinámica la home estática y su JSON-LD). El HTML del servidor es siempre español, que es lo que
+  indexan los buscadores; `I18nProvider` (en `app/layout.tsx`) arranca en `es` y, ya hidratado, aplica
+  `elegirLocale(localStorage 'vtuberdex:idioma', navigator.languages)`. Selector en la cabecera (`language-switcher.tsx`).
+  Sin proveedor `useI18n` devuelve español: los componentes se prueban sin envolver nada.
+- **Textos**: `lib/i18n/es.ts` es la fuente de claves; `en.ts`/`ja.ts` se tipan contra ella (falta o sobra una → `tsc`
+  falla) y `i18n.test.ts` exige mismas claves y mismos marcadores `{x}`. Plurales `x_one`/`x_other` con
+  `t('x', { n })`. **Al añadir texto a la UI pública, añade la clave en los tres.**
+- **Datos de la base** (`lib/i18n/nombres.ts`): países vía `Intl.DisplayNames` con el ISO sacado del emoji de bandera,
+  idiomas por su código, etiquetas de la ficha (con las erratas del scrape: `Pais`, `Hashtag arte`…), stats y tipos
+  de habilidad por tablas cerradas. El texto libre (frases, valores de la ficha, nombres de habilidades) no se traduce.
+- **Fuera de alcance, sigue en español**: formularios `/inscripcion`, `/modificacion`, `/baja`, `/terminos` (texto
+  legal versionado: `TERMINOS_VERSION`), el mantenedor, los textos pintados en el canvas de la carta 3D (etiqueta de la
+  placa premium) y los metadatos SEO del servidor.
+- **Traducción al vuelo de la historia/frase** (`components/texto-traducible.tsx`, `lib/traductor/`): si
+  `idiomaDelTexto` ve el texto en otro idioma que el de la interfaz, ofrece «Traducir a …». Corre EN EL DISPOSITIVO,
+  solo al pulsar: 1) API nativa `Translator` del navegador (Chrome 138+ escritorio); 2) respaldo Transformers.js con
+  `Xenova/opus-mt-{es-en,en-es,ja-en,en-jap}` (~100 MB cada uno, en caché del navegador), importado por URL desde jsDelivr
+  con `webpackIgnore` para que no entre en ningún bundle. No hay modelo directo es↔ja: pasa por inglés. La calidad
+  es↔ja por pivote es modesta. Sin medir en un navegador real (jsdom no tiene ninguno de los dos motores): las pruebas
+  cubren la lógica pura y la API nativa simulada, no la descarga del modelo.
 
 ## SEO: qué dice el servidor sin JavaScript
 
@@ -438,27 +484,24 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
 - **Generar las texturas de las cartas es lo que cuesta, no traer los datos.** Medido al
   cargar una página de 8: la API tarda 11-45 ms y el hilo principal quedó bloqueado 6,5 s
   (4 lienzos por carta más dos máscaras píxel a píxel). `card-texture/fabrica.ts` es la
-  única puerta de generación y aplica cuatro medidas, con sus perillas en `TEXTURAS`:
+  única puerta de generación y aplica tres medidas, con sus perillas en `TEXTURAS`:
   (1) PROGRESIVA: `generarRapida` (superficie, personaje, título) muestra la carta y
   `completar` añade marca y máscaras REUTILIZANDO esas capas (`reutilizar` en
-  `drawCardLayers`), nada se dibuja dos veces; (2) ADAPTATIVA: se mide la generación
-  completa y si la mediana de `muestras` supera `lentoMs` se baja un escalón de `anchos`
-  (512 -> 384 -> 256) para las siguientes, decide la máquina real y no
-  `hardwareConcurrency`; (3) CACHÉ LRU por carta y ancho con presupuesto en PÍXELES
+  `drawCardLayers`), nada se dibuja dos veces; (2) CACHÉ LRU por carta y ancho con presupuesto en PÍXELES
   (`cacheMaxPixels`), con las cartas montadas ancladas (`anclar`) para que no se
   desalojen debajo de quien las usa, los canvases se cachean y las `CanvasTexture` se crean
-  por montaje porque pertenecen a un renderer; (4) PREGENERACIÓN: `pregenerar` encola con
+  por montaje porque pertenecen a un renderer; (3) PREGENERACIÓN: `pregenerar` encola con
   prioridad BAJA y en `requestIdleCallback` las cartas de las páginas vecinas que trajo
   `cache-paginas`, y un trabajo bajo que ya tenía turno lo CEDE si llega uno alto. Las
   máscaras corren en un Web Worker (`mascaras.worker.ts`, matemática pura en
   `mascaras-puras.ts` compartida con el camino síncrono de respaldo): el hilo principal
   solo dibuja, lee y escribe píxeles. Dos trampas: la cola ejecuta de UNO en uno con un
   `setTimeout 0` entre trabajos (ocho a la vez bloqueaban en un tramo), y `buscarEnCache`
-  REJUVENECE la entrada (LRU), así que una consulta la aleja del desalojo. Y una tercera
-  que costó una vuelta: la calidad adaptativa mide SOLO CPU del hilo principal
-  (`Completada.msCpu`), nunca la espera del worker, porque su arranque (~0,7 s en una
-  máquina lenta) se colaba en la primera carta y bajaba un escalón sin motivo; además
-  `precalentarMascaras()` arranca el worker mientras se descargan las imágenes. Medido con
+  REJUVENECE la entrada (LRU), así que una consulta la aleja del desalojo. `precalentarMascaras()`
+  arranca el worker mientras se descargan las imágenes. **NO hay calidad adaptativa**: hubo una que medía la
+  generación y bajaba el ancho 512 -> 384 -> 256 (y otra, `card-quality.ts`, que elegía nivel por
+  `hardwareConcurrency`/`deviceMemory`/táctil/`saveData`/`prefers-reduced-motion`); se retiraron. El ancho es FIJO
+  (`TEXTURAS.ancho` = 512 en el libro, `CARD_TEXTURE_FULL_WIDTH` en el detalle) y el canvas usa `dpr={[1, RENDER.dprMax]}` (2; el único mando de resolución). Medido con
   canvas por CPU (`--disable-accelerated-2d-canvas`; con SwiftShader el canvas 2D también
   va por software y las cifras no valen): ~14 ms la etapa rápida y ~13 ms de CPU la
   completa por carta a 512, máximo 40 ms de pared, y 24 aciertos de caché al volver a una
@@ -472,16 +515,14 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
   contexto se pierde, `webgl-recovery.ts` remonta; si agota los intentos, el libro muestra
   `BinderUnavailable` («No se pudo mostrar el libro 3D», botón Recargar). La lista `sr-only` de enlaces
   (`data-testid="binder-link"`) queda SIEMPRE en el DOM: es la accesibilidad y lo que ve un rastreador.
-  `prefers-reduced-motion` ya no manda al 2D (el tier `static` solo baja textura/DPR y desactiva la
-  precarga). jsdom no tiene WebGL, así que `test/setup.ts` sustituye el `<Canvas>` de R3F por una caja
+  `prefers-reduced-motion` ya no cambia nada de la carta (no hay niveles de calidad). jsdom no tiene WebGL, así que `test/setup.ts` sustituye el `<Canvas>` de R3F por una caja
   inerte (`data-testid="r3f-canvas"`); lo que se prueba es el contrato de DOM, no la escena.
 - **El canvas NO corre a 60 fps continuos, y un `contextlost` ya no es permanente.** Antes el
   `<Canvas>` iba en `frameloop="always"` y el primer `webglcontextlost` dejaba un 2D hasta
   recargar (`setLost(true)` sin vuelta). Hoy (`components/render-governor.tsx`, lógica pura en
   `render-pacing.ts`, perillas en `RENDER` de `card3d-config.ts`): `frameloop="demand"` y un
   gobernador que (1) PAUSA del todo fuera de pantalla (IntersectionObserver) o con la pestaña
-  oculta, (2) baja a `idleFps` en reposo y con interacción topa a `RENDER.activeFps` = **60** (se probó 24: en 60 Hz alterna 33/50 ms y se ve menos suave; agenda FIJA `nextSchedule`, porque comparar con el último frame real rinde menos fps que los pedidos), (3) DPR adaptativo AGRESIVO (`RENDER.dpr`: ventana de 24 frames, escalón 0,3, dos escalones si la mediana pasa de 40 ms, mínimo 0,6, sube con calma tras 5 ventanas; `slowMs` 23 queda por encima de los 20,8 ms de 144 Hz con tope 60) si la cadencia de los frames ACTIVOS no se sostiene (nunca midiendo durante un giro: el hilo
-  está saturado por las texturas y realocar el framebuffer a mitad del giro es otro tirón).
+  oculta, (2) baja a `idleFps` en reposo y con interacción topa a `RENDER.activeFps` = **60** (se probó 24: en 60 Hz alterna 33/50 ms y se ve menos suave; agenda FIJA `nextSchedule`, porque comparar con el último frame real rinde menos fps que los pedidos), y NO hay DPR adaptativo (hubo uno que medía la cadencia y realocaba el framebuffer; se retiró: la resolución es fija).
   `advanceFlip` recorta el delta a `RENDER.maxDeltaMs` (70: debe superar el paso de 50 ms del reposo): el primer frame del giro llega tras uno de
   reposo (50 ms) y adelantaba la hoja de golpe. `webgl-recovery.ts` desmonta el canvas,
   espera `cooldownMs` y REMONTA un canvas nuevo (`key`); no sigue en sitio tras
@@ -489,9 +530,7 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
   Trampas: (a) desmontar un Canvas dispara `webglcontextlost` en el canvas viejo
   (`forceContextLoss`): el hook solo acepta el evento del canvas VIGENTE; (b) el reloj de three
   sigue corriendo en pausa, así que al reanudar se descarta con `clock.getDelta()` o `advanceFlip`
-  (integra por delta) saltaría el giro; (c) R3F reimpone la prop `dpr` en cada re-render del
-  Canvas, por eso el DPR adaptativo vive en estado de React del dueño y no en un `setDpr` directo;
-  (d) `PerformanceMonitor` de drei NO sirve: contaría el reposo (20 fps a propósito) como lento.
+  (integra por delta) saltaría el giro; (c) `PerformanceMonitor` de drei NO sirve: contaría el reposo (20 fps a propósito) como lento.
   Medido en chrome-headless con SwiftShader: fuera de pantalla = 0 frames/s y tras `loseContext()`
   el canvas vuelve a los ~2,5 s; los topes de fps no se pueden medir ahí (el rasterizador por
   software satura antes), los cubre `render-pacing.test.ts`. Sin medir aún: GPU real.
@@ -711,7 +750,13 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
   (785 cartas, 211 fichas, 31 países, 1055 habilidades); se obtienen ejecutando
   `verifySeed()` o consultando la base, no estimando.
 
-## Despliegue en Vercel
+## Despliegue en Vercel (HISTÓRICO)
+
+> **Ya no se despliega en Vercel.** Producción es la VPS (ver «Despliegue en VPS») y el workflow
+> `deploy.yml` se eliminó: el CI solo valida. Esta sección y el código de compatibilidad que conserva
+> (build `standalone` opt-in, rama de Blob en `/images`, `outputFileTracingIncludes`) describen cómo era.
+> Si el proyecto sigue enlazado en Vercel, su integración Git seguirá construyendo cada push a `master`:
+> se corta desconectando el repositorio en el panel de Vercel (no es algo que viva en este repo).
 
 La app es **Next.js con App Router** (Vercel la detecta como framework nativo). El
 catálogo corre como funciones con SQLite empaquetada; las imágenes y las ediciones del
@@ -731,7 +776,7 @@ npm install                      # deps del proyecto (root)
 npm run build                    # next build (usa deploy/ ya construido)
 npm run build:data               # regenera deploy/ desde data/ (local, tras scrape o edición)
 npm run verify                   # 32 comprobaciones sobre un escenario de producción
-npx vercel deploy --prod         # publica (o push a master, lo hace deploy.yml)
+npx vercel deploy --prod         # (HISTÓRICO) ya no se despliega en Vercel: ver «Despliegue en VPS»
 ```
 
 `npm run publish:images` sube las imágenes a **Turso** (`asset_remoto`), no a Blob; es
@@ -795,16 +840,13 @@ porque la mitad del contenido del mantenedor NO está en el disco de nadie más 
 
 ### CI en GitHub Actions
 
-El repositorio es **privado y de una organización en plan Hobby**, así que Vercel
-no lo conecta por integración Git. Eso NO impide tener CI: `deploy.yml` ya
-publicaba con un token, y **`ci.yml` valida sin necesitar ningún secreto**.
-
-Dos workflows con trabajos distintos, a propósito:
+Hay **un solo workflow, `ci.yml`**, que valida sin necesitar ningún secreto. No publica nada: el
+despliegue es `scripts/release.sh` en la VPS (antes existía `deploy.yml` con `vercel deploy --prod`; se eliminó).
+Corre con **Node 22**, el mismo que la VPS.
 
 | Workflow | Cuándo | Qué hace |
 |---|---|---|
 | `ci.yml` | todo push (cualquier rama) y cada PR | lint, typecheck, check:shaders, las 3 suites, build y `verify` |
-| `deploy.yml` | solo `master` | los mismos gates + `vercel deploy --prod` con el secret `VERCEL_TOKEN` |
 
 ```bash
 npm run lint      # eslint . — cubre front, scripts, server y scraper
@@ -913,30 +955,114 @@ hay un script por sentido y **tienen reglas que no pueden divergir**:
 
 ## Despliegue en VPS (nginx + base local, sin Turso)
 
-`test.vtuberdex.com` corre en una VPS, no en Vercel. `TURSO_DATABASE_URL` admite una URL `file:`
-(`@libsql/client` abre un SQLite local con el MISMO código), así que no hay rama aparte.
+`vtuberdex.com` y `www.vtuberdex.com` corren en una VPS, no en Vercel. `TURSO_DATABASE_URL` admite una URL `file:`
+(`@libsql/client` abre un SQLite local con el MISMO código), así que no hay rama aparte. (Hubo un `test.vtuberdex.com`;
+se retiró: ya no hay nada con ese nombre en nginx, systemd ni `/var/www`.)
 
-- **Release**: `./scripts/release.sh` hace el build con `VTUBERDEX_STANDALONE=1` (`output: 'standalone'`,
-  opt-in para no afectar a Vercel), lo copia a `~/releases/vtuberdex/<fecha>/` (con `.next/static` y
-  `deploy/data`, que el trazado no copia), apunta `/var/www/test.vtuberdex.com` a él con `ln -sfn` y
-  reinicia el servicio `vtuberdex-test` (`node server.js` en 127.0.0.1:3100). Volver atrás = repuntar el enlace.
-- **nginx**: `/etc/nginx/conf.d/00-a-test.vtuberdex.com.conf` (server_name exacto: gana al regex del multidominio,
-  que solo sirve estáticos). Cachea `/images/` (clave con `?v=`) y `/_next/static/`. **No** usar `alias` hacia
-  el release: `www-data` no lee `/home/madkoding`. Al activarse HTTPS, `ssl-dominios` genera un 443 ESTÁTICO que
-  hay que reemplazar por uno con `proxy_pass`.
-- **Entorno** en `/etc/vtuberdex-test.env` (600): URL `file:` de la base, usuario y hash del mantenedor, sal de likes.
+- **Release**: `./scripts/release.sh` compila con `VTUBERDEX_STANDALONE=1` (`output: 'standalone'`, opt-in para no afectar
+  a Vercel) y `SITE_URL=https://vtuberdex.com` **definida en el build** (la home es estática: sin ella el canonical se
+  congela como `http://localhost:3000`). Deja `/srv/vtuberdex/releases/<fecha>/` con `index.html`, `.well-known/` (legibles)
+  y `app/` (la app, **modo 700**), apunta `/var/www/vtuberdex.com` a él (`ln -sfn`) y reinicia el servicio `vtuberdex`
+  (`node server.js` en 127.0.0.1:3100, `WorkingDirectory=/var/www/vtuberdex.com/app`). Volver atrás = repuntar el enlace.
+- **Por qué `app/` cerrada y el release en `/srv`**: el script `ssl-dominios` de la VPS genera, al emitir un certificado, un
+  bloque 443 que sirve `/var/www/<dominio>` COMO ESTÁTICO; con la app en la raíz quedaban descargables `deploy/data/*.db` y
+  el código compilado. Y `www-data` no atraviesa `/home/madkoding`: el desafío ACME daba 404 (el primer intento de
+  certificado falló por eso). Comprobado: `app/` y la base responden 404 por HTTP y HTTPS.
+- **nginx**: `/etc/nginx/conf.d/00-a-vtuberdex.com.conf` (HTTP; `server_name` exacto gana al regex del multidominio) +
+  `snippets/vtuberdex-{locations,proxy}.conf`. Cachea `/images/` (clave con `?v=`) y `/_next/static/`. **No** servir el
+  release con `alias`/`root` salvo `/.well-known/acme-challenge/`. `www` comparte carpeta (mapa `$dominio_web`).
+- **HTTPS**: lo emite `ssl-dominios` (Let's Encrypt, cada 5 min, cuando el DNS apunta aquí); su 443 es estático y no sirve,
+  así que `/usr/local/sbin/vtuberdex-https` (drop-in `ExecStartPost` de `ssl-dominios.service`) escribe el 443 PROPIO
+  `conf.d/00-b-vtuberdex.com-https.conf` (carga antes y gana) y **amplía el certificado a `www`** si este resuelve a la VPS
+  pero el certificado no lo lleva (ssl-dominios exige un A directo; con CNAME dejaría www sin cubrir). Renueva `certbot.timer`
+  y `renewal-hooks/deploy/nginx-reload` recarga nginx. Vigente hasta 2027-01-03, `certbot renew --dry-run` pasa.
+  Sin HTTPS `navigator.clipboard` no existe (solo en contexto seguro): por eso el botón de copiar tiene respaldo `execCommand`.
+- **DNS**: `vtuberdex.com` y `www` con registros **A** a la IP de la VPS (169.58.75.176). Vercel sigue teniendo el dominio
+  asociado a su proyecto, pero ya no recibe tráfico.
+- **Entorno** en `/etc/vtuberdex.env` (600): URL `file:` de la base, usuario y hash del mantenedor, sal de likes,
+  `SITE_URL`, `VTUBERDEX_VOCES_DIR`.
 - **Base**: `~/data/vtuberdex/turso-local.db` (WAL). `npm run copiar:turso` la rellena desde Turso (una vez; lotes
   de 5 filas en `asset_remoto`, porque Turso cortaba la conexión con lotes grandes de BLOB). `lib/ediciones.mjs`
-  aplica pragmas (WAL, `busy_timeout`, `mmap`) solo para URLs `file:`.
+  aplica pragmas (WAL, `busy_timeout`, `mmap`) solo para URLs `file:`. **Es la única copia de las ediciones** desde que se
+  dejó Turso: producción en Vercel ya no recibe visitas, pero sus cambios previos al corte solo están en la copia de ese día.
 - **Respaldo**: `scripts/respaldo-db.mjs` (`VACUUM INTO`, consistente con WAL) vía `/etc/cron.d/vtuberdex-respaldo`,
   03:30, 7 copias en `~/backups/vtuberdex/`. No copies solo el `.db`: pierdes lo que está en el `-wal`.
 - **Trampa de imports de imagen**: en Next, `import x from './a.webp'` da un OBJETO `{ src }`, no una cadena.
   El mapa del metal se pedía como `/[object Object]` (404) y NUNCA cargaba, sin error visible; vitest sí da
   cadena, por eso ningún test lo vio (`card-material.ts`, `metalEnvUrl`).
+- **Código de donación y certificado**: `VTD-` + **número de dex** (`#016` ⇒ `VTD-016`), no el id interno (que no coincide con
+  lo visible: madKoding es dex 16, id 17; las fichas nuevas tienen ids desde 100001). Los códigos viejos de 6 dígitos se
+  rechazan a propósito (`dexDeCodigo`): leídos como dex apuntarían a OTRA ficha. Si el mantenedor mueve el dex, el código cambia.
+  PayPal: el enlace `ncp/payment/<id>` solo admite `locale.x`/`country.x` (no lleva referencia); el botón copia el código al
+  pulsarlo. Con `PAYPAL_MERCHANT_ID` (lib/donar.ts) el enlace pasa a `paypal.com/donate?business=…&item_number=VTD-016`, que sí lo
+  transporta. Está vacío: hace falta el ID de comerciante de la cuenta.
+- **«← Catálogo» de la ficha** vuelve a la página/filtros donde se estaba: `use-vtuber-search` guarda el querystring en
+  `sessionStorage` (`lib/volver-al-catalogo.ts`).
 - **Medición del libro (VPS, CPU, Chromium + SwiftShader)**: texturas ~46 ms rápida / ~110 ms completa por carta;
-  el pico de 1,3-1,5 s al primer giro es compilación/enlazado de shaders (`getProgramInfoLog`) y `texSubImage2D`,
-  no las texturas. Se probó `debug.checkShaderErrors = false` en producción: solo movió la espera a
-  `getProgramParameter`, sin ganancia medible, y se revirtió. Medir en GPU real antes de tocar más.
+  el pico de 1,3-1,5 s al primer giro es compilación/enlazado de shaders y `texSubImage2D`, no las texturas. Se calientan
+  los shaders (`shader-warmup.tsx`: compilar Y dibujar una vez, que es lo que obliga al primer dibujo). Se probó
+  `debug.checkShaderErrors = false` en producción: solo movió la espera, y se revirtió. Medir en GPU real antes de tocar más.
+
+## Voz de la ficha (Piper + filtro, cola de regeneración)
+
+Cada ficha con historia tiene un clip `<slug>.mp3`: una voz femenina española «de aparato» que dice
+«Nombre. País. Historia.» al entrar a la ficha. Hay un parlantito con mute sobre la carta
+(`components/voice-button.tsx`). **La voz sintética es propia: nunca se clona la de la Pokédex** (personaje comercial).
+
+- **Dónde viven**: `VTUBERDEX_VOCES_DIR` (VPS: `~/data/vtuberdex/voces/`), junto a un `<slug>.txt` con el guion con que
+  se generó. La ruta `app/voces/[slug]/route.js` los sirve (con `Range`: Safari no reproduce `<audio>` sin 206).
+- **Qué se dice** (`lib/voz-guion.mjs`, pura y probada): se saltan las fichas sin historia (3), las de baja grado 1
+  (`deteriorada-*`: su nombre es secreto) y las cuyo TEXTO no está en español; la historia se corta en una frase completa a
+  700 caracteres (111 fichas pasan de eso); NFKC convierte las «letras matemáticas» de algunos nombres.
+  OJO: el facet `languages` de una ficha es el idioma del STREAMER, no el del texto (8 fichas no-`es` tienen historia en español).
+- **Generar**: `npm run voces -- --todas` (lote, ~1,5 h en 4 núcleos; reanudable: salta lo que no cambió comparando el `.txt`),
+  `--slug=x`, `--forzar`, `--seco`, `--limpiar`. Piper: `~/voces/venv`, modelo `es_ES-sharvard-medium` hablante 1 (F),
+  `--noise-scale 0.15` (entonación plana). El filtro es `scripts/voz/pokedex-voz.sh` (altura +30 %, anillo 110 Hz, bitcrush, eco,
+  pitidos). **`sine` de ffmpeg sale a −18 dBFS**: con `volume=0.25` los pitidos quedaban a −30 dB (inaudibles).
+- **Al crear/editar una ficha**: `aplicarYAnotar` (`lib/diario.mjs`) llama a `encolarVocesAfectadas` → `lib/voces-cola.mjs`
+  escribe `<VOCES>/.cola/<id>.json` (un trabajo por ficha). El servicio `vtuberdex-voces` (`scripts/voces-generar.mjs --vigilar`,
+  cada 5 s) lo procesa: regenera si el guion cambió, **retira el clip si la ficha ya no tiene guion** o quedó oculta/en borrador.
+  Piper tarda segundos de CPU y necesita Python: por eso NO corre dentro de la petición del mantenedor. Sin `VTUBERDEX_VOCES_DIR`
+  (Vercel, CI) la cola no hace nada y no falla.
+- **Trampas**: (1) el `id` de una ficha NO es su número de dex (madKoding: dex 16, **id 17**). Una prueba con `PATCH /vtubers/16`
+  sobrescribió la historia de otra ficha; se restauró desde el cambio nº 177 del diario, pero el diario conserva ambos cambios.
+  Resuelve siempre el id por slug y comprueba el nombre ANTES de editar. (2) Durante el lote, una ficha editada puede
+  procesarse con el texto viejo de su instantánea: corre `--todas` una vez más al terminar (idempotente). (3) Un slug
+  renombrado deja su clip viejo huérfano hasta el siguiente `--limpiar`. (4) El autoplay con sonido lo bloquea el navegador
+  sin gesto previo (enlace directo): el botón queda en «Escuchar». Entrando desde el catálogo hay un clic y suena sola.
+- **El servicio** corre desde el CHECKOUT (`~/projects/vtuberdex`, no desde el release): necesita `lib/` y `server/src` en
+  claro, y el `.env` es `/etc/vtuberdex.env` (el mismo del sitio).
+
+## Estadísticas de visitantes (panel de la IP)
+
+El panel de estado del servidor (lo que se ve al entrar por la IP, `/srv/estado`, fuera de este repo; copias de lo que se
+modificó en `~/backups/estado-*`) tiene una sección «Visitantes // vtuberdex.com» alimentada por la propia app. Todo es
+**anónimo y agregado**: no se guarda IP, cookies ni User-Agent. El servidor lee el `User-Agent` de la petición y lo
+reduce a una familia cerrada de navegador y de sistema (`lib/user-agent.mjs`; los robots no cuentan); lo que el cuerpo
+del latido diga de sí mismo (`navegador`, `so`, `fichaId`) se ignora. **Qué ficha se ve**: el cliente manda el slug SOLO
+en `/v/:slug`; el servidor lo valida (`lib/ficha-id.mjs`: publicada, no baja, alias resuelven), lo convierte en id y
+descarta el slug. Se cuentan vistas por id de ficha (ranking mensual) sin cruzarlas con navegador, sistema ni
+dispositivo. El panel pone los nombres al servir y una ficha retirada sale como «Ficha retirada». Un guardia limita a
+600 sesiones nuevas por minuto (no hay IP con la que limitar). Panel: donas, gráfica de 30 días y ranking, no tablas.
+
+- **Cliente** (`components/cliente-stats.tsx` + `lib/telemetria-cliente.ts`, montado en `app/layout.tsx`): un latido cada 20 s
+  (carga, LCP, fluidez, tareas largas, si la GPU es por software…) y un **aviso mínimo de navegación** inmediato al cargar y en cada
+  cambio de página (`usePathname`), con dispositivo y conexión. Respeta «No rastrear» y Global Privacy Control. El latido de 20 s se
+  perdería las navegaciones rápidas catálogo → ficha: por eso el aviso aparte.
+- **En vivo** (`lib/clientes-stats.mjs`, en memoria, estado en `globalThis` porque Next compila cada ruta como entrada distinta):
+  conectados, medianas de rendimiento y repartos. Valida y acota todo campo; claves de listas cerradas. Topes: 5.000 sesiones, un
+  latido cada 5 s y un aviso de navegación cada 2 s por sesión (sin IP no hay otro límite).
+- **Histórico mensual** (`lib/clientes-historial.mjs`, tabla `estadistica_mes(mes, clave, n)` en la base local, así entra en el
+  respaldo): por mes UTC cuenta `visitas` (cargas de página), `dispositivo:*`, `conexion:*` (por visita), `pagina:*` (vistas, contando
+  cada cambio de página), `cruce:dispositivo:pagina` y `pico` de conectados. Se acumula en memoria y se vuelca cada 15 s con un UPSERT
+  que SUMA (el pico usa MAX): al reiniciar el servicio se pierde, como mucho, lo de los últimos 15 s. Si la base falla, lo acumulado
+  se conserva para el siguiente intento. Sin base configurada solo hay histórico en memoria. Empezó a acumular el 2026-10-06.
+- **Entrega al panel**: `GET /api/stats/resumen` (`app/api/stats/resumen/route.js`) exige `X-Estado-Token` (= `VTUBERDEX_STATS_TOKEN`,
+  sin él o con otro responde 404 como si no existiera); lo consulta el nginx del panel (`location = /clientes.json` en
+  `00-multidominio.conf`, token en `snippets/estado-token.conf`, 600 root). Devuelve lo de ahora + `historial` (12 meses).
+- **Panel** (`/srv/estado/{index.html,estado.js,estado.css}`): tarjetas Dispositivo/Página/Conexión de ahora y el histórico mensual
+  (barras apiladas por mes + tabla resumen). Solo muestra los meses con datos y el actual. Su CSP es estricta (`connect-src 'self'`):
+  por eso consulta `clientes.json` del mismo origen y todo texto entra por `textContent`.
 
 ## Verificación antes de decir "listo"
 

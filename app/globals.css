@@ -13,10 +13,11 @@
   --color-dex-ink: #e8ecf5;
   --color-dex-muted: #8b96ad;
   --color-dex-accent: #5eead4;
-  /* Pila local (sin CDN): prioriza tipografías técnicas del sistema. */
-  --font-display: 'Chakra Petch', 'Rajdhani', 'Bahnschrift', 'DIN Alternate', ui-sans-serif, system-ui,
-    -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-  --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Cascadia Mono', 'Roboto Mono', monospace;
+  /* Asul para todo el texto de la interfaz (incluidos los números, antes en monoespaciada);
+     Knewave para los títulos. Las variables las define `next/font` en <html> (app/layout.tsx). */
+  --font-display: var(--font-asul), ui-serif, Georgia, serif;
+  --font-mono: var(--font-asul), ui-serif, Georgia, serif;
+  --font-heading: var(--font-knewave), 'Asul', ui-serif, Georgia, serif;
 }
 
 :root {
@@ -37,6 +38,17 @@ body {
   color: var(--color-dex-ink);
   font-family: var(--font-display);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Títulos: Knewave, que solo tiene peso 400 (una negrita sería sintética). */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  font-weight: 400;
 }
 
 /* Rejilla técnica de fondo, coherente con la estética "terminal" del origen. */
@@ -71,4 +83,26 @@ body {
   background: linear-gradient(90deg, #141924 25%, #1d2432 50%, #141924 75%);
   background-size: 200% 100%;
   animation: dex-shimmer 1.4s linear infinite;
+}
+
+/* El catálogo cabe en una sola pantalla (libro + paginación + pie): solo ahí se compacta el pie,
+   que es compartido con las demás páginas. `[data-catalogo]` lo pone `catalog-page.tsx`. */
+.dex-grid:has([data-catalogo]) footer {
+  margin-top: 0.5rem;
+}
+.dex-grid:has([data-catalogo]) footer nav {
+  padding-block: 0.625rem;
+}
+
+/* Alto que NO es el libro en el catálogo (cabecera + barra + paginación + pie), MEDIDO en 1440x900:
+   17,13 rem sin chips de filtros activos, más un margen. En celular (< md) los valores son otros (ver abajo). */
+:root {
+  --binder-chrome: 17.6rem;
+  --binder-min-width: 22rem;
+}
+@media (max-width: 767px) {
+  :root {
+    --binder-chrome: 26.4rem; /* medido: 26 rem (barra y paginación en dos filas, pie en líneas) */
+    --binder-min-width: 17rem;
+  }
 }

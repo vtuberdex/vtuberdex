@@ -6,8 +6,9 @@
  * 9, dorado para el 10 y negro con filete dorado para la Black Label. Si cambia uno, cambia el
  * otro: el distintivo es lo que el visitante ve cuando la carta aún no ha cargado.
  */
+import { useI18n } from '@/lib/i18n';
 import type { PremiumInfo } from '@/lib/types';
-import { esBlackLabel, esGradoDegradado, leyendaDePremium, textoDeRacha } from '@/lib/premium';
+import { esBlackLabel, esGradoDegradado, leyendaDePremium, nombreDeGrado, rachaDe } from '@/lib/premium';
 
 const ESTILO_POR_GRADO: Record<string, string> = {
   '6': 'border-yellow-700/50 bg-yellow-900/20 text-yellow-200/80',
@@ -28,19 +29,28 @@ const ESTILO_POR_GRADO: Record<string, string> = {
   '1': 'border-stone-700/60 bg-stone-950 text-stone-400',
 };
 
-export function PremiumBadge({ premium, className = '' }: { premium: PremiumInfo; className?: string }) {
-  const racha = textoDeRacha(premium);
+/**
+ * `compacto`: solo el símbolo y la nota (`★ 9.5`, `◆ BL`) para listas densas del mantenedor. La leyenda
+ * completa y la racha siguen disponibles en el `title` (al pasar el ratón) y en el atributo `data-grade`.
+ */
+export function PremiumBadge({ premium, className = '', compacto = false }: { premium: PremiumInfo; className?: string; compacto?: boolean }) {
+  const { t } = useI18n();
+  const meses = rachaDe(premium);
+  const racha = meses > 0 ? t('premium.racha', { n: meses }) : null;
+  const degradada = esGradoDegradado(premium.grade);
+  // El nombre del grado (GEM MINT…) es un término de coleccionismo: no se traduce; solo la marca de «deteriorada».
+  const leyenda = degradada ? `${nombreDeGrado(premium.grade)} ${premium.grade} · ${t('premium.deteriorada')}` : leyendaDePremium(premium);
   const estilo = ESTILO_POR_GRADO[premium.grade] ?? ESTILO_POR_GRADO['8'];
   return (
     <span
       data-testid="premium-badge"
       data-grade={premium.grade}
-      title={`${esGradoDegradado(premium.grade) ? 'Carta deteriorada' : 'Carta premium'} · ${leyendaDePremium(premium)} · ${premium.cert}${racha ? ` · ${racha}` : ''}`}
+      title={`${degradada ? t('premium.cartaDeteriorada') : t('premium.cartaPremium')} · ${leyenda} · ${premium.cert}${racha ? ` · ${racha}` : ''}`}
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em] ${estilo} ${className}`}
     >
       <span aria-hidden>{esBlackLabel(premium.grade) ? '◆' : esGradoDegradado(premium.grade) ? '✕' : '★'}</span>
-      {leyendaDePremium(premium)}
-      {racha && (
+      {compacto ? (esBlackLabel(premium.grade) ? 'BL' : premium.grade) : leyenda}
+      {!compacto && racha && (
         <span data-testid="premium-streak" className="font-semibold normal-case tracking-normal opacity-80">
           · {racha}
         </span>

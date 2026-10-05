@@ -22,6 +22,7 @@
     "sweep:dead-code": "node scripts/sweep-dead-code.mjs",
     "build:data": "node scripts/build-db.mjs",
     "publish:images": "node scripts/publish-images.mjs",
+    "voces": "node scripts/voces-generar.mjs",
     "copiar:turso": "node scripts/copiar-turso.mjs",
     "download:images": "node scripts/descargar-imagenes.mjs",
     "admin:hash": "node scripts/admin-hash.mjs",
