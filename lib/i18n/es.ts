@@ -1,3 +1,7 @@
+import { formulariosEs } from './textos/formularios';
+import { miFichaEs } from './textos/mificha';
+import { nivelesEs } from './textos/niveles';
+import { fichasEs } from './textos/fichas';
 /**
  * Textos de la interfaz en español: la FUENTE de las claves. `en.ts` y `ja.ts` se tipan contra
  * este objeto, así que olvidar una traducción (o dejar una de más) rompe `tsc`.
@@ -74,6 +78,8 @@ export const es = {
   'detalle.fichaCompleta': 'Ficha completa',
   'detalle.fichaBasica': 'Ficha básica',
   'detalle.premiumDesde': 'Premium desde {fecha}',
+  'detalle.sinCorreoTitulo': 'Falta E-Mail',
+  'detalle.sinCorreoAyuda': 'Contacta a {correo}',
   'detalle.historia': 'Su historia',
   'detalle.ocrAyuda': 'Fiabilidad de la lectura OCR del texto impreso en la carta',
 
@@ -176,6 +182,10 @@ export const es = {
   'donar.copiado': 'Copiado ✓',
   'donar.noCopio': 'No se pudo copiar: selecciónalo a mano.',
   'donar.boton': 'Donar con PayPal',
+  ...formulariosEs,
+  ...fichasEs,
+  ...miFichaEs,
+  ...nivelesEs,
 } as const;
 
 export type Mensajes = { [K in keyof typeof es]: string };

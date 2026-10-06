@@ -6,8 +6,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const origen = process.argv[2] ?? `${process.env.HOME}/data/vtuberdex/turso-local.db`;
-const carpeta = process.argv[3] ?? `${process.env.HOME}/backups/vtuberdex`;
+const origen = process.argv[2] || `${process.env.HOME}/data/vtuberdex/turso-local.db`;
+const carpeta = process.argv[3] || `${process.env.HOME}/backups/vtuberdex`;
 const conservar = Number(process.argv[4] ?? 7);
 
 mkdirSync(carpeta, { recursive: true });

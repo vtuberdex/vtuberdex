@@ -18,6 +18,7 @@ import { seedDatabase } from '@/server/src/seed.mjs';
 import {
   SolicitudError,
   TERMINOS_VERSION,
+  confirmarSolicitud,
   crearSolicitud,
   ejecutorSqlite,
   leerSolicitud,
@@ -83,7 +84,6 @@ beforeEach(() => {
 const pedido = (extra: Record<string, unknown> = {}) => ({
   ficha: '/v/gkuro',
   email: 'GKuro@Example.com',
-  prueba: 'dejaré una marca en mi canal',
   phrase: 'Frase nueva',
   aceptaTerminos: true,
   terminosVersion: TERMINOS_VERSION,
@@ -92,6 +92,7 @@ const pedido = (extra: Record<string, unknown> = {}) => ({
 
 const enviar = async (entrada: object, ip = '1.1.1.1') => {
   const { id } = await crearSolicitud(ejecutor, entrada, { tipo: 'modificacion', ip });
+  await confirmarSolicitud(ejecutor, Number(id));
   return (await leerSolicitud(ejecutor, Number(id)))!;
 };
 
@@ -120,7 +121,6 @@ describe('la solicitud de modificación', () => {
   test.each([
     ['sin ningún cambio', { phrase: '' }],
     ['sin ficha', { ficha: '  ' }],
-    ['sin prueba de titularidad', { prueba: '' }],
     ['con correo inválido', { email: 'no-es-correo' }],
     ['con una imagen que no es URL http(s)', { imageUrl: 'javascript:alert(1)' }],
   ])('se rechaza %s', async (_nombre, extra) => {

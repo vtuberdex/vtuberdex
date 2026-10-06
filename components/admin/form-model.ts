@@ -232,7 +232,8 @@ export function toPayload(form: EditorForm): { payload: VtuberPatch; errors: Pay
 
   const payload: VtuberPatch = {
     name: form.name.trim(),
-    slug: slugifyUrl(form.slug),
+    // Vacío (nombre sin letras latinas) = no mandar: el servidor rechaza `slug: ''` y conserva el actual.
+    slug: slugifyUrl(form.slug) || undefined,
     phrase: orNull(form.phrase),
     cardText: orNull(form.cardText),
     themeColor: form.themeColor,

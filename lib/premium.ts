@@ -91,6 +91,17 @@ export const mismoMes = (a: string, b: string = hoy()): boolean => a.slice(0, 7)
 export const esFichaDeteriorada = (cartaOGrado: { premium?: { grade: string } | null } | string | null | undefined): boolean =>
   esFichaDeterioradaServidor(cartaOGrado);
 
+/** Grado con que se pinta una ficha sin correo (degradada, pero SIN placa: no es una carta premium). */
+export const GRADO_SIN_CORREO: PremiumGrade = '4';
+
+/**
+ * El grado con que se DIBUJA la carta: el premium si lo tiene y, si no, el 4 de las fichas sin correo
+ * (`sinCorreo` lo calcula el servidor al leer). Solo afecta al deterioro de la textura; la placa
+ * de acrílico sigue colgando de `card.premium`, así que estas fichas se rompen sin marco.
+ */
+export const gradoDeDibujo = (card: { premium?: { grade: PremiumGrade } | null; sinCorreo?: boolean }): PremiumGrade | undefined =>
+  card.premium?.grade ?? (card.sinCorreo ? GRADO_SIN_CORREO : undefined);
+
 /** Meses seguidos donando (0 = nada que mostrar). Se calcula al pintar: la home es estática y «hoy» cambia. */
 export const rachaDe = (premium: Pick<PremiumInfo, 'grade' | 'since' | 'gradedAt'>, ahora: string = hoy()): number =>
   rachaDeServidor(premium, ahora);

@@ -205,6 +205,15 @@ export function DetailPage({ slug }: { slug: string }) {
                   <span aria-hidden>•</span>
                   <span>{data.hasDetail ? t('detalle.fichaCompleta') : t('detalle.fichaBasica')}</span>
                 </p>
+                {data.sinCorreo && (
+                  <p
+                    className="mt-3 inline-flex flex-wrap items-center gap-x-2 rounded border border-dex-muted/40 bg-black/30 px-2 py-1 text-xs"
+                    data-testid="sin-correo"
+                  >
+                    <strong>{t('detalle.sinCorreoTitulo')}</strong>
+                    <span className="text-dex-muted">({t('detalle.sinCorreoAyuda', { correo: 'madkoding@gmail.com' })})</span>
+                  </p>
+                )}
                 {data.premium && (
                   <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-dex-muted" data-testid="premium-info">
                     <PremiumBadge premium={data.premium} />

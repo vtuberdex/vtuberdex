@@ -221,14 +221,16 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   el Express). Si la ficha no se puede crear (URL repetida, país desconocido) la solicitud sigue pendiente.
 - **«Procesar» una baja NO degrada la ficha**: solo cierra la solicitud. La degradación de la cláusula de salida es un
   paso manual aparte (no está automatizada) y el mantenedor lo avisa.
-- **La inscripción es un formulario de 3 pasos** (`inscripcion-form.tsx`; el estado vive en el padre, así que «Volver» no pierde nada y la
-  validación nativa `required` de cada paso corre antes de avanzar): 1) lo básico y el contacto, 2) tu personaje (avatar y logo como ENLACE,
-  modelo, hashtag, estatura, cumpleaños, país, signo, lore), 3) gustos + términos. Obligatorios todos salvo país y signo. Los textos cortos
-  salen de `CAMPOS_PERFIL` (cliente) y `perfilObligatorio` (`solicitudes.mjs`): al añadir uno, tócalos a la vez. `fichaDesdeInscripcion`
+- **La inscripción es un formulario de 5 pasos** (`inscripcion-form.tsx`; el estado vive en el padre, así que «Volver» no pierde nada y la
+  validación nativa `required` de cada paso corre antes de avanzar): 1) nombre artístico y correo, 2) código del correo, 3) tu ficha
+  (color, idiomas, frase, redes), 4) tu personaje (avatar y logo como ENLACE, modelo, hashtag, estatura, cumpleaños, país, signo, lore),
+  5) gustos + términos. Obligatorios todos salvo país y signo. Los textos cortos
+  salen de `CAMPOS_PERFIL` (cliente) y `perfilObligatorio` (`solicitudes.mjs`): al añadir uno, tócalos a la vez (y `sanearBorrador` los toma de
+  `PERFIL_CAMPOS`, así que el borrador los sigue solo). `fichaDesdeInscripcion`
   mapea estatura/cumpleaños/hashtag/color a sus columnas, el modelador a `artists` y el resto a filas de `profile`.
-- **Modificación de una ficha ya registrada** (`/modificacion`, `components/solicitudes/modificacion-form.tsx`, tipo `modificacion`
-  en la MISMA cola y tabla): misma forma que la inscripción pero solo identifica la ficha (ficha + correo + cómo se comprueba la
-  titularidad, como la baja) y todo lo demás es opcional (en blanco = no cambia; el servidor exige al menos un cambio). Las preguntas
+- **Modificación de una ficha ya registrada** (4 pasos: correo → código → qué cambiar → gustos y envío; la ficha sale del correo, ver más abajo; `/modificacion`, `components/solicitudes/modificacion-form.tsx`, tipo `modificacion`
+  en la MISMA cola y tabla): misma forma que la inscripción pero solo identifica el correo (verificado antes de rellenar; la ficha sale de él: la de la inscripción
+  aprobada con ese correo, se elige si hay varias y se escribe solo si no hay ninguna, como en las del scrape; ya no hay «cómo comprobamos») y todo lo demás es opcional (en blanco = no cambia; el servidor exige al menos un cambio). Las preguntas
   salen de `campos-ficha.ts`, compartido con la inscripción. **Aprobar APLICA** el parche a la ficha existente
   (`server/src/modificacion.mjs`, `prepararModificacion`: lo comparten Express y Next; local escribe con `aplicarParche`, producción
   con `vtuber.editar` del diario, leyendo la ficha del diario ya reproducido): las redes se SUMAN o actualizan por plataforma, los
@@ -250,6 +252,71 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
 - **Antispam**: campo trampa `website`, un solo pendiente por correo y tipo, tope de 5 envíos por red y día. El arte del
   personaje se pide como ENLACE: un formulario público que recibe archivos es una puerta a subir basura.
 - `/api/admin/solicitudes*` sale 404 sin Turso ni proxy local, como el resto del mantenedor.
+- **Registro de rechazos** (`server/src/rechazos.mjs`, tabla `rechazo` en el MISMO ejecutor que `solicitud`): una validación que
+  falla responde 400/409/410 y antes no dejaba rastro (solo los 503 se imprimían), así que nadie sabía dónde se atascaba la gente.
+  `lib/solicitudes.mjs` (`responderRegistrando`) apunta todo 4xx/503 de los formularios públicos: **formulario, código, status y ruta del
+  campo** (`socials.0.url`). **Nunca** correo, contenido, red ni mensaje (puede citar lo escrito); se poda a los 30 días y no lanza jamás.
+  Se ve en el mantenedor, «Envíos rechazados (últimos 7 días)» (`GET /api/admin/solicitudes/rechazos?dias=`, Next y Express). Si añades
+  un formulario público, estrénalo con `responderRegistrando`.
+
+## Correo saliente, verificación de solicitudes y acceso por enlace mágico
+
+**Diseño de los correos**: una sola plantilla (`plantilla()` en `lib/correo.mjs`) con el sistema de diseño de la web
+(`docs/sistema-de-diseno.md`, tokens en `lib/diseno.mjs`). Un color nuevo va primero en `diseno.mjs`; `lib/diseno.test.ts` lo cruza con
+`globals.css` y rechaza cualquier hexadecimal del correo que no sea un token.
+
+La VPS envía correo con su propio **Exim4**, configurado como servidor SOLO DE SALIDA: escucha únicamente en
+`127.0.0.1:25` (no es accesible desde internet, no recibe correo), `disable_ipv6 = true` (el SPF declara solo la IPv4) y firma
+con DKIM (`/etc/exim4/dkim/vtuberdex.com.key`, selector `mail`; macros en `conf.d/main/00_local_macros`). La app le habla por
+SMTP local con nodemailer (`lib/correo.mjs`). Sin `VTUBERDEX_MAIL=smtp` el correo NO sale: el enlace se imprime en la consola del
+servidor (así local y CI funcionan sin servidor de correo). Variables: `VTUBERDEX_MAIL`, `VTUBERDEX_MAIL_FROM`,
+`VTUBERDEX_MAIL_REPLY_TO`, `VTUBERDEX_ADMIN_EMAILS` (por defecto los dos mantenedores). DNS necesario (Cloudflare): SPF, DKIM
+(`mail._domainkey`) y DMARC; sin ellos Gmail marca el correo como spam o lo rechaza.
+
+- **Tokens** (`server/src/verificacion.mjs`, tabla `token_correo` en el MISMO ejecutor que `solicitud`): un solo uso (`UPDATE …
+  WHERE usado = 0 AND expira > ahora` es el cerrojo), 24 h para solicitudes y 15 min para acceso, **solo se guarda el sha256**. El
+  enlace lleva el token en el **fragmento** (`/verificar#t=…`, `/admin#entrar=…`): no llega a nginx ni a los logs. Y se gasta con un
+  **botón (POST)**, no al abrir el enlace: antivirus y clientes de correo abren los enlaces y lo quemarían. La URL sale de
+  `SITE_URL`, nunca de la cabecera `Host`.
+- **Dos formas de demostrar el correo**:
+  · **Inscripción y actualización: el correo se demuestra ANTES de rellenar** (`pedirCodigo` / `verificarCodigo` en `lib/solicitudes.mjs`,
+    rutas `/api/inscripciones|modificaciones/codigo|verificar`). Se manda un CÓDIGO (1 h, un uso; el enlace del correo abre el formulario en el
+    paso 2 con el código puesto, `/inscripcion#t=…`) y se canjea por una credencial que vive solo en memoria del navegador: la **`sesion`**
+    de la inscripción (24 h, se puede usar muchas veces, se gasta al enviar) y el **`permiso`** de la actualización (2 h, un solo envío).
+    El envío final lleva la credencial y **el servidor toma el correo de ella, no del cuerpo** (`crearSolicitud(..., { permiso, propositoPermiso })`):
+    la solicitud nace `pendiente` sin segundo correo. La credencial se MIRA (`correoDelToken`) y se gasta (`consumirToken`) al final, con todo lo
+    demás validado: un error de validación no quema un formulario largo. Sin credencial, `recibirSolicitud` responde 400 `falta_verificacion`.
+    Tope de 1 código/min y 4/día por correo (`envioPermitido`); un código no sirve para otro formulario (propósitos distintos).
+  · **Baja: se envía primero y se confirma después** (la solicitud entra `sin_verificar` y el mantenedor NO la ve; su cola lista `pendiente`).
+    Pasa a `pendiente` al confirmar (`POST /api/verificar`). Reenviar reemplaza la anterior sin confirmar del mismo correo. Tope por correo
+    comprobado **antes** de guardar: crear reemplaza, y un doble clic no puede borrar la solicitud cuyo correo ya va en camino. Si el correo no se
+    puede enviar, la solicitud se descarta (503): nadie podría confirmarla.
+- **BORRADOR de la inscripción** (`server/src/borradores.mjs`, tabla `borrador (email, tipo)`, `PUT /api/inscripciones/borrador`): desde que se
+  valida el código, lo escrito se guarda solo (un instante después de dejar de teclear) atado al correo de la `sesion`. Para retomar: volver a
+  `/inscripcion`, escribir el MISMO correo y un código nuevo; `verificarCodigo` devuelve el borrador y el formulario carga todo y sigue en su paso
+  (3 a 5). **Solo se guarda por lista blanca** (`sanearBorrador`: nunca el correo dentro de `datos`, los términos ni el campo trampa); un
+  borrador por correo; se borra al enviar y a los 60 días sin cambios (se purga al guardar otro). **Antes de verificar el correo no se guarda
+  nada** en el servidor: nombre y correo del paso 1 viven en memoria; si hay un borrador, manda sobre lo recién escrito. El borrador está en la
+  cláusula 4.10 de los términos. Si la sesión caduca, el envío devuelve 410 y el formulario vuelve al paso 1 (el borrador sigue guardado).
+- **La baja es de DOS pasos y no pide ficha ni «cómo comprobamos»** (`baja-form.tsx`): 1) correo + motivo (+ términos) → se envía
+  el token; 2) la persona **pega el código** en la misma página (o pulsa el botón del correo, que va a `/verificar`) y se confirma
+  por `POST /api/verificar`. La ficha SALE DEL CORREO: `fichasDelTitular` busca las inscripciones APROBADAS con ese correo
+  (compara por id de ficha vigente, el slug pudo cambiar). Sin ficha escrita se dan de baja TODAS las de ese correo
+  (`premium: { grade: '1' }` por el diario, actor `baja-verificada`), la solicitud queda `procesada`, se borran los contactos y la
+  respuesta lista los nombres (`fichas`). Con ficha escrita solo se baja esa y solo si es de ese correo. **Las ~785 fichas del
+  scrape no tienen correo guardado**: sin ficha asociada ni escrita la baja queda `pendiente` y la respuesta es `sin_ficha` (el
+  mantenedor tiene el correo y el motivo para escribirle); con ficha escrita que no es del correo, `en_revision`. El campo «Ficha»
+  existe pero escondido y opcional. Cualquier fallo al aplicar también la deja pendiente. Los términos (3.2, 8.1 y 8.9) lo dicen:
+  quien controle ese buzón puede dar de baja las fichas inscritas con él, de forma irreversible. **La modificación tampoco pide
+  prueba de titularidad**: el enlace del correo es la comprobación y el mantenedor revisa igual.
+- **Acceso del mantenedor** (`lib/admin-enlace.mjs`, `POST /api/admin/enlace` y `/enlace/entrar`): pedir el enlace responde SIEMPRE
+  lo mismo y el envío va en segundo plano (ni la respuesta ni el tiempo delatan quién es admin). La sesión es la de siempre
+  (`emitirSesion`) con el correo como usuario, así que el diario dice quién editó. **La UI de `/admin` ya no tiene login por
+  contraseña** (solo correo). El endpoint `POST /api/admin/login` sigue en la ruta de Next y funciona mientras exista
+  `VTUBERDEX_ADMIN_PASSWORD_HASH`: **en producción se cierra quitando esa variable de `/etc/vtuberdex.env`**. El Express local
+  conserva su login por contraseña, pero ya no hay pantalla que lo use.
+- **No desplegar sin DNS**: sin SPF/DKIM/DMARC publicados el correo sale pero Gmail lo descarta o lo manda a spam, y las
+  inscripciones parecerían enviadas sin que nadie pueda confirmarlas.
 
 ## Cartas premium: grado, placa de acrílico y mantenedor
 
@@ -343,6 +410,32 @@ calcula ni «procesar» una baja los aplica solo**.
   llegue a la ficha (URL, vecino, buscador) es una fuga del nombre.
 - Para ver el resultado sin WebGL ni base de datos: bundlear `drawCardFront` con `esbuild --alias:@=.` y dibujar los grados en
   Chromium (`/opt/pw-browsers`); es lo que se hizo para calibrar `DETERIORO`.
+
+## Experiencia, niveles y puntos de habilidad («Mi ficha»)
+
+- **La experiencia es función de los likes** (`server/src/experiencia.mjs`, `experienciaConLikes`): la barra (`current/max`) se
+  vacía al subir de nivel y cada nivel pide más que el anterior (`BASE_NIVEL + PASO_NIVEL × (n-1)`, nunca menos). **El contador
+  TOTAL no se reinicia** (`total`: lo que valían los niveles que la ficha ya traía + su barra + los likes; como en Ragnarok): sale
+  en `experience.total` y se ve como «EXP total» en `StatBars`.
+- **Puntos de habilidad**: cada nivel GANADO con likes (`nivelesGanados`, desde el nivel que traía la ficha, no el del scrape) da
+  `PUNTOS_POR_NIVEL` = 3. Cada punto sube un rango (`RANGO_MAXIMO` = 5) de una habilidad con nombre. Los disponibles NO se guardan:
+  `ganados − repartidos` (`server/src/mi-ficha.mjs`, tabla `punto_habilidad` por **nombre** de habilidad, no por id: el mantenedor
+  reescribe las filas). Gastar es UNA sentencia condicional (dos clics a la vez no gastan un punto inexistente). El rango sale
+  público en la ficha (`skills[].rank`, insignia en `SkillList`).
+- **Aviso de subida de nivel** (`lib/mi-ficha.mjs`, `avisarSubidaDeNivel`, llamado en segundo plano desde el POST del like):
+  `reclamarAvisoDeNivel` (tabla `aviso_nivel`) es un UPSERT condicional, así que solo UN like gana el derecho a mandar el correo; si
+  el envío falla se suelta y el siguiente like lo reintenta. Va al correo de la inscripción APROBADA (`correoDeLaFicha`); las fichas
+  del scrape no tienen correo: suben de nivel sin aviso.
+- **Enlace mágico** (propósito `ficha` en `token_correo`): vale 7 días y **NO se gasta** (se MIRA con `correoDelToken`), a
+  diferencia del resto: los puntos se reparten en varias visitas. Lleva el token en el fragmento (`/mi-ficha#t=…`) y la página lo deja
+  en la barra para que recargar funcione. Sin enlace, `/mi-ficha` pide el correo y responde siempre igual (`pedirEnlaceDeMiFicha`).
+  Rutas: `POST /api/mi-ficha`, `/enlace`, `/puntos`. Textos en `lib/i18n/textos/mificha.ts` (es/en/ja); el correo va en español.
+
+- **Página explicativa `/niveles`** (enlazada en el pie, trilingüe en `lib/i18n/textos/niveles.ts`, `components/niveles/niveles-contenido.tsx`): las cifras
+  y la tabla de niveles salen de `server/src/experiencia.mjs` (`umbralDeNivel`, `XP_POR_LIKE`…), no de números escritos en el texto: si cambias la
+  regla, la página se corrige sola (y `niveles-contenido.test.tsx` lo comprueba). Sus «capturas» NO son PNG: `components/niveles/graficos.tsx` dibuja
+  los gráficos en SVG desde `experienciaConLikes`/`umbralDeNivel` y las maquetas son los componentes REALES (`StatBars`, `SkillList`, `MiFichaVista`
+  — la pantalla de «Mi ficha» sin lógica) con datos de ejemplo, `inert` y marcadas «Ejemplo»: no se desfasan al cambiar el diseño y se traducen solas.
 
 ## Idiomas (es / en / ja) y traducción de la historia
 

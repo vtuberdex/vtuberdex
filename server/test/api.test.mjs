@@ -463,7 +463,7 @@ test('OPTIONS responde 204 para preflight', async () => {
 
 test('una solicitud de modificación aprobada se aplica a la ficha existente', async () => {
   const { DatabaseSync } = await import('node:sqlite');
-  const { crearSolicitud, ejecutorSqlite, TERMINOS_VERSION } = await import('../src/solicitudes.mjs');
+  const { confirmarSolicitud, crearSolicitud, ejecutorSqlite, TERMINOS_VERSION } = await import('../src/solicitudes.mjs');
   // La cola es el MISMO archivo que abre el Express (`solicitudes.db`, junto a la base): así llegan
   // las solicitudes desde los formularios públicos de Next.
   const cola = new DatabaseSync(path.join(path.dirname(dbPath), 'solicitudes.db'));
@@ -472,7 +472,6 @@ test('una solicitud de modificación aprobada se aplica a la ficha existente', a
     {
       ficha: '/v/drawchii',
       email: 'drawchii@example.com',
-      prueba: 'una marca en mi canal',
       height: '1,70 m',
       favoriteAnime: 'Frieren',
       imageUrl: 'https://x.test/avatar.png',
@@ -481,6 +480,7 @@ test('una solicitud de modificación aprobada se aplica a la ficha existente', a
     },
     { tipo: 'modificacion', ip: '9.9.9.9' },
   );
+  await confirmarSolicitud(ejecutorSqlite(cola), id);
   cola.close();
   const headers = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
 
@@ -506,9 +506,10 @@ test('una solicitud de modificación aprobada se aplica a la ficha existente', a
   const cola2 = new DatabaseSync(path.join(path.dirname(dbPath), 'solicitudes.db'));
   const otra = await crearSolicitud(
     ejecutorSqlite(cola2),
-    { ficha: '/v/nadie', email: 'x@example.com', prueba: 'una marca en mi canal', height: '1', aceptaTerminos: true, terminosVersion: TERMINOS_VERSION },
+    { ficha: '/v/nadie', email: 'x@example.com', height: '1', aceptaTerminos: true, terminosVersion: TERMINOS_VERSION },
     { tipo: 'modificacion', ip: '9.9.9.9' },
   );
+  await confirmarSolicitud(ejecutorSqlite(cola2), otra.id);
   cola2.close();
   const fallida = await fetch(`${baseUrl}/api/admin/solicitudes/${otra.id}/resolver`, { method: 'POST', headers, body: JSON.stringify({ accion: 'aprobar' }) });
   assert.equal(fallida.status, 404);

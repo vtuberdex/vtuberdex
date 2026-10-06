@@ -21,6 +21,9 @@ import { dbConDiario } from '../../../../lib/diario.mjs';
 import { conExperiencia, contarLikes } from '../../../../lib/likes.mjs';
 import { aplicarImagenesDelMantenedor, reemplazosDelMantenedor } from '../../../../lib/ediciones.mjs';
 import { KINDS_GESTIONABLES } from '../../../../lib/carpetas.mjs';
+import { ejecutorDeSolicitudes } from '../../../../lib/solicitudes.mjs';
+import { marcarSinCorreo } from '../../../../lib/sin-correo.mjs';
+import { claveDeHabilidad, leerRangos } from '../../../../server/src/mi-ficha.mjs';
 import { getNeighbors, getVtuberBySlug } from '../../../../server/src/search.mjs';
 
 export const dynamic = 'force-dynamic';
@@ -57,8 +60,16 @@ export async function GET(_request, { params }) {
   } catch (error) {
     console.error(`[likes] la ficha ${slug} sale sin likes: ${error.message}`);
   }
+  // Rango de cada habilidad (los puntos que su titular repartió al subir de nivel). Si el almacén falla, la
+  // ficha sale sin rangos: es un adorno, no puede tumbarla.
+  try {
+    const rangos = await leerRangos(await ejecutorDeSolicitudes(), card.id);
+    if (rangos.size) conLikes = { ...conLikes, skills: conLikes.skills.map((s) => ({ ...s, rank: rangos.get(claveDeHabilidad(s)) ?? 0 })) };
+  } catch (error) {
+    console.error(`[mi-ficha] la ficha ${slug} sale sin rangos: ${error.message}`);
+  }
   return Response.json(
-    { ...conLikes, neighbors: getNeighbors(db, card.dexNumber) },
+    { ...(await marcarSinCorreo(db, [conLikes]))[0], neighbors: getNeighbors(db, card.dexNumber) },
     { headers: { 'cache-control': CACHE_PUBLICA } },
   );
 }

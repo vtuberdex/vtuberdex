@@ -12,7 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import { openDatabase } from '@/server/src/db/index.mjs';
 import { candidatasParaReferencia, cambiosDeModificacion, vistaPrevia } from '@/server/src/solicitud-vista.mjs';
 import { seedDatabase } from '@/server/src/seed.mjs';
-import { TERMINOS_VERSION, crearSolicitud, ejecutorSqlite, leerSolicitud } from '@/server/src/solicitudes.mjs';
+import { TERMINOS_VERSION, confirmarSolicitud, crearSolicitud, ejecutorSqlite, leerSolicitud } from '@/server/src/solicitudes.mjs';
 
 const pais = (slug: string, name: string) => ({ slug, name, flag: '🏳️' });
 const DATASET = {
@@ -53,7 +53,8 @@ beforeEach(() => {
 let n = 0;
 const base = { aceptaTerminos: true, terminosVersion: TERMINOS_VERSION };
 const mod = async (extra: Record<string, unknown>) => {
-  const { id } = await crearSolicitud(ejecutor, { ficha: '/v/gkuro', email: `m${(n += 1)}@example.com`, prueba: 'marca en mi canal', ...base, ...extra }, { tipo: 'modificacion', ip: '1.1.1.1' });
+  const { id } = await crearSolicitud(ejecutor, { ficha: '/v/gkuro', email: `m${(n += 1)}@example.com`, ...base, ...extra }, { tipo: 'modificacion', ip: '1.1.1.1' });
+  await confirmarSolicitud(ejecutor, Number(id));
   return (await leerSolicitud(ejecutor, Number(id)))!;
 };
 const inscripcion = async (extra: Record<string, unknown> = {}) => {
@@ -68,10 +69,12 @@ const inscripcion = async (extra: Record<string, unknown> = {}) => {
     },
     { tipo: 'inscripcion', ip: '2.2.2.2' },
   );
+  await confirmarSolicitud(ejecutor, Number(id));
   return (await leerSolicitud(ejecutor, Number(id)))!;
 };
 const baja = async (extra: Record<string, unknown> = {}) => {
   const { id } = await crearSolicitud(ejecutor, { ficha: '/v/gkuro', email: `b${(n += 1)}@example.com`, prueba: 'soy el titular', motivo: 'ya no streameo', ...base, ...extra }, { tipo: 'baja', ip: '3.3.3.3' });
+  await confirmarSolicitud(ejecutor, Number(id));
   return (await leerSolicitud(ejecutor, Number(id)))!;
 };
 const total = () => (db.prepare('SELECT COUNT(*) n FROM vtuber').get() as { n: number }).n;

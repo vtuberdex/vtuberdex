@@ -54,6 +54,7 @@ import { cardFragmentShader, cardVertexShader, glowFragmentShader, glowVertexSha
 import { iconosDeFaccion } from '@/components/card-texture/facciones';
 import type { ColorPredominante } from '@/components/card-texture/predominante';
 import { refuerzoDeGrado } from '@/components/premium-boost';
+import { gradoDeDibujo } from '@/lib/premium';
 import { anclar, generarTexturas, type TexturasDeCarta } from '@/components/card-texture/fabrica';
 
 /** Proporción real de una carta coleccionable (5x7 pulgadas -> 1.4). */
@@ -208,7 +209,7 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
   } = options;
   const shared = useContext(CardEnvContext);
   /** Una carta gradeada refuerza su holografía (`PREMIUM.boost`); una normal queda en 1 en todo. */
-  const boost = useMemo(() => refuerzoDeGrado(card.premium?.grade), [card.premium?.grade]);
+  const boost = useMemo(() => refuerzoDeGrado(gradoDeDibujo(card)), [card.premium?.grade, card.sinCorreo]);
   const [textures, setTextures] = useState<CardTextures | null>(null);
   const texturasActuales = useRef<CardTextures | null>(null);
   const palette = useMemo(() => cardPalette(card.themeColor, card.secondaryColor), [card.themeColor, card.secondaryColor]);

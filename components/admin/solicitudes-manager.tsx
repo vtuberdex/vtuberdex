@@ -18,12 +18,13 @@
  *     qué ficha es y, en una modificación, qué cambia (antes → después). Si la ficha no se encuentra, se ELIGE a mano;
  *   · rechazar pide confirmación (borra el contacto y no se deshace).
  *
- * Aquí SÍ se ve el contacto confidencial (correo, nombre civil): es para lo que existe. Se borra
+ * Aquí SÍ se ve el contacto confidencial (correo): es para lo que existe. Se borra
  * solo al cerrar una baja o rechazar una solicitud.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { api, type FichaResumen, type SolicitudAdmin, type VistaPreviaSolicitud } from '@/lib/api';
+import { SocialIcon } from '@/components/social-icon';
+import { api, type FichaResumen, type ResumenRechazos, type SolicitudAdmin, type VistaPreviaSolicitud } from '@/lib/api';
 import { haceCuanto } from '@/lib/tiempo-relativo';
 import { ghostButton, inputClass, primaryButton } from '@/components/admin/ui';
 
@@ -231,11 +232,71 @@ function Redes({ s }: { s: SolicitudAdmin }) {
       {redes.map((r, i) => (
         <li key={i}>
           <a href={r.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full border border-dex-line px-3 py-1 text-xs text-dex-accent hover:bg-dex-accent/10">
-            {r.platform} <span aria-hidden>↗</span>
+            <SocialIcon platform={r.platform} url={r.url} /> {r.platform} <span aria-hidden>↗</span>
           </a>
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Rechazos de los formularios públicos de los últimos 7 días: qué formulario, qué código y qué campo. Sirve
+ * para saber dónde se atasca la gente (una validación que falla no deja otro rastro). No lleva correos ni
+ * contenido. Se pide al abrirlo, no al montar la cola.
+ */
+export function RechazosPanel({ token }: { token: string }) {
+  const [datos, setDatos] = useState<ResumenRechazos | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const abrir = (abierto: boolean) => {
+    if (!abierto || datos) return;
+    api
+      .rechazosDeSolicitudes(token, 7)
+      .then(setDatos)
+      .catch((causa) => setError(causa instanceof Error ? causa.message : 'No se pudo leer el resumen'));
+  };
+  return (
+    <details className="rounded-xl border border-dex-line bg-dex-panel/50 px-4 py-2 text-sm" data-testid="rechazos-panel" onToggle={(e) => abrir(e.currentTarget.open)}>
+      <summary className="cursor-pointer text-dex-muted hover:text-dex-ink">Envíos rechazados (últimos 7 días)</summary>
+      <div className="mt-3 space-y-3">
+        {error && <p className="text-rose-300">{error}</p>}
+        {!error && !datos && <p className="text-dex-muted">Cargando…</p>}
+        {datos && datos.total === 0 && <p className="text-dex-muted">Ningún rechazo registrado: nada se atascó.</p>}
+        {datos && datos.total > 0 && (
+          <>
+            <p className="text-xs text-dex-muted">
+              {datos.total} en total. Solo se guarda el formulario, el código de error y el campo: nunca el correo ni lo escrito.
+            </p>
+            <table className="w-full text-left text-xs">
+              <thead className="text-dex-muted">
+                <tr><th className="py-1 pr-3 font-normal">Formulario</th><th className="pr-3 font-normal">Código</th><th className="text-right font-normal">Veces</th></tr>
+              </thead>
+              <tbody>
+                {datos.porCodigo.map((f) => (
+                  <tr key={`${f.formulario}/${f.codigo}`} className="border-t border-dex-line/60">
+                    <td className="py-1 pr-3 font-mono">{f.formulario}</td>
+                    <td className="pr-3 font-mono">{f.codigo} <span className="text-dex-muted">({f.status})</span></td>
+                    <td className="text-right font-mono">{f.n}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {datos.porCampo.length > 0 && (
+              <div>
+                <p className="mb-1 text-xs text-dex-muted">Campos que fallaron más</p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {datos.porCampo.slice(0, 12).map((c) => (
+                    <li key={`${c.formulario}/${c.campo}`} className="rounded-full border border-dex-line px-2 py-0.5 font-mono text-[11px]">
+                      {c.formulario} · {c.campo} · {c.n}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -350,6 +411,7 @@ export function SolicitudesManager({
 
   return (
     <section className="space-y-4" data-testid="solicitudes-manager">
+      <RechazosPanel token={token} />
       <header className="space-y-3">
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Estado de las solicitudes">
           {ESTADOS.map((f) => (
@@ -570,7 +632,6 @@ export function SolicitudesManager({
                     <Seccion titulo="Quién la pide">
                       <dl className="grid gap-2">
                         <Dato k="Ficha que escribió" v={texto(seleccionada.datos.ficha)} ancho />
-                        <Dato k="Comprobación de titularidad" v={texto(seleccionada.datos.prueba)} ancho />
                         <Dato k="Nota de quien la envía" v={texto(seleccionada.datos.nota)} ancho />
                       </dl>
                     </Seccion>
@@ -587,7 +648,6 @@ export function SolicitudesManager({
                   <Seccion titulo="La baja">
                     <dl className="grid gap-2">
                       <Dato k="Ficha que escribió" v={texto(seleccionada.datos.ficha)} ancho />
-                      <Dato k="Comprobación de titularidad" v={texto(seleccionada.datos.prueba)} ancho />
                       <Dato k="Motivo" v={texto(seleccionada.datos.motivo)} ancho />
                     </dl>
                     {vista?.ficha && (

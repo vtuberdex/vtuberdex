@@ -10,7 +10,7 @@ export interface StatBarsProps {
   stats: StatRow[];
   palette: { accent: string; secondary: string };
   level: number | null;
-  experience: { current: number | null; max: number | null } | null;
+  experience: { current: number | null; max: number | null; total?: number } | null;
 }
 
 /** Máximos de referencia para escalar las barras (los datos del origen son 0-400). */
@@ -61,6 +61,12 @@ export function StatBars({ stats, palette, level, experience }: StatBarsProps) {
           >
             <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${expPercent}%`, background: palette.accent }} />
           </div>
+          {typeof experience.total === 'number' && (
+            <p className="mt-1.5 flex justify-between text-[11px] uppercase tracking-[0.12em] text-dex-muted" data-testid="exp-total">
+              <span>{t('atributos.expTotal')}</span>
+              <span className="font-mono">{experience.total.toLocaleString(locale)}</span>
+            </p>
+          )}
         </div>
       )}
 

@@ -33,7 +33,7 @@ import type { VtuberCard } from '@/lib/types';
 import { TEXTURAS } from '@/components/card3d-config';
 import { CARD_TEXTURE_FULL_WIDTH } from './dimensiones';
 import { drawCardLayers } from './componer';
-import { esFichaDeteriorada } from '@/lib/premium';
+import { esFichaDeteriorada, gradoDeDibujo } from '@/lib/premium';
 import { deteriorarArte, deteriorarCabecera, planDeCarta, tarjetaParaTitulo } from './deterioro';
 import { drawSurfaceLayer } from './capa-superficie';
 import { drawCharacterLayer } from './capa-personaje';
@@ -276,7 +276,7 @@ let pixelesEnCache = 0;
  * URLs porque `buscarEnCache` compara prefijo (`id|`) y sufijo (URLs) para encontrar otro ancho.
  */
 const claveDe = (card: VtuberCard, width: number) => `${card.id}|${width}|${gradoDeCarta(card)}|${urlsDeCarta(card).join('|')}`;
-const gradoDeCarta = (card: VtuberCard) => card.premium?.grade ?? '';
+const gradoDeCarta = (card: VtuberCard) => gradoDeDibujo(card) ?? '';
 
 const pixelesDe = (t: TexturasDeCarta) =>
   [...t.layers, t.edge, t.logoMask, t.logoSticker].reduce((suma, c) => suma + c.width * c.height, 0);

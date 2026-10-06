@@ -136,8 +136,15 @@ export const adminListQuerySchema = z.object({
   status: z.enum(['all', 'published', 'draft', 'hidden']).optional().default('all'),
   /** Solo las cartas premium: la pestaña «Premium» del mantenedor lista las que ya existen. */
   premium: z.enum(['1', 'true']).optional(),
+  /** `con` / `sin`: solo las fichas que tienen (o no) un correo asociado. */
+  correo: z.enum(['con', 'sin']).optional(),
   page: z.coerce.number().int().min(1).max(10_000).optional().default(1),
   perPage: z.coerce.number().int().min(1).max(100).optional().default(40),
+});
+
+/** Cuerpo de `PUT /admin/vtubers/:id/correo`: vacío o `null` quita el correo. */
+export const fichaCorreoSchema = z.object({
+  email: z.string().trim().max(200).nullable(),
 });
 
 export const loginSchema = z.object({

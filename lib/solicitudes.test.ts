@@ -7,16 +7,18 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { beforeEach, describe, expect, test } from 'vitest';
 
-import { recibirSolicitud } from '@/lib/solicitudes.mjs';
+import { pedirCodigo, recibirSolicitud } from '@/lib/solicitudes.mjs';
 import { CLAUSULAS, contarPalabras } from '@/lib/terminos';
 import { vtuberCreateSchema } from '@/server/src/validation.mjs';
 import {
   MAX_POR_RED_Y_DIA,
   SolicitudError,
   TERMINOS_VERSION,
+  confirmarSolicitud,
   crearSolicitud,
   ejecutorSqlite,
   fichaDesdeInscripcion,
+  fijarCorreoDeFicha,
   leerSolicitud,
   listarSolicitudes,
   resolverSolicitud,
@@ -30,7 +32,6 @@ beforeEach(() => {
 const inscripcion = (extra: Record<string, unknown> = {}) => ({
   name: 'Luna Test',
   email: 'Luna@Example.com',
-  realName: 'Persona Real',
   country: 'chile',
   languages: ['es'],
   phrase: 'Hola',
@@ -56,9 +57,7 @@ const inscripcion = (extra: Record<string, unknown> = {}) => ({
 });
 
 const baja = (extra: Record<string, unknown> = {}) => ({
-  ficha: '/v/luna-test',
   email: 'luna@example.com',
-  prueba: 'dejaré una marca en mi canal',
   aceptaTerminos: true,
   terminosVersion: TERMINOS_VERSION,
   ...extra,
@@ -66,6 +65,8 @@ const baja = (extra: Record<string, unknown> = {}) => ({
 
 const enviar = async (entrada: object, tipo: 'inscripcion' | 'baja' = 'inscripcion', ip = '1.1.1.1') => {
   const resultado = await crearSolicitud(ejecutor, entrada, { tipo, ip });
+  // Entra `sin_verificar`; la cola la ve solo tras confirmar el correo (lo prueban los tests de verificación).
+  if (resultado.id) await confirmarSolicitud(ejecutor, resultado.id);
   // `id` es `null` solo en el envío descartado por el campo trampa, que tiene su propia prueba.
   return { ...resultado, id: resultado.id ?? 0 };
 };
@@ -108,10 +109,10 @@ describe('términos obligatorios', () => {
 });
 
 describe('confidencialidad', () => {
-  test('el correo y el nombre civil van al contacto, no a los datos públicos', async () => {
+  test('el correo va al contacto, no a los datos públicos', async () => {
     const { id } = await enviar(inscripcion());
     const guardada = await leerSolicitud(ejecutor, id);
-    expect(guardada?.contacto).toEqual({ email: 'luna@example.com', realName: 'Persona Real' });
+    expect(guardada?.contacto).toEqual({ email: 'luna@example.com' });
     expect(JSON.stringify(guardada?.datos)).not.toMatch(/luna@example\.com|Persona Real/);
     expect(guardada?.datos).not.toHaveProperty('aceptaTerminos');
   });
@@ -168,9 +169,10 @@ describe('validación', () => {
     }
   });
 
-  test('la baja exige indicar la ficha y cómo comprobar la titularidad', async () => {
-    expect((await rechazo(enviar(baja({ ficha: '' }), 'baja'))).status).toBe(400);
-    expect((await rechazo(enviar(baja({ prueba: '' }), 'baja'))).status).toBe(400);
+  test('la baja solo exige el correo: ni la ficha ni una prueba de titularidad', async () => {
+    const sola = await enviar(baja(), 'baja');
+    expect((await leerSolicitud(ejecutor, sola.id))?.datos).not.toHaveProperty('prueba');
+    expect((await rechazo(enviar(baja({ email: 'no-es-correo' }), 'baja'))).status).toBe(400);
   });
 
   test('el campo trampa descarta el envío sin guardar nada y sin avisar', async () => {
@@ -231,23 +233,61 @@ describe('POST público', () => {
     });
 
   test('201 con acuse que no devuelve lo guardado', async () => {
-    const respuesta = await recibirSolicitud(peticion(inscripcion()), 'inscripcion', ejecutor);
+    await fijarCorreoDeFicha(ejecutor, 1, 'luna@example.com');
+    const respuesta = await recibirSolicitud(peticion(baja()), 'baja', ejecutor);
     expect(respuesta.status).toBe(201);
     const cuerpo = await respuesta.json();
-    expect(cuerpo).toMatchObject({ ok: true, estado: 'pendiente' });
+    expect(cuerpo).toMatchObject({ ok: true, estado: 'sin_verificar' });
     expect(JSON.stringify(cuerpo)).not.toContain('example.com');
     expect(respuesta.headers.get('cache-control')).toBe('no-store');
   });
 
   test('400 sin aceptar términos, con el motivo', async () => {
-    const respuesta = await recibirSolicitud(peticion(inscripcion({ aceptaTerminos: false })), 'inscripcion', ejecutor);
+    await fijarCorreoDeFicha(ejecutor, 1, 'luna@example.com');
+    const respuesta = await recibirSolicitud(peticion(baja({ aceptaTerminos: false })), 'baja', ejecutor);
     expect(respuesta.status).toBe(400);
     expect((await respuesta.json()).detail).toMatch(/términos/);
   });
 
+  test('una baja con un correo sin ficha se rechaza (404) y manda a hablar con un administrador', async () => {
+    const respuesta = await recibirSolicitud(peticion(baja({ email: 'nadie@example.com' })), 'baja', ejecutor);
+    expect(respuesta.status).toBe(404);
+    const cuerpo = await respuesta.json();
+    expect(cuerpo.error).toBe('correo_no_registrado');
+    expect(cuerpo.detail).toMatch(/administradores/);
+    expect(await listarSolicitudes(ejecutor, { estado: 'todas' })).toMatchObject({ items: [] });
+  });
+
+  test('pedir el código de una modificación con un correo sin ficha se rechaza; con ficha, se manda', async () => {
+    const codigo = (email: string) =>
+      pedirCodigo(
+        new Request('http://localhost/api/modificaciones/codigo', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', host: 'localhost' },
+          body: JSON.stringify({ email }),
+        }),
+        'modificacion',
+        ejecutor,
+      );
+    const sin = await codigo('nadie@example.com');
+    expect(sin.status).toBe(404);
+    expect((await sin.json()).error).toBe('correo_no_registrado');
+    await fijarCorreoDeFicha(ejecutor, 1, 'luna@example.com');
+    expect((await codigo('luna@example.com')).status).toBe(200);
+  });
+
+  test('la inscripción y los cambios NO se aceptan sin la credencial del correo verificado', async () => {
+    for (const tipo of ['inscripcion', 'modificacion'] as const) {
+      const respuesta = await recibirSolicitud(peticion(inscripcion()), tipo, ejecutor);
+      expect(respuesta.status).toBe(400);
+      expect((await respuesta.json()).error).toBe('falta_verificacion');
+    }
+    expect(await listarSolicitudes(ejecutor, { estado: 'todas' })).toMatchObject({ items: [] });
+  });
+
   test('400 con cuerpo que no es JSON y 403 con origen ajeno', async () => {
     expect((await recibirSolicitud(peticion('no json'), 'inscripcion', ejecutor)).status).toBe(400);
-    const ajeno = await recibirSolicitud(peticion(inscripcion(), { origin: 'https://malo.example' }), 'inscripcion', ejecutor);
+    const ajeno = await recibirSolicitud(peticion(baja(), { origin: 'https://malo.example' }), 'baja', ejecutor);
     expect(ajeno.status).toBe(403);
   });
 });

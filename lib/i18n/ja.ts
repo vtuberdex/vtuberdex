@@ -1,3 +1,7 @@
+import { formulariosJa } from './textos/formularios';
+import { miFichaJa } from './textos/mificha';
+import { nivelesJa } from './textos/niveles';
+import { fichasJa } from './textos/fichas';
 import type { Mensajes } from './es';
 
 export const ja: Mensajes = {
@@ -68,6 +72,8 @@ export const ja: Mensajes = {
   'detalle.sinPais': '国が未登録',
   'detalle.fichaCompleta': '詳細プロフィール',
   'detalle.fichaBasica': '基本プロフィール',
+  'detalle.sinCorreoTitulo': 'メールアドレス未登録',
+  'detalle.sinCorreoAyuda': '{correo} までご連絡ください',
   'detalle.premiumDesde': '{fecha}からプレミアム',
   'detalle.historia': 'ストーリー',
   'detalle.ocrAyuda': 'カードに印刷された文字のOCR読み取りの信頼度',
@@ -171,4 +177,8 @@ export const ja: Mensajes = {
   'donar.copiado': 'コピーしました ✓',
   'donar.noCopio': 'コピーできません。手動で選択してください。',
   'donar.boton': 'PayPalで寄付',
+  ...formulariosJa,
+  ...fichasJa,
+  ...miFichaJa,
+  ...nivelesJa,
 };

@@ -18,6 +18,20 @@
  * El primer nivel pide lo que ya dice la ficha (`max`, o 100 si no tiene); desde ahí cada nivel
  * pide `BASE_NIVEL + PASO_NIVEL x (nivel - 1)`, y nunca MENOS que el anterior: una ficha del
  * scrape con `max = 500` no puede bajar a 250 al subir de nivel.
+ *
+ * EL CONTADOR TOTAL NO SE BORRA (como en Ragnarok Online)
+ * -------------------------------------------------------
+ * La barra se vacía al subir de nivel (`current`), pero `total` es la experiencia ACUMULADA de toda
+ * la vida de la ficha: lo que ya valían los niveles anteriores según la curva, más lo de la barra,
+ * más los likes. Nunca baja y no se reinicia: es lo que la persona ve crecer aunque la barra vuelva
+ * a cero. Es otra función de los mismos datos, no un segundo contador guardado.
+ *
+ * PUNTOS DE HABILIDAD
+ * -------------------
+ * Cada nivel que la ficha GANA con likes da `PUNTOS_POR_NIVEL` puntos para subir sus habilidades
+ * (`nivelesGanados`). Se cuentan desde el nivel que traía la ficha (el del scrape o el del
+ * mantenedor): las 785 fichas no nacen con cientos de puntos por un nivel que no ganaron aquí.
+ * Cuántos se gastaron y en qué vive en `server/src/mi-ficha.mjs`.
  */
 
 /** Puntos de experiencia por like. */
@@ -26,6 +40,10 @@ export const XP_POR_LIKE = 10;
 export const BASE_NIVEL = 100;
 /** Cuánto más pide cada nivel que el anterior. */
 export const PASO_NIVEL = 50;
+/** Puntos de habilidad que da cada nivel ganado. */
+export const PUNTOS_POR_NIVEL = 3;
+/** Rango máximo de una habilidad: con 3 puntos por nivel, 5 rangos se alcanzan sin que sea eterno ni trivial. */
+export const RANGO_MAXIMO = 5;
 /** Tope de niveles por cálculo: corta cualquier entrada absurda (`max` ínfimo, likes enormes). */
 const MAX_NIVELES_POR_CALCULO = 100_000;
 
@@ -41,17 +59,22 @@ const entero = (valor, porDefecto) => (Number.isFinite(Number(valor)) && valor !
  *
  * @param {{ level?: number|null, current?: number|null, max?: number|null }} base
  * @param {number} likes
- * @returns {{ level: number, current: number, max: number, likes: number, xpPorLike: number }}
+ * @returns {{ level: number, current: number, max: number, total: number, nivelesGanados: number, likes: number, xpPorLike: number }}
  */
 export function experienciaConLikes(base, likes) {
   const totalLikes = Math.max(0, entero(likes, 0));
   let nivel = Math.max(1, entero(base?.level, 1));
+  const nivelBase = nivel;
   let max = Math.max(1, entero(base?.max, 0) || umbralDeNivel(nivel));
-  let actual = Math.max(0, entero(base?.current, 0)) + totalLikes * XP_POR_LIKE;
+  const actualBase = Math.max(0, entero(base?.current, 0));
+  let actual = actualBase + totalLikes * XP_POR_LIKE;
+  // Lo que valieron los niveles que la ficha ya traía + su barra + los likes: no se reinicia nunca.
+  let total = actualBase + totalLikes * XP_POR_LIKE;
+  for (let n = 1; n < nivelBase; n += 1) total += umbralDeNivel(n);
   for (let vueltas = 0; actual >= max && vueltas < MAX_NIVELES_POR_CALCULO; vueltas += 1) {
     actual -= max;
     nivel += 1;
     max = Math.max(max, umbralDeNivel(nivel));
   }
-  return { level: nivel, current: actual, max, likes: totalLikes, xpPorLike: XP_POR_LIKE };
+  return { level: nivel, current: actual, max, total, nivelesGanados: nivel - nivelBase, likes: totalLikes, xpPorLike: XP_POR_LIKE };
 }

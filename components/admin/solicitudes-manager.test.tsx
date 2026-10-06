@@ -2,13 +2,14 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { SolicitudAdmin, VistaPreviaSolicitud } from '@/lib/api';
-import { SolicitudesManager, tituloDe } from '@/components/admin/solicitudes-manager';
+import { RechazosPanel, SolicitudesManager, tituloDe } from '@/components/admin/solicitudes-manager';
 
 const mocks = vi.hoisted(() => ({
   solicitudes: vi.fn(),
   resolverSolicitud: vi.fn(),
   vistaPreviaSolicitud: vi.fn(),
   adminList: vi.fn(),
+  rechazosDeSolicitudes: vi.fn(),
 }));
 vi.mock('@/lib/api', async (importActual) => {
   const actual = await importActual<typeof import('@/lib/api')>();
@@ -34,7 +35,7 @@ const sol = (id: number, tipo: SolicitudAdmin['tipo'], datos: Record<string, unk
 
 const COLA = [
   sol(1, 'inscripcion', { name: 'Nueva Estrella', country: 'chile', languages: ['es'], themeColor: '#336699', phrase: 'Hola', cardText: 'Una historia larga.', socials: [{ platform: 'twitch', url: 'https://twitch.tv/x' }] }),
-  sol(2, 'modificacion', { ficha: '#486 CEJ PAPA LUCHON', prueba: 'marca en mi canal', phrase: 'Nueva frase' }),
+  sol(2, 'modificacion', { ficha: '#486 CEJ PAPA LUCHON', phrase: 'Nueva frase' }),
   sol(3, 'baja', { ficha: '/v/alguien', prueba: 'soy el titular', motivo: 'ya no streameo' }),
 ];
 
@@ -265,5 +266,25 @@ describe('SolicitudesManager: resolver', () => {
     const d = await detalle();
     expect(d.getByTestId('solicitud-contacto')).toHaveTextContent('Contacto confidencial');
     expect(d.getByRole('link', { name: 'persona1@example.com' })).toHaveAttribute('href', 'mailto:persona1@example.com');
+  });
+});
+
+describe('RechazosPanel', () => {
+  test('se pide al abrirlo y muestra formulario, código y campos, sin datos personales', async () => {
+    mocks.rechazosDeSolicitudes.mockResolvedValue({
+      dias: 7,
+      total: 3,
+      porCodigo: [{ formulario: 'inscripcion', codigo: 'payload_invalido', status: 400, n: 3 }],
+      porCampo: [{ formulario: 'inscripcion', campo: 'socials.0.url', n: 2 }],
+      ultimo: null,
+    });
+    render(<RechazosPanel token="t" />);
+    expect(mocks.rechazosDeSolicitudes).not.toHaveBeenCalled();
+    const detalle = screen.getByTestId('rechazos-panel') as HTMLDetailsElement;
+    detalle.open = true;
+    fireEvent(detalle, new Event('toggle'));
+    expect(await screen.findByText('payload_invalido', { exact: false })).toBeTruthy();
+    expect(screen.getByText(/socials\.0\.url/)).toBeTruthy();
+    expect(mocks.rechazosDeSolicitudes).toHaveBeenCalledWith('t', 7);
   });
 });

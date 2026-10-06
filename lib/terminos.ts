@@ -21,7 +21,7 @@ export interface Clausula {
   parrafos: string[];
 }
 
-export const FECHA_VIGENCIA = '4 de octubre de 2026';
+export const FECHA_VIGENCIA = '6 de octubre de 2026';
 
 export const PREAMBULO: string[] = [
   'Los presentes Términos y Condiciones (en adelante, los «Términos») regulan de manera integral, completa y vinculante la relación entre VTuberDex (en adelante, «el Proyecto», «nosotros» o «el Mantenedor») y toda persona natural o jurídica que, por cualquier medio, solicite la inscripción de una ficha de VTuber en el catálogo, solicite su baja, visite el sitio, interactúe con él o utilice cualquiera de sus funcionalidades (en adelante, «el Titular», «la Persona Usuaria» o «usted»).',
@@ -36,7 +36,7 @@ export const CLAUSULAS: Clausula[] = [
       '1.1. «Catálogo»: el conjunto de fichas de VTubers publicadas y consultables en el sitio, incluidas sus cartas, imágenes, textos, atributos, enlaces y metadatos.',
       '1.2. «Ficha»: el registro individual de un VTuber dentro del Catálogo, con todos los datos de presentación pública que lo componen.',
       '1.3. «Datos Públicos»: los datos artísticos y de presentación del VTuber destinados a mostrarse en la Ficha, tales como nombre artístico, frase, descripción, país, idiomas, color de marca, imagen del personaje y enlaces a canales y redes sociales profesionales.',
-      '1.4. «Datos Personales»: toda información que identifique o haga identificable a una persona natural y que se entregue en los formularios con carácter reservado, incluyendo, sin que la enumeración sea taxativa, el correo electrónico, el nombre civil y los medios de comprobación de titularidad.',
+      '1.4. «Datos Personales»: toda información que identifique o haga identificable a una persona natural y que se entregue en los formularios con carácter reservado, incluyendo, sin que la enumeración sea taxativa, el correo electrónico y los medios de comprobación de titularidad.',
       '1.5. «Solicitud»: cualquier envío realizado mediante el formulario de inscripción o el formulario de baja.',
       '1.6. «Aprobación»: la decisión discrecional del Mantenedor de acoger una Solicitud de inscripción, que da origen a una Ficha en estado de borrador.',
       '1.7. «Degradación»: el proceso descrito en la cláusula de salida, por el cual los Datos Públicos de una Ficha dada de baja se alteran de forma progresiva e irreversible sin que la Ficha se elimine del Catálogo.',
@@ -60,7 +60,7 @@ export const CLAUSULAS: Clausula[] = [
     titulo: 'Tercera. Naturaleza de la inscripción y proceso de revisión',
     parrafos: [
       '3.1. La inscripción es una mera Solicitud. Su envío no crea derecho alguno a figurar en el Catálogo, a obtener una fecha de publicación determinada, a ocupar un número de la dex determinado ni a conservar un lugar en el orden del Catálogo.',
-      '3.2. Toda Solicitud queda en estado pendiente hasta ser revisada por el Mantenedor. No existe un plazo máximo de revisión; los tiempos indicados en cualquier comunicación son estimaciones no vinculantes y dependen de la disponibilidad voluntaria de quienes mantienen el Proyecto.',
+      '3.2. Toda Solicitud exige confirmar el correo electrónico informado mediante un código o enlace de un solo uso que se envía a esa dirección. En la inscripción y en la actualización de una Ficha la confirmación es previa a rellenar el formulario (el código vale 1 hora); en la baja se confirma tras enviar el formulario (vale 24 horas) y, mientras no se confirme, la Solicitud no se revisa y se elimina pasados unos días. Confirmada, la Solicitud queda en estado pendiente hasta ser revisada por el Mantenedor. No existe un plazo máximo de revisión; los tiempos indicados en cualquier comunicación son estimaciones no vinculantes y dependen de la disponibilidad voluntaria de quienes mantienen el Proyecto.',
       '3.3. El Mantenedor podrá aprobar, rechazar, dejar sin respuesta, solicitar antecedentes adicionales o aprobar parcialmente cualquier Solicitud, a su sola discreción y sin obligación de expresar causa. El rechazo no es impugnable ni genera derecho a indemnización alguna.',
       '3.4. La Aprobación crea una Ficha en estado de borrador. La publicación efectiva de la Ficha es una decisión posterior, independiente y también discrecional, que puede tardar o no producirse.',
       '3.5. El Mantenedor podrá corregir, completar, abreviar, traducir, reordenar, reformular o suprimir cualquier dato de la Solicitud para adecuarlo al formato, al estilo y a los criterios editoriales del Catálogo, incluyendo la elección de la imagen, del color de marca y de las facciones asociadas.',
@@ -72,7 +72,7 @@ export const CLAUSULAS: Clausula[] = [
     id: 'datos-personales',
     titulo: 'Cuarta. Datos personales: confidencialidad y tratamiento',
     parrafos: [
-      '4.1. Los Datos Personales entregados en los formularios (correo electrónico, nombre civil si se informa, medios de comprobación de titularidad y cualquier otro dato de carácter reservado) son CONFIDENCIALES. No se publican en el sitio, no se incorporan a ninguna Ficha, no se muestran en el Catálogo, no se incluyen en la API pública ni en el mapa del sitio, y no se entregan a terceros ajenos al Proyecto.',
+      '4.1. Los Datos Personales entregados en los formularios (correo electrónico, medios de comprobación de titularidad y cualquier otro dato de carácter reservado) son CONFIDENCIALES. No se publican en el sitio, no se incorporan a ninguna Ficha, no se muestran en el Catálogo, no se incluyen en la API pública ni en el mapa del sitio, y no se entregan a terceros ajenos al Proyecto.',
       '4.2. Los Datos Personales se almacenan separados de los Datos Públicos, en un campo distinto de la Solicitud, de modo que el proceso de creación de la Ficha solo lee los Datos Públicos. Solo acceden a ellos las personas con credenciales del mantenedor, y únicamente para revisar la Solicitud, comprobar la titularidad y comunicarse con el Titular.',
       '4.3. La finalidad exclusiva del tratamiento es: (a) evaluar la Solicitud; (b) comunicar su resultado; (c) verificar que quien pide una baja es efectivamente el Titular; y (d) conservar evidencia de la aceptación de estos Términos. Ningún Dato Personal se utilizará con fines publicitarios, comerciales ni de elaboración de perfiles, ni se venderá, cederá o arrendará.',
       '4.4. Se exceptúan de la confidencialidad los casos en que una norma legal obligue a entregar la información, o en que lo ordene una autoridad judicial o administrativa competente mediante resolución fundada. En tal caso se entregará solo lo estrictamente exigido.',
@@ -81,7 +81,8 @@ export const CLAUSULAS: Clausula[] = [
       '4.7. El Titular puede pedir en cualquier momento el acceso, la rectificación o la eliminación de sus Datos Personales escribiendo por los canales de contacto del Proyecto. La eliminación de los Datos Personales no implica la eliminación de la Ficha, que se rige por la cláusula de salida.',
       '4.8. El Titular es responsable de proporcionar datos de contacto verdaderos y vigentes. El Mantenedor no responde por comunicaciones no recibidas por errores en el correo informado, filtros de correo no deseado o casillas llenas.',
       '4.9. Sin perjuicio de las medidas razonables adoptadas, ningún sistema es infalible. El Mantenedor no garantiza la inviolabilidad absoluta de los sistemas y no responde por accesos no autorizados derivados de ataques de terceros que no pudieron evitarse con diligencia razonable, comprometiéndose a informar las brechas relevantes cuando corresponda.',
-      '4.10. Los Datos Públicos, a diferencia de los Datos Personales, están destinados a la exhibición. El Titular que incluya datos personales en un campo público (por ejemplo, en la descripción o en un enlace) lo hace bajo su exclusiva responsabilidad y autoriza su publicación.',
+      '4.10. Mientras se rellena la inscripción, lo escrito se guarda automáticamente como borrador asociado al correo electrónico confirmado, para que el Titular pueda cerrar la página y retomarlo después con ese mismo correo. El borrador solo lo ve el Mantenedor al revisar la Solicitud ya enviada, se elimina al enviar la inscripción y, si no se envía, a los sesenta (60) días sin cambios.',
+      '4.11. Los Datos Públicos, a diferencia de los Datos Personales, están destinados a la exhibición. El Titular que incluya datos personales en un campo público (por ejemplo, en la descripción o en un enlace) lo hace bajo su exclusiva responsabilidad y autoriza su publicación.',
     ],
   },
   {
@@ -125,16 +126,17 @@ export const CLAUSULAS: Clausula[] = [
     id: 'salida',
     titulo: 'Octava. Cláusula de salida (baja) y degradación de la Ficha',
     parrafos: [
-      '8.1. El Titular puede solicitar su baja en cualquier momento mediante el formulario de baja, aceptando estos mismos Términos. La baja es una Solicitud que queda pendiente hasta ser revisada y procesada por el Mantenedor, previa comprobación de la titularidad.',
+      '8.1. El Titular puede solicitar su baja en cualquier momento mediante el formulario de baja, aceptando estos mismos Términos. La baja exige indicar un correo y confirmarlo con un enlace o código de un solo uso enviado a esa dirección. Si ese correo es el que el Titular entregó al inscribir una o más Fichas, la baja se aplica de inmediato y sin revisión a las Fichas inscritas con él: pasan al grado 1 de degradación. En cualquier otro caso (por ejemplo, fichas incorporadas al Catálogo sin inscripción propia) la baja queda pendiente hasta ser revisada y procesada por el Mantenedor, que podrá pedir antecedentes adicionales para comprobar la titularidad.',
       '8.2. LA BAJA NO IMPLICA LA ELIMINACIÓN DE LA FICHA. Dado que la Ficha es una entrada de una obra colectiva y que forma parte del orden, de las estadísticas, de las facetas y de la numeración del Catálogo, ésta permanece en él después de la baja. El Titular reconoce y acepta expresamente que no existe un derecho a la supresión de la Ficha como entrada del Catálogo.',
       '8.3. En lugar de eliminarse, la Ficha será sometida a DEGRADACIÓN: una alteración progresiva e irreversible de sus Datos Públicos, que podrá comprender, a discreción del Mantenedor y en el orden y ritmo que éste determine, la corrupción parcial o total de los textos, la sustitución de caracteres por símbolos ilegibles, la pérdida de nitidez, color y resolución de las imágenes, el retiro de los enlaces a canales y redes sociales, la pérdida de atributos, habilidades y estadísticas, la neutralización del color de marca y la desvinculación de facciones, grados y distinciones.',
       '8.4. La Degradación persigue que la Ficha deje de representar, identificar o promocionar al Titular, sin alterar la integridad del Catálogo. Una Ficha degradada puede seguir siendo visible, buscable y numerada, con un aspecto deteriorado, y podrá seguir figurando en listados, recuentos y conjuntos de datos del Proyecto.',
       '8.5. La Degradación es irreversible. El Titular que se retire no podrá exigir la restauración de la Ficha anterior, aunque posteriormente se arrepienta. Una nueva inscripción será tratada como una Solicitud nueva y sujeta a su propia revisión, y no obligará al Proyecto a recuperar nada de lo degradado.',
-      '8.6. Los Datos Personales del Titular (correo, nombre civil y medios de comprobación) se eliminan al procesar la baja, según la cláusula de datos personales. Lo que subsiste es la Ficha degradada, que no contiene Datos Personales, porque éstos nunca formaron parte de ella.',
+      '8.6. Los Datos Personales del Titular (correo y medios de comprobación) se eliminan al procesar la baja, según la cláusula de datos personales. Lo que subsiste es la Ficha degradada, que no contiene Datos Personales, porque éstos nunca formaron parte de ella.',
       '8.7. Las copias de seguridad, los registros históricos, los archivos de terceros y los materiales ya difundidos o descargados antes de la baja no están sujetos a Degradación, y el Proyecto no puede asegurar su eliminación de sitios o servicios ajenos.',
       '8.8. El Mantenedor no está obligado a procesar la baja dentro de un plazo determinado, ni a informar del avance de la Degradación, ni a confirmar su término. Podrá rechazar la baja si no se acredita la titularidad.',
-      '8.9. La Degradación podrá aplicarse también, sin necesidad de solicitud, a las Fichas cuyos Titulares incumplan gravemente estos Términos o respecto de las cuales se compruebe que la inscripción se hizo sin derecho.',
-      '8.10. El Titular declara haber leído esta cláusula, comprender su alcance y aceptarla como condición esencial, sin la cual el Proyecto no habría admitido su inscripción.',
+      '8.9. Quien controle el buzón del correo entregado al inscribir la Ficha puede, por ese solo hecho, dar de baja la Ficha de forma irreversible: el Titular es responsable de la seguridad de ese correo.',
+      '8.10. La Degradación podrá aplicarse también, sin necesidad de solicitud, a las Fichas cuyos Titulares incumplan gravemente estos Términos o respecto de las cuales se compruebe que la inscripción se hizo sin derecho.',
+      '8.11. El Titular declara haber leído esta cláusula, comprender su alcance y aceptarla como condición esencial, sin la cual el Proyecto no habría admitido su inscripción.',
     ],
   },
   {

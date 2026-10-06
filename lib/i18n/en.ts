@@ -1,3 +1,7 @@
+import { formulariosEn } from './textos/formularios';
+import { miFichaEn } from './textos/mificha';
+import { nivelesEn } from './textos/niveles';
+import { fichasEn } from './textos/fichas';
 import type { Mensajes } from './es';
 
 export const en: Mensajes = {
@@ -68,6 +72,8 @@ export const en: Mensajes = {
   'detalle.sinPais': 'No country listed',
   'detalle.fichaCompleta': 'Full profile',
   'detalle.fichaBasica': 'Basic profile',
+  'detalle.sinCorreoTitulo': 'E-Mail missing',
+  'detalle.sinCorreoAyuda': 'Contact {correo}',
   'detalle.premiumDesde': 'Premium since {fecha}',
   'detalle.historia': 'Their story',
   'detalle.ocrAyuda': 'Reliability of the OCR reading of the text printed on the card',
@@ -171,4 +177,8 @@ export const en: Mensajes = {
   'donar.copiado': 'Copied ✓',
   'donar.noCopio': 'Could not copy: select it by hand.',
   'donar.boton': 'Donate with PayPal',
+  ...formulariosEn,
+  ...fichasEn,
+  ...miFichaEn,
+  ...nivelesEn,
 };

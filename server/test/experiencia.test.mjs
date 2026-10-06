@@ -2,10 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BASE_NIVEL, PASO_NIVEL, XP_POR_LIKE, experienciaConLikes, umbralDeNivel } from '../src/experiencia.mjs';
+import { BASE_NIVEL, PASO_NIVEL, PUNTOS_POR_NIVEL, XP_POR_LIKE, experienciaConLikes, umbralDeNivel } from '../src/experiencia.mjs';
 
 test('una ficha sin experiencia parte del nivel 1 con la barra vacía', () => {
-  assert.deepEqual(experienciaConLikes({}, 0), { level: 1, current: 0, max: BASE_NIVEL, likes: 0, xpPorLike: XP_POR_LIKE });
+  assert.deepEqual(experienciaConLikes({}, 0), { level: 1, current: 0, max: BASE_NIVEL, total: 0, nivelesGanados: 0, likes: 0, xpPorLike: XP_POR_LIKE });
   assert.deepEqual(experienciaConLikes(null, 0).level, 1);
 });
 
@@ -52,4 +52,34 @@ test('es monótona: más likes nunca baja de nivel', () => {
     assert.ok(level >= anterior);
     anterior = level;
   }
+});
+
+test('el contador TOTAL nunca se reinicia aunque la barra se vacíe al subir', () => {
+  let anterior = -1;
+  for (let likes = 0; likes < 400; likes += 1) {
+    const r = experienciaConLikes({}, likes);
+    assert.equal(r.total, likes * XP_POR_LIKE);
+    assert.ok(r.total > anterior || likes === 0);
+    anterior = r.total;
+  }
+  // La barra volvió a cero al subir de nivel, pero el total sigue ahí.
+  const sube = experienciaConLikes({}, BASE_NIVEL / XP_POR_LIKE);
+  assert.equal(sube.current, 0);
+  assert.equal(sube.total, BASE_NIVEL);
+});
+
+test('una ficha que ya traía nivel suma lo que valieron sus niveles anteriores al total', () => {
+  const r = experienciaConLikes({ level: 3, current: 40, max: 200 }, 0);
+  assert.equal(r.total, umbralDeNivel(1) + umbralDeNivel(2) + 40);
+});
+
+test('los puntos de habilidad salen solo de los niveles GANADOS con likes, no del nivel de partida', () => {
+  assert.equal(experienciaConLikes({ level: 50, current: 0, max: 0 }, 0).nivelesGanados, 0);
+  const r = experienciaConLikes({}, BASE_NIVEL / XP_POR_LIKE);
+  assert.equal(r.nivelesGanados, 1);
+  assert.equal(r.nivelesGanados * PUNTOS_POR_NIVEL, PUNTOS_POR_NIVEL);
+});
+
+test('cada nivel pide más que el anterior: sube más lento a medida que avanza', () => {
+  for (let n = 1; n < 60; n += 1) assert.ok(umbralDeNivel(n + 1) > umbralDeNivel(n));
 });

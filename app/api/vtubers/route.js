@@ -14,6 +14,7 @@
  */
 import { dbConDiario } from '../../../lib/diario.mjs';
 import { aplicarReemplazosALista } from '../../../lib/ediciones.mjs';
+import { marcarSinCorreo } from '../../../lib/sin-correo.mjs';
 import { facetCounts, searchVtubers } from '../../../server/src/search.mjs';
 import { formatIssues, listQuerySchema } from '../../../server/src/validation.mjs';
 
@@ -67,5 +68,6 @@ export async function GET(request) {
    * Una sola consulta para toda la página (ver `reemplazosDePagina`).
    */
   const conImagenes = await aplicarReemplazosALista(result.items);
-  return Response.json({ ...result, items: conImagenes, facets }, { headers: { 'cache-control': CACHE_PUBLICA } });
+  const items = await marcarSinCorreo(db, conImagenes);
+  return Response.json({ ...result, items, facets }, { headers: { 'cache-control': CACHE_PUBLICA } });
 }

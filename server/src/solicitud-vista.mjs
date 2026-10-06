@@ -179,13 +179,15 @@ function vistaModificacion(db, solicitud, base, { fichaSlug }) {
 
 function vistaBaja(db, solicitud, base) {
   let ficha = null;
+  const escrita = String(solicitud.datos.ficha ?? '').trim();
   try {
-    ficha = fichaDeLaSolicitud(db, solicitud.datos.ficha);
+    if (escrita) ficha = fichaDeLaSolicitud(db, escrita);
   } catch (error) {
     if (!(error instanceof SolicitudError)) throw error;
   }
   const avisos = ['«Marcar procesada» solo cierra la solicitud: la degradación de la ficha (cláusula de salida) se aplica aparte, desde «Premium».'];
-  if (!ficha) avisos.unshift(`No se encontró la ficha «${solicitud.datos.ficha}»: ubícala a mano desde «Fichas».`);
+  if (!escrita) avisos.unshift('No indicó ficha y su correo no está asociado a ninguna inscripción: escríbele al correo de contacto para saber cuál es.');
+  else if (!ficha) avisos.unshift(`No se encontró la ficha «${escrita}»: ubícala a mano desde «Fichas».`);
   return { ...base, ficha: ficha ? resumenDeFicha(ficha) : null, avisos };
 }
 

@@ -19,6 +19,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: urlAbsoluta('/'), changeFrequency: 'daily', priority: 1 },
     { url: urlAbsoluta('/inscripcion'), changeFrequency: 'yearly' as const, priority: 0.3 },
     { url: urlAbsoluta('/modificacion'), changeFrequency: 'yearly' as const, priority: 0.3 },
+    { url: urlAbsoluta('/niveles'), changeFrequency: 'yearly' as const, priority: 0.3 },
     { url: urlAbsoluta('/terminos'), changeFrequency: 'yearly' as const, priority: 0.2 },
     ...fichas.map((f: { slug: string }) => ({
       url: urlAbsoluta(rutaDeFicha(f.slug)),

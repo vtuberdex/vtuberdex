@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   adminDetail: vi.fn(),
   createVtuber: vi.fn(),
   updateVtuber: vi.fn(),
+  setVtuberEmail: vi.fn(),
   dexNext: vi.fn(),
   createFaction: vi.fn(),
   updateFaction: vi.fn(),
@@ -130,15 +131,30 @@ describe('Asistente de carta: edición', () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 
-  test('sin cambios el guardado está deshabilitado y lo explica; la dirección se normaliza', async () => {
+  test('sin cambios el guardado está deshabilitado y lo explica; la dirección está bloqueada y sigue al nombre', async () => {
     await renderWizard();
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
     expect(screen.getByText(/Sin cambios pendientes/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Dirección de la página'), { target: { value: 'Nueva Ñandú' } });
+    expect(screen.getByLabelText('Dirección de la página')).toHaveAttribute('readonly');
+    fireEvent.change(screen.getByLabelText('Nombre de la carta'), { target: { value: 'Nueva Ñandú' } });
+    expect(screen.getByLabelText('Dirección de la página')).toHaveValue('nueva-nandu');
     expect(screen.getByTestId('slug-preview')).toHaveTextContent('/v/nueva-nandu');
     mocks.updateVtuber.mockImplementation(async (_t, _id, patch) => applyPatch(makeDetail(), patch));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
-    await waitFor(() => expect(mocks.updateVtuber).toHaveBeenCalledWith('t', 18, { slug: 'nueva-nandu' }));
+    await waitFor(() => expect(mocks.updateVtuber).toHaveBeenCalledWith('t', 18, { name: 'Nueva Ñandú', slug: 'nueva-nandu' }));
+  });
+
+  test('al escribir el correo aparece «Guardar cambio de correo»; guarda solo el correo y avisa de la bienvenida', async () => {
+    const { notify } = await renderWizard();
+    expect(screen.queryByRole('button', { name: 'Guardar cambio de correo' })).not.toBeInTheDocument();
+    mocks.setVtuberEmail.mockResolvedValue({ email: 'ana@ejemplo.com', bienvenida: 'enviada' });
+    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: ' Ana@Ejemplo.com ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambio de correo' }));
+    await waitFor(() => expect(mocks.setVtuberEmail).toHaveBeenCalledWith('t', 18, 'Ana@Ejemplo.com'));
+    expect(mocks.updateVtuber).not.toHaveBeenCalled();
+    await waitFor(() => expect(notify).toHaveBeenCalledWith('ok', expect.stringContaining('bienvenida')));
+    expect(screen.getByLabelText('Correo electrónico')).toHaveValue('ana@ejemplo.com');
+    expect(screen.queryByRole('button', { name: 'Guardar cambio de correo' })).not.toBeInTheDocument();
   });
 
   test('un 409 de número ocupado se explica y propone cómo resolverlo', async () => {
@@ -155,7 +171,7 @@ describe('Asistente de carta: edición', () => {
     const { ApiError } = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
     const { notify } = await renderWizard();
     mocks.updateVtuber.mockRejectedValue(new ApiError('slug_duplicado', 409));
-    fireEvent.change(screen.getByLabelText('Dirección de la página'), { target: { value: 'gkuro' } });
+    fireEvent.change(screen.getByLabelText('Nombre de la carta'), { target: { value: 'gkuro' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
     expect(await screen.findByTestId('admin-slug-hint')).toHaveTextContent('gkuro-2');
     expect(notify).toHaveBeenCalledWith('error', expect.stringMatching(/dirección/i));

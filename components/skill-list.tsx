@@ -6,6 +6,7 @@ import { useI18n } from '@/lib/i18n';
 import type { Clave } from '@/lib/i18n/mensajes';
 import { tipoDeHabilidad } from '@/lib/i18n/nombres';
 import type { SkillRow } from '@/lib/types';
+import { RANGO_MAXIMO } from '@/server/src/experiencia.mjs';
 
 const CATEGORY_LABEL: Record<SkillRow['category'], Clave> = {
   active: 'habilidades.activas',
@@ -66,6 +67,15 @@ export function SkillList({ skills, palette }: SkillListProps) {
                         </span>
                       )}
                     </span>
+                    {skill.rank ? (
+                      <span
+                        className="shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em]"
+                        style={{ borderColor: palette.accent, color: palette.accent }}
+                        data-testid="skill-rank"
+                      >
+                        {t('habilidades.rango', { n: skill.rank, max: RANGO_MAXIMO })}
+                      </span>
+                    ) : null}
                     <span
                       className="h-2 w-2 shrink-0 rounded-full"
                       style={{ background: palette.accent }}

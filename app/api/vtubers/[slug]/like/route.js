@@ -22,6 +22,7 @@ import {
   visitanteValido,
   yaDioLikeHoy,
 } from '../../../../../lib/likes.mjs';
+import { avisarSubidaDeNivel } from '../../../../../lib/mi-ficha.mjs';
 import { getVtuberBySlug } from '../../../../../server/src/search.mjs';
 
 export const dynamic = 'force-dynamic';
@@ -76,6 +77,9 @@ export async function POST(request, { params }) {
           : 'Se alcanzó el máximo de likes de hoy desde esta red.';
       return responder({ error: resultado.motivo, detail: detalle, ...resumenDeLikes(card, likes, resultado.motivo === 'ya_dio_like_hoy') }, 409, cabeceras);
     }
+    // Si este like hizo subir de nivel a la ficha, su titular recibe el enlace para repartir puntos. En segundo
+    // plano: el correo no retrasa ni puede romper el like (`avisarSubidaDeNivel` nunca lanza).
+    void avisarSubidaDeNivel({ card, likes });
     return responder(resumenDeLikes(card, likes, true), 200, cabeceras);
   } catch (error) {
     console.error(`[likes] no se pudo registrar el like de ${slug}: ${error.message}`);

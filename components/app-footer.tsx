@@ -17,6 +17,8 @@ export function AppFooter() {
       >
         <Link href="/inscripcion" className="hover:text-dex-ink">{t('pie.inscribir')}</Link>
         <Link href="/modificacion" className="hover:text-dex-ink">{t('pie.actualizar')}</Link>
+        <Link href="/niveles" className="hover:text-dex-ink">{t('pie.niveles')}</Link>
+        <Link href="/mi-ficha" className="hover:text-dex-ink">{t('pie.miFicha')}</Link>
         <Link href="/baja" className="hover:text-dex-ink">{t('pie.baja')}</Link>
         <Link href="/terminos" className="hover:text-dex-ink">{t('pie.terminos')}</Link>
       </nav>
