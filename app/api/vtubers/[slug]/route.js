@@ -23,7 +23,7 @@ import { aplicarImagenesDelMantenedor, reemplazosDelMantenedor } from '../../../
 import { KINDS_GESTIONABLES } from '../../../../lib/carpetas.mjs';
 import { ejecutorDeSolicitudes } from '../../../../lib/solicitudes.mjs';
 import { marcarSinCorreo } from '../../../../lib/sin-correo.mjs';
-import { claveDeHabilidad, leerRangos } from '../../../../server/src/mi-ficha.mjs';
+import { aplicarPuntosAStats, claveDeHabilidad, leerPuntosDeStats, leerRangos } from '../../../../server/src/mi-ficha.mjs';
 import { getNeighbors, getVtuberBySlug } from '../../../../server/src/search.mjs';
 
 export const dynamic = 'force-dynamic';
@@ -67,6 +67,14 @@ export async function GET(_request, { params }) {
     if (rangos.size) conLikes = { ...conLikes, skills: conLikes.skills.map((s) => ({ ...s, rank: rangos.get(claveDeHabilidad(s)) ?? 0 })) };
   } catch (error) {
     console.error(`[mi-ficha] la ficha ${slug} sale sin rangos: ${error.message}`);
+  }
+  // Los stats que la persona subió con sus puntos y el bono automático por niveles (velocidad, evasión…) se ven
+  // en la ficha pública. Si el almacén falla, la ficha sale con sus valores base.
+  try {
+    const puestos = await leerPuntosDeStats(await ejecutorDeSolicitudes(), card.id);
+    conLikes = { ...conLikes, stats: aplicarPuntosAStats(conLikes.stats, puestos, conLikes.levelsGained ?? 0) };
+  } catch (error) {
+    console.error(`[mi-ficha] la ficha ${slug} sale sin puntos de stats: ${error.message}`);
   }
   return Response.json(
     { ...(await marcarSinCorreo(db, [conLikes]))[0], neighbors: getNeighbors(db, card.dexNumber) },

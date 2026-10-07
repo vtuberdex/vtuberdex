@@ -20,7 +20,7 @@
  *
  * JS puro sobre un EJECUTOR `{ execute, exec }` (Turso/`file:` en producción, SQLite en los tests).
  */
-import { PUNTOS_POR_NIVEL, RANGO_MAXIMO } from './experiencia.mjs';
+import { PUNTOS_POR_NIVEL, PUNTOS_STATS_POR_NIVEL, RANGO_MAXIMO } from './experiencia.mjs';
 import { normalizeText } from './text.mjs';
 
 const DDL = `
@@ -29,6 +29,12 @@ const DDL = `
     clave      TEXT NOT NULL,
     rango      INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (vtuber_id, clave)
+  );
+  CREATE TABLE IF NOT EXISTS punto_stat (
+    vtuber_id  INTEGER NOT NULL,
+    slug       TEXT NOT NULL,
+    puntos     INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (vtuber_id, slug)
   );
   CREATE TABLE IF NOT EXISTS aviso_nivel (
     vtuber_id  INTEGER PRIMARY KEY,
@@ -132,6 +138,152 @@ export async function reiniciarRangos(ejecutor, { vtuberId, skills, nivelesGanad
   const e = await conTablas(ejecutor);
   await e.execute('DELETE FROM punto_habilidad WHERE vtuber_id = ?', [Number(vtuberId)]);
   return estadoDePuntos(e, { vtuberId, skills, nivelesGanados });
+}
+
+/* ------------------------------------------------------------------ stats */
+
+/**
+ * Los stats que se suben GASTANDO los puntos y cuánto vale UN punto en cada uno. Las escalas son muy distintas
+ * (HP llega a 12.440, Ataque a 950): un +1 plano sería invisible, así que cada stat lleva su paso. HP y MP suben
+ * también su `max` (la barra se agranda con ellos). Nivel y EXP NO están: salen de los likes. `tope` es el valor
+ * máximo absoluto, solo donde lo hay (ninguno de estos hoy; queda para cuando se necesite).
+ */
+export const STATS_MEJORABLES = Object.freeze({
+  hp: { paso: 50 },
+  mp: { paso: 25 },
+  attack: { paso: 5 },
+  magicAttack: { paso: 5 },
+  defense: { paso: 5 },
+  magicDefense: { paso: 5 },
+});
+
+/**
+ * Los stats que suben SOLOS con los niveles ganados con likes, sin gastar nada: `suma` cada `cada` niveles.
+ * Son derivados como la experiencia (no se guardan: función de `nivelesGanados`), así que no pueden desincronizarse.
+ * `tope` es el valor máximo absoluto: la Evasión no pasa de 100 y la Suerte, de 20.
+ */
+export const STATS_AUTOMATICOS = Object.freeze({
+  speed: { cada: 10, suma: 1 },
+  evasion: { cada: 10, suma: 1, tope: 100 },
+  accuracy: { cada: 10, suma: 1 },
+  critic: { cada: 10, suma: 1 },
+  luck: { cada: 20, suma: 1, tope: 20 },
+});
+
+/** Cuánto suma un stat automático por `nivelesGanados` (0 si no lo es). Sin pasar del tope. */
+export function bonoAutomatico(slug, base, nivelesGanados) {
+  const regla = STATS_AUTOMATICOS[slug];
+  if (!regla || !Number.isFinite(base)) return 0;
+  const bono = Math.floor(Math.max(0, Math.trunc(Number(nivelesGanados) || 0)) / regla.cada) * regla.suma;
+  return regla.tope === undefined ? bono : Math.max(0, Math.min(bono, regla.tope - base));
+}
+
+/** Puntos repartidos por slug de stat (solo los de stats mejorables, mayores que 0). */
+export async function leerPuntosDeStats(ejecutor, vtuberId) {
+  const e = await conTablas(ejecutor);
+  const { rows } = await e.execute('SELECT slug, puntos FROM punto_stat WHERE vtuber_id = ? AND puntos > 0', [Number(vtuberId)]);
+  return new Map(rows.filter((f) => STATS_MEJORABLES[f.slug]).map((f) => [String(f.slug), Number(f.puntos)]));
+}
+
+/** Valor de un stat con sus puntos, sin pasar del tope (si lo tiene). */
+export function valorConPuntos(slug, base, puntos) {
+  const regla = STATS_MEJORABLES[slug];
+  if (!regla || !Number.isFinite(base)) return base;
+  const valor = base + puntos * regla.paso;
+  return regla.tope !== undefined ? Math.min(regla.tope, Math.max(base, valor)) : valor;
+}
+
+/**
+ * Puntos que aún caben en un stat antes de su tope (infinito si no tiene). El tope cuenta desde el valor BASE
+ * de la ficha, que no cambia al repartir.
+ */
+function cabenEn(slug, base, puntos) {
+  const { paso, tope } = STATS_MEJORABLES[slug];
+  if (tope === undefined) return Infinity;
+  return Math.max(0, Math.floor((tope - base) / paso) - puntos);
+}
+
+/**
+ * Los stats de la ficha tal como los ve «Mi ficha»: base, puntos puestos, valor resultante y si aún admiten más.
+ * @param {{ vtuberId: number, stats: Array<{slug: string, label: string, value: number|null}>, nivelesGanados: number }} entrada
+ */
+export async function estadoDeStats(ejecutor, { vtuberId, stats, nivelesGanados }) {
+  const puestos = await leerPuntosDeStats(ejecutor, vtuberId);
+  const lista = [];
+  for (const stat of stats ?? []) {
+    const regla = STATS_MEJORABLES[stat.slug];
+    if (!regla || typeof stat.value !== 'number') continue;
+    const puntos = puestos.get(stat.slug) ?? 0;
+    lista.push({
+      slug: stat.slug,
+      label: stat.label,
+      base: stat.value,
+      puntos,
+      valor: valorConPuntos(stat.slug, stat.value, puntos),
+      paso: regla.paso,
+      tope: regla.tope ?? null,
+      puedeSubir: cabenEn(stat.slug, stat.value, puntos) > 0,
+    });
+  }
+  const automaticos = [];
+  for (const stat of stats ?? []) {
+    if (!STATS_AUTOMATICOS[stat.slug] || typeof stat.value !== 'number') continue;
+    const regla = STATS_AUTOMATICOS[stat.slug];
+    const bono = bonoAutomatico(stat.slug, stat.value, nivelesGanados);
+    automaticos.push({ slug: stat.slug, label: stat.label, base: stat.value, bono, valor: stat.value + bono, cada: regla.cada, suma: regla.suma, tope: regla.tope ?? null });
+  }
+  const repartidos = lista.reduce((suma, s) => suma + s.puntos, 0);
+  const ganados = Math.max(0, Math.trunc(Number(nivelesGanados) || 0)) * PUNTOS_STATS_POR_NIVEL;
+  return { stats: lista, automaticos, ganados, repartidos, disponibles: Math.max(0, ganados - repartidos), puntosPorNivel: PUNTOS_STATS_POR_NIVEL };
+}
+
+/** Gasta UN punto en un stat. Mismo cerrojo que las habilidades: una sola sentencia condicional. */
+export async function subirStat(ejecutor, { vtuberId, stats, nivelesGanados, slug }) {
+  const e = await conTablas(ejecutor);
+  const antes = await estadoDeStats(e, { vtuberId, stats, nivelesGanados });
+  const stat = antes.stats.find((s) => s.slug === slug);
+  if (!stat) throw new PuntosError(404, 'stat_no_encontrado', 'Ese stat no se puede subir. Recarga la página.');
+  if (antes.disponibles < 1) throw new PuntosError(409, 'sin_puntos_stats', 'No te quedan puntos de stats. Ganas más al subir de nivel.');
+  if (!stat.puedeSubir) throw new PuntosError(409, 'stat_maximo', 'Ese stat ya llegó a su máximo.');
+  const maxPuntos = stat.puntos + cabenEn(stat.slug, stat.base, stat.puntos);
+  const slugs = antes.stats.map((s) => s.slug);
+  const escrito = await e.execute(
+    `INSERT INTO punto_stat (vtuber_id, slug, puntos)
+     SELECT ?, ?, 1
+      WHERE (SELECT COALESCE(SUM(puntos), 0) FROM punto_stat WHERE vtuber_id = ? AND slug IN (${slugs.map(() => '?').join(', ')})) < ?
+     ON CONFLICT (vtuber_id, slug) DO UPDATE SET puntos = puntos + 1 WHERE puntos < ?`,
+    [Number(vtuberId), slug, Number(vtuberId), ...slugs, antes.ganados, Number.isFinite(maxPuntos) ? maxPuntos : 1_000_000],
+  );
+  if (escrito.rowsAffected === 0) {
+    const ahora = await estadoDeStats(e, { vtuberId, stats, nivelesGanados });
+    if (ahora.disponibles < 1) throw new PuntosError(409, 'sin_puntos_stats', 'No te quedan puntos de stats. Ganas más al subir de nivel.');
+    throw new PuntosError(409, 'stat_maximo', 'Ese stat ya llegó a su máximo.');
+  }
+  return estadoDeStats(e, { vtuberId, stats, nivelesGanados });
+}
+
+/** Devuelve todos los puntos de stats repartidos (los de habilidades no se tocan). */
+export async function reiniciarStats(ejecutor, { vtuberId, stats, nivelesGanados }) {
+  const e = await conTablas(ejecutor);
+  await e.execute('DELETE FROM punto_stat WHERE vtuber_id = ?', [Number(vtuberId)]);
+  return estadoDeStats(e, { vtuberId, stats, nivelesGanados });
+}
+
+/**
+ * Aplica a la lista de stats de una ficha pública los puntos repartidos y el bono automático por niveles: el valor sube y, en HP y MP, también el máximo
+ * (la barra no puede quedar con más vida que su tope). No muta la entrada.
+ */
+export function aplicarPuntosAStats(stats, puestos, nivelesGanados = 0) {
+  return stats.map((s) => {
+    if (typeof s.value !== 'number') return s;
+    const bono = bonoAutomatico(s.slug, s.value, nivelesGanados);
+    if (bono) return { ...s, value: s.value + bono };
+    const puntos = puestos.get(s.slug);
+    if (!puntos) return s;
+    const valor = valorConPuntos(s.slug, s.value, puntos);
+    const sube = valor - s.value;
+    return { ...s, value: valor, max: typeof s.max === 'number' ? s.max + sube : s.max };
+  });
 }
 
 /**

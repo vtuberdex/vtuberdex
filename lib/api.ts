@@ -147,6 +147,39 @@ export interface HabilidadMejorable {
   rango: number;
 }
 
+/** «Mi ficha»: un stat que se sube gastando puntos (HP, MP, ataques, defensas). */
+export interface StatMejorable {
+  slug: string;
+  label: string;
+  base: number;
+  puntos: number;
+  valor: number;
+  paso: number;
+  tope: number | null;
+  puedeSubir: boolean;
+}
+
+/** Un stat que sube solo con los niveles ganados (velocidad, evasión, precisión, crítico, suerte). */
+export interface StatAutomatico {
+  slug: string;
+  label: string;
+  base: number;
+  bono: number;
+  valor: number;
+  cada: number;
+  suma: number;
+  tope: number | null;
+}
+
+export interface EstadoDeStats {
+  stats: StatMejorable[];
+  automaticos: StatAutomatico[];
+  ganados: number;
+  repartidos: number;
+  disponibles: number;
+  puntosPorNivel: number;
+}
+
 export interface VistaMiFicha {
   slug: string;
   name: string;
@@ -155,6 +188,8 @@ export interface VistaMiFicha {
   likes: number;
   experience: { current: number; max: number; total: number };
   puntos: { habilidades: HabilidadMejorable[]; ganados: number; repartidos: number; disponibles: number; rangoMaximo: number; puntosPorNivel: number };
+  /** Puntos de stats (bolsa aparte de las habilidades). Opcional: la maqueta de /niveles no lo trae. */
+  statsPuntos?: EstadoDeStats;
 }
 
 export interface RespuestaMiFicha {
@@ -368,8 +403,8 @@ export const api = {
   miFicha(token: string, slug?: string) {
     return request<RespuestaMiFicha>('/api/mi-ficha', { method: 'POST', body: JSON.stringify({ token, slug }) });
   },
-  /** Gasta un punto de habilidad (`subir`) o devuelve todos los repartidos (`reiniciar`). */
-  repartirPuntos(token: string, slug: string, accion: 'subir' | 'reiniciar', clave?: string) {
+  /** Gasta un punto de habilidad (`subir`) o de stat (`subir-stat`, `clave` = slug), o devuelve los repartidos de esa bolsa. */
+  repartirPuntos(token: string, slug: string, accion: 'subir' | 'reiniciar' | 'subir-stat' | 'reiniciar-stats', clave?: string) {
     return request<{ ok: true; ficha: VistaMiFicha }>('/api/mi-ficha/puntos', { method: 'POST', body: JSON.stringify({ token, slug, accion, clave }) });
   },
   /** Manda el enlace mágico a ese correo si tiene fichas; responde igual para cualquiera. */

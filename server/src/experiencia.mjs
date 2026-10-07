@@ -44,6 +44,12 @@ export const PASO_NIVEL = 50;
 export const PUNTOS_POR_NIVEL = 3;
 /** Rango máximo de una habilidad: con 3 puntos por nivel, 5 rangos se alcanzan sin que sea eterno ni trivial. */
 export const RANGO_MAXIMO = 5;
+/**
+ * Puntos de STATS que da cada nivel ganado. Es una bolsa APARTE de la de habilidades (`PUNTOS_POR_NIVEL`):
+ * no se mezclan ni se compensan; cada una se gasta solo en lo suyo. Qué vale un punto en cada stat y sus
+ * topes viven en `STATS_MEJORABLES` (`server/src/mi-ficha.mjs`).
+ */
+export const PUNTOS_STATS_POR_NIVEL = 10;
 /** Tope de niveles por cálculo: corta cualquier entrada absurda (`max` ínfimo, likes enormes). */
 const MAX_NIVELES_POR_CALCULO = 100_000;
 
