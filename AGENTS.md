@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 857 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 861 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 136 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
 
@@ -451,8 +451,13 @@ evolución con los efectos OFICIALES y la facción exclusiva (Juramento, Requiem
 - La evolución lleva el color de su base; Hackeo y System Override, el degradado. Nombres canónicos = lista de colores
   (`Deux ex Machina`, `Mente Agil`, `Glotoneria`); los alias se aceptan con aviso.
 - Medido al escribirlo (base empaquetada, 211 kits): 18 limpias, 150 con algún error; 114 Ultimates con estado base.
-- **Asistente de kit en el mantenedor** (paso «Atributos», `components/admin/kit-builder.tsx`; lógica pura y probada en
-  `kit-habilidades.ts`): arriba muestra qué reglas rompe el kit ACTUAL; «Armar/Rehacer el kit» abre menús (estado por polaridad,
+- **Pasos de la ficha en el mantenedor**: Atributos, Habilidades y Redes sociales son TRES pasos (antes uno solo, una
+  sábana). Atributos es una línea por atributo con su barra (`steps/attributes-step.tsx`); Habilidades, una línea por
+  habilidad con su estado (punto verde/ámbar/rojo según `validarKit`) que se despliega para ver y editar a mano
+  (`steps/skills-step.tsx`).
+- **Asistente de kit** (`components/admin/kit-builder.tsx`, sustituye a la lista mientras está abierto; lógica pura y
+  probada en `kit-habilidades.ts`): va PIEZA POR PIEZA (Activa 1 … Ultimate, Revisar), cada una con su vista previa y lo
+  que dice hoy la ficha al lado. Menús (estado por polaridad,
   exclusivos de otra facción deshabilitados, 3 fórmulas de Ultimate, Habilidad Única opcional) y el texto libre admite `[[Estado]]`
   → `<span>` oficial. Lo escrito a mano se ESCAPA. «Usar este kit» solo reemplaza las habilidades del formulario (las `other` se
   conservan); se publica con el Guardar de siempre. Precarga nombres y pasivas del kit existente; activas y Ultimate se rehacen.

@@ -189,7 +189,7 @@ describe('Asistente de carta: edición', () => {
 
   test('una red con URL sin http bloquea el guardado y lo explica', async () => {
     await renderWizard();
-    fireEvent.click(stepButton(/Atributos, habilidades y redes/));
+    fireEvent.click(stepButton(/Redes sociales/));
     fireEvent.click(screen.getByRole('button', { name: '+ Twitch' }));
     fireEvent.change(screen.getByPlaceholderText('https://twitch.tv/tu_canal'), { target: { value: 'javascript:alert(1)' } });
     expect(screen.getByTestId('admin-editor-invalid')).toHaveTextContent(/http/);
@@ -568,7 +568,7 @@ describe('AdminPage', () => {
     render(<AdminPage />);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Nueva carta' }))[0]);
     expect(await screen.findByTestId('admin-editor')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Paso 1 de 6: Identidad/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Paso 1 de 8: Identidad/ })).toBeInTheDocument();
   });
 
   test('abre una ficha por id con la ruta del mantenedor, con insignia de completitud', async () => {

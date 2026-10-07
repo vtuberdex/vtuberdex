@@ -266,11 +266,14 @@ export function faltantes(kit: KitForm): string[] {
 /** Validación completa del kit armado: lo que falta + las reglas del sistema (`validarKit`). */
 export function revisarKit(kit: KitForm, facciones: string[]) {
   const habilidades = habilidadesDelKit(kit);
+  const faltan = faltantes(kit);
+  const estadosPendientes = faltan.some((f) => /estados/.test(f));
   const problemas = validarKit({
     habilidades: habilidades.map((h) => ({ category: h.category as 'active' | 'passive' | 'ultimate', name: h.name, effectHtml: h.effectHtml ?? '' })),
     facciones,
-  });
-  return { habilidades, faltan: faltantes(kit), problemas };
+    // «Falta: los dos estados» ya lo dice; el «entrega 0 estados» del validador sería el mismo aviso dos veces.
+  }).filter((p) => !(estadosPendientes && p.codigo === 'ultimate_estados'));
+  return { habilidades, faltan, problemas };
 }
 
 /** Reemplaza el kit (activas, pasivas, Ultimate) del formulario y conserva las «otras» al final. */

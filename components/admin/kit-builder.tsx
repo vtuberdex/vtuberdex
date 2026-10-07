@@ -2,9 +2,10 @@
 /**
  * Asistente del KIT de habilidades (2 activas, 2 pasivas, Ultimate y Habilidad Única opcional).
  *
- * Arriba, siempre: cómo está el kit ACTUAL frente a las reglas del sistema (`validarKit`), para que
- * una ficha heredada del scrape muestre qué rompe sin abrir nada. Abajo, al pulsar «Armar kit»: los
- * menús. La persona elige nombres, estados y fórmulas; el HTML (colores, verbos, evoluciones, `<br>`)
+ * PIEZA POR PIEZA: una pestaña por habilidad (con ✓ o ⚠ según lo que le falte) y una de «Revisar».
+ * La primera versión ponía las cinco piezas, la revisión y la vista previa en una sola columna y
+ * era una sábana difícil de seguir; ahora cada pantalla tiene un formulario corto y su vista previa al
+ * lado. La persona elige nombres, estados y fórmulas; el HTML (colores, verbos, evoluciones, `<br>`)
  * lo escribe `kit-habilidades.ts`. «Usar este kit» solo REEMPLAZA las habilidades en el formulario:
  * se publica con el «Guardar» de siempre, así que un kit a medias nunca llega a la base.
  */
@@ -18,20 +19,21 @@ import {
   kitDesdeHabilidades,
   reemplazarKit,
   revisarKit,
+  type PasivaForm,
   type ActivaForm,
   type EstadoElegido,
   type KitForm,
   type UltimateForm,
 } from '@/components/admin/kit-habilidades';
 import { ghostButton, inputClass, labelClass, primaryButton } from '@/components/admin/ui';
-import { buscarEstado, validarKit } from '@/server/src/habilidades.mjs';
+import { buscarEstado, type validarKit } from '@/server/src/habilidades.mjs';
 
 const compact = `${inputClass} !mt-1`;
 const AYUDA_TOKENS = 'Una línea por efecto. Escribe [[Miedo]] para poner un estado con su color oficial.';
 
-type Problema = ReturnType<typeof validarKit>[number];
+export type Problema = ReturnType<typeof validarKit>[number];
 
-function ListaDeProblemas({ problemas, faltan = [] }: { problemas: Problema[]; faltan?: string[] }) {
+export function ListaDeProblemas({ problemas, faltan = [] }: { problemas: Problema[]; faltan?: string[] }) {
   if (!problemas.length && !faltan.length) {
     return <p className="text-xs text-emerald-300" data-testid="kit-ok">Cumple todas las reglas que se pueden comprobar.</p>;
   }
@@ -125,8 +127,8 @@ function EditorDeActiva({ valor, onChange, facciones, indice }: { valor: ActivaF
   const set = (parche: Partial<ActivaForm>) => onChange({ ...valor, ...parche });
   return (
     <Pieza titulo={`Activa ${indice + 1}`} mp={MP_ACTIVA[indice]}>
-      <div className="grid gap-2 sm:grid-cols-3">
-        <label className={`${labelClass} sm:col-span-2`}>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className={labelClass}>
           Nombre
           <input value={valor.nombre} onChange={(e) => set({ nombre: e.target.value })} className={compact} />
         </label>
@@ -153,7 +155,7 @@ function EditorDeActiva({ valor, onChange, facciones, indice }: { valor: ActivaF
           </label>
         )}
         <label className={labelClass}>
-          Turnos del estado
+          Turnos
           <input inputMode="numeric" value={valor.turnos} onChange={(e) => set({ turnos: e.target.value })} className={compact} />
         </label>
       </div>
@@ -177,17 +179,17 @@ function EditorDeUltimate({ valor, onChange, facciones }: { valor: UltimateForm;
   };
   return (
     <Pieza titulo="Ultimate" mp={MP_ULTIMATE}>
-      <div className="grid gap-2 sm:grid-cols-3">
-        <label className={`${labelClass} sm:col-span-3`}>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className={`${labelClass} sm:col-span-2`}>
           Nombre
           <input value={valor.nombre} onChange={(e) => set({ nombre: e.target.value })} className={compact} />
         </label>
         <label className={labelClass}>
           Fórmula
           <select value={valor.formula} onChange={(e) => set({ formula: e.target.value as UltimateForm['formula'] })} className={compact}>
-            <option value="consecutivos">N ataques consecutivos</option>
-            <option value="directo">Un ataque directo</option>
-            <option value="dado">Lanza 1d6 (X ataques)</option>
+            <option value="consecutivos">Varios ataques</option>
+            <option value="directo">Un solo ataque</option>
+            <option value="dado">Dado 1d6</option>
           </select>
         </label>
         <label className={labelClass}>
@@ -208,7 +210,7 @@ function EditorDeUltimate({ valor, onChange, facciones }: { valor: UltimateForm;
           </label>
         )}
         <label className={labelClass}>
-          Turnos de los estados
+          Turnos
           <input inputMode="numeric" value={valor.turnos} onChange={(e) => set({ turnos: e.target.value })} className={compact} />
         </label>
       </div>
@@ -267,121 +269,152 @@ function VistaPrevia({ habilidades }: { habilidades: SkillForm[] }) {
   );
 }
 
-export function KitBuilder({ skills, facciones, onApply }: { skills: SkillForm[]; facciones: string[]; onApply: (skills: SkillForm[]) => void }) {
-  const [kit, setKit] = useState<KitForm | null>(null);
+const PIEZAS = ['Activa 1', 'Activa 2', 'Pasiva 1', 'Pasiva 2', 'Ultimate'] as const;
+const REVISAR = PIEZAS.length;
+
+/** A qué pieza pertenece un «Falta: …» de `faltantes` (las de la Ultimate no nombran «Ultimate» siempre). */
+function piezaDeFaltante(texto: string): string {
+  if (/Ultimate|Única/.test(texto)) return 'Ultimate';
+  return /(Activa|Pasiva) \d/.exec(texto)?.[0] ?? '';
+}
+
+function EditorDePasiva({ valor, onChange, indice }: { valor: PasivaForm; onChange: (v: PasivaForm) => void; indice: number }) {
+  return (
+    <Pieza titulo={`Pasiva ${indice + 1}`}>
+      <label className={labelClass}>
+        Nombre
+        <input value={valor.nombre} onChange={(e) => onChange({ ...valor, nombre: e.target.value })} className={compact} />
+      </label>
+      <label className={labelClass}>
+        Efecto
+        <textarea rows={4} value={valor.texto} onChange={(e) => onChange({ ...valor, texto: e.target.value })} className={compact} />
+        <span className="mt-1 block text-[11px] normal-case tracking-normal text-dex-muted">{AYUDA_TOKENS}</span>
+      </label>
+    </Pieza>
+  );
+}
+
+export function KitBuilder({
+  skills,
+  facciones,
+  onApply,
+  onCancel,
+}: {
+  skills: SkillForm[];
+  facciones: string[];
+  onApply: (skills: SkillForm[]) => void;
+  onCancel: () => void;
+}) {
+  const [kit, setKit] = useState<KitForm>(() => kitDesdeHabilidades(skills));
+  const [paso, setPaso] = useState(0);
   const [confirmando, setConfirmando] = useState(false);
-  const [aviso, setAviso] = useState<string | null>(null);
 
   const kitActual = skills.filter((s) => s.category !== 'other');
-  const problemasActuales = useMemo(() => {
-    const actual = skills.filter((s) => s.category !== 'other');
-    if (!actual.length) return [];
-    return validarKit({
-      habilidades: actual.map((s) => ({ category: s.category as 'active' | 'passive' | 'ultimate', name: s.name, effectHtml: s.effectHtml ?? s.effect })),
-      // Sin facciones no se sabe nada de la exclusividad: no se acusa a ciegas (igual que el informe).
-      facciones: facciones.length ? facciones : null,
-    });
-  }, [skills, facciones]);
-  const revision = useMemo(() => (kit ? revisarKit(kit, facciones) : null), [kit, facciones]);
-  const errores = revision ? revision.problemas.filter((p) => p.gravedad === 'error').length : 0;
-  const listo = revision !== null && revision.faltan.length === 0 && errores === 0;
+  const revision = useMemo(() => revisarKit(kit, facciones), [kit, facciones]);
+  /**
+   * Lo que la ficha dice HOY en cada pieza. Activas y Ultimate no se pueden leer de vuelta como menús, así
+   * que al rehacerlas se escriben desde cero: tener el texto anterior al lado evita trabajar de memoria.
+   */
+  const anteriores = [
+    ...[0, 1].map((i) => skills.filter((s) => s.category === 'active')[i]),
+    ...[0, 1].map((i) => skills.filter((s) => s.category === 'passive')[i]),
+    skills.find((s) => s.category === 'ultimate'),
+  ];
+  const errores = revision.problemas.filter((p) => p.gravedad === 'error').length;
+  const listo = revision.faltan.length === 0 && errores === 0;
+
+  /** Lo que toca a cada pieza: sus faltantes y los problemas que la nombran. */
+  const dePieza = (pieza: string) => ({
+    faltan: revision.faltan.filter((f) => piezaDeFaltante(f) === pieza),
+    problemas: revision.problemas.filter((p) => p.pieza.split(', ').includes(pieza)),
+  });
 
   const aplicar = () => {
-    if (!revision) return;
     onApply(reemplazarKit(skills, revision.habilidades));
-    setKit(null);
-    setConfirmando(false);
-    setAviso('Kit puesto en el formulario. Guarda los cambios para publicarlo.');
+  };
+
+  const setActiva = (i: number, v: ActivaForm) => {
+    const activas: KitForm['activas'] = [...kit.activas];
+    activas[i] = v;
+    setKit({ ...kit, activas });
+  };
+  const setPasiva = (i: number, v: PasivaForm) => {
+    const pasivas: KitForm['pasivas'] = [...kit.pasivas];
+    pasivas[i] = v;
+    setKit({ ...kit, pasivas });
   };
 
   return (
-    <section className="space-y-3 rounded-2xl border border-dex-line bg-dex-panel/40 p-4" data-testid="kit-builder">
+    <section className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/40 p-4" data-testid="kit-builder">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-bold text-dex-ink">Kit del RPG</h4>
-        {!kit && (
-          <button
-            type="button"
-            className={ghostButton}
-            onClick={() => {
-              setAviso(null);
-              setKit(kitDesdeHabilidades(skills));
-            }}
-          >
-            {kitActual.length ? 'Rehacer el kit con el asistente' : 'Armar el kit con el asistente'}
-          </button>
-        )}
+        <div>
+          <h4 className="text-sm font-bold text-dex-ink">Asistente del kit</h4>
+          <p className="text-xs text-dex-muted">Tú eliges nombres, estados y textos; colores, verbos y evoluciones los pone el sistema.</p>
+        </div>
+        <button type="button" className={ghostButton} onClick={onCancel}>
+          Cancelar
+        </button>
       </div>
-      {aviso && <p className="text-xs text-emerald-300">{aviso}</p>}
-      {!kit && kitActual.length > 0 && <ListaDeProblemas problemas={problemasActuales} />}
-      {!kit && !facciones.length && (
-        <p className="text-[11px] text-dex-muted">La ficha no tiene facciones: no se comprueban los estados exclusivos.</p>
-      )}
 
-      {kit && revision && (
-        <div className="space-y-3">
-          <p className="text-xs text-dex-muted">
-            Tú decides los nombres, los estados y lo que dicen las pasivas a partir del lore; los colores, los verbos y las
-            evoluciones los pone el sistema.
-          </p>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {kit.activas.map((a, i) => (
-              <EditorDeActiva
-                key={i}
-                indice={i}
-                valor={a}
-                facciones={facciones}
-                onChange={(v) => {
-                  const activas: KitForm['activas'] = [...kit.activas];
-                  activas[i] = v;
-                  setKit({ ...kit, activas });
-                }}
-              />
-            ))}
-            {kit.pasivas.map((p, i) => (
-              <Pieza key={i} titulo={`Pasiva ${i + 1}`}>
-                <label className={labelClass}>
-                  Nombre
-                  <input
-                    value={p.nombre}
-                    onChange={(e) => {
-                      const pasivas: KitForm['pasivas'] = [...kit.pasivas];
-                      pasivas[i] = { ...p, nombre: e.target.value };
-                      setKit({ ...kit, pasivas });
-                    }}
-                    className={compact}
-                  />
-                </label>
-                <label className={labelClass}>
-                  Efecto
-                  <textarea
-                    rows={3}
-                    value={p.texto}
-                    onChange={(e) => {
-                      const pasivas: KitForm['pasivas'] = [...kit.pasivas];
-                      pasivas[i] = { ...p, texto: e.target.value };
-                      setKit({ ...kit, pasivas });
-                    }}
-                    className={compact}
-                  />
-                  <span className="mt-1 block text-[11px] normal-case tracking-normal text-dex-muted">{AYUDA_TOKENS}</span>
-                </label>
-              </Pieza>
-            ))}
-          </div>
-          <EditorDeUltimate valor={kit.ultimate} onChange={(ultimate) => setKit({ ...kit, ultimate })} facciones={facciones} />
+      <nav aria-label="Piezas del kit">
+        <ol className="flex flex-wrap gap-1.5">
+          {[...PIEZAS, 'Revisar'].map((nombre, i) => {
+            const estado = i === REVISAR ? null : dePieza(nombre);
+            const bien = estado && !estado.faltan.length && !estado.problemas.some((p) => p.gravedad === 'error');
+            return (
+              <li key={nombre}>
+                <button
+                  type="button"
+                  aria-current={paso === i ? 'step' : undefined}
+                  onClick={() => setPaso(i)}
+                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
+                    paso === i ? 'border-dex-accent bg-dex-accent/15 text-dex-ink' : 'border-dex-line text-dex-muted hover:text-dex-ink'
+                  }`}
+                >
+                  {estado && (
+                    <span aria-hidden className={bien ? 'text-emerald-300' : 'text-amber-300'}>
+                      {bien ? '✓' : '•'}
+                    </span>
+                  )}
+                  {nombre}
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
 
-          <div className="space-y-2 rounded-xl border border-dex-line p-3">
-            <h5 className="text-xs font-bold uppercase tracking-[0.14em] text-dex-muted">Revisión</h5>
-            <ListaDeProblemas problemas={revision.problemas} faltan={revision.faltan} />
+      {paso < REVISAR ? (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <div>
+            {paso < 2 && <EditorDeActiva indice={paso} valor={kit.activas[paso]} facciones={facciones} onChange={(v) => setActiva(paso, v)} />}
+            {paso >= 2 && paso < 4 && <EditorDePasiva indice={paso - 2} valor={kit.pasivas[paso - 2]} onChange={(v) => setPasiva(paso - 2, v)} />}
+            {paso === 4 && <EditorDeUltimate valor={kit.ultimate} onChange={(ultimate) => setKit({ ...kit, ultimate })} facciones={facciones} />}
           </div>
-          <details className="rounded-xl border border-dex-line p-3">
-            <summary className="cursor-pointer text-xs font-bold uppercase tracking-[0.14em] text-dex-muted">Vista previa</summary>
-            <div className="mt-2">
-              <VistaPrevia habilidades={revision.habilidades} />
+          <aside className="space-y-3">
+            <div className="space-y-1">
+              <h5 className="text-xs font-bold uppercase tracking-[0.14em] text-dex-muted">Así se verá</h5>
+              <VistaPrevia habilidades={[revision.habilidades[paso]]} />
             </div>
-          </details>
-
-          {confirmando ? (
+            <ListaDeProblemas {...dePieza(PIEZAS[paso])} />
+            {anteriores[paso] && (anteriores[paso]?.effectHtml || anteriores[paso]?.effect) && (
+              <details className="rounded-xl border border-dex-line/70 p-2" data-testid="kit-anterior">
+                <summary className="cursor-pointer text-xs text-dex-muted">Lo que dice ahora la ficha</summary>
+                <p className="mt-2 text-sm font-semibold text-dex-ink">{anteriores[paso]?.name}</p>
+                {/* HTML ya guardado en la ficha: el servidor solo acepta su lista blanca. */}
+                <div
+                  className="mt-1 text-sm leading-relaxed text-dex-ink/75"
+                  dangerouslySetInnerHTML={{ __html: anteriores[paso]?.effectHtml ?? anteriores[paso]?.effect ?? '' }}
+                />
+              </details>
+            )}
+          </aside>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <ListaDeProblemas problemas={revision.problemas} faltan={revision.faltan} />
+          <VistaPrevia habilidades={revision.habilidades} />
+          {confirmando && (
             <div role="alertdialog" aria-label="Confirmar reemplazo del kit" className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
               <p>
                 Se reemplazan las {kitActual.length} habilidades actuales. Los puntos de habilidad repartidos en «Mi ficha» van por
@@ -396,8 +429,22 @@ export function KitBuilder({ skills, facciones, onApply }: { skills: SkillForm[]
                 </button>
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {!confirmando && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-dex-line pt-3">
+          <button type="button" className={ghostButton} disabled={paso === 0} onClick={() => setPaso(paso - 1)}>
+            ← Anterior
+          </button>
+          {paso < REVISAR ? (
+            <button type="button" className={primaryButton} onClick={() => setPaso(paso + 1)}>
+              {paso === REVISAR - 1 ? 'Revisar el kit →' : `Siguiente: ${PIEZAS[paso + 1]} →`}
+            </button>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <span className="flex flex-wrap items-center gap-2">
+              {!listo && <span className="text-[11px] text-dex-muted">Corrige lo marcado para poder usarlo.</span>}
               <button
                 type="button"
                 className={primaryButton}
@@ -406,11 +453,7 @@ export function KitBuilder({ skills, facciones, onApply }: { skills: SkillForm[]
               >
                 Usar este kit
               </button>
-              <button type="button" className={ghostButton} onClick={() => setKit(null)}>
-                Cancelar
-              </button>
-              {!listo && <span className="self-center text-[11px] text-dex-muted">Corrige lo marcado para poder usarlo.</span>}
-            </div>
+            </span>
           )}
         </div>
       )}

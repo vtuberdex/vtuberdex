@@ -11,7 +11,7 @@
  */
 import type { VtuberCard } from '@/lib/types';
 
-export type StepId = 'identidad' | 'imagenes' | 'colores' | 'historia' | 'atributos' | 'revision';
+export type StepId = 'identidad' | 'imagenes' | 'colores' | 'historia' | 'atributos' | 'habilidades' | 'redes' | 'revision';
 
 export interface CheckItem {
   id: string;
@@ -49,13 +49,13 @@ export function checklist(input: CompletenessInput): CheckItem[] {
     { id: 'frase', label: 'Frase de presentación', ok: input.phrase, step: 'historia', hint: 'Una línea que lo describa.' },
     { id: 'historia', label: 'Historia (lore)', ok: input.cardText, step: 'historia', hint: 'Cuenta quién es en unas líneas.' },
     { id: 'atributos', label: 'Atributos', ok: input.stats > 0, step: 'atributos', hint: 'Usa «Añadir atributos estándar».' },
-    { id: 'redes', label: 'Redes sociales', ok: input.socials > 0, step: 'atributos', hint: 'Añade al menos un enlace.' },
+    { id: 'redes', label: 'Redes sociales', ok: input.socials > 0, step: 'redes', hint: 'Añade al menos un enlace.' },
   ];
   if (input.profile !== undefined) {
     items.push({ id: 'perfil', label: 'Datos de perfil (recomendado)', ok: input.profile > 0, step: 'historia', hint: 'Cumpleaños, altura…', optional: true });
   }
   if (input.skills !== undefined) {
-    items.push({ id: 'habilidades', label: 'Habilidades (recomendado)', ok: input.skills > 0, step: 'atributos', hint: 'Activas, pasivas o definitiva.', optional: true });
+    items.push({ id: 'habilidades', label: 'Habilidades (recomendado)', ok: input.skills > 0, step: 'habilidades', hint: 'Activas, pasivas o definitiva.', optional: true });
   }
   return items;
 }

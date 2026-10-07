@@ -23,6 +23,8 @@ import { checklist, percent, stepComplete, type StepId } from '@/components/admi
 import { FactionWizard } from '@/components/admin/faction-wizard';
 import { buildPatch, createBody, DEFAULT_THEME, emptyForm, formFromDetail, slugifyUrl, type EditorForm } from '@/components/admin/form-model';
 import { AttributesStep } from '@/components/admin/steps/attributes-step';
+import { SkillsStep } from '@/components/admin/steps/skills-step';
+import { SocialsStep } from '@/components/admin/steps/socials-step';
 import { ColorsStep } from '@/components/admin/steps/colors-step';
 import { IdentityStep } from '@/components/admin/steps/identity-step';
 import { ImagesStep } from '@/components/admin/steps/images-step';
@@ -42,7 +44,9 @@ const STEPS: Array<{ id: StepId; label: string; help: string }> = [
   { id: 'imagenes', label: 'Imágenes', help: 'Personaje, logo y fondo.' },
   { id: 'colores', label: 'Colores y facciones', help: 'El color de la carta y su(s) facción(es).' },
   { id: 'historia', label: 'Historia', help: 'Frase, lore y datos de perfil.' },
-  { id: 'atributos', label: 'Atributos, habilidades y redes', help: 'Números, poderes y enlaces.' },
+  { id: 'atributos', label: 'Atributos', help: 'Los números que se dibujan como barras (vida, ataque…).' },
+  { id: 'habilidades', label: 'Habilidades', help: 'El kit del RPG: 2 activas, 2 pasivas y la Ultimate.' },
+  { id: 'redes', label: 'Redes sociales', help: 'Los enlaces a sus canales.' },
   { id: 'revision', label: 'Revisar y publicar', help: 'Comprueba y decide si se publica.' },
 ];
 const stepLabel = (id: StepId) => STEPS.find((step) => step.id === id)?.label ?? id;
@@ -408,6 +412,8 @@ export function CardWizard({
         {step.id === 'colores' && <ColorsStep form={form} set={set} factions={factions} onCreateFaction={() => setFactionDialog(true)} />}
         {step.id === 'historia' && <StoryStep form={form} set={set} />}
         {step.id === 'atributos' && <AttributesStep form={form} set={set} />}
+        {step.id === 'habilidades' && <SkillsStep form={form} set={set} />}
+        {step.id === 'redes' && <SocialsStep form={form} set={set} />}
         {step.id === 'revision' && (
           <ReviewStep
             form={form}
