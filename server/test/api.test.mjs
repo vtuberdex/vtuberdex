@@ -297,6 +297,14 @@ test('GET /api/admin/stats resume totales y calidad', async () => {
   assert.equal(body.totals.total, 2);
   assert.equal(body.totals.notPublished, 0);
   assert.ok(body.quality.length > 0);
+  // Lo que dibuja el panel: estados que suman el total, países, facciones, grados y la cola.
+  assert.equal(body.estados.published + body.estados.draft + body.estados.hidden, 2);
+  assert.ok(body.totals.sinProblemas >= 0 && body.totals.sinProblemas <= 2);
+  assert.ok(body.paises.some((pais) => pais.name && pais.count > 0));
+  assert.ok(body.paises.length <= 10 && body.facciones.length <= 10);
+  assert.ok(Array.isArray(body.grados));
+  assert.equal(body.correo.con + body.correo.sin, 2);
+  assert.deepEqual(Object.keys(body.solicitudes.pendientes).sort(), ['baja', 'inscripcion', 'modificacion']);
 });
 
 test('el número de dex solo se cambia a uno LIBRE y el anterior queda disponible', async () => {

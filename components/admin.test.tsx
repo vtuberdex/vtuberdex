@@ -58,7 +58,17 @@ beforeEach(() => {
   mocks.dexNext.mockResolvedValue({ next: 786 });
   mocks.factions.mockResolvedValue({ items: FACTIONS });
   mocks.session.mockResolvedValue({ user: { username: 'admin', role: 'admin' } });
-  mocks.adminStats.mockResolvedValue({ totals: { total: 785, withDetail: 211, notPublished: 1 }, themes: 205, quality: [] });
+  mocks.adminStats.mockResolvedValue({
+    totals: { total: 785, withDetail: 211, notPublished: 1, sinProblemas: 700 },
+    estados: { published: 784, draft: 1, hidden: 0 },
+    themes: 205,
+    quality: [],
+    paises: [{ name: 'Chile', flag: '🇨🇱', count: 120 }],
+    facciones: [{ name: 'Netherbane', count: 40 }],
+    grados: [{ grade: '10', count: 1 }, { grade: '1', count: 2 }],
+    correo: { con: 12, sin: 773 },
+    solicitudes: { pendientes: { inscripcion: 2, modificacion: 1, baja: 0 } },
+  });
   mocks.audit.mockResolvedValue({ items: [] });
   mocks.list.mockResolvedValue(makeList());
   mocks.adminList.mockResolvedValue({ items: [], total: 0, page: 1, perPage: 40, pageCount: 1 });
@@ -560,10 +570,28 @@ describe('AdminPage', () => {
     mocks.adminList.mockResolvedValue({ items: [detail], total: 1, page: 1, perPage: 40, pageCount: 1 });
     mocks.adminDetail.mockResolvedValue(detail);
     render(<AdminPage />);
+    // Sin búsqueda ni filtro la lista no pide nada: es un buscador, no un índice.
+    expect(await screen.findByTestId('list-idle')).toBeInTheDocument();
+    expect(mocks.adminList).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByPlaceholderText('nombre o número'), { target: { value: 'gkuro' } });
     const row = await screen.findByRole('button', { name: /GKuro Monochrome/ });
+    expect(mocks.adminList).toHaveBeenLastCalledWith('tok', expect.objectContaining({ q: 'gkuro', perPage: 10 }), expect.anything());
     expect(within(row).getByTestId('row-percent')).toHaveTextContent(/%/);
     fireEvent.click(row);
     await waitFor(() => expect(mocks.adminDetail).toHaveBeenCalledWith('tok', 18));
     expect(await screen.findByTestId('admin-editor')).toBeInTheDocument();
+  });
+
+  test('el panel muestra medidores y gráficos del catálogo', async () => {
+    window.localStorage.setItem('vtuberdex.admin.token', 'tok');
+    render(<AdminPage />);
+    const panel = await screen.findByTestId('panel-estadisticas');
+    expect(within(panel).getAllByTestId('medidor')).toHaveLength(4);
+    expect(within(panel).getByRole('img', { name: /Publicadas: 100%/ })).toBeInTheDocument();
+    expect(within(panel).getByRole('img', { name: /Con correo: 2%/ })).toBeInTheDocument();
+    expect(within(panel).getByText('Top 10 países')).toBeInTheDocument();
+    expect(within(panel).getByTitle('🇨🇱 Chile: 120')).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole('button', { name: 'revisar' }));
+    expect(screen.getByRole('tab', { name: 'Solicitudes' })).toHaveAttribute('aria-selected', 'true');
   });
 });

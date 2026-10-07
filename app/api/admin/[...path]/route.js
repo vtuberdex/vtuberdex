@@ -74,6 +74,7 @@ import {
   resolverSolicitud,
 } from '../../../../server/src/solicitudes.mjs';
 import { listarConCorreo } from '../../../../server/src/correo-fichas.mjs';
+import { estadisticasDelMantenedor } from '../../../../server/src/estadisticas-admin.mjs';
 import { prepararModificacion } from '../../../../server/src/modificacion.mjs';
 import { vistaPrevia } from '../../../../server/src/solicitud-vista.mjs';
 import { getVtuberBySlug } from '../../../../server/src/search.mjs';
@@ -282,10 +283,11 @@ async function logout(request) {
 }
 
 /**
- * `GET /api/admin/stats` — totales y calidad del catálogo.
+ * `GET /api/admin/stats` — los datos del panel (totales, estados, calidad, países, facciones,
+ * grados, correos y solicitudes pendientes).
  *
- * Se calcula sobre la SQLite empaquetada (las MISMAS consultas que el Express) y luego se
- * aplican las ediciones, para que los totales no contradigan la lista que el mantenedor
+ * Se calcula con `estadisticasDelMantenedor` (la MISMA función que el Express) sobre la base con
+ * el diario aplicado, para que los totales no contradigan la lista que el mantenedor
  * muestra al lado: si alguien despublica una ficha, `notPublished` tiene que subir.
  *
  * `audit` no se calcula: el registro de auditoría vive en `audit_log`, que en la base
@@ -295,28 +297,13 @@ async function logout(request) {
  */
 async function estadisticas() {
   const db = await dbConDiario();
-  const totals = db
-    .prepare(
-      `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN has_detail = 1 THEN 1 ELSE 0 END) AS withDetail,
-              SUM(CASE WHEN status != 'published' THEN 1 ELSE 0 END) AS notPublished
-         FROM vtuber`,
-    )
-    .get();
-  const quality = db
-    .prepare('SELECT data_quality AS flags, COUNT(*) AS count FROM vtuber GROUP BY data_quality ORDER BY count DESC')
-    .all()
-    .map((row) => ({ flags: JSON.parse(row.flags ?? '[]'), count: row.count }));
-  const themes = db.prepare('SELECT COUNT(DISTINCT theme_color) AS n FROM vtuber').get().n;
-  return NextResponse.json({
-    totals: {
-      total: Number(totals.total ?? 0),
-      withDetail: Number(totals.withDetail ?? 0),
-      notPublished: Number(totals.notPublished ?? 0),
-    },
-    themes,
-    quality,
-  });
+  let ejecutor = null;
+  try {
+    ejecutor = await ejecutorDeSolicitudes();
+  } catch (error) {
+    console.error('[admin] sin cola de solicitudes: las estadísticas salen sin correos ni pendientes', error);
+  }
+  return NextResponse.json(await estadisticasDelMantenedor(db, ejecutor), { headers: { 'cache-control': 'no-store' } });
 }
 
 /**

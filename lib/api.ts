@@ -3,6 +3,7 @@
  * consume funciones tipadas y nunca arma URLs a mano.
  */
 import type {
+  AdminStats,
   AdminCorreoFilter,
   AdminListResponse,
   AdminStatusFilter,
@@ -434,11 +435,7 @@ export const api = {
     return request<VistaPreviaSolicitud>(`/api/admin/solicitudes/${id}/vista-previa${query}`, { headers: bearer(token) });
   },
   adminStats(token: string) {
-    return request<{
-      totals: { total: number; withDetail: number; notPublished: number };
-      themes: number;
-      quality: Array<{ flags: string[]; count: number }>;
-    }>('/api/admin/stats', { headers: { authorization: `Bearer ${token}` } });
+    return request<AdminStats>('/api/admin/stats', { headers: { authorization: `Bearer ${token}` } });
   },
   audit(token: string) {
     return request<{

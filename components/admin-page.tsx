@@ -5,15 +5,16 @@
  * Reemplaza el "editar HTML a mano" del origen. Aquí solo está el estado que comparten
  * (sesión, catálogo de facciones, qué ficha está abierta) y los avisos.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
-import { facetValue, type FactionRow, type VtuberDetail } from '@/lib/types';
+import { facetValue, type AdminStats, type FactionRow, type VtuberDetail } from '@/lib/types';
 import { DEFAULT_SEARCH } from '@/lib/query';
 import { CardWizard } from '@/components/admin/card-wizard';
 import { FactionManager } from '@/components/admin/faction-manager';
 import { GettingStarted } from '@/components/admin/getting-started';
+import { PanelEstadisticas } from '@/components/admin/panel-estadisticas';
 import { PremiumRates } from '@/components/admin/premium-rates';
 import { PremiumManager } from '@/components/admin/premium-manager';
 import { SolicitudesManager } from '@/components/admin/solicitudes-manager';
@@ -23,21 +24,6 @@ import { primaryButton } from '@/components/admin/ui';
 import { ToastContainer, useToasts } from '@/components/toast';
 
 const TOKEN_KEY = 'vtuberdex.admin.token';
-
-interface AdminStats {
-  totals: { total: number; withDetail: number; notPublished: number };
-  themes: number;
-  quality: Array<{ flags: string[]; count: number }>;
-}
-
-const FLAG_LABELS: Record<string, string> = {
-  'sin-imagen-carta': 'Sin imagen de carta',
-  'sin-ficha': 'Sin ficha personal',
-  'sin-stats': 'Sin atributos',
-  'sin-skills': 'Sin habilidades',
-  'sin-color': 'Sin color de marca',
-  'sin-logo': 'Sin logo',
-};
 
 type Section = 'fichas' | 'emblemas' | 'premium' | 'tarifas' | 'solicitudes';
 type View = { kind: 'none' } | { kind: 'create'; n: number } | { kind: 'edit'; detail: VtuberDetail; epoch: number };
@@ -208,17 +194,6 @@ export function AdminPage() {
     }
   };
 
-  const qualitySummary = useMemo(
-    () =>
-      (stats?.quality ?? [])
-        .flatMap((bucket) => bucket.flags.map((flag) => ({ flag, count: bucket.count })))
-        .reduce<Record<string, number>>((accumulator, item) => {
-          accumulator[item.flag] = (accumulator[item.flag] ?? 0) + item.count;
-          return accumulator;
-        }, {}),
-    [stats],
-  );
-
   if (!user) {
     if (tokenDeEnlace) {
       return (
@@ -320,35 +295,8 @@ export function AdminPage() {
 
       <GettingStarted onGoFactions={() => setSection('emblemas')} onNewCard={startCreate} />
 
-      {/* Métricas */}
-      {stats && (
-        <section className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: 'VTubers', value: stats.totals.total },
-            { label: 'Con ficha completa', value: stats.totals.withDetail },
-            { label: 'Sin publicar', value: stats.totals.notPublished },
-            { label: 'Colores de marca', value: stats.themes },
-          ].map((metric) => (
-            <div key={metric.label} className="rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
-              <p className="text-xs uppercase tracking-[0.14em] text-dex-muted">{metric.label}</p>
-              <p className="mt-1 font-mono text-2xl font-bold text-dex-ink">{metric.value}</p>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {Object.keys(qualitySummary).length > 0 && (
-        <section className="mb-6 rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
-          <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">Calidad de datos</h2>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {Object.entries(qualitySummary).map(([flag, count]) => (
-              <li key={flag} className="rounded-full border border-dex-line px-3 py-1 text-xs text-dex-muted">
-                {FLAG_LABELS[flag] ?? flag}: <span className="font-mono text-dex-ink">{count}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* Panel: medidores y gráficos del catálogo (components/admin/panel-estadisticas.tsx). */}
+      {stats && <PanelEstadisticas stats={stats} onVerSolicitudes={() => setSection('solicitudes')} />}
 
       <div role="tablist" aria-label="Secciones del mantenedor" className="mb-6 flex gap-1 border-b border-dex-line">
         {sections.map((item) => (

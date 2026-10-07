@@ -231,6 +231,19 @@ export type AdminStatusFilter = 'all' | VtuberStatus;
 /** Filtro por correo asociado del listado del mantenedor (`todos` = sin filtrar). */
 export type AdminCorreoFilter = 'todos' | 'con' | 'sin';
 
+/** `GET /api/admin/stats` (`server/src/estadisticas-admin.mjs`). `correo`/`solicitudes` son nulos sin cola. */
+export interface AdminStats {
+  totals: { total: number; withDetail: number; notPublished: number; sinProblemas: number };
+  estados: { published: number; draft: number; hidden: number };
+  themes: number;
+  quality: Array<{ flags: string[]; count: number }>;
+  paises: Array<{ name: string; flag: string | null; count: number }>;
+  facciones: Array<{ name: string; count: number }>;
+  grados: Array<{ grade: string; count: number }>;
+  correo: { con: number; sin: number } | null;
+  solicitudes: { pendientes: { inscripcion: number; baja: number; modificacion: number } } | null;
+}
+
 /** Fila del catálogo cerrado de facciones, con su uso (`total` = fichas, `publicadas` = visibles). */
 export interface FactionRow {
   id: number;

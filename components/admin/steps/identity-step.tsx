@@ -77,14 +77,16 @@ export function IdentityStep({
         </div>
 
         <Field label="Correo electrónico" hint="Privado: no se muestra en la carta ni en la página. Se usa para avisos de nivel y «Mi ficha». Al guardar uno nuevo se le envía un correo de bienvenida. Déjalo vacío si no hay.">
-          <span className="mt-1 flex flex-wrap items-center gap-2">
+          {/* Apilado, no en fila: en media columna el botón le quitaba el ancho al input (min-w-0 + flex-1)
+              y el correo dejaba de verse justo mientras se escribía. */}
+          <span className="mt-1 flex flex-col items-start gap-2">
             <input
               type="email"
               autoComplete="off"
               aria-label="Correo electrónico"
               value={email}
               onChange={(event) => onEmailChange(event.target.value)}
-              className={`${inputClass} mt-0! min-w-0 flex-1`}
+              className={`${inputClass} mt-0! w-full`}
               placeholder="persona@ejemplo.com"
             />
             {emailDirty && (
