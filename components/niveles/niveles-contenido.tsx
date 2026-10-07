@@ -10,7 +10,8 @@ import Link from 'next/link';
 
 import { EscalaDeRangos, Figura, GraficoBarraYTotal, GraficoCurva, MaquetaFichaPublica, MaquetaMiFicha, PasosDelCamino } from '@/components/niveles/graficos';
 import { useI18n } from '@/lib/i18n';
-import { BASE_NIVEL, PASO_NIVEL, PUNTOS_POR_NIVEL, RANGO_MAXIMO, XP_POR_LIKE, umbralDeNivel } from '@/server/src/experiencia.mjs';
+import { BASE_NIVEL, PASO_NIVEL, PUNTOS_POR_NIVEL, PUNTOS_STATS_POR_NIVEL, RANGO_MAXIMO, XP_POR_LIKE, umbralDeNivel } from '@/server/src/experiencia.mjs';
+import { STATS_AUTOMATICOS } from '@/server/src/mi-ficha.mjs';
 
 /** Hasta qué nivel llega la tabla de ejemplo. */
 const NIVELES_EN_TABLA = 10;
@@ -26,7 +27,14 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
 
 export function NivelesContenido() {
   const { t, locale } = useI18n();
-  const cifras = { xp: XP_POR_LIKE, base: BASE_NIVEL, paso: PASO_NIVEL, pts: PUNTOS_POR_NIVEL, max: RANGO_MAXIMO };
+  const cifras = { xp: XP_POR_LIKE, base: BASE_NIVEL, paso: PASO_NIVEL, pts: PUNTOS_POR_NIVEL,
+    max: RANGO_MAXIMO,
+    // Las reglas de los stats salen del servidor, no de números escritos en el texto.
+    ptsStats: PUNTOS_STATS_POR_NIVEL,
+    cadaRapido: STATS_AUTOMATICOS.speed.cada,
+    cadaSuerte: STATS_AUTOMATICOS.luck.cada,
+    topeSuerte: STATS_AUTOMATICOS.luck.tope,
+  };
   const fmt = (n: number) => n.toLocaleString(locale);
   // «Para subir al nivel N» pide lo que vale el nivel N-1.
   const filas = Array.from({ length: NIVELES_EN_TABLA - 1 }, (_, i) => {
@@ -90,6 +98,12 @@ export function NivelesContenido() {
         <Figura titulo={t('niveles.m3.titulo')} texto={t('niveles.m3.texto', cifras)}>
           <EscalaDeRangos />
         </Figura>
+      </Seccion>
+
+      <Seccion titulo={t('niveles.sStats.titulo')}>
+        <p>{t('niveles.sStats.texto', cifras)}</p>
+        <p>{t('niveles.sStats.auto', cifras)}</p>
+        <p className="text-xs text-dex-muted">{t('niveles.sStats.aviso')}</p>
       </Seccion>
 
       <Seccion titulo={t('niveles.s5.titulo')}>

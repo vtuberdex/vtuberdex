@@ -6,7 +6,7 @@
 export const nivelesEs = {
   'pie.niveles': 'Cómo funcionan los niveles',
   'niveles.titulo': 'Cómo funcionan los niveles',
-  'niveles.intro': 'Cada ficha tiene experiencia, nivel y habilidades que se pueden mejorar. Esta página explica cómo funciona todo, paso a paso.',
+  'niveles.intro': 'Cada ficha tiene experiencia, nivel, habilidades y stats que se pueden mejorar. Esta página explica cómo funciona todo, paso a paso.',
   'niveles.s1.titulo': '1. La experiencia viene de los likes',
   'niveles.s1.texto':
     'Cualquier visitante puede darle un like a una ficha, uno por día. Cada like suma {xp} puntos de experiencia (EXP). No hay nada más que hacer: la experiencia crece sola con el cariño de la comunidad.',
@@ -24,16 +24,22 @@ export const nivelesEs = {
   'niveles.s4.texto':
     'Cada vez que tu ficha sube de nivel gracias a los likes, ganas {pts} puntos de habilidad. Cada punto mejora una de tus habilidades en un rango, hasta el rango {max}. Los puntos no caducan: puedes guardarlos y gastarlos cuando quieras.',
   'niveles.s4.aviso': 'Solo cuentan los niveles que ganas desde que tu ficha existe en VTuberDex; el nivel con que empezó no da puntos.',
+  'niveles.sStats.titulo': 'Puntos de stats',
+  'niveles.sStats.texto':
+    'Aparte de las habilidades, cada nivel ganado te da {ptsStats} puntos de stats. Sirven para subir HP, MP, Ataque, Ataque Mágico, Defensa y Defensa Mágica: cada punto suma una cantidad fija (HP +50, MP +25, el resto +5). Se reparten en «Mi ficha» y se ven en tu ficha pública.',
+  'niveles.sStats.auto':
+    'Velocidad, Evasión, Precisión y Crítico suben solos: +1 cada {cadaRapido} niveles ganados. La Suerte sube +1 cada {cadaSuerte} niveles, hasta un máximo de {topeSuerte}. La Evasión no pasa de 100. Estos no gastan puntos.',
+  'niveles.sStats.aviso': 'Los puntos de stats y los de habilidad son bolsas separadas: no se mezclan.',
   'niveles.s5.titulo': '5. Cómo repartir tus puntos',
   'niveles.s5.paso1': 'Cuando tu ficha sube de nivel te llega un correo a la dirección con la que la inscribiste.',
   'niveles.s5.paso2': 'Pulsa el botón del correo: entras a «Mi ficha» sin contraseña.',
-  'niveles.s5.paso3': 'Elige las habilidades que quieras mejorar y pulsa «Subir». El rango se ve al instante en tu ficha pública.',
+  'niveles.s5.paso3': 'Elige las habilidades y los stats que quieras mejorar y pulsa «Subir». El cambio se ve al instante en tu ficha pública.',
   'niveles.s5.nota':
     'El enlace del correo vale 7 días y puedes usarlo varias veces. Si caduca o lo perdiste, pide otro en «Mi ficha» con tu correo.',
   'niveles.s5.boton': 'Ir a Mi ficha',
   'niveles.s6.titulo': 'Preguntas frecuentes',
   'niveles.q1': '¿Puedo cambiar cómo repartí mis puntos?',
-  'niveles.a1': 'Sí. En «Mi ficha» el botón «Repartir de nuevo» te devuelve todos los puntos para que los repartas otra vez.',
+  'niveles.a1': 'Sí. En «Mi ficha» los botones «Repartir de nuevo» (habilidades) y «Repartir stats de nuevo» te devuelven los puntos para que los repartas otra vez.',
   'niveles.q2': '¿Qué pasa si mi ficha no tiene correo?',
   'niveles.a2':
     'Las fichas que vienen del catálogo original no tienen un correo asociado, así que suben de nivel pero no reciben el aviso ni pueden repartir puntos. Las fichas inscritas por el formulario sí.',
@@ -51,7 +57,7 @@ export const nivelesEs = {
   'niveles.flujo.3.t': 'Te llega un correo',
   'niveles.flujo.3.d': 'Con un botón para entrar sin contraseña.',
   'niveles.flujo.4.t': 'Reparten sus puntos',
-  'niveles.flujo.4.d': 'Eligen qué habilidades mejorar.',
+  'niveles.flujo.4.d': 'Eligen qué habilidades y stats mejorar.',
   'niveles.g1.titulo': 'La barra se vacía, el total sigue subiendo',
   'niveles.g1.texto': 'Arriba, la barra de cada nivel: se llena y vuelve a cero al subir. Abajo, la EXP total: solo sube. Ambas salen de los mismos likes.',
   'niveles.g1.barra': 'Barra del nivel',
@@ -76,7 +82,7 @@ export const nivelesEs = {
 export const nivelesEn: { [K in keyof typeof nivelesEs]: string } = {
   'pie.niveles': 'How levels work',
   'niveles.titulo': 'How levels work',
-  'niveles.intro': 'Every profile has experience, a level and skills that can be improved. This page explains how it all works, step by step.',
+  'niveles.intro': 'Every profile has experience, a level, skills and stats that can be improved. This page explains how it all works, step by step.',
   'niveles.s1.titulo': '1. Experience comes from likes',
   'niveles.s1.texto':
     'Any visitor can give a profile one like per day. Each like adds {xp} experience points (EXP). There is nothing else to do: experience grows by itself with the community’s love.',
@@ -94,10 +100,16 @@ export const nivelesEn: { [K in keyof typeof nivelesEs]: string } = {
   'niveles.s4.texto':
     'Every time your profile levels up thanks to likes, you earn {pts} skill points. Each point improves one of your skills by one rank, up to rank {max}. Points never expire: you can save them and spend them whenever you like.',
   'niveles.s4.aviso': 'Only the levels you gain since your profile joined VTuberDex count; the level it started with gives no points.',
+  'niveles.sStats.titulo': 'Stat points',
+  'niveles.sStats.texto':
+    'Besides skills, every level you gain gives you {ptsStats} stat points. They raise HP, MP, Attack, Magic Attack, Defense and Magic Defense: each point adds a fixed amount (HP +50, MP +25, the rest +5). You spend them in “My profile” and they show on your public profile.',
+  'niveles.sStats.auto':
+    'Speed, Evasion, Accuracy and Critical grow on their own: +1 every {cadaRapido} levels gained. Luck grows +1 every {cadaSuerte} levels, up to a maximum of {topeSuerte}. Evasion never goes past 100. These do not cost points.',
+  'niveles.sStats.aviso': 'Stat points and skill points are separate pools: they are never mixed.',
   'niveles.s5.titulo': '5. How to spend your points',
   'niveles.s5.paso1': 'When your profile levels up, an email arrives at the address you registered it with.',
   'niveles.s5.paso2': 'Press the button in the email: you enter “My profile” without a password.',
-  'niveles.s5.paso3': 'Pick the skills you want to improve and press “Upgrade”. The rank shows up right away on your public profile.',
+  'niveles.s5.paso3': 'Pick the skills and stats you want to improve and press “Upgrade”. The change shows up right away on your public profile.',
   'niveles.s5.nota':
     'The email link lasts 7 days and you can use it several times. If it expires or you lost it, ask for a new one in “My profile” with your email.',
   'niveles.s5.boton': 'Go to My profile',
@@ -121,7 +133,7 @@ export const nivelesEn: { [K in keyof typeof nivelesEs]: string } = {
   'niveles.flujo.3.t': 'You get an email',
   'niveles.flujo.3.d': 'With a button to sign in without a password.',
   'niveles.flujo.4.t': 'Spend the points',
-  'niveles.flujo.4.d': 'Choose which skills to improve.',
+  'niveles.flujo.4.d': 'Choose which skills and stats to improve.',
   'niveles.g1.titulo': 'The bar empties, the total keeps growing',
   'niveles.g1.texto': 'Top: each level’s bar, which fills and goes back to zero when you level up. Bottom: total EXP, which only goes up. Both come from the same likes.',
   'niveles.g1.barra': 'Level bar',
@@ -164,6 +176,12 @@ export const nivelesJa: { [K in keyof typeof nivelesEs]: string } = {
   'niveles.s4.texto':
     'いいねでカードがレベルアップするたびに、スキルポイントが{pts}ポイントもらえます。1ポイントでスキルを1ランク強化でき、最大ランクは{max}です。ポイントに期限はなく、好きなときに使えます。',
   'niveles.s4.aviso': 'VTuberDexに登録されてから上がったレベルだけが対象です。最初から持っていたレベルではポイントはもらえません。',
+  'niveles.sStats.titulo': 'ステータスポイント',
+  'niveles.sStats.texto':
+    'スキルとは別に、獲得したレベルごとに {ptsStats} ポイントのステータスポイントがもらえます。HP・MP・攻撃・魔法攻撃・防御・魔法防御を上げられ、1ポイントで固定値が加算されます（HP +50、MP +25、その他 +5）。「マイカード」で振り分けると、公開カードに反映されます。',
+  'niveles.sStats.auto':
+    '素早さ・回避・命中・クリティカルは自動で上がります：獲得 {cadaRapido} レベルごとに +1。運は {cadaSuerte} レベルごとに +1、最大 {topeSuerte} です。回避は 100 を超えません。これらはポイントを使いません。',
+  'niveles.sStats.aviso': 'ステータスポイントとスキルポイントは別々で、混ざることはありません。',
   'niveles.s5.titulo': '5. ポイントの振り分け方',
   'niveles.s5.paso1': 'カードがレベルアップすると、登録したメールアドレスにメールが届きます。',
   'niveles.s5.paso2': 'メールのボタンを押すと、パスワードなしで「マイカード」に入れます。',

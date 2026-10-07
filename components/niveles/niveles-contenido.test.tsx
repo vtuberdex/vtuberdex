@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 
 import { NivelesContenido } from '@/components/niveles/niveles-contenido';
 import { AppFooter } from '@/components/app-footer';
-import { BASE_NIVEL, PASO_NIVEL, PUNTOS_POR_NIVEL, RANGO_MAXIMO, XP_POR_LIKE } from '@/server/src/experiencia.mjs';
+import { BASE_NIVEL, PASO_NIVEL, PUNTOS_POR_NIVEL, PUNTOS_STATS_POR_NIVEL, RANGO_MAXIMO, XP_POR_LIKE } from '@/server/src/experiencia.mjs';
 
 describe('página de niveles', () => {
   test('las cifras que explica son las de la regla, no números escritos a mano', () => {
@@ -14,6 +14,7 @@ describe('página de niveles', () => {
     expect(pagina.textContent).toContain(`${PASO_NIVEL} más`);
     expect(pagina.textContent).toContain(`${PUNTOS_POR_NIVEL} puntos de habilidad`);
     expect(pagina.textContent).toContain(`rango ${RANGO_MAXIMO}`);
+    expect(pagina.textContent).toContain(`${PUNTOS_STATS_POR_NIVEL} puntos de stats`);
   });
 
   test('la tabla crece nivel a nivel y explica en likes lo que pide cada uno', () => {
