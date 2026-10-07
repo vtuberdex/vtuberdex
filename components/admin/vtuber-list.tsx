@@ -42,22 +42,33 @@ export function VtuberList({
   const [correo, setCorreo] = useState<AdminCorreoFilter>('todos');
   const [rows, setRows] = useState<(VtuberCard & { hasEmail?: boolean })[]>([]);
   const [total, setTotal] = useState(0);
+  /**
+   * Hay una búsqueda en vuelo. Sin esto no se sabía si la búsqueda había empezado, y mientras llegaba la
+   * respuesta la lista decía «Ninguna ficha coincide» (o seguía mostrando los resultados de lo anterior).
+   * Solo lo apaga la petición VIGENTE: una abortada por la siguiente tecla no lo baja a mitad de camino.
+   */
+  const [buscando, setBuscando] = useState(false);
   const filtrando = query.trim() !== '' || status !== 'all' || correo !== 'todos';
 
   useEffect(() => {
     if (!filtrando) {
       setRows([]);
       setTotal(0);
+      setBuscando(false);
       return;
     }
     const controller = new AbortController();
+    setBuscando(true);
     api
       .adminList(token, { q: query, status, correo, page: 1, perPage: MAX_RESULTADOS }, controller.signal)
       .then((response) => {
         setRows(response.items);
         setTotal(response.total);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!controller.signal.aborted) setBuscando(false);
+      });
     return () => controller.abort();
   }, [token, query, status, correo, filtrando, refreshKey]);
 
@@ -65,14 +76,24 @@ export function VtuberList({
     <aside className="rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
       <label className={labelClass}>
         Buscar ficha
-        <input
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-          }}
-          className={inputClass}
-          placeholder="nombre o número"
-        />
+        <span className="relative block">
+          <input
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+            }}
+            className={`${inputClass} pr-9`}
+            placeholder="nombre o número"
+            aria-busy={buscando}
+          />
+          {buscando && (
+            <span
+              aria-hidden
+              data-testid="list-spinner"
+              className="absolute right-3 top-1/2 mt-0.5 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-dex-accent/30 border-t-dex-accent"
+            />
+          )}
+        </span>
       </label>
       <label className={`${labelClass} mt-3`}>
         Estado
@@ -106,8 +127,12 @@ export function VtuberList({
         </select>
       </label>
       {filtrando && (
-        <p className="mt-3 text-xs text-dex-muted" data-testid="list-count">
-          {total > rows.length ? `${rows.length} de ${total} fichas: afina la búsqueda para ver el resto` : `${total} ${total === 1 ? 'ficha' : 'fichas'}`}
+        <p className="mt-3 text-xs text-dex-muted" data-testid="list-count" role="status">
+          {buscando
+            ? 'Buscando…'
+            : total > rows.length
+              ? `${rows.length} de ${total} fichas: afina la búsqueda para ver el resto`
+              : `${total} ${total === 1 ? 'ficha' : 'fichas'}`}
         </p>
       )}
       <ul className="dex-scroll mt-2 max-h-[60vh] space-y-1 overflow-y-auto">
@@ -148,7 +173,7 @@ export function VtuberList({
             )}
           </li>
         )}
-        {filtrando && rows.length === 0 && (
+        {filtrando && !buscando && rows.length === 0 && (
           <li className="px-2 py-3 text-xs text-dex-muted" data-testid="list-empty">
             Ninguna ficha coincide con la búsqueda.
           </li>

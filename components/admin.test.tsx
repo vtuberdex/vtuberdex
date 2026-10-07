@@ -589,6 +589,22 @@ describe('AdminPage', () => {
     expect(await screen.findByTestId('admin-editor')).toBeInTheDocument();
   });
 
+  test('al buscar sale un spinner hasta que llega la respuesta, sin decir «ninguna coincide» antes de tiempo', async () => {
+    window.localStorage.setItem('vtuberdex.admin.token', 'tok');
+    let responder: (value: unknown) => void = () => {};
+    mocks.adminList.mockReturnValue(new Promise((resolve) => (responder = resolve)));
+    render(<AdminPage />);
+    await screen.findByTestId('list-idle');
+    expect(screen.queryByTestId('list-spinner')).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText('nombre o número'), { target: { value: 'nadie' } });
+    expect(await screen.findByTestId('list-spinner')).toBeInTheDocument();
+    expect(screen.getByTestId('list-count')).toHaveTextContent('Buscando…');
+    expect(screen.queryByTestId('list-empty')).toBeNull();
+    await act(async () => responder({ items: [], total: 0, page: 1, perPage: 10, pageCount: 0 }));
+    expect(screen.queryByTestId('list-spinner')).toBeNull();
+    expect(screen.getByTestId('list-empty')).toBeInTheDocument();
+  });
+
   test('el panel muestra medidores y gráficos del catálogo, en su propia pestaña', async () => {
     window.localStorage.setItem('vtuberdex.admin.token', 'tok');
     render(<AdminPage />);
