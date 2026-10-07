@@ -261,10 +261,14 @@ describe('SolicitudesManager: resolver', () => {
     expect(screen.queryByTestId('solicitud-confirmar-rechazo')).not.toBeInTheDocument();
   });
 
-  test('el contacto confidencial se ve con su correo como enlace', async () => {
+  test('el contacto confidencial nace oculto (streaming) y al mostrarlo el correo es un enlace', async () => {
     montar();
     const d = await detalle();
-    expect(d.getByTestId('solicitud-contacto')).toHaveTextContent('Contacto confidencial');
+    const contacto = d.getByTestId('solicitud-contacto');
+    expect(contacto).toHaveTextContent('Contacto confidencial');
+    expect(contacto).not.toHaveTextContent('persona1@example.com');
+    expect(d.queryByRole('link', { name: 'persona1@example.com' })).toBeNull();
+    fireEvent.click(within(contacto).getByRole('button', { name: /Mostrar correo/ }));
     expect(d.getByRole('link', { name: 'persona1@example.com' })).toHaveAttribute('href', 'mailto:persona1@example.com');
   });
 });

@@ -13,6 +13,7 @@ import { facetValue, type AdminStats, type FactionRow, type VtuberDetail } from 
 import { DEFAULT_SEARCH } from '@/lib/query';
 import { CardWizard } from '@/components/admin/card-wizard';
 import { DadosPanel } from '@/components/admin/dados-panel';
+import { QuizasCorreo } from '@/components/admin/dato-oculto';
 import { FactionManager } from '@/components/admin/faction-manager';
 import { GettingStarted } from '@/components/admin/getting-started';
 import { PanelEstadisticas } from '@/components/admin/panel-estadisticas';
@@ -269,7 +270,8 @@ export function AdminPage() {
         <div>
           <h1 className="text-2xl font-extrabold text-dex-ink">Mantenedor</h1>
           <p className="text-sm text-dex-muted">
-            Sesión de {user.username} · {user.role}
+            {/* El usuario es el correo del admin (acceso por enlace): oculto, el mantenedor se usa en directo. */}
+            Sesión de <QuizasCorreo texto={user.username} /> · {user.role}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -425,7 +427,7 @@ export function AdminPage() {
         <ul className="mt-3 space-y-1 font-mono text-xs text-dex-muted">
           {audit.slice(0, 12).map((entry) => (
             <li key={entry.id}>
-              {entry.createdAt} · {entry.actor} · {entry.action}
+              {entry.createdAt} · <QuizasCorreo texto={entry.actor} /> · {entry.action}
               {entry.entityId ? ` · #${entry.entityId}` : ''}
             </li>
           ))}

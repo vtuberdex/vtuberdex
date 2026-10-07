@@ -1,5 +1,6 @@
 'use client';
 /** Paso 1: identidad — nombre, dirección de la página, país y número en la dex. */
+import { CampoCorreoOculto } from '@/components/admin/dato-oculto';
 import type { ChipOption } from '@/components/admin/chip-picker';
 import { ChipPicker } from '@/components/admin/chip-picker';
 import { slugifyUrl, type EditorForm } from '@/components/admin/form-model';
@@ -80,15 +81,8 @@ export function IdentityStep({
           {/* Apilado, no en fila: en media columna el botón le quitaba el ancho al input (min-w-0 + flex-1)
               y el correo dejaba de verse justo mientras se escribía. */}
           <span className="mt-1 flex flex-col items-start gap-2">
-            <input
-              type="email"
-              autoComplete="off"
-              aria-label="Correo electrónico"
-              value={email}
-              onChange={(event) => onEmailChange(event.target.value)}
-              className={`${inputClass} mt-0! w-full`}
-              placeholder="persona@ejemplo.com"
-            />
+            {/* Oculto al abrir la ficha: el mantenedor se usa en directo y un correo a la vista es un doxxeo. */}
+            <CampoCorreoOculto valor={email} onChange={onEmailChange} etiqueta="Correo electrónico" placeholder="persona@ejemplo.com" />
             {emailDirty && (
               <button type="button" className={ghostButton} disabled={savingEmail} onClick={onSaveEmail}>
                 {savingEmail ? 'Guardando…' : 'Guardar cambio de correo'}

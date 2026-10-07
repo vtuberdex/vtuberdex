@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 861 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 897 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 136 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
 
@@ -467,6 +467,34 @@ evolución con los efectos OFICIALES y la facción exclusiva (Juramento, Requiem
   cual y solo lo suelta en la habilidad cuyo texto se reescribe a mano. Como la ficha pública lo inyecta como HTML, el servidor
   acepta solo lista blanca (`htmlDeHabilidadSeguro`: `<br>`, `<span style>` sin `url(`, `<b>/<i>`, el `<div>` del scrape y
   comentarios; las 1.055 habilidades del scrape pasan, comprobado: si no, reenviar su kit daría 400).
+
+## Datos personales ocultos en el mantenedor (streaming)
+
+El mantenedor se usa en directo: todo correo y el nombre civil nacen OCULTOS (`components/admin/dato-oculto.tsx`) y se revelan
+uno a uno con «Mostrar»; al volver a montar, se ocultan otra vez (no se guarda). Cubre la cabecera («Sesión de …», el usuario es el
+correo del admin), el correo de la ficha (paso Identidad: «Mostrar y editar»; si nace vacío, lo que se escribe queda a la vista),
+el contacto de una solicitud (correo y nombre civil), «resuelta por» y el actor de «Actividad reciente» (`QuizasCorreo`: solo si
+parece un correo). La máscara es de largo FIJO (`MASCARA_CORREO`): copiar el largo o el dominio ya daría pistas. Si añades una vista
+que muestre un correo, envuélvelo igual. Ojo: un botón dentro de un `<label>` (`Field`) hereda el texto de la etiqueta como nombre
+accesible; por eso los botones llevan `aria-label` explícito.
+
+## Dados de rol 3D (pestaña «Dados» del mantenedor)
+
+El admin tira los dados de la partida (la X de una Ultimate «Lanza 2d6», o cualquier tirada) en `components/admin/dados-panel.tsx`;
+la escena es `components/dados/` (un canvas, montado solo con la pestaña abierta).
+- **El resultado NO sale de la animación**: `tirar` (`dados-geometria.ts`) usa `crypto.getRandomValues` con rechazo (sin sesgo de
+  módulo) y el dado rueda hasta `orientacionFinal`, que deja ESA cara arriba (el d4, ese vértice). No hay motor de física: el tumbo
+  es un giro que se deshace y rebotes que decrecen. El panel muestra el número al acabar la duración conocida (`DADOS.duracionMs`),
+  no por aviso de la escena, así que se prueba sin WebGL.
+- **Forma**: vértices → envolvente convexa → caras (triángulos coplanares fundidos). Opuestas suman N+1; el d10 es un trapezoedro
+  pentagonal cuyas cometas solo son planas con el zigzag `H·(1−cos36°)/(1+cos36°)`. Bisel = envolvente de las caras encogidas
+  (`DADOS.bisel`). Todo probado en `dados-geometria.test.ts` (planitud, N+1, la cara de arriba es el resultado, UV no espejadas).
+- **Cristal**: `MeshPhysicalMaterial` con transmisión, `dispersion` y atenuación; reflejos de un `RoomEnvironment` local (sin HDR
+  descargado). Un atlas GRIS por tipo (`atlas.ts`) hace de `roughnessMap` (grabado esmerilado), `bumpMap` con escala NEGATIVA
+  (relieve inverso: el número se hunde) y `emissiveMap`. Sin la trama del tapete la refracción no se nota.
+- **Humo espectral** (`humo.ts`): cuadro-billboard con fbm, aditivo y SIN prueba de profundidad (el cuerpo con transmisión escribe
+  profundidad y lo taparía); la luz puntual de cada dado usa el mismo matiz y tiñe el tapete: es lo que asienta los dados en la mesa.
+- Calibrado mirando la escena en Chromium con SwiftShader (página temporal + CDP). Sin medir en GPU real; perillas en `ESCENA` y `HUMO`.
 
 ## Idiomas (es / en / ja) y traducción de la historia
 

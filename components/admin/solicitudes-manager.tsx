@@ -21,6 +21,7 @@
  * Aquí SÍ se ve el contacto confidencial (correo): es para lo que existe. Se borra
  * solo al cerrar una baja o rechazar una solicitud.
  */
+import { DatoOculto, QuizasCorreo } from '@/components/admin/dato-oculto';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { SocialIcon } from '@/components/social-icon';
@@ -665,19 +666,32 @@ export function SolicitudesManager({
                 {seleccionada.contacto && (
                   <section className="rounded-xl border border-dex-line bg-dex-void/60 px-3 py-2 text-xs text-dex-muted" data-testid="solicitud-contacto">
                     <strong className="text-dex-ink">Contacto confidencial (no publicar):</strong>{' '}
+                    {/* Oculto hasta pulsar «Mostrar»: el mantenedor se usa en directo (ver dato-oculto.tsx). */}
                     {seleccionada.contacto.email && (
-                      <a href={`mailto:${seleccionada.contacto.email}`} className="text-dex-accent underline underline-offset-2">
-                        {seleccionada.contacto.email}
-                      </a>
+                      <DatoOculto valor={seleccionada.contacto.email}>
+                        <a href={`mailto:${seleccionada.contacto.email}`} className="break-all text-dex-accent underline underline-offset-2">
+                          {seleccionada.contacto.email}
+                        </a>
+                      </DatoOculto>
                     )}
-                    {seleccionada.contacto.realName ? ` · ${seleccionada.contacto.realName}` : ''}
+                    {seleccionada.contacto.realName && (
+                      <>
+                        {' · '}
+                        <DatoOculto valor={seleccionada.contacto.realName} etiqueta="nombre civil" />
+                      </>
+                    )}
                   </section>
                 )}
 
                 {seleccionada.estado !== 'pendiente' && (
                   <p className="rounded-xl border border-dex-line px-3 py-2 text-xs text-dex-muted" data-testid="solicitud-resuelta">
                     {seleccionada.estado} {seleccionada.resuelto ? haceCuanto(seleccionada.resuelto) : ''}
-                    {seleccionada.resueltoPor ? ` por ${seleccionada.resueltoPor}` : ''}
+                    {seleccionada.resueltoPor && (
+                      <>
+                        {' por '}
+                        <QuizasCorreo texto={seleccionada.resueltoPor} />
+                      </>
+                    )}
                     {seleccionada.vtuberSlug && (
                       <>
                         {' · '}

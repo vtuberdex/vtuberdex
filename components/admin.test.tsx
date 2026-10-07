@@ -158,6 +158,9 @@ describe('Asistente de carta: edición', () => {
     const { notify } = await renderWizard();
     expect(screen.queryByRole('button', { name: 'Guardar cambio de correo' })).not.toBeInTheDocument();
     mocks.setVtuberEmail.mockResolvedValue({ email: 'ana@ejemplo.com', bienvenida: 'enviada' });
+    // Si la ficha ya trae correo, nace oculto (streaming): hay que pedir verlo para editarlo.
+    const mostrar = screen.queryByRole('button', { name: /Mostrar y editar/ });
+    if (mostrar) fireEvent.click(mostrar);
     fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: ' Ana@Ejemplo.com ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambio de correo' }));
     await waitFor(() => expect(mocks.setVtuberEmail).toHaveBeenCalledWith('t', 18, 'Ana@Ejemplo.com'));
@@ -165,6 +168,15 @@ describe('Asistente de carta: edición', () => {
     await waitFor(() => expect(notify).toHaveBeenCalledWith('ok', expect.stringContaining('bienvenida')));
     expect(screen.getByLabelText('Correo electrónico')).toHaveValue('ana@ejemplo.com');
     expect(screen.queryByRole('button', { name: 'Guardar cambio de correo' })).not.toBeInTheDocument();
+  });
+
+  test('el correo de la ficha nace OCULTO (streaming) y se revela solo al pedirlo', async () => {
+    await renderWizard({ initial: makeDetail({ id: 18, email: 'secreto@ejemplo.com' }) });
+    expect(screen.getByTestId('correo-oculto')).toHaveTextContent('••••••@••••');
+    expect(document.body).not.toHaveTextContent('secreto@ejemplo.com');
+    expect(screen.queryByDisplayValue('secreto@ejemplo.com')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Mostrar y editar/ }));
+    expect(screen.getByLabelText('Correo electrónico')).toHaveValue('secreto@ejemplo.com');
   });
 
   test('un 409 de número ocupado se explica y propone cómo resolverlo', async () => {
