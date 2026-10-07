@@ -67,6 +67,9 @@ export interface UltimateForm {
   ataque: Exclude<Ataque, 'ninguno'>;
   bono: string;
   golpes: string;
+  /** Solo en la fórmula de dado: cuántos dados (X = la suma) y de cuántas caras. */
+  dados: '1' | '2';
+  caras: CarasDelDado;
   estados: [EstadoElegido, EstadoElegido];
   turnos: string;
   extra: string;
@@ -78,6 +81,18 @@ export interface KitForm {
   pasivas: [PasivaForm, PasivaForm];
   ultimate: UltimateForm;
 }
+
+export type CarasDelDado = '4' | '6' | '8';
+
+/**
+ * Fórmula de dado: X ataques, y cada uno vale una FRACCIÓN del ataque según el tamaño del dado.
+ *
+ * Un dado más grande da más ataques posibles, así que cada uno vale menos: con 1d8 salen hasta 8 golpes y
+ * a ataque completo serían el doble que un 1d4. La versión anterior era siempre «Lanza 1d6» con el ataque
+ * entero más un bono, sin poder elegir el dado. Con 2 dados X es la suma (más ataques y más estables), y la
+ * fracción sigue siendo la del tamaño del dado. Si el reparto cambia, se cambia aquí.
+ */
+export const FRACCION_DEL_DADO: Record<CarasDelDado, string> = { '4': 'la mitad', '6': 'un tercio', '8': 'un cuarto' };
 
 /** Bonos de referencia del prompt: «normalmente +40, +45». */
 export const BONO_ACTIVA = ['45', '40'] as const;
@@ -100,6 +115,8 @@ export function kitVacio(): KitForm {
       ataque: 'base',
       bono: '40',
       golpes: '4',
+      dados: '1',
+      caras: '6',
       estados: [sinEstado(), sinEstado()],
       turnos: '2',
       extra: '',
@@ -192,7 +209,10 @@ export function htmlDeUltimate(u: UltimateForm): string {
   const partes: string[] = [];
   const dano = formula(u.ataque, u.bono);
   if (u.formula === 'dado') {
-    partes.push('Lanza 1d6, donde X es el resultado obtenido.<br>', `Realizas X ataques consecutivos equivalentes a ${dano}.<br>`);
+    const base = u.ataque === 'magico' ? 'Ataque Mágico Base' : 'Ataque Base';
+    const caras = FRACCION_DEL_DADO[u.caras] ? u.caras : '6';
+    const tirada = u.dados === '2' ? `Lanza 2d${caras}, donde X es la suma de los resultados.<br>` : `Lanza 1d${caras}, donde X es el resultado obtenido.<br>`;
+    partes.push(tirada, `Realizas X ataques consecutivos equivalentes a ${FRACCION_DEL_DADO[caras]} del ${base}.<br>`);
   } else if (u.formula === 'consecutivos') {
     partes.push(`Realizas ${Math.max(2, Number(u.golpes) || 2)} ataques consecutivos equivalentes a ${dano}.<br>`);
   } else {

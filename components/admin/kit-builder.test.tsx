@@ -91,6 +91,19 @@ describe('Paso «Habilidades»', () => {
     expect(onApply.mock.calls[0][0].map((s: SkillForm) => s.name)).toEqual(['Vieja', 'A2', 'P1', 'P2', 'U']);
   });
 
+  it('en la Ultimate con dado se eligen dados y caras, y el bono desaparece', () => {
+    render(<KitBuilder skills={[]} facciones={[]} onApply={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Piezas del kit' })).getByRole('button', { name: /Ultimate$/ }));
+    expect(screen.queryByLabelText('Dados')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Fórmula'), { target: { value: 'dado' } });
+    expect(screen.queryByLabelText(/^Bono/)).toBeNull();
+    fireEvent.change(screen.getByLabelText('Dados'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Caras'), { target: { value: '4' } });
+    const previa = screen.getByTestId('kit-vista-previa');
+    expect(previa).toHaveTextContent('Lanza 2d4, donde X es la suma de los resultados.');
+    expect(previa).toHaveTextContent('equivalentes a la mitad del Ataque Base.');
+  });
+
   it('cada pieza del asistente marca si le falta algo', () => {
     render(<KitBuilder skills={[]} facciones={[]} onApply={vi.fn()} onCancel={vi.fn()} />);
     const pestana = within(screen.getByRole('navigation', { name: 'Piezas del kit' })).getByRole('button', { name: /Activa 1$/ });

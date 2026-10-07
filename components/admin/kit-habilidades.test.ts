@@ -73,10 +73,20 @@ describe('kit de habilidades: armado', () => {
 
   it('las tres fórmulas de la Ultimate', () => {
     const u = kitCompleto().ultimate;
-    expect(htmlDeUltimate({ ...u, formula: 'dado', ataque: 'magico', bono: '35' })).toMatch(
-      /^Lanza 1d6, donde X es el resultado obtenido\.<br>\nRealizas X ataques consecutivos equivalentes a Ataque Mágico Base \+35\.<br>/,
+    expect(htmlDeUltimate({ ...u, formula: 'dado', ataque: 'magico', dados: '1', caras: '6' })).toMatch(
+      /^Lanza 1d6, donde X es el resultado obtenido\.<br>\nRealizas X ataques consecutivos equivalentes a un tercio del Ataque Mágico Base\.<br>/,
     );
     expect(htmlDeUltimate({ ...u, formula: 'directo', bono: '120' })).toMatch(/^Ataque Base \+120\.<br>/);
+  });
+
+  it('el dado se elige: 1 o 2 dados de 4, 6 u 8 caras, y cada ataque vale la mitad, un tercio o un cuarto', () => {
+    const u = kitCompleto().ultimate;
+    const dado = (dados: '1' | '2', caras: '4' | '6' | '8') => htmlDeUltimate({ ...u, formula: 'dado', dados, caras }).split('\n').slice(0, 2).join('\n');
+    expect(dado('1', '4')).toBe('Lanza 1d4, donde X es el resultado obtenido.<br>\nRealizas X ataques consecutivos equivalentes a la mitad del Ataque Base.<br>');
+    expect(dado('2', '8')).toBe('Lanza 2d8, donde X es la suma de los resultados.<br>\nRealizas X ataques consecutivos equivalentes a un cuarto del Ataque Base.<br>');
+    expect(dado('2', '6')).toContain('un tercio del Ataque Base');
+    // El bono no aplica al dado: la fracción manda.
+    expect(htmlDeUltimate({ ...u, formula: 'dado', bono: '99' })).not.toContain('+99');
   });
 
   it('la Habilidad Única va después de los estados, con su condición y su color', () => {

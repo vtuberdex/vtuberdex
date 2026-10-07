@@ -24,6 +24,8 @@ import {
   type EstadoElegido,
   type KitForm,
   type UltimateForm,
+  FRACCION_DEL_DADO,
+  type CarasDelDado,
 } from '@/components/admin/kit-habilidades';
 import { ghostButton, inputClass, labelClass, primaryButton } from '@/components/admin/ui';
 import { buscarEstado, type validarKit } from '@/server/src/habilidades.mjs';
@@ -189,7 +191,7 @@ function EditorDeUltimate({ valor, onChange, facciones }: { valor: UltimateForm;
           <select value={valor.formula} onChange={(e) => set({ formula: e.target.value as UltimateForm['formula'] })} className={compact}>
             <option value="consecutivos">Varios ataques</option>
             <option value="directo">Un solo ataque</option>
-            <option value="dado">Dado 1d6</option>
+            <option value="dado">Dado (X ataques)</option>
           </select>
         </label>
         <label className={labelClass}>
@@ -199,10 +201,32 @@ function EditorDeUltimate({ valor, onChange, facciones }: { valor: UltimateForm;
             <option value="magico">Ataque Mágico Base</option>
           </select>
         </label>
-        <label className={labelClass}>
-          Bono (+)
-          <input inputMode="numeric" value={valor.bono} onChange={(e) => set({ bono: e.target.value })} className={compact} />
-        </label>
+        {valor.formula === 'dado' ? (
+          <>
+            <label className={labelClass}>
+              Dados
+              <select value={valor.dados} onChange={(e) => set({ dados: e.target.value as UltimateForm['dados'] })} className={compact}>
+                <option value="1">1 dado</option>
+                <option value="2">2 dados (X = la suma)</option>
+              </select>
+            </label>
+            <label className={labelClass}>
+              Caras
+              <select value={valor.caras} onChange={(e) => set({ caras: e.target.value as CarasDelDado })} className={compact}>
+                {(Object.keys(FRACCION_DEL_DADO) as CarasDelDado[]).map((c) => (
+                  <option key={c} value={c}>
+                    d{c} · cada ataque, {FRACCION_DEL_DADO[c]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : (
+          <label className={labelClass}>
+            Bono (+)
+            <input inputMode="numeric" value={valor.bono} onChange={(e) => set({ bono: e.target.value })} className={compact} />
+          </label>
+        )}
         {valor.formula === 'consecutivos' && (
           <label className={labelClass}>
             Ataques
