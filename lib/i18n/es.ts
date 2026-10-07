@@ -78,6 +78,7 @@ export const es = {
   'detalle.fichaCompleta': 'Ficha completa',
   'detalle.fichaBasica': 'Ficha básica',
   'detalle.premiumDesde': 'Premium desde {fecha}',
+  'detalle.graduado': 'Graduada',
   'detalle.sinCorreoTitulo': 'Falta E-Mail',
   'detalle.sinCorreoAyuda': 'Contacta a {correo}',
   'detalle.historia': 'Su historia',

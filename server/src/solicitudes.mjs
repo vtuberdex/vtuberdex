@@ -80,6 +80,10 @@ const DDL = `
     email       TEXT NOT NULL,
     actualizado TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS graduado (
+    vtuber_id INTEGER PRIMARY KEY,
+    desde     TEXT NOT NULL
+  );
 `;
 
 export class SolicitudError extends Error {
@@ -490,6 +494,28 @@ export async function correoTieneFicha(ejecutor, email) {
     [limpio],
   );
   return inscrita.rows.length > 0;
+}
+
+/**
+ * Las fichas de personas GRADUADAS (dejaron de hacer streams): solo una marca, no toca el grado. Vive junto
+ * a `ficha_correo` (mismo almacén, mismo respaldo) porque la base del catálogo es de solo lectura en producción.
+ * @returns {Promise<Set<number>>} ids de ficha
+ */
+export async function idsGraduados(ejecutor) {
+  const e = await conTablas(ejecutor);
+  const { rows } = await e.execute('SELECT vtuber_id FROM graduado');
+  return new Set(rows.map((f) => Number(f.vtuber_id)));
+}
+
+/** Marca (`true`) o desmarca (`false`) una ficha como graduada. Idempotente. */
+export async function fijarGraduado(ejecutor, fichaId, graduado = true, ahora = new Date()) {
+  const e = await conTablas(ejecutor);
+  if (!graduado) {
+    await e.execute('DELETE FROM graduado WHERE vtuber_id = ?', [Number(fichaId)]);
+    return false;
+  }
+  await e.execute('INSERT OR IGNORE INTO graduado (vtuber_id, desde) VALUES (?, ?)', [Number(fichaId), ahora.toISOString().slice(0, 10)]);
+  return true;
 }
 
 /** Valida y normaliza un correo (minúsculas); lanza `SolicitudError` 400 si no lo es. */

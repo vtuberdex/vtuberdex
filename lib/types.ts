@@ -99,8 +99,10 @@ export interface VtuberCard {
   socialCount: number;
   /** Carta premium: la 3D la dibuja dentro de una placa de acrílico con su etiqueta. */
   premium?: PremiumInfo | null;
-  /** La ficha no tiene correo asociado: se pinta degradada (grado 4) sin placa y la ficha lo avisa. */
+  /** La ficha no tiene correo asociado: se pinta con desgaste (grado 6) sin placa y la ficha lo avisa. */
   sinCorreo?: boolean;
+  /** La persona se graduó (dejó de hacer streams). Solo una marca: no cambia la carta ni el grado. */
+  graduado?: boolean;
   images: VtuberImages;
 }
 

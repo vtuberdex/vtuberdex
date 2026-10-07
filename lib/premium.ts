@@ -91,8 +91,12 @@ export const mismoMes = (a: string, b: string = hoy()): boolean => a.slice(0, 7)
 export const esFichaDeteriorada = (cartaOGrado: { premium?: { grade: string } | null } | string | null | undefined): boolean =>
   esFichaDeterioradaServidor(cartaOGrado);
 
-/** Grado con que se pinta una ficha sin correo (degradada, pero SIN placa: no es una carta premium). */
-export const GRADO_SIN_CORREO: PremiumGrade = '4';
+/**
+ * Grado con que se pinta una ficha sin correo, SIN placa (no es una carta premium). Es el 6 y no el 4: el 4 rompía
+ * demasiado la carta. El 6 solo le da el desgaste leve más fuerte de la escala premium; el aviso real es el banner.
+ * El refuerzo holográfico NO lo usa (solo mira `card.premium`): sería un premium regalado.
+ */
+export const GRADO_SIN_CORREO: PremiumGrade = '6';
 
 /**
  * El grado con que se DIBUJA la carta: el premium si lo tiene y, si no, el 4 de las fichas sin correo

@@ -72,6 +72,7 @@ export const ja: Mensajes = {
   'detalle.sinPais': '国が未登録',
   'detalle.fichaCompleta': '詳細プロフィール',
   'detalle.fichaBasica': '基本プロフィール',
+  'detalle.graduado': '卒業',
   'detalle.sinCorreoTitulo': 'メールアドレス未登録',
   'detalle.sinCorreoAyuda': '{correo} までご連絡ください',
   'detalle.premiumDesde': '{fecha}からプレミアム',

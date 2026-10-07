@@ -19,6 +19,7 @@
     "verify": "node scripts/verify-vercel-bundle.mjs",
     "probe:timings": "node scripts/probe-timings.mjs",
     "bench:ediciones": "node scripts/bench-ediciones.mjs",
+    "marcar:graduados": "node scripts/marcar-graduados.mjs",
     "sweep:dead-code": "node scripts/sweep-dead-code.mjs",
     "build:data": "node scripts/build-db.mjs",
     "publish:images": "node scripts/publish-images.mjs",

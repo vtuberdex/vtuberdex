@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
-import { fichasDelTitular, correoDeLaFicha, correoTieneFicha, correosDeFichas, ejecutorSqlite, fijarCorreoDeFicha, conTablas } from '../src/solicitudes.mjs';
+import { fijarGraduado, idsGraduados, fichasDelTitular, correoDeLaFicha, correoTieneFicha, correosDeFichas, ejecutorSqlite, fijarCorreoDeFicha, conTablas } from '../src/solicitudes.mjs';
 
 const nuevo = () => ejecutorSqlite(new DatabaseSync(':memory:'));
 const resolverFicha = (slug) => ({ aaa: { id: 1, slug: 'aaa' }, bbb: { id: 2, slug: 'bbb' } })[slug] ?? null;
@@ -61,4 +61,14 @@ test('fichasDelTitular: el correo fijado a mano solo cuenta si se pide (Mi ficha
   assert.deepEqual(manual.map((f) => f.ficha.id), [2]);
   const insc = await fichasDelTitular(e, { email: 'insc@ejemplo.com', resolverFicha, resolverPorId: porId });
   assert.deepEqual(insc.map((f) => f.ficha.id), [1]);
+});
+
+test('graduados: marcar, repetir sin duplicar y desmarcar', async () => {
+  const e = nuevo();
+  assert.equal((await idsGraduados(e)).size, 0);
+  await fijarGraduado(e, 3);
+  await fijarGraduado(e, 3);
+  assert.deepEqual([...(await idsGraduados(e))], [3]);
+  await fijarGraduado(e, 3, false);
+  assert.equal((await idsGraduados(e)).size, 0);
 });

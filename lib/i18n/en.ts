@@ -72,6 +72,7 @@ export const en: Mensajes = {
   'detalle.sinPais': 'No country listed',
   'detalle.fichaCompleta': 'Full profile',
   'detalle.fichaBasica': 'Basic profile',
+  'detalle.graduado': 'Graduated',
   'detalle.sinCorreoTitulo': 'E-Mail missing',
   'detalle.sinCorreoAyuda': 'Contact {correo}',
   'detalle.premiumDesde': 'Premium since {fecha}',

@@ -205,6 +205,11 @@ export function DetailPage({ slug }: { slug: string }) {
                   <span aria-hidden>•</span>
                   <span>{data.hasDetail ? t('detalle.fichaCompleta') : t('detalle.fichaBasica')}</span>
                 </p>
+                {data.graduado && (
+                  <p className="mt-3 inline-flex rounded border border-dex-muted/40 bg-black/30 px-2 py-1 text-xs" data-testid="graduado">
+                    <strong>🎓 {t('detalle.graduado')}</strong>
+                  </p>
+                )}
                 {data.sinCorreo && (
                   <p
                     className="mt-3 inline-flex flex-wrap items-center gap-x-2 rounded border border-dex-muted/40 bg-black/30 px-2 py-1 text-xs"
