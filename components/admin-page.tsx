@@ -1,7 +1,7 @@
 'use client';
 /**
  * Mantenedor: orquestador. Login y las pestañas (Fichas, Emblemas y facciones, Premium, Tarifas,
- * Solicitudes y Estadísticas); el trabajo de cada una vive en `components/admin/`.
+ * Solicitudes, Estadísticas y Dados); el trabajo de cada una vive en `components/admin/`.
  * Reemplaza el "editar HTML a mano" del origen. Aquí solo está el estado que comparten
  * (sesión, catálogo de facciones, qué ficha está abierta) y los avisos.
  */
@@ -12,6 +12,7 @@ import { api } from '@/lib/api';
 import { facetValue, type AdminStats, type FactionRow, type VtuberDetail } from '@/lib/types';
 import { DEFAULT_SEARCH } from '@/lib/query';
 import { CardWizard } from '@/components/admin/card-wizard';
+import { DadosPanel } from '@/components/admin/dados-panel';
 import { FactionManager } from '@/components/admin/faction-manager';
 import { GettingStarted } from '@/components/admin/getting-started';
 import { PanelEstadisticas } from '@/components/admin/panel-estadisticas';
@@ -25,7 +26,7 @@ import { ToastContainer, useToasts } from '@/components/toast';
 
 const TOKEN_KEY = 'vtuberdex.admin.token';
 
-type Section = 'fichas' | 'emblemas' | 'premium' | 'tarifas' | 'solicitudes' | 'estadisticas';
+type Section = 'fichas' | 'emblemas' | 'premium' | 'tarifas' | 'solicitudes' | 'estadisticas' | 'dados';
 type View = { kind: 'none' } | { kind: 'create'; n: number } | { kind: 'edit'; detail: VtuberDetail; epoch: number };
 
 export function AdminPage() {
@@ -258,6 +259,7 @@ export function AdminPage() {
     { id: 'tarifas', label: 'Tarifas' },
     { id: 'solicitudes', label: 'Solicitudes' },
     { id: 'estadisticas', label: 'Estadísticas' },
+    { id: 'dados', label: 'Dados' },
   ];
 
   return (
@@ -350,6 +352,11 @@ export function AdminPage() {
           entrar (`stats`), así que abrir la pestaña no espera a la red. */}
       <div role="tabpanel" id="section-estadisticas" aria-labelledby="section-tab-estadisticas" hidden={section !== 'estadisticas'}>
         {stats && <PanelEstadisticas stats={stats} onVerSolicitudes={() => setSection('solicitudes')} />}
+      </div>
+
+      {/* Dados se monta solo con la pestaña abierta: su escena es un canvas WebGL y no puede convivir con otro. */}
+      <div role="tabpanel" id="section-dados" aria-labelledby="section-tab-dados" hidden={section !== 'dados'}>
+        {section === 'dados' && <DadosPanel />}
       </div>
 
       <div role="tabpanel" id="section-fichas" aria-labelledby="section-tab-fichas" hidden={section !== 'fichas'}>
