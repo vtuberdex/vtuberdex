@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 
 import { ApiError, api, type LikeResumen } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 
 export function LikeButton({
   slug,
@@ -21,6 +22,7 @@ export function LikeButton({
   /** Tras cambiar (like dado o estado leído) el padre actualiza nivel y barra de experiencia. */
   onChange?: (resumen: LikeResumen) => void;
 }) {
+  const { t } = useI18n();
   const [total, setTotal] = useState(likes);
   const [liked, setLiked] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,7 +43,7 @@ export function LikeButton({
       })
       // Sin estado fiable el botón queda deshabilitado con su motivo: mejor eso que dejar votar a ciegas.
       .catch(() => {
-        if (!controller.signal.aborted) setMensaje('Los likes no están disponibles ahora mismo.');
+        if (!controller.signal.aborted) setMensaje(t('like.noDisponible'));
       });
     return () => controller.abort();
     // `onChange` cambia de identidad en cada render del padre: no debe reiniciar la consulta.
@@ -56,11 +58,11 @@ export function LikeButton({
       setLiked(true);
       setTotal(resumen.likes);
       setXp(resumen.xpPorLike);
-      setMensaje(`¡Gracias! +${resumen.xpPorLike} de experiencia. Vuelve mañana.`);
+      setMensaje(t('like.gracias', { xp: resumen.xpPorLike }));
       onChange?.(resumen);
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409) setLiked(true);
-      setMensaje(cause instanceof Error ? cause.message : 'No se pudo dar el like.');
+      setMensaje(cause instanceof Error ? cause.message : t('like.fallo'));
     } finally {
       setBusy(false);
     }
@@ -84,13 +86,13 @@ export function LikeButton({
         <span aria-hidden className="text-base leading-none">
           {liked ? '♥' : '♡'}
         </span>
-        <span>{liked ? 'Like dado hoy' : 'Dar like'}</span>
+        <span>{liked ? t('like.dado') : t('like.dar')}</span>
         <span data-testid="like-count" className="rounded-md bg-black/30 px-1.5 font-mono text-xs">
           {total}
         </span>
       </button>
       <p role="status" className="text-xs text-dex-muted" data-testid="like-message">
-        {mensaje ?? (liked === false ? `1 like por día. Cada like suma ${xp ?? 10} de experiencia a la ficha.` : liked ? 'Vuelve mañana para dar otro.' : '')}
+        {mensaje ?? (liked === false ? t('like.ayuda', { xp: xp ?? 10 }) : liked ? t('like.manana') : '')}
       </p>
     </div>
   );

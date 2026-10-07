@@ -19,7 +19,11 @@ export function IdentityStep({
   countryOptions,
   languageOptions,
   onNameChange,
-  onSlugChange,
+  email,
+  onEmailChange,
+  emailDirty,
+  savingEmail,
+  onSaveEmail,
 }: StepProps & {
   setForm: Dispatch<SetStateAction<EditorForm>>;
   mode: 'create' | 'edit';
@@ -31,7 +35,13 @@ export function IdentityStep({
   countryOptions: ChipOption[];
   languageOptions: ChipOption[];
   onNameChange: (name: string) => void;
-  onSlugChange: (slug: string) => void;
+  /** Correo asociado (confidencial: no sale en la API pública ni en la carta). Vacío = sin correo. */
+  email: string;
+  onEmailChange: (email: string) => void;
+  /** El correo escrito difiere del guardado (y la ficha ya existe): aparece el botón para guardarlo solo. */
+  emailDirty: boolean;
+  savingEmail: boolean;
+  onSaveEmail: () => void;
 }) {
   const normalized = slugifyUrl(form.slug);
   const slugChanged = currentSlug !== null && normalized !== '' && normalized !== currentSlug;
@@ -47,15 +57,16 @@ export function IdentityStep({
         <div>
           <Field
             label="Dirección de la página"
-            hint={currentSlug !== null ? `Si la cambias, la dirección anterior (/v/${currentSlug}) seguirá llevando a la nueva.` : 'Se genera sola desde el nombre; puedes cambiarla. Solo minúsculas, números y guiones.'}
+            hint={currentSlug !== null ? `Cambia sola con el nombre; la dirección anterior (/v/${currentSlug}) seguirá llevando a la nueva.` : 'Bloqueada: se genera sola a partir del nombre.'}
           >
             <span className="mt-1 flex items-stretch">
               <span className="flex items-center rounded-l-lg border border-r-0 border-dex-line bg-dex-void/60 px-3 font-mono text-xs text-dex-muted">/v/</span>
               <input
                 aria-label="Dirección de la página"
                 value={form.slug}
-                onChange={(event) => onSlugChange(event.target.value)}
-                className="w-full rounded-r-lg border border-dex-line bg-dex-void px-3 py-2 font-mono text-sm text-dex-ink outline-none focus:border-dex-accent"
+                readOnly
+                aria-readonly
+                className="w-full cursor-not-allowed opacity-80 rounded-r-lg border border-dex-line bg-dex-void px-3 py-2 font-mono text-sm text-dex-ink outline-none focus:border-dex-accent"
               />
             </span>
           </Field>
@@ -64,6 +75,25 @@ export function IdentityStep({
             {slugChanged && <span className="ml-2 text-amber-200">(cambio pendiente)</span>}
           </p>
         </div>
+
+        <Field label="Correo electrónico" hint="Privado: no se muestra en la carta ni en la página. Se usa para avisos de nivel y «Mi ficha». Al guardar uno nuevo se le envía un correo de bienvenida. Déjalo vacío si no hay.">
+          <span className="mt-1 flex flex-wrap items-center gap-2">
+            <input
+              type="email"
+              autoComplete="off"
+              aria-label="Correo electrónico"
+              value={email}
+              onChange={(event) => onEmailChange(event.target.value)}
+              className={`${inputClass} mt-0! min-w-0 flex-1`}
+              placeholder="persona@ejemplo.com"
+            />
+            {emailDirty && (
+              <button type="button" className={ghostButton} disabled={savingEmail} onClick={onSaveEmail}>
+                {savingEmail ? 'Guardando…' : 'Guardar cambio de correo'}
+              </button>
+            )}
+          </span>
+        </Field>
 
         <div className="sm:col-span-2">
           <Field

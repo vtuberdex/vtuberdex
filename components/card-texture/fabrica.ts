@@ -1,7 +1,7 @@
 'use client';
 /**
  * Fábrica de texturas de carta: cola con prioridades, generación progresiva, caché
- * acotada, calidad adaptativa y pregeneración de páginas vecinas.
+ * acotada y pregeneración de páginas vecinas.
  *
  * EL PROBLEMA MEDIDO: cargar una página de 8 cartas dejaba el hilo principal bloqueado
  * 6,5 s en total aunque la API respondiera en 11-45 ms. Generar las texturas (4 lienzos
@@ -9,30 +9,31 @@
  * veía como «se demora mucho»: las cartas aparecían de a una, y pasar de página volvía a
  * pagarlo todo aunque las imágenes ya estuvieran en memoria.
  *
- * LAS CUATRO MEDIDAS, y por qué cada una vive aquí y no en el hook:
+ * LAS TRES MEDIDAS, y por qué cada una vive aquí y no en el hook:
  *   1. PROGRESIVA: `generarRapida` pinta superficie, personaje y título (lo barato y lo
  *      que identifica la carta) y la carta ya se ve; `completar` añade marca, máscaras y
  *      color predominante reutilizando esas capas (`reutilizar` en `drawCardLayers`), así
  *      que no se dibuja nada dos veces.
- *   2. ADAPTATIVA: se mide cuánto tarda la generación completa de cada carta y, si la
- *      mediana de `TEXTURAS.muestras` supera `lentoMs`, se baja un escalón de `anchos`
- *      para las siguientes. Decide la máquina real, no `hardwareConcurrency`.
- *   3. CACHÉ: lo generado se guarda por carta y ancho en un LRU con presupuesto en
+ *   2. CACHÉ: lo generado se guarda por carta y ancho en un LRU con presupuesto en
  *      píxeles. Volver a una página no regenera nada, y las entradas de cartas montadas
  *      están ancladas (`anclar`) para no desalojarlas por debajo de quien las usa.
- *   4. PREGENERACIÓN: `pregenerar` encola, con prioridad BAJA y en tiempo ocioso, las
+ *   3. PREGENERACIÓN: `pregenerar` encola, con prioridad BAJA y en tiempo ocioso, las
  *      texturas de las cartas que la caché de páginas ya trajo: al pasar de hoja las 8
  *      cartas salen de la caché ya hechas.
  *
  * Los canvases se cachean; las texturas de three (`CanvasTexture`) las crea cada montaje a
  * partir de ellos, porque una textura pertenece a un renderer y el detalle y el libro
  * tienen cada uno el suyo. La subida a GPU es barata frente a la generación.
+ *
+ * SIN CALIDAD ADAPTATIVA, A PROPÓSITO: hubo una que medía la generación de cada carta y bajaba el
+ * ancho (512 → 384 → 256) en máquinas lentas. Se retiró: el ancho es FIJO (`TEXTURAS.ancho`), la
+ * misma carta se ve igual en todos los equipos y no hay estado oculto que dependa del historial.
  */
 import type { VtuberCard } from '@/lib/types';
 import { TEXTURAS } from '@/components/card3d-config';
 import { CARD_TEXTURE_FULL_WIDTH } from './dimensiones';
 import { drawCardLayers } from './componer';
-import { esFichaDeteriorada } from '@/lib/premium';
+import { esFichaDeteriorada, gradoDeDibujo } from '@/lib/premium';
 import { deteriorarArte, deteriorarCabecera, planDeCarta, tarjetaParaTitulo } from './deterioro';
 import { drawSurfaceLayer } from './capa-superficie';
 import { drawCharacterLayer } from './capa-personaje';
@@ -111,42 +112,6 @@ export function encolarTrabajo(trabajo: Trabajo, prioridad: Prioridad = 'alta'):
 /** Para los tests: cuántos trabajos esperan en cada cola. */
 export function __pendientes(): { alta: number; baja: number } {
   return { alta: colaAlta.length, baja: colaBaja.length };
-}
-
-/* ----------------------------------------------------------------------------
- * Calidad adaptativa.
- * ------------------------------------------------------------------------- */
-
-let techoAdaptado = Number.POSITIVE_INFINITY;
-let muestras: number[] = [];
-
-/** Ancho con el que se generan las texturas de un plan: el del plan, o menos si la máquina es lenta. */
-export function anchoEfectivo(anchoDelPlan: number): number {
-  return Math.min(anchoDelPlan, techoAdaptado);
-}
-
-/**
- * Registra cuánto tardó una generación completa y baja un escalón si la mediana de las
- * últimas `muestras` supera `lentoMs`. Solo se mide lo generado AL ancho efectivo actual:
- * una carta vieja a 512 no debe decidir por el escalón de 384.
- */
-export function registrarMedicion(ms: number, width: number): void {
-  if (width !== anchoEfectivo(width)) return;
-  muestras.push(ms);
-  if (muestras.length > TEXTURAS.muestras) muestras.shift();
-  if (muestras.length < TEXTURAS.muestras) return;
-  const ordenadas = [...muestras].sort((a, b) => a - b);
-  const mediana = ordenadas[Math.floor(ordenadas.length / 2)];
-  if (mediana <= TEXTURAS.lentoMs) return;
-  const siguiente = TEXTURAS.anchos.find((ancho) => ancho < width);
-  if (siguiente === undefined) return;
-  techoAdaptado = siguiente;
-  muestras = [];
-}
-
-/** Para los tests y la consola: el techo adaptado actual (Infinity = sin adaptar). */
-export function __techoAdaptado(): number {
-  return techoAdaptado;
 }
 
 /* ----------------------------------------------------------------------------
@@ -311,7 +276,7 @@ let pixelesEnCache = 0;
  * URLs porque `buscarEnCache` compara prefijo (`id|`) y sufijo (URLs) para encontrar otro ancho.
  */
 const claveDe = (card: VtuberCard, width: number) => `${card.id}|${width}|${gradoDeCarta(card)}|${urlsDeCarta(card).join('|')}`;
-const gradoDeCarta = (card: VtuberCard) => card.premium?.grade ?? '';
+const gradoDeCarta = (card: VtuberCard) => gradoDeDibujo(card) ?? '';
 
 const pixelesDe = (t: TexturasDeCarta) =>
   [...t.layers, t.edge, t.logoMask, t.logoSticker].reduce((suma, c) => suma + c.width * c.height, 0);
@@ -412,7 +377,7 @@ export interface OpcionesGeneracion {
  */
 export async function generarTexturas(card: VtuberCard, opciones: OpcionesGeneracion): Promise<TexturasDeCarta | null> {
   const { prioridad = 'alta', alRapida, cancelada = () => false } = opciones;
-  const width = anchoEfectivo(opciones.width);
+  const width = opciones.width;
   const enCache = buscarEnCache(card, width);
   if (enCache) {
     medir('textura-cache', 0);
@@ -425,13 +390,10 @@ export async function generarTexturas(card: VtuberCard, opciones: OpcionesGenera
 
   let rapida: TexturasDeCarta | null = null;
   let completa: TexturasDeCarta | null = null;
-  let ms = 0;
-
   await encolarTrabajo(() => {
     if (cancelada()) return;
     const t0 = performance.now();
     rapida = generarRapida(card, fuentes, width);
-    ms += performance.now() - t0;
     medir(`textura-rapida:${width}`, performance.now() - t0);
     if (prioridad === 'alta') alRapida?.(rapida);
   }, prioridad);
@@ -442,11 +404,9 @@ export async function generarTexturas(card: VtuberCard, opciones: OpcionesGenera
     const t0 = performance.now();
     const resultado = await completar(card, fuentes, rapida);
     completa = resultado.texturas;
-    ms += resultado.msCpu;
     medir(`textura-completa:${width}:${prioridad}`, performance.now() - t0);
     medir(`textura-completa-cpu:${width}`, resultado.msCpu);
     guardarEnCache(card, completa);
-    registrarMedicion(ms, width);
   }, prioridad);
 
   return completa;
@@ -465,10 +425,8 @@ export function pregenerar(cards: readonly VtuberCard[], anchoDelPlan: number): 
 /** Ancho de textura por defecto cuando el plan no dice otra cosa. */
 export const ANCHO_POR_DEFECTO = CARD_TEXTURE_FULL_WIDTH;
 
-/** Para los tests: olvida caché, mediciones y adaptación. */
+/** Para los tests: olvida la caché. */
 export function __reiniciarFabrica(): void {
   cache.clear();
   pixelesEnCache = 0;
-  techoAdaptado = Number.POSITIVE_INFINITY;
-  muestras = [];
 }

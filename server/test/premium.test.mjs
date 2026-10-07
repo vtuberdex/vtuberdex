@@ -119,10 +119,11 @@ test('gradoSiguiente recorre la escala y se detiene en la Black Label', () => {
   assert.equal(esGradoValido('11'), false);
 });
 
-test('el certificado se deriva del id y no cambia', () => {
-  assert.equal(numeroDeCertificado(17), 'VTD-000017');
-  assert.equal(numeroDeCertificado(100_001), 'VTD-100001');
-  assert.equal(numeroDeCertificado(null), 'VTD-000000');
+test('el certificado se deriva del número de dex (#016 ⇒ VTD-016) y no cambia', () => {
+  assert.equal(numeroDeCertificado(16), 'VTD-016');
+  assert.equal(numeroDeCertificado(0), 'VTD-000');
+  assert.equal(numeroDeCertificado(1005), 'VTD-1005');
+  assert.equal(numeroDeCertificado(null), 'VTD-000');
 });
 
 test('una carta nueva no es premium', () => {
@@ -134,7 +135,9 @@ test('aplicarParche convierte una ficha en premium y la API la devuelve con su c
   const id = idDe('madkoding');
   aplicarParche(db, id, { premium: { grade: '10', since: '2026-05-01', gradedAt: '2026-09-01' } });
   const carta = getVtuberBySlug(db, 'madkoding');
-  assert.deepEqual(carta.premium, { grade: '10', since: '2026-05-01', gradedAt: '2026-09-01', cert: numeroDeCertificado(id) });
+  assert.deepEqual(carta.premium, { grade: '10', since: '2026-05-01', gradedAt: '2026-09-01', cert: numeroDeCertificado(carta.dexNumber) });
+  // El certificado es lo que el visitante lee en la carta: el MISMO número que su `#NNN`.
+  assert.equal(carta.premium.cert, `VTD-${String(carta.dexNumber).padStart(3, '0')}`);
   // También sale en el listado (es lo que pinta el libro del catálogo).
   const enLista = searchVtubers(db, {}).items.find((item) => item.slug === 'madkoding');
   assert.equal(enLista.premium.grade, '10');

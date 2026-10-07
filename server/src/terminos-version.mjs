@@ -8,4 +8,4 @@
  * Súbela (fecha ISO) cada vez que cambie el texto de `lib/terminos.ts`: los formularios abiertos
  * con la versión anterior se rechazan en vez de registrar la aceptación de un texto que ya no existe.
  */
-export const TERMINOS_VERSION = '2026-10-04';
+export const TERMINOS_VERSION = '2026-10-06b';

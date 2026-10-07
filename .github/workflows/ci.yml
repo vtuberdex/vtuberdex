@@ -1,19 +1,15 @@
 # CI del repositorio: lint + gates + verificación del artefacto desplegable.
 #
-# POR QUÉ ESTE WORKFLOW EXISTE APARTE DEL DE DEPLOY
-# -------------------------------------------------
-# El deploy ya no vive en Actions: el repo es PÚBLICO y Vercel lo construye por
-# integración Git en cada push a `master`. Pero ese build solo corre `next build`,
-# así que NO ve el lint, `check:shaders`, los tests ni `verify` — y el límite de
-# samplers de GLSL, por ejemplo, solo se manifiesta como la carta negra en el
-# navegador. Este workflow es el único que valida todo eso, y lo hace en CUALQUIER
-# push y en cada PR, sin necesitar ningún secreto.
+# ESTE ES EL ÚNICO WORKFLOW: VALIDA, NO PUBLICA
+# ---------------------------------------------
+# El sitio corre en una VPS (nginx + `node server.js`) y se publica con
+# `scripts/release.sh` desde la propia máquina; ya no hay despliegue a Vercel ni
+# workflow que lo dispare (se eliminó `deploy.yml`). Aquí solo se mira verde o rojo
+# antes de mezclar trabajo: en CUALQUIER push y en cada PR, sin ningún secreto.
 #
-#   · Este (`ci.yml`) VALIDA. Corre en cada push —a cualquier rama— y en cada
-#     pull request, no necesita ningún secreto y su único resultado es verde o
-#     rojo. Es lo que se mira antes de mezclar trabajo.
-#   · `deploy.yml` PUBLICA a mano (`workflow_dispatch`). Es el camino de respaldo,
-#     y el único que exige los gates ANTES de publicar.
+# Los gates que NO se cubren entre sí: el límite de samplers de GLSL, por ejemplo,
+# solo se manifiesta como la carta negra en el navegador, y `next build` no corre
+# lint, `check:shaders`, tests ni `verify`.
 #
 # Antes de este archivo no había NINGÚN gate automático: `npm run lint` estaba
 # roto (ESLint 9 exige config plana y el repo no tenía ninguna), así que errores
@@ -48,8 +44,7 @@ name: ci
 
 on:
   # Todo push, en CUALQUIER rama: el sentido del CI es ver el rojo ANTES de
-  # mezclar, no después. La publicación a producción la hace la integración Git
-  # de Vercel al entrar en `master`, no este workflow.
+  # mezclar, no después. Nada se publica desde aquí.
   #
   # Sin filtro `branches:` a propósito. Un patrón glob mal escrito ahí es un fallo
   # SILENCIOSO (el workflow no se dispara nunca y el repo parece "sin CI"), y no
@@ -58,9 +53,8 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Un CI por rama. `cancel-in-progress: true` al revés que en el deploy: aquí sí
-# conviene matar la corrida anterior si se empuja de nuevo, porque solo interesa
-# el resultado del último commit. Los deploys, en cambio, no se cancelan.
+# Un CI por rama. `cancel-in-progress: true`: si se empuja de nuevo, la corrida anterior ya no
+# importa; solo interesa el resultado del último commit.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -76,9 +70,9 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          # Node 24, el mismo que corre en Vercel. El `node:sqlite` que usa
-          # `server/src/db/index.mjs` exige >= 22 y en 24 ya es estable.
-          node-version: '24'
+          # Node 22: el mismo que corre en la VPS de producción (v22.x). El `node:sqlite` que
+          # usa `server/src/db/index.mjs` exige >= 22; se prueba en la versión que se despliega.
+          node-version: '22'
           cache: npm
           # Tres paquetes, tres lockfiles: sin declararlos la caché solo cubriría
           # el de la raíz.

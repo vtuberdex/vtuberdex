@@ -10,6 +10,7 @@ import { facetCounts, getNeighbors, getVtuberBySlug, searchVtubers } from './sea
 import { hashPassword, verifyPassword } from './auth.mjs';
 import {
   adminListQuerySchema,
+  fichaCorreoSchema,
   bulkStatusSchema,
   factionCreateSchema,
   factionUpdateSchema,
@@ -34,9 +35,13 @@ import {
   SolicitudError,
   fichaDesdeInscripcion,
   leerSolicitud,
+  correosDeFichas,
+  fijarCorreoDeFicha,
   listarSolicitudes,
   resolverSolicitud,
 } from './solicitudes.mjs';
+import { listarConCorreo } from './correo-fichas.mjs';
+import { resumenDeRechazos } from './rechazos.mjs';
 import { prepararModificacion } from './modificacion.mjs';
 import { UPLOADABLE_KINDS, MAX_UPLOAD_BYTES, saveUploadedImage, saveFactionEmblem, removeUploadedImage } from './uploads.mjs';
 
@@ -179,35 +184,68 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
    * publicado, así que una ficha en borrador (o una carta recién creada) no podía abrirse para
    * editarla.
    */
-  router.get('/admin/vtubers', requireAdmin, (req, res) => {
+  router.get('/admin/vtubers', requireAdmin, async (req, res) => {
     const parsed = adminListQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'query_invalida', issues: formatIssues(parsed.error) });
       return;
     }
-    const { q, status, premium, page, perPage } = parsed.data;
-    res.json(
-      searchVtubers(db, {
-        q,
-        page,
-        perPage,
-        includeHidden: true,
-        status: status === 'all' ? null : status,
-        premium: premium ? 'todas' : false,
-        sort: 'dex',
-      }),
-    );
+    const { q, status, premium, correo, page, perPage } = parsed.data;
+    try {
+      res.json(
+        await listarConCorreo(db, solicitudes, {
+          q,
+          correo,
+          page,
+          perPage,
+          includeHidden: true,
+          status: status === 'all' ? null : status,
+          premium: premium ? 'todas' : false,
+          sort: 'dex',
+        }),
+      );
+    } catch (error) {
+      res.status(503).json({ error: 'solicitudes_no_disponibles', detail: error.message });
+    }
   });
 
   /** Detalle por id, sin filtrar por estado: es lo que el editor abre. */
-  router.get('/admin/vtubers/:id', requireAdmin, (req, res) => {
-    const row = db.prepare('SELECT slug FROM vtuber WHERE id = ?').get(Number(req.params.id));
+  router.get('/admin/vtubers/:id', requireAdmin, async (req, res) => {
+    const row = db.prepare('SELECT id, slug FROM vtuber WHERE id = ?').get(Number(req.params.id));
     const detail = row ? getVtuberBySlug(db, row.slug, { includeHidden: true }) : null;
     if (!detail) {
       res.status(404).json({ error: 'no_encontrado' });
       return;
     }
-    res.json(detail);
+    // El correo va SOLO en el detalle del mantenedor; la cola puede no estar disponible y no tumba la ficha.
+    let email = null;
+    try {
+      const correos = await correosDeFichas(solicitudes, { resolverFicha: (slug) => getVtuberBySlug(db, slug, { includeHidden: true }) });
+      email = correos.get(row.id) ?? null;
+    } catch {
+      /* sin cola, sin correo */
+    }
+    res.json({ ...detail, email });
+  });
+
+  /** Fija o quita el correo de una ficha (vive en la cola de solicitudes, no en la ficha). */
+  router.put('/admin/vtubers/:id/correo', requireAdmin, async (req, res) => {
+    const row = db.prepare('SELECT id FROM vtuber WHERE id = ?').get(Number(req.params.id));
+    if (!row) {
+      res.status(404).json({ error: 'no_encontrado' });
+      return;
+    }
+    const parsed = fichaCorreoSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'payload_invalido', issues: formatIssues(parsed.error) });
+      return;
+    }
+    try {
+      res.json({ email: await fijarCorreoDeFicha(solicitudes, row.id, parsed.data.email) });
+    } catch (error) {
+      if (error instanceof SolicitudError) res.status(error.status).json({ error: error.code, detail: error.detail });
+      else res.status(503).json({ error: 'solicitudes_no_disponibles', detail: error.message });
+    }
   });
 
   /** El siguiente número libre al final de la dex, para el botón "al final". */
@@ -227,6 +265,15 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
     }
     try {
       res.json(await listarSolicitudes(solicitudes, { estado, tipo }));
+    } catch (error) {
+      res.status(503).json({ error: 'solicitudes_no_disponibles', detail: error.message });
+    }
+  });
+
+  router.get('/admin/solicitudes/rechazos', requireAdmin, async (req, res) => {
+    const dias = Math.min(30, Math.max(1, Number(req.query.dias) || 7));
+    try {
+      res.json(await resumenDeRechazos(solicitudes, { dias }));
     } catch (error) {
       res.status(503).json({ error: 'solicitudes_no_disponibles', detail: error.message });
     }

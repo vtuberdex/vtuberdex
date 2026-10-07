@@ -1,0 +1,190 @@
+/** Textos de los formularios públicos (piezas compartidas, baja y verificación) en es / en / ja. Mismas claves en los tres. */
+export const formulariosEs = {
+  'form.confidencial': 'confidencial · no se publica',
+  'form.trampa': 'No rellenar este campo',
+  'form.terminosAcepto': 'He leído y acepto los',
+  'form.terminosNombre': 'Términos y Condiciones',
+  'form.terminosIncluida': ', incluida la',
+  'form.terminosSalida': 'cláusula de salida',
+  'form.terminosSalidaNota': '(una ficha dada de baja no se elimina: se degrada).',
+
+  'baja.titulo': 'Darme de baja',
+  'baja.intro':
+    'Si ya no quieres figurar en el catálogo, escribe tu correo y el motivo. Te enviaremos un código de un solo uso para confirmar que la dirección es tuya; con él, la baja de la ficha inscrita con ese correo se aplica al instante.',
+  'baja.errorTerminos': 'Debes aceptar los términos y condiciones para solicitar la baja.',
+  'baja.errorEnviar': 'No se pudo enviar la solicitud. Inténtalo de nuevo.',
+  'baja.errorConfirmar': 'No se pudo confirmar. Inténtalo de nuevo.',
+  'baja.revisaCorreo': 'Revisa tu correo.',
+  'baja.codigoEnviadoA': 'Te enviamos un código a',
+  'baja.codigoInstrucciones': 'Pégalo aquí para confirmar la baja, o pulsa el botón del correo. Vale 24 horas; si no llega, mira en spam.',
+  'baja.paso2': 'Paso 2 de 2 · Confirmar la baja',
+  'baja.codigo': 'Código del correo',
+  'baja.confirmando': 'Confirmando…',
+  'baja.confirmar': 'Confirmar la baja',
+  'baja.volver': 'Volver y cambiar el correo',
+  'baja.avisoTitulo': 'Antes de continuar: qué pasa con tu ficha',
+  'baja.avisoNoElimina': 'Darte de baja',
+  'baja.avisoNoEliminaFuerte': 'no elimina tu ficha',
+  'baja.avisoTexto':
+    '. Permanece en el catálogo, pero sus datos se corrompen y se degradan de forma irreversible (textos, imágenes, enlaces). Tus datos personales (correo) sí se eliminan. Está en la',
+  'baja.paso1': 'Paso 1 de 2 · Tu correo y el motivo',
+  'baja.correo': 'Correo electrónico',
+  'baja.correoAyuda':
+    'El correo con el que inscribiste tu ficha. Te enviaremos un código para confirmar que es tuyo; con él se da de baja la ficha asociada.',
+  'baja.motivo': 'Motivo',
+  'baja.motivoAyuda': 'Opcional.',
+  'baja.otroCorreo': 'Mi ficha no se inscribió con este correo',
+  'baja.ficha': 'Ficha',
+  'baja.fichaAyuda':
+    'Su nombre o su dirección (por ejemplo /v/mi-nombre). Una persona la revisará, porque no podemos comprobar la titularidad solo con el correo.',
+  'baja.enviando': 'Enviando…',
+  'baja.enviarCodigo': 'Enviarme el código',
+
+  'verificar.titulo': 'Confirmar correo',
+  'verificar.intro': 'Pulsa el botón para confirmar que esta dirección es tuya. El enlace sirve una sola vez.',
+  'verificar.tipo.inscripcion': 'Tu inscripción',
+  'verificar.tipo.baja': 'Tu baja',
+  'verificar.tipo.modificacion': 'Tu solicitud de cambios',
+  'verificar.bajaAplicada': 'Baja aplicada.',
+  'verificar.bajaTexto_one':
+    'Confirmaste que el correo es tuyo: la ficha {fichas} pasó al grado 1 y tus datos de contacto se eliminaron.',
+  'verificar.bajaTexto_other':
+    'Confirmaste que el correo es tuyo: las fichas {fichas} pasaron al grado 1 y tus datos de contacto se eliminaron.',
+  'verificar.confirmado': 'Correo confirmado.',
+  'verificar.sinFicha':
+    'No encontramos ninguna ficha inscrita con esta dirección, así que no se aplicó nada. Tu solicitud quedó en espera: el mantenedor la revisará y podrá escribirte a este correo para saber qué ficha es.',
+  'verificar.enEspera': '{tipo} quedó en espera de revisión del mantenedor. No hay plazo garantizado de respuesta.',
+  'verificar.bajaRevision': 'Como no pudimos comprobar la titularidad solo con el correo, la revisará una persona.',
+  'verificar.volver': 'Volver al catálogo',
+  'verificar.errorConfirmar': 'No se pudo confirmar. Inténtalo de nuevo.',
+  'verificar.incompleto':
+    'Este enlace está incompleto. Abre el enlace del correo tal cual llegó (si tu cliente lo cortó, cópialo entero) o vuelve a enviar el formulario.',
+  'verificar.confirmando': 'Confirmando…',
+  'verificar.confirmarBoton': 'Confirmar mi correo',
+} as const;
+
+export const formulariosEn: { [K in keyof typeof formulariosEs]: string } = {
+  'form.confidencial': 'confidential · not published',
+  'form.trampa': 'Do not fill in this field',
+  'form.terminosAcepto': 'I have read and accept the',
+  'form.terminosNombre': 'Terms and Conditions',
+  'form.terminosIncluida': ', including the',
+  'form.terminosSalida': 'exit clause',
+  'form.terminosSalidaNota': '(a card that is removed is not deleted: it is degraded).',
+
+  'baja.titulo': 'Remove me',
+  'baja.intro':
+    'If you no longer want to appear in the catalog, enter your email and the reason. We will send you a one-time code to confirm the address is yours; with it, the card registered with that email is removed right away.',
+  'baja.errorTerminos': 'You must accept the terms and conditions to request removal.',
+  'baja.errorEnviar': 'The request could not be sent. Please try again.',
+  'baja.errorConfirmar': 'Could not confirm. Please try again.',
+  'baja.revisaCorreo': 'Check your email.',
+  'baja.codigoEnviadoA': 'We sent a code to',
+  'baja.codigoInstrucciones': 'Paste it here to confirm the removal, or press the button in the email. It is valid for 24 hours; if it does not arrive, check your spam folder.',
+  'baja.paso2': 'Step 2 of 2 · Confirm the removal',
+  'baja.codigo': 'Code from the email',
+  'baja.confirmando': 'Confirming…',
+  'baja.confirmar': 'Confirm the removal',
+  'baja.volver': 'Go back and change the email',
+  'baja.avisoTitulo': 'Before you continue: what happens to your card',
+  'baja.avisoNoElimina': 'Removing yourself',
+  'baja.avisoNoEliminaFuerte': 'does not delete your card',
+  'baja.avisoTexto':
+    '. It stays in the catalog, but its data is corrupted and irreversibly degraded (texts, images, links). Your personal data (email) is deleted. It is covered by the',
+  'baja.paso1': 'Step 1 of 2 · Your email and the reason',
+  'baja.correo': 'Email address',
+  'baja.correoAyuda':
+    'The email you used to register your card. We will send you a code to confirm it is yours; with it, the associated card is removed.',
+  'baja.motivo': 'Reason',
+  'baja.motivoAyuda': 'Optional.',
+  'baja.otroCorreo': 'My card was not registered with this email',
+  'baja.ficha': 'Card',
+  'baja.fichaAyuda':
+    'Its name or its address (for example /v/my-name). A person will review it, because we cannot verify ownership from the email alone.',
+  'baja.enviando': 'Sending…',
+  'baja.enviarCodigo': 'Send me the code',
+
+  'verificar.titulo': 'Confirm email',
+  'verificar.intro': 'Press the button to confirm that this address is yours. The link works only once.',
+  'verificar.tipo.inscripcion': 'Your registration',
+  'verificar.tipo.baja': 'Your removal request',
+  'verificar.tipo.modificacion': 'Your change request',
+  'verificar.bajaAplicada': 'Removal applied.',
+  'verificar.bajaTexto_one':
+    'You confirmed the email is yours: the card {fichas} was moved to grade 1 and your contact data was deleted.',
+  'verificar.bajaTexto_other':
+    'You confirmed the email is yours: the cards {fichas} were moved to grade 1 and your contact data was deleted.',
+  'verificar.confirmado': 'Email confirmed.',
+  'verificar.sinFicha':
+    'We found no card registered with this address, so nothing was applied. Your request is on hold: the maintainer will review it and may write to this email to find out which card it is.',
+  'verificar.enEspera': '{tipo} is waiting for the maintainer to review it. There is no guaranteed response time.',
+  'verificar.bajaRevision': 'Since we could not verify ownership from the email alone, a person will review it.',
+  'verificar.volver': 'Back to the catalog',
+  'verificar.errorConfirmar': 'Could not confirm. Please try again.',
+  'verificar.incompleto':
+    'This link is incomplete. Open the link from the email exactly as it arrived (if your client cut it, copy it in full) or submit the form again.',
+  'verificar.confirmando': 'Confirming…',
+  'verificar.confirmarBoton': 'Confirm my email',
+};
+
+export const formulariosJa: { [K in keyof typeof formulariosEs]: string } = {
+  'form.confidencial': '非公開 · 公開されません',
+  'form.trampa': 'この欄には入力しないでください',
+  'form.terminosAcepto': '次の内容を読み、同意します：',
+  'form.terminosNombre': '利用規約',
+  'form.terminosIncluida': '（',
+  'form.terminosSalida': '退会条項',
+  'form.terminosSalidaNota': 'を含む。退会したカードは削除されず、劣化します）。',
+
+  'baja.titulo': '退会する',
+  'baja.intro':
+    'カタログへの掲載を終了したい場合は、メールアドレスと理由を入力してください。アドレスが本人のものであることを確認するため、1回限りのコードを送信します。コードを入力すると、そのメールで登録したカードの退会がすぐに適用されます。',
+  'baja.errorTerminos': '退会を申請するには利用規約に同意する必要があります。',
+  'baja.errorEnviar': '申請を送信できませんでした。もう一度お試しください。',
+  'baja.errorConfirmar': '確認できませんでした。もう一度お試しください。',
+  'baja.revisaCorreo': 'メールを確認してください。',
+  'baja.codigoEnviadoA': 'コードを次のアドレスに送信しました：',
+  'baja.codigoInstrucciones': 'ここに貼り付けて退会を確定するか、メール内のボタンを押してください。有効期間は24時間です。届かない場合は迷惑メールをご確認ください。',
+  'baja.paso2': 'ステップ 2/2 · 退会の確認',
+  'baja.codigo': 'メールのコード',
+  'baja.confirmando': '確認中…',
+  'baja.confirmar': '退会を確定する',
+  'baja.volver': '戻ってメールを変更する',
+  'baja.avisoTitulo': '続ける前に：カードはどうなるか',
+  'baja.avisoNoElimina': '退会しても',
+  'baja.avisoNoEliminaFuerte': 'カードは削除されません',
+  'baja.avisoTexto':
+    '。カタログには残りますが、データ（テキスト、画像、リンク）は破損し、元に戻せない形で劣化します。個人情報（メール）は削除されます。詳しくは次をご覧ください：',
+  'baja.paso1': 'ステップ 1/2 · メールアドレスと理由',
+  'baja.correo': 'メールアドレス',
+  'baja.correoAyuda':
+    'カードの登録に使ったメールアドレス。本人のものか確認するためコードを送信し、それによって関連するカードが退会となります。',
+  'baja.motivo': '理由',
+  'baja.motivoAyuda': '任意。',
+  'baja.otroCorreo': 'このメールでカードを登録していません',
+  'baja.ficha': 'カード',
+  'baja.fichaAyuda':
+    '名前またはアドレス（例：/v/my-name）。メールだけでは本人確認ができないため、担当者が確認します。',
+  'baja.enviando': '送信中…',
+  'baja.enviarCodigo': 'コードを送信する',
+
+  'verificar.titulo': 'メールの確認',
+  'verificar.intro': 'ボタンを押して、このアドレスが本人のものであることを確認してください。リンクは1回のみ有効です。',
+  'verificar.tipo.inscripcion': 'あなたの登録',
+  'verificar.tipo.baja': 'あなたの退会申請',
+  'verificar.tipo.modificacion': 'あなたの変更申請',
+  'verificar.bajaAplicada': '退会が適用されました。',
+  'verificar.bajaTexto_one': 'メールが本人のものであることを確認しました。カード {fichas} はグレード1になり、連絡先データは削除されました。',
+  'verificar.bajaTexto_other': 'メールが本人のものであることを確認しました。カード {fichas} はグレード1になり、連絡先データは削除されました。',
+  'verificar.confirmado': 'メールを確認しました。',
+  'verificar.sinFicha':
+    'このアドレスで登録されたカードは見つからなかったため、何も適用されていません。申請は保留中で、管理者が確認し、どのカードかを尋ねるためにこのメールへ連絡することがあります。',
+  'verificar.enEspera': '{tipo}は管理者の確認待ちです。返信の期限は保証されません。',
+  'verificar.bajaRevision': 'メールだけでは本人確認ができないため、担当者が確認します。',
+  'verificar.volver': 'カタログに戻る',
+  'verificar.errorConfirmar': '確認できませんでした。もう一度お試しください。',
+  'verificar.incompleto':
+    'このリンクは不完全です。メールのリンクを届いたとおりに開いてください（途切れた場合は全体をコピーしてください）。または、フォームをもう一度送信してください。',
+  'verificar.confirmando': '確認中…',
+  'verificar.confirmarBoton': 'メールを確認する',
+};

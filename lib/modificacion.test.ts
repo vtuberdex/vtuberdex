@@ -18,6 +18,7 @@ import { seedDatabase } from '@/server/src/seed.mjs';
 import {
   SolicitudError,
   TERMINOS_VERSION,
+  confirmarSolicitud,
   crearSolicitud,
   ejecutorSqlite,
   leerSolicitud,
@@ -83,7 +84,6 @@ beforeEach(() => {
 const pedido = (extra: Record<string, unknown> = {}) => ({
   ficha: '/v/gkuro',
   email: 'GKuro@Example.com',
-  prueba: 'dejaré una marca en mi canal',
   phrase: 'Frase nueva',
   aceptaTerminos: true,
   terminosVersion: TERMINOS_VERSION,
@@ -92,6 +92,7 @@ const pedido = (extra: Record<string, unknown> = {}) => ({
 
 const enviar = async (entrada: object, ip = '1.1.1.1') => {
   const { id } = await crearSolicitud(ejecutor, entrada, { tipo: 'modificacion', ip });
+  await confirmarSolicitud(ejecutor, Number(id));
   return (await leerSolicitud(ejecutor, Number(id)))!;
 };
 
@@ -120,7 +121,6 @@ describe('la solicitud de modificación', () => {
   test.each([
     ['sin ningún cambio', { phrase: '' }],
     ['sin ficha', { ficha: '  ' }],
-    ['sin prueba de titularidad', { prueba: '' }],
     ['con correo inválido', { email: 'no-es-correo' }],
     ['con una imagen que no es URL http(s)', { imageUrl: 'javascript:alert(1)' }],
   ])('se rechaza %s', async (_nombre, extra) => {
@@ -158,6 +158,45 @@ describe('prepararModificacion', () => {
       ejecutor = ejecutorSqlite(new DatabaseSync(':memory:'));
       const { slug } = await parche({ ficha, height: '1,70 m' });
       expect(slug).toBe('gkuro');
+    }
+  });
+
+  test('encuentra la ficha tal como se ve en el catálogo: «#NNN NOMBRE» (el formato que la gente escribe)', async () => {
+    const { dex_number: dex } = db.prepare("SELECT dex_number FROM vtuber WHERE slug = 'gkuro'").get() as { dex_number: number };
+    for (const ficha of [`#${dex} GKuro`, `#${dex} GKURO`, `# ${dex} gkuro`, `GKuro #${dex}`, `#${dex}`, `  #${dex}  `]) {
+      ejecutor = ejecutorSqlite(new DatabaseSync(':memory:'));
+      const { slug } = await parche({ ficha, height: '1,70 m' });
+      expect(slug, ficha).toBe('gkuro');
+    }
+  });
+
+  test('el nombre sin tildes ni mayúsculas coincide aunque el catálogo las lleve (CEJ PAPA LUCHON ↔ CEJ Papá Luchón)', async () => {
+    db.prepare("UPDATE vtuber SET name = 'GKuro Papá', search_name = 'gkuro papa' WHERE slug = 'gkuro'").run();
+    const { dex_number: dex } = db.prepare("SELECT dex_number FROM vtuber WHERE slug = 'gkuro'").get() as { dex_number: number };
+    ejecutor = ejecutorSqlite(new DatabaseSync(':memory:'));
+    expect((await parche({ ficha: `#${dex} GKURO PAPA`, height: '1' })).slug).toBe('gkuro');
+    db.prepare("UPDATE vtuber SET name = 'GKuro', search_name = 'gkuro' WHERE slug = 'gkuro'").run();
+  });
+
+  test('un número de dex que no existe, o un nombre que NO coincide con ese dex, no se adivina', async () => {
+    const { dex_number: dex } = db.prepare("SELECT dex_number FROM vtuber WHERE slug = 'gkuro'").get() as { dex_number: number };
+    for (const ficha of ['#9999', `#${dex} otra persona distinta`, '#abc', '#']) {
+      ejecutor = ejecutorSqlite(new DatabaseSync(':memory:'));
+      const error = await rechazo(Promise.resolve().then(async () => parche({ ficha, height: '1' })));
+      expect(error.code, ficha).toBe('ficha_no_encontrada');
+    }
+  });
+
+  test('con dos fichas del mismo nombre, el número de dex decide cuál', async () => {
+    db.prepare("INSERT INTO vtuber (id, dex_number, slug, name, search_name, status) VALUES (777777, 77, 'gkuro-2', 'GKuro', 'gkuro', 'published')").run();
+    try {
+      ejecutor = ejecutorSqlite(new DatabaseSync(':memory:'));
+      expect((await parche({ ficha: '#77 GKuro', height: '1' })).slug).toBe('gkuro-2');
+      // Sin número, un slug exacto sigue ganando (comportamiento de siempre): el número solo desempata.
+      ejecutor = ejecutorSqlite(new DatabaseSync(':memory:'));
+      expect((await parche({ ficha: 'GKuro', height: '1' })).slug).toBe('gkuro');
+    } finally {
+      db.prepare('DELETE FROM vtuber WHERE id = 777777').run();
     }
   });
 

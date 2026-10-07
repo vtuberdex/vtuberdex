@@ -1,3 +1,4 @@
+import { AbriendoDetalle } from '@/components/abriendo-detalle';
 import { AppFooter } from '@/components/app-footer';
 import { AppHeader } from '@/components/app-header';
 
@@ -20,6 +21,7 @@ export default function CatalogLayout({ children }: { children: React.ReactNode 
         */}
         {children}
         <AppFooter />
+        <AbriendoDetalle />
       </div>
     </div>
   );

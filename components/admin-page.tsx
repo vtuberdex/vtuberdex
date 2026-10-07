@@ -51,7 +51,12 @@ export function AdminPage() {
   // Con `useState(null)` + efecto, el HTML sale sin sesión y el cliente decide.
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<{ username: string; role: string } | null>(null);
-  const [credentials, setCredentials] = useState({ username: '', password: '' });
+  // Acceso por enlace mágico: el correo que se pide, si ya se envió y el token que llegó en el
+  // fragmento (`/admin#entrar=<token>`, que nunca llega al servidor ni a sus logs).
+  const [correo, setCorreo] = useState('');
+  const [enlaceEnviado, setEnlaceEnviado] = useState(false);
+  const [enviandoEnlace, setEnviandoEnlace] = useState(false);
+  const [tokenDeEnlace, setTokenDeEnlace] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [audit, setAudit] = useState<Array<{ id: number; actor: string; action: string; entityId: number | null; createdAt: string }>>([]);
@@ -69,6 +74,13 @@ export function AdminPage() {
   useEffect(() => {
     const stored = window.localStorage.getItem(TOKEN_KEY);
     if (stored) setToken(stored);
+    // El enlace del correo se gasta con un BOTÓN, no al abrirlo: los antivirus y clientes de correo
+    // abren los enlaces y lo quemarían. El fragmento se borra de la barra en cuanto se lee.
+    const deEnlace = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('entrar');
+    if (deEnlace) {
+      setTokenDeEnlace(deEnlace);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
   }, []);
 
   // Sesión guardada -> validar contra la API.
@@ -121,17 +133,32 @@ export function AdminPage() {
       .catch(() => undefined);
   }, [user, token, loadFactions]);
 
-  const login = async (event: React.FormEvent) => {
+  const pedirEnlace = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    setEnviandoEnlace(true);
     try {
-      const response = await api.login(credentials.username, credentials.password);
+      await api.pedirEnlaceDeAcceso(correo.trim());
+      setEnlaceEnviado(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'no se pudo enviar el enlace');
+    } finally {
+      setEnviandoEnlace(false);
+    }
+  };
+
+  const entrarConEnlace = async () => {
+    if (!tokenDeEnlace) return;
+    setError(null);
+    try {
+      const response = await api.entrarConEnlace(tokenDeEnlace);
       window.localStorage.setItem(TOKEN_KEY, response.token);
       setToken(response.token);
       setUser(response.user);
-      setCredentials({ username: '', password: '' });
+      setTokenDeEnlace(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'credenciales inválidas');
+      setTokenDeEnlace(null);
+      setError(cause instanceof Error ? cause.message : 'el enlace no es válido');
     }
   };
 
@@ -193,48 +220,58 @@ export function AdminPage() {
   );
 
   if (!user) {
+    if (tokenDeEnlace) {
+      return (
+        <div className="mx-auto max-w-md px-4 py-16">
+          <div className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-6" data-testid="admin-enlace">
+            <h1 className="text-xl font-extrabold text-dex-ink">Mantenedor VTuberDex</h1>
+            <p className="text-sm text-dex-muted">Tu enlace es válido. Pulsa el botón para iniciar sesión.</p>
+            {error && <p className="text-sm text-red-300">{error}</p>}
+            <button type="button" onClick={entrarConEnlace} className="w-full rounded-xl bg-dex-accent px-4 py-2.5 text-sm font-bold text-black">
+              Entrar al mantenedor
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="mx-auto max-w-md px-4 py-16">
-        <form
-          onSubmit={login}
-          className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-6"
-          data-testid="admin-login"
-        >
+        <div className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-6" data-testid="admin-login">
           <h1 className="text-xl font-extrabold text-dex-ink">Mantenedor VTuberDex</h1>
-          <p className="text-sm text-dex-muted">Inicia sesión para editar fichas, colores y visibilidad.</p>
-          <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-            Usuario
-            <input
-              value={credentials.username}
-              onChange={(event) => setCredentials((current) => ({ ...current, username: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm text-dex-ink outline-none focus:border-dex-accent"
-              autoComplete="username"
-            />
-          </label>
-          <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-            Contraseña
-            <input
-              type="password"
-              value={credentials.password}
-              onChange={(event) => setCredentials((current) => ({ ...current, password: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm text-dex-ink outline-none focus:border-dex-accent"
-              autoComplete="current-password"
-            />
-          </label>
-          {error && <p className="text-sm text-red-300">{error}</p>}
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-dex-accent px-4 py-2.5 text-sm font-bold text-black"
-            disabled={!credentials.username || !credentials.password}
-          >
-            Entrar
-          </button>
+          {enlaceEnviado ? (
+            <p className="text-sm text-dex-muted" data-testid="admin-enlace-enviado">
+              Si ese correo es de un administrador, te enviamos un enlace para entrar. Vale 15 minutos y sirve una sola vez. Revisa también el
+              spam.
+            </p>
+          ) : (
+            <form onSubmit={pedirEnlace} className="space-y-4">
+              <p className="text-sm text-dex-muted">Escribe tu correo de administrador y te enviamos un enlace para entrar.</p>
+              <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
+                Correo
+                <input
+                  type="email"
+                  value={correo}
+                  onChange={(event) => setCorreo(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm text-dex-ink outline-none focus:border-dex-accent"
+                  autoComplete="email"
+                />
+              </label>
+              {error && <p className="text-sm text-red-300">{error}</p>}
+              <button
+                type="submit"
+                className="w-full rounded-xl bg-dex-accent px-4 py-2.5 text-sm font-bold text-black disabled:opacity-50"
+                disabled={!correo || enviandoEnlace}
+              >
+                {enviandoEnlace ? 'Enviando…' : 'Enviarme el enlace'}
+              </button>
+            </form>
+          )}
           <p className="text-center text-xs text-dex-muted">
             <Link href="/" className="hover:text-dex-ink">
               ← Volver al catálogo
             </Link>
           </p>
-        </form>
+        </div>
       </div>
     );
   }

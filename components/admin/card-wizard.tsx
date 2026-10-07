@@ -89,11 +89,13 @@ export function CardWizard({
   const [error, setError] = useState<SaveFailure | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [attempted, setAttempted] = useState(false);
-  const [slugAuto, setSlugAuto] = useState(mode === 'create');
   const [nextDex, setNextDex] = useState<number | null>(null);
   const [origin, setOrigin] = useState('');
   const [factionDialog, setFactionDialog] = useState(false);
   const [finished, setFinished] = useState(false);
+  // El correo no es parte de la ficha (es confidencial y vive aparte): se edita y se guarda por su propia ruta.
+  const [email, setEmail] = useState(initial?.email ?? '');
+  const [emailSaved, setEmailSaved] = useState(initial?.email ?? '');
 
   const set = <K extends keyof EditorForm>(key: K, value: EditorForm[K]) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -139,7 +141,6 @@ export function CardWizard({
   const adopt = (next: VtuberDetail) => {
     setDetail(next);
     setForm(formFromDetail(next));
-    setSlugAuto(false);
     setSavedAt(new Date().toISOString());
     onChanged(next);
   };
@@ -152,6 +153,40 @@ export function CardWizard({
     setError(failure);
     const kind = conflictKind(failure, requested.dex, requested.slug);
     notify('error', kind === 'slug' ? `${failure.message}. Esa dirección ya está en uso.` : failure.message);
+  };
+
+  /** Guarda el correo si cambió. `false` = falló (ya avisó) y no hay que seguir. */
+  const persistEmail = async (id: number): Promise<boolean> => {
+    const wanted = email.trim();
+    if (wanted === emailSaved.trim()) return true;
+    try {
+      const response = await api.setVtuberEmail(token, id, wanted || null);
+      const stored = response.email ?? '';
+      setEmail(stored);
+      setEmailSaved(stored);
+      if (!stored) notify('ok', 'Correo quitado.');
+      else if (response.bienvenida === 'enviada') notify('ok', `Correo guardado. Se envió el correo de bienvenida a ${stored}.`);
+      else if (response.bienvenida === 'fallo') notify('error', 'Correo guardado, pero no se pudo enviar la bienvenida. Revisa el servidor de correo.');
+      else notify('ok', 'Correo guardado.');
+      return true;
+    } catch (cause) {
+      const failure: SaveFailure = { message: cause instanceof Error ? `Correo: ${cause.message}` : 'No se pudo guardar el correo.', status: (cause as { status?: number }).status };
+      setError(failure);
+      notify('error', failure.message);
+      return false;
+    }
+  };
+
+  const [savingEmail, setSavingEmail] = useState(false);
+  const saveEmailOnly = async () => {
+    if (!detail) return;
+    setError(null);
+    setSavingEmail(true);
+    try {
+      await persistEmail(detail.id);
+    } finally {
+      setSavingEmail(false);
+    }
   };
 
   /** Crea (paso 1 del modo create) o guarda lo modificado. `true` = se puede continuar. */
@@ -168,7 +203,8 @@ export function CardWizard({
         const created = await api.createVtuber(token, body);
         adopt(created);
         notify('ok', `Borrador «${created.name}» creado con el número #${created.dexNumber}.`);
-        return true;
+        // La ficha ya existe: si el correo falla se avisa, pero el borrador no se pierde ni se reintenta crear.
+        return await persistEmail(created.id);
       } catch (cause) {
         fail(cause, { dex: body.dexNumber !== undefined, slug: body.slug !== undefined });
         return false;
@@ -180,7 +216,14 @@ export function CardWizard({
       setAttempted(true);
       return false;
     }
-    if (Object.keys(patch).length === 0) return true;
+    if (Object.keys(patch).length === 0) {
+      setSaving(true);
+      try {
+        return await persistEmail(detail.id);
+      } finally {
+        setSaving(false);
+      }
+    }
     setSaving(true);
     try {
       const updated = await api.updateVtuber(token, detail.id, patch);
@@ -191,7 +234,7 @@ export function CardWizard({
       if (updated?.slug) adopt(updated);
       else setSavedAt(new Date().toISOString());
       notify('ok', 'Cambios guardados.');
-      return true;
+      return await persistEmail(detail.id);
     } catch (cause) {
       fail(cause, { dex: patch.dexNumber !== undefined, slug: patch.slug !== undefined });
       return false;
@@ -208,11 +251,9 @@ export function CardWizard({
     if (mode === 'create') setFinished(true);
   };
 
-  const onNameChange = (name: string) => setForm((current) => ({ ...current, name, slug: slugAuto ? slugifyUrl(name) : current.slug }));
-  const onSlugChange = (slug: string) => {
-    setSlugAuto(false);
-    set('slug', slug);
-  };
+  // La dirección no se escribe a mano: sale SIEMPRE del nombre, también al editar (la anterior sigue
+  // redirigiendo por `slug_alias`), así nombre y URL no pueden desincronizarse.
+  const onNameChange = (name: string) => setForm((current) => ({ ...current, name, slug: slugifyUrl(name) }));
 
   const jumpToFirstPending = () => {
     const pending = items.find((item) => !item.optional && !item.ok);
@@ -356,7 +397,11 @@ export function CardWizard({
             countryOptions={countryOptions}
             languageOptions={languageOptions}
             onNameChange={onNameChange}
-            onSlugChange={onSlugChange}
+            email={email}
+            onEmailChange={setEmail}
+            emailDirty={Boolean(detail) && email.trim() !== emailSaved.trim()}
+            savingEmail={savingEmail}
+            onSaveEmail={saveEmailOnly}
           />
         )}
         {step.id === 'imagenes' && detail && <ImagesStep token={token} detail={detail} onUpdated={setDetail} />}

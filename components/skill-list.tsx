@@ -2,13 +2,17 @@
 /** Habilidades agrupadas por categoría (activas, pasivas, ultimate). */
 import { useState } from 'react';
 
+import { useI18n } from '@/lib/i18n';
+import type { Clave } from '@/lib/i18n/mensajes';
+import { tipoDeHabilidad } from '@/lib/i18n/nombres';
 import type { SkillRow } from '@/lib/types';
+import { RANGO_MAXIMO } from '@/server/src/experiencia.mjs';
 
-const CATEGORY_LABEL: Record<SkillRow['category'], string> = {
-  active: 'Habilidades activas',
-  passive: 'Habilidades pasivas',
-  ultimate: 'Habilidad ultimate',
-  other: 'Otras habilidades',
+const CATEGORY_LABEL: Record<SkillRow['category'], Clave> = {
+  active: 'habilidades.activas',
+  passive: 'habilidades.pasivas',
+  ultimate: 'habilidades.ultimate',
+  other: 'habilidades.otras',
 };
 
 const ORDER: Array<SkillRow['category']> = ['active', 'passive', 'ultimate', 'other'];
@@ -19,13 +23,14 @@ export interface SkillListProps {
 }
 
 export function SkillList({ skills, palette }: SkillListProps) {
+  const { t, locale } = useI18n();
   const [open, setOpen] = useState<string | null>(skills[0]?.name ?? null);
 
   if (skills.length === 0) {
     return (
       <section className="rounded-2xl border border-dex-line bg-dex-panel/60 p-5">
-        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">Habilidades</h2>
-        <p className="mt-3 text-sm text-dex-muted">Sin habilidades registradas.</p>
+        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">{t('habilidades.titulo')}</h2>
+        <p className="mt-3 text-sm text-dex-muted">{t('habilidades.vacio')}</p>
       </section>
     );
   }
@@ -40,7 +45,7 @@ export function SkillList({ skills, palette }: SkillListProps) {
       {grouped.map((group) => (
         <div key={group.category} className="rounded-2xl border border-dex-line bg-dex-panel/60 p-5">
           <h2 className="text-sm font-bold uppercase tracking-[0.16em]" style={{ color: palette.accent }}>
-            {CATEGORY_LABEL[group.category]}
+            {t(CATEGORY_LABEL[group.category])}
           </h2>
           <ul className="mt-3 space-y-2">
             {group.items.map((skill) => {
@@ -55,13 +60,22 @@ export function SkillList({ skills, palette }: SkillListProps) {
                     className="flex w-full items-center gap-3 px-4 py-3 text-left"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold text-dex-ink">{skill.name ?? 'Sin nombre'}</span>
+                      <span className="block truncate text-sm font-bold text-dex-ink">{skill.name ?? t('habilidades.sinNombre')}</span>
                       {skill.type && (
                         <span className="mt-0.5 block text-[11px] uppercase tracking-[0.12em] text-dex-muted">
-                          {skill.type}
+                          {tipoDeHabilidad(locale, skill.type)}
                         </span>
                       )}
                     </span>
+                    {skill.rank ? (
+                      <span
+                        className="shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em]"
+                        style={{ borderColor: palette.accent, color: palette.accent }}
+                        data-testid="skill-rank"
+                      >
+                        {t('habilidades.rango', { n: skill.rank, max: RANGO_MAXIMO })}
+                      </span>
+                    ) : null}
                     <span
                       className="h-2 w-2 shrink-0 rounded-full"
                       style={{ background: palette.accent }}

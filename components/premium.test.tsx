@@ -256,7 +256,7 @@ describe('PremiumManager', () => {
   const tabla = {
     premium: [
       fila(17, 'madKoding', premium({ grade: '9', gradedAt: '2026-01-05' })),
-      fila(40, 'Maxima', premium({ grade: 'BL', cert: 'VTD-000040' }), { status: 'draft' }),
+      fila(40, 'Maxima', premium({ grade: 'BL', cert: 'VTD-040' }), { status: 'draft' }),
     ],
     busqueda: [fila(50, 'Mari', null), fila(51, 'Madre', premium({ grade: '8' }))],
   };
@@ -276,23 +276,49 @@ describe('PremiumManager', () => {
     render(<PremiumManager token="t" notify={notify} onChanged={onChanged} />);
     return { notify, onChanged };
   };
+  /** La fila de una carta por su nombre (el orden por defecto es «grado mayor primero»). */
+  const filaDe = async (nombre: string) => {
+    const filas = await screen.findAllByTestId('premium-row');
+    const fila = filas.find((f) => within(f).queryByText(nombre));
+    if (!fila) throw new Error(`no hay fila para ${nombre}`);
+    return fila;
+  };
+  const abrirMas = async (nombre: string) => {
+    const f = await filaDe(nombre);
+    fireEvent.click(within(f).getByRole('button', { name: `Más opciones de ${nombre}` }));
+    return within(await screen.findByTestId('premium-mas'));
+  };
+  const abrirAlta = async () => {
+    await screen.findAllByTestId('premium-row');
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva premium' }));
+  };
 
-  test('lista las cartas premium con su grado, certificado y antigüedad', async () => {
+  test('lista una línea por carta con su grado, número y último cambio', async () => {
     montar();
     const filas = await screen.findAllByTestId('premium-row');
     expect(filas).toHaveLength(2);
     expect(mocks.adminList.mock.calls[0][1]).toMatchObject({ premium: true });
-    expect(within(filas[0]).getByTestId('premium-badge')).toHaveTextContent('MINT 9');
-    expect(filas[0]).toHaveTextContent('VTD-000017');
-    expect(filas[0]).toHaveTextContent('premium desde 2026-05-01');
+    // Orden por defecto: la de mayor grado primero (Black Label, luego el 9).
+    expect(filas[0]).toHaveTextContent('Maxima');
+    expect(within(filas[1]).getByTestId('premium-badge')).toHaveAttribute('data-grade', '9');
+    expect(filas[1]).toHaveTextContent('#017');
+    expect(filas[1]).toHaveTextContent('2026-01-05');
     // Una carta en borrador avisa de que el público no la ve.
-    expect(filas[1]).toHaveTextContent('borrador');
+    expect(filas[0]).toHaveTextContent('borrador');
+  });
+
+  test('el detalle (certificado, antigüedad) está en «Más», no ensucia cada línea', async () => {
+    montar();
+    const filas = await screen.findAllByTestId('premium-row');
+    expect(filas[1]).not.toHaveTextContent('VTD-');
+    const mas = await abrirMas('madKoding');
+    expect(mas.getByText(/Certificado/)).toHaveTextContent('VTD-000017');
+    expect(mas.getByText(/Premium desde 2026-05-01/)).toBeInTheDocument();
   });
 
   test('«Subir a …» manda el grado siguiente de la escala', async () => {
     const { notify, onChanged } = montar();
-    const filas = await screen.findAllByTestId('premium-row');
-    fireEvent.click(within(filas[0]).getByRole('button', { name: 'Subir a 9.5' }));
+    fireEvent.click(within(await filaDe('madKoding')).getByRole('button', { name: 'Subir a 9.5' }));
     await waitFor(() => expect(mocks.updateVtuber).toHaveBeenCalledWith('t', 17, { premium: { grade: '9.5' } }));
     await waitFor(() => expect(notify).toHaveBeenCalledWith('ok', expect.stringContaining('sube a')));
     expect(onChanged).toHaveBeenCalled();
@@ -303,44 +329,99 @@ describe('PremiumManager', () => {
   test('después del 10 el siguiente paso es la Black Label, y en la BL no hay más', async () => {
     tabla.premium[0] = fila(17, 'madKoding', premium({ grade: '10' }));
     montar();
-    const filas = await screen.findAllByTestId('premium-row');
-    expect(within(filas[0]).getByRole('button', { name: 'Subir a Black Label' })).toBeEnabled();
-    expect(within(filas[1]).getByRole('button', { name: 'Grado máximo' })).toBeDisabled();
+    expect(within(await filaDe('madKoding')).getByRole('button', { name: 'Subir a Black Label' })).toBeEnabled();
+    expect(within(await filaDe('Maxima')).getByRole('button', { name: 'Grado máximo' })).toBeDisabled();
     tabla.premium[0] = fila(17, 'madKoding', premium({ grade: '9', gradedAt: '2026-01-05' }));
   });
 
-  test('avisa si el grado ya cambió este mes, pero deja subir', async () => {
+  test('avisa en la línea si ya subió este mes (y por revisar si no), pero deja subir', async () => {
     tabla.premium[0] = fila(17, 'madKoding', premium({ grade: '9', gradedAt: hoyMismoMes }));
     montar();
-    const filas = await screen.findAllByTestId('premium-row');
-    expect(within(filas[0]).getByTestId('reason')).toHaveTextContent('Ya cambió de grado este mes');
-    expect(within(filas[0]).getByRole('button', { name: 'Subir a 9.5' })).toBeEnabled();
-    expect(within(filas[1]).queryByTestId('reason')).not.toBeInTheDocument();
+    const f = await filaDe('madKoding');
+    expect(f).toHaveTextContent('subió este mes');
+    expect(within(f).getByRole('button', { name: 'Subir a 9.5' })).toBeEnabled();
+    expect(await filaDe('Maxima')).toHaveTextContent('grado máximo');
+    // El aviso largo está en «Más».
+    expect((await abrirMas('madKoding')).getByTestId('reason')).toHaveTextContent('Ya cambió de grado este mes');
     tabla.premium[0] = fila(17, 'madKoding', premium({ grade: '9', gradedAt: '2026-01-05' }));
   });
 
-  test('«Fijar grado» corrige a mano cualquier grado de la escala', async () => {
+  test('una carta que no subió este mes aparece «por revisar»', async () => {
     montar();
-    const filas = await screen.findAllByTestId('premium-row');
-    fireEvent.change(within(filas[0]).getByLabelText('Grado de madKoding'), { target: { value: '10' } });
+    expect(await filaDe('madKoding')).toHaveTextContent('por revisar');
+  });
+
+  test('«Fijar grado» (en «Más») corrige a mano cualquier grado de la escala', async () => {
+    montar();
+    const mas = await abrirMas('madKoding');
+    fireEvent.change(mas.getByLabelText('Grado de madKoding'), { target: { value: '10' } });
     await waitFor(() => expect(mocks.updateVtuber).toHaveBeenCalledWith('t', 17, { premium: { grade: '10' } }));
+  });
+
+  test('degradar desde la fila usa el grado de deterioro elegido', async () => {
+    montar();
+    const mas = await abrirMas('madKoding');
+    fireEvent.change(mas.getByLabelText('Grado de deterioro de madKoding'), { target: { value: '3' } });
+    fireEvent.click(mas.getByRole('button', { name: 'Degradar' }));
+    await waitFor(() => expect(mocks.updateVtuber).toHaveBeenCalledWith('t', 17, { premium: { grade: '3' } }));
+  });
+
+  test('el deterioro arranca en el grado más leve, no en la baja', async () => {
+    montar();
+    const mas = await abrirMas('madKoding');
+    const selector = mas.getByLabelText('Grado de deterioro de madKoding') as HTMLSelectElement;
+    expect(selector.value).not.toBe('1');
+    fireEvent.click(mas.getByRole('button', { name: 'Degradar' }));
+    await waitFor(() => expect(mocks.updateVtuber).toHaveBeenCalledTimes(1));
+    expect(mocks.updateVtuber.mock.calls[0][2]).not.toEqual({ premium: { grade: '1' } });
+  });
+
+  test('dar de baja (grado 1) pide confirmación: la ficha deja de ser pública', async () => {
+    montar();
+    const mas = await abrirMas('madKoding');
+    fireEvent.change(mas.getByLabelText('Grado de deterioro de madKoding'), { target: { value: '1' } });
+    fireEvent.click(mas.getByRole('button', { name: 'Dar de baja (grado 1)' }));
+    expect(mocks.updateVtuber).not.toHaveBeenCalled();
+    expect(mas.getByTestId('premium-confirmar-baja')).toHaveTextContent('dejará de tener página pública');
+    fireEvent.click(mas.getByRole('button', { name: 'No' }));
+    expect(mocks.updateVtuber).not.toHaveBeenCalled();
+    fireEvent.click(mas.getByRole('button', { name: 'Dar de baja (grado 1)' }));
+    fireEvent.click(mas.getByRole('button', { name: 'Sí, dar de baja' }));
+    await waitFor(() => expect(mocks.updateVtuber).toHaveBeenCalledWith('t', 17, { premium: { grade: '1' } }));
   });
 
   test('quitar el premium pide confirmación y manda null', async () => {
     montar();
-    const filas = await screen.findAllByTestId('premium-row');
-    fireEvent.click(within(filas[0]).getByRole('button', { name: 'Quitar premium' }));
+    const mas = await abrirMas('madKoding');
+    fireEvent.click(mas.getByRole('button', { name: 'Quitar premium' }));
     expect(mocks.updateVtuber).not.toHaveBeenCalled();
-    fireEvent.click(within(filas[0]).getByRole('button', { name: 'No' }));
+    fireEvent.click(mas.getByRole('button', { name: 'No' }));
     expect(mocks.updateVtuber).not.toHaveBeenCalled();
-    fireEvent.click(within(filas[0]).getByRole('button', { name: 'Quitar premium' }));
-    fireEvent.click(within(filas[0]).getByRole('button', { name: 'Sí, quitar' }));
+    fireEvent.click(mas.getByRole('button', { name: 'Quitar premium' }));
+    fireEvent.click(mas.getByRole('button', { name: 'Sí, quitar' }));
     await waitFor(() => expect(mocks.updateVtuber).toHaveBeenCalledWith('t', 17, { premium: null }));
+  });
+
+  test('solo una fila tiene «Más» abierto a la vez', async () => {
+    montar();
+    await abrirMas('madKoding');
+    await abrirMas('Maxima');
+    expect(screen.getAllByTestId('premium-mas')).toHaveLength(1);
+  });
+
+  test('el alta está cerrada mientras haya cartas, y se abre con «+ Nueva premium»', async () => {
+    montar();
+    await screen.findAllByTestId('premium-row');
+    expect(screen.queryByTestId('premium-alta')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva premium' }));
+    expect(screen.getByTestId('premium-alta')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    expect(screen.queryByTestId('premium-alta')).not.toBeInTheDocument();
   });
 
   test('da de alta una ficha con el grado inicial elegido y no ofrece las que ya son premium', async () => {
     montar();
-    await screen.findAllByTestId('premium-row');
+    await abrirAlta();
     fireEvent.change(screen.getByLabelText('Buscar ficha para hacerla premium'), { target: { value: 'ma' } });
     const candidatas = await screen.findByTestId('premium-candidates');
     await waitFor(() => expect(within(candidatas).getByText('Mari')).toBeInTheDocument());
@@ -351,48 +432,163 @@ describe('PremiumManager', () => {
     await waitFor(() => expect(mocks.updateVtuber).toHaveBeenCalledWith('t', 50, { premium: { grade: '9' } }));
   });
 
-  test('un código VTD-… (el de la nota de PayPal) encuentra la ficha por id', async () => {
-    mocks.adminDetail.mockResolvedValue(fila(50, 'Mari', null));
+  test('un código VTD-… (el de la nota de PayPal) encuentra la ficha por su número de dex', async () => {
     montar();
-    await screen.findAllByTestId('premium-row');
-    fireEvent.change(screen.getByLabelText('Buscar ficha para hacerla premium'), { target: { value: 'VTD-000050' } });
+    await abrirAlta();
+    mocks.adminList.mockResolvedValue({ items: [fila(50, 'Mari', null), fila(150, 'Otra con 50 en el texto', null)], total: 2, page: 1, pageCount: 1, perPage: 20, facets: null });
+    fireEvent.change(screen.getByLabelText('Buscar ficha para hacerla premium'), { target: { value: 'VTD-050' } });
     const candidatas = await screen.findByTestId('premium-candidates');
     await waitFor(() => expect(within(candidatas).getByText('Mari')).toBeInTheDocument());
-    expect(mocks.adminDetail).toHaveBeenCalledWith('t', 50);
-    // No se pregunta por texto: el código no está en el nombre.
-    expect(mocks.adminList.mock.calls.some((c) => c[1].q === 'VTD-000050')).toBe(false);
+    // Se busca por el NÚMERO (50), no por el texto del código; y solo vale la ficha cuyo dex es EXACTAMENTE 50.
+    expect(mocks.adminList.mock.calls.some((c) => c[1].q === '50')).toBe(true);
+    expect(mocks.adminList.mock.calls.some((c) => c[1].q === 'VTD-050')).toBe(false);
+    expect(within(candidatas).queryByText('Otra con 50 en el texto')).not.toBeInTheDocument();
   });
 
   test('un código de una ficha que YA es premium no se ofrece de nuevo', async () => {
-    mocks.adminDetail.mockResolvedValue(fila(17, 'madKoding', premium({ grade: '9' })));
     montar();
-    await screen.findAllByTestId('premium-row');
-    fireEvent.change(screen.getByLabelText('Buscar ficha para hacerla premium'), { target: { value: 'VTD-000017' } });
-    await waitFor(() => expect(mocks.adminDetail).toHaveBeenCalled());
+    await abrirAlta();
+    mocks.adminList.mockResolvedValue({ items: [fila(17, 'madKoding', premium({ grade: '9' }))], total: 1, page: 1, pageCount: 1, perPage: 20, facets: null });
+    fireEvent.change(screen.getByLabelText('Buscar ficha para hacerla premium'), { target: { value: 'VTD-017' } });
+    await waitFor(() => expect(mocks.adminList.mock.calls.some((c) => c[1].q === '17')).toBe(true));
     await waitFor(() => expect(screen.getByText(/Ninguna ficha sin premium coincide/)).toBeInTheDocument());
   });
 
   test('un código que no existe no rompe nada', async () => {
-    mocks.adminDetail.mockRejectedValue(new Error('no_encontrado'));
     montar();
-    await screen.findAllByTestId('premium-row');
-    fireEvent.change(screen.getByLabelText('Buscar ficha para hacerla premium'), { target: { value: 'VTD-999999' } });
+    await abrirAlta();
+    mocks.adminList.mockRejectedValue(new Error('no_encontrado'));
+    fireEvent.change(screen.getByLabelText('Buscar ficha para hacerla premium'), { target: { value: 'VTD-999' } });
     await waitFor(() => expect(screen.getByText(/Ninguna ficha sin premium coincide/)).toBeInTheDocument());
   });
 
   test('un error del servidor llega como aviso, no rompe la lista', async () => {
     mocks.updateVtuber.mockRejectedValueOnce(new Error('grado_invalido'));
     const { notify } = montar();
-    const filas = await screen.findAllByTestId('premium-row');
-    fireEvent.click(within(filas[0]).getByRole('button', { name: 'Subir a 9.5' }));
+    fireEvent.click(within(await filaDe('madKoding')).getByRole('button', { name: 'Subir a 9.5' }));
     await waitFor(() => expect(notify).toHaveBeenCalledWith('error', 'grado_invalido'));
     expect(screen.getAllByTestId('premium-row')).toHaveLength(2);
   });
 
-  test('sin cartas premium explica cómo hacer la primera', async () => {
+  test('sin cartas premium muestra el alta abierta y explica cómo hacer la primera', async () => {
     tabla.premium.length = 0;
     montar();
     expect(await screen.findByText(/Aún no hay cartas premium/)).toBeInTheDocument();
+    expect(screen.getByTestId('premium-alta')).toBeInTheDocument();
+  });
+});
+
+describe('PremiumManager: filtros, orden y paginación (la lista no es una sábana)', () => {
+  const fila = (id: number, name: string, p: PremiumInfo | null, extra = {}) =>
+    makeCard({ id, dexNumber: id, slug: name.toLowerCase().replace(/\s/g, '-'), name, premium: p, ...extra });
+  const mes = hoy();
+  const base = [
+    fila(1, 'Ana', premium({ grade: '6', gradedAt: '2026-01-05', cert: 'VTD-001' })),
+    fila(2, 'Beto', premium({ grade: '8', gradedAt: mes, cert: 'VTD-002' })),
+    fila(3, 'Carla', premium({ grade: '9.5', gradedAt: '2026-01-05', cert: 'VTD-003' })),
+    fila(4, 'Diego', premium({ grade: '10', gradedAt: '2026-01-05', cert: 'VTD-004' })),
+    fila(5, 'Elisa', premium({ grade: 'BL', cert: 'VTD-005' })),
+    fila(6, 'Fran', premium({ grade: '3', cert: 'VTD-006' })),
+  ];
+
+  const montarCon = (filas: ReturnType<typeof fila>[], pageCount = 1) => {
+    mocks.adminList.mockImplementation(async (_t: string, params: { page?: number }) => {
+      const page = params.page ?? 1;
+      const porPagina = Math.ceil(filas.length / pageCount);
+      const items = filas.slice((page - 1) * porPagina, page * porPagina);
+      return { items, total: filas.length, page, perPage: porPagina, pageCount };
+    });
+    render(<PremiumManager token="t" />);
+  };
+  afterEach(() => vi.clearAllMocks());
+  const nombres = () => screen.getAllByTestId('premium-row').map((f) => within(f).getAllByText(/^[A-Z][a-z]+$/)[0].textContent);
+
+  test('cada filtro muestra su CONTADOR y recorta la lista', async () => {
+    montarCon(base);
+    await screen.findAllByTestId('premium-row');
+    const chip = (re: RegExp) => within(screen.getByRole('navigation', { name: 'Filtrar cartas premium' })).getByRole('button', { name: re });
+    expect(chip(/^Todas/)).toHaveTextContent('6');
+    expect(chip(/6 – 7,5/)).toHaveTextContent('1');
+    expect(chip(/8 – 9,5/)).toHaveTextContent('2');
+    expect(chip(/^10/)).toHaveTextContent('1');
+    expect(chip(/Black Label/)).toHaveTextContent('1');
+    expect(chip(/Deterioradas/)).toHaveTextContent('1');
+    fireEvent.click(chip(/8 – 9,5/));
+    expect(nombres()).toEqual(['Carla', 'Beto']);
+    expect(chip(/8 – 9,5/)).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('«Por subir este mes» deja solo a quien puede subir y aún no cambió este mes', async () => {
+    montarCon(base);
+    await screen.findAllByTestId('premium-row');
+    // Beto ya subió este mes, Elisa está en el máximo y Fran está deteriorada: ninguno cuenta.
+    const chip = within(screen.getByRole('navigation', { name: 'Filtrar cartas premium' })).getByRole('button', { name: /Por subir este mes/ });
+    expect(chip).toHaveTextContent('3');
+    fireEvent.click(chip);
+    expect(nombres().sort()).toEqual(['Ana', 'Carla', 'Diego']);
+    expect(screen.getByText(/3 cartas pendientes de revisar este mes/)).toBeInTheDocument();
+  });
+
+  test('la búsqueda en la lista encuentra por nombre sin tildes, por número y por certificado', async () => {
+    montarCon([...base, fila(7, 'Papá Noel', premium({ grade: '8', cert: 'VTD-007' }))]);
+    await screen.findAllByTestId('premium-row');
+    const caja = screen.getByLabelText('Buscar en la lista de premium');
+    fireEvent.change(caja, { target: { value: 'papa' } });
+    expect(screen.getAllByTestId('premium-row')).toHaveLength(1);
+    fireEvent.change(caja, { target: { value: '#003' } });
+    expect(nombres()).toEqual(['Carla']);
+    fireEvent.change(caja, { target: { value: 'VTD-005' } });
+    expect(nombres()).toEqual(['Elisa']);
+  });
+
+  test('si nada coincide lo dice y ofrece quitar los filtros', async () => {
+    montarCon(base);
+    await screen.findAllByTestId('premium-row');
+    fireEvent.change(screen.getByLabelText('Buscar en la lista de premium'), { target: { value: 'zzzz' } });
+    expect(screen.getByTestId('premium-sin-resultados')).toHaveTextContent('Ninguna carta coincide');
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+    expect(screen.getAllByTestId('premium-row')).toHaveLength(6);
+  });
+
+  test('ordena por grado (por defecto mayor primero), por nombre y por último cambio más antiguo', async () => {
+    montarCon(base);
+    await screen.findAllByTestId('premium-row');
+    expect(nombres()).toEqual(['Elisa', 'Diego', 'Carla', 'Beto', 'Ana', 'Fran']);
+    fireEvent.change(screen.getByLabelText('Ordenar'), { target: { value: 'grado-asc' } });
+    expect(nombres()[0]).toBe('Fran');
+    fireEvent.change(screen.getByLabelText('Ordenar'), { target: { value: 'nombre' } });
+    expect(nombres()).toEqual(['Ana', 'Beto', 'Carla', 'Diego', 'Elisa', 'Fran']);
+  });
+
+  test('pagina de 20 en 20: con 45 cartas hay 3 páginas y no se pinta una sábana', async () => {
+    const muchas = Array.from({ length: 45 }, (_, i) => fila(i + 1, `Carta${String(i + 1).padStart(2, '0')}`, premium({ grade: '8', cert: `VTD-${i + 1}` })));
+    montarCon(muchas);
+    await screen.findAllByTestId('premium-row');
+    expect(screen.getAllByTestId('premium-row')).toHaveLength(20);
+    expect(screen.getByTestId('premium-paginacion')).toHaveTextContent('Mostrando 1–20 de 45');
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente ›' }));
+    expect(screen.getByTestId('premium-paginacion')).toHaveTextContent('Mostrando 21–40 de 45');
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente ›' }));
+    expect(screen.getAllByTestId('premium-row')).toHaveLength(5);
+    expect(screen.getByRole('button', { name: 'Siguiente ›' })).toBeDisabled();
+  });
+
+  test('al cambiar de filtro vuelve a la primera página', async () => {
+    const muchas = Array.from({ length: 45 }, (_, i) => fila(i + 1, `Carta${String(i + 1).padStart(2, '0')}`, premium({ grade: i < 30 ? '8' : '10', cert: `VTD-${i + 1}` })));
+    montarCon(muchas);
+    await screen.findAllByTestId('premium-row');
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente ›' }));
+    expect(screen.getByTestId('premium-paginacion')).toHaveTextContent('21–40');
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Filtrar cartas premium' })).getByRole('button', { name: /^10/ }));
+    expect(screen.getByTestId('premium-paginacion')).toHaveTextContent('Mostrando 1–15 de 15');
+  });
+
+  test('trae TODAS las páginas de la API (antes se cortaba en 100 sin avisar)', async () => {
+    const muchas = Array.from({ length: 6 }, (_, i) => fila(i + 1, `Carta${i + 1}`, premium({ grade: '8', cert: `VTD-${i + 1}` })));
+    montarCon(muchas, 2);
+    await screen.findAllByTestId('premium-row');
+    expect(screen.getAllByTestId('premium-row')).toHaveLength(6);
+    expect(mocks.adminList.mock.calls.filter((c) => c[1].premium).map((c) => c[1].page)).toEqual([1, 2]);
   });
 });
 

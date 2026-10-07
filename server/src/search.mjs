@@ -153,14 +153,14 @@ export function mapCard(row) {
     socialCount: row.socialCount ?? 0,
     /**
      * Carta premium: `null` en una carta normal (la inmensa mayoría). El certificado se DERIVA
-     * del id (`numeroDeCertificado`): un dato recalculable no se guarda.
+     * del número de dex (`numeroDeCertificado`): un dato recalculable no se guarda.
      */
     premium: row.premiumGrade
       ? {
           grade: row.premiumGrade,
           since: row.premiumSince,
           gradedAt: row.premiumGradedAt,
-          cert: numeroDeCertificado(row.id),
+          cert: numeroDeCertificado(row.dexNumber),
         }
       : null,
     images: {

@@ -5,12 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '@/lib/api';
 import { RETRASO_PRECARGA_MS, guardarPagina, imagenesDeCartas, leerPagina, precargarVecinas } from '@/lib/cache-paginas';
+import { guardarCatalogo } from '@/lib/volver-al-catalogo';
 import { DEFAULT_PER_PAGE, DEFAULT_SEARCH, searchParamsFromUrl, searchParamsToUrl } from '@/lib/query';
 import type { ApiListResponse, SearchParams, VtuberCard } from '@/lib/types';
 import { loadImage } from '@/components/card-texture/imagen';
 import { pregenerar } from '@/components/card-texture/fabrica';
-import { pickCardQuality } from '@/components/card-quality';
-import { BINDER } from '@/components/card3d-config';
+import { TEXTURAS } from '@/components/card3d-config';
 
 /**
  * El tamaño de página lo decide el LIBRO, no la URL: 8 cartas (dos hojas de 4) en
@@ -35,9 +35,7 @@ const calentarImagenes = (items: VtuberCard[]) => {
   if (typeof Image === 'undefined') return;
   for (const src of imagenesDeCartas(items)) void loadImage(src);
   if (typeof document === 'undefined' || typeof HTMLCanvasElement === 'undefined') return;
-  const quality = pickCardQuality();
-  if (quality.tier === 'static') return;
-  pregenerar(items, Math.min(quality.textureWidth, BINDER.textureWidthCap));
+  pregenerar(items, TEXTURAS.ancho);
 };
 
 export interface UseVtuberSearchResult {
@@ -59,6 +57,10 @@ export function useVtuberSearch({ perPage = DEFAULT_PER_PAGE }: UseVtuberSearchO
   const router = useRouter();
   const queryString = searchParams.toString();
   const params = useMemo(() => ({ ...searchParamsFromUrl(queryString), perPage }), [queryString, perPage]);
+  // La URL es el estado del catálogo: se recuerda para que «← Catálogo» de la ficha vuelva a esta página.
+  useEffect(() => {
+    guardarCatalogo(queryString);
+  }, [queryString]);
   const [data, setData] = useState<ApiListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

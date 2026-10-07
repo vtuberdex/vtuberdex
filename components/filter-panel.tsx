@@ -6,6 +6,9 @@
  */
 import { useState } from 'react';
 
+import { useI18n } from '@/lib/i18n';
+import { nombreDeIdioma, nombreDePais } from '@/lib/i18n/nombres';
+
 import type { FacetBucket, Facets, SearchParams } from '@/lib/types';
 import { facetValue } from '@/lib/types';
 import { toggleValue } from '@/lib/query';
@@ -18,9 +21,12 @@ interface FacetGroupProps {
   initialOpen?: boolean;
   showFlag?: boolean;
   max?: number;
+  /** Cómo se escribe el nombre de un bucket en el idioma activo (por defecto, el de la base). */
+  nombre?: (bucket: FacetBucket) => string;
 }
 
-function FacetGroup({ title, buckets, selected, onToggle, initialOpen = false, showFlag = false, max = 14 }: FacetGroupProps) {
+function FacetGroup({ title, buckets, selected, onToggle, initialOpen = false, showFlag = false, max = 14, nombre }: FacetGroupProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(initialOpen);
   const [showAll, setShowAll] = useState(false);
   if (buckets.length === 0) return null;
@@ -71,7 +77,7 @@ function FacetGroup({ title, buckets, selected, onToggle, initialOpen = false, s
                     className="h-3.5 w-3.5 accent-dex-accent"
                   />
                   {showFlag && <span aria-hidden>{bucket.flag?.trim() || '🏳️'}</span>}
-                  <span className="min-w-0 flex-1 truncate">{bucket.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{nombre ? nombre(bucket) : bucket.name}</span>
                   <span className="font-mono text-[11px] text-dex-muted">{bucket.count}</span>
                 </label>
               </li>
@@ -84,7 +90,7 @@ function FacetGroup({ title, buckets, selected, onToggle, initialOpen = false, s
                 onClick={() => setShowAll((value) => !value)}
                 className="mt-1 px-2 text-xs text-dex-accent hover:underline"
               >
-                {showAll ? 'ver menos' : `ver todos (${buckets.length})`}
+                {showAll ? t('filtros.verMenos') : t('filtros.verTodos', { n: buckets.length })}
               </button>
             </li>
           )}
@@ -103,6 +109,7 @@ export interface FilterPanelProps {
 }
 
 export function FilterPanel({ facets, params, onChange, onReset, loading = false }: FilterPanelProps) {
+  const { t, locale } = useI18n();
   const activeCount =
     params.countries.length + params.languages.length + params.groups.length + params.artists.length + params.factions.length;
 
@@ -110,9 +117,9 @@ export function FilterPanel({ facets, params, onChange, onReset, loading = false
     <div className="dex-scroll flex h-full flex-col overflow-y-auto rounded-2xl border border-dex-line bg-dex-panel/70 p-4" data-testid="filter-panel">
       <header className="flex items-center justify-between gap-2 pb-2">
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-dex-ink">Filtros</h2>
+          <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-dex-ink">{t('filtros.titulo')}</h2>
           <p className="text-xs text-dex-muted">
-            {loading ? 'Calculando…' : `${facets?.totals.total ?? 0} en catálogo`}
+            {loading ? t('filtros.calculando') : t('filtros.enCatalogo', { n: facets?.totals.total ?? 0 })}
           </p>
         </div>
         {activeCount > 0 && (
@@ -121,40 +128,40 @@ export function FilterPanel({ facets, params, onChange, onReset, loading = false
             onClick={onReset}
             className="rounded-lg border border-dex-line px-2 py-1 text-xs text-dex-muted hover:border-dex-accent/60 hover:text-dex-ink"
           >
-            Limpiar ({activeCount})
+            {t('filtros.limpiar', { n: activeCount })}
           </button>
         )}
       </header>
 
       <FacetGroup
-        title="País"
+        title={t('filtros.pais')}
         buckets={facets?.countries ?? []}
         selected={params.countries}
         onToggle={(value) => onChange({ countries: toggleValue(params.countries, value), page: 1 })}
-        initialOpen
         showFlag
+        nombre={(bucket) => nombreDePais(locale, bucket)}
       />
       <FacetGroup
-        title="Idioma"
+        title={t('filtros.idioma')}
         buckets={facets?.languages ?? []}
         selected={params.languages}
         onToggle={(value) => onChange({ languages: toggleValue(params.languages, value), page: 1 })}
-        initialOpen
+        nombre={(bucket) => nombreDeIdioma(locale, bucket.code ?? facetValue(bucket), bucket.name)}
       />
       <FacetGroup
-        title="Facción"
+        title={t('filtros.faccion')}
         buckets={facets?.factions ?? []}
         selected={params.factions}
         onToggle={(value) => onChange({ factions: toggleValue(params.factions, value), page: 1 })}
       />
       <FacetGroup
-        title="Grupo"
+        title={t('filtros.grupo')}
         buckets={facets?.groups ?? []}
         selected={params.groups}
         onToggle={(value) => onChange({ groups: toggleValue(params.groups, value), page: 1 })}
       />
       <FacetGroup
-        title="Artista"
+        title={t('filtros.artista')}
         buckets={facets?.artists ?? []}
         selected={params.artists}
         onToggle={(value) => onChange({ artists: toggleValue(params.artists, value), page: 1 })}

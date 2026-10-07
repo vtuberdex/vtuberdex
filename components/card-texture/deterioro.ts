@@ -21,7 +21,7 @@
  */
 import { DETERIORO } from '../card3d-config';
 import { corromperTexto, crearAzar, planDeDesgasteLeve, planDeDeterioro, type PlanDeDeterioro } from '@/lib/degradado';
-import { esGradoDegradado } from '@/lib/premium';
+import { esGradoDegradado, gradoDeDibujo } from '@/lib/premium';
 import type { VtuberCard } from '@/lib/types';
 import { CARD_TEXTURE_HEIGHT, CARD_TEXTURE_WIDTH, HEADER } from './dimensiones';
 
@@ -30,7 +30,7 @@ import { CARD_TEXTURE_HEIGHT, CARD_TEXTURE_WIDTH, HEADER } from './dimensiones';
  * entrada (6…7,5), y `null` del 8 hacia arriba (el camino de siempre no paga nada).
  */
 export function planDeCarta(card: VtuberCard): PlanDeDeterioro | null {
-  const grado = card.premium?.grade;
+  const grado = gradoDeDibujo(card);
   if (grado && esGradoDegradado(grado)) return planDeDeterioro(grado, card.id, CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT);
   return planDeDesgasteLeve(grado, card.id, CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT);
 }
@@ -41,7 +41,7 @@ export function planDeCarta(card: VtuberCard): PlanDeDeterioro | null {
  * el shader en el mismo sitio, y mover uno sin el otro los despega.
  */
 export function tarjetaParaTitulo(card: VtuberCard): VtuberCard {
-  const grado = card.premium?.grade;
+  const grado = gradoDeDibujo(card);
   if (!grado || !esGradoDegradado(grado)) return card;
   const plan = planDeDeterioro(grado, card.id, CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT);
   return {

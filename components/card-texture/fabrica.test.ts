@@ -12,13 +12,10 @@ import {
   __estadoCache,
   __pendientes,
   __reiniciarFabrica,
-  __techoAdaptado,
-  anchoEfectivo,
   anclar,
   buscarEnCache,
   encolarTrabajo,
   guardarEnCache,
-  registrarMedicion,
   type TexturasDeCarta,
 } from '@/components/card-texture/fabrica';
 import { makeCard } from '@/test/fixtures';
@@ -68,34 +65,14 @@ describe('cola con prioridades', () => {
   });
 });
 
-describe('calidad adaptativa', () => {
-  it('sin mediciones, el ancho efectivo es el del plan', () => {
-    expect(anchoEfectivo(512)).toBe(512);
-    expect(__techoAdaptado()).toBe(Number.POSITIVE_INFINITY);
-  });
-
-  it('baja un escalón cuando la mediana de las muestras supera el umbral, y no antes', () => {
-    registrarMedicion(TEXTURAS.lentoMs * 3, 512);
-    expect(anchoEfectivo(512)).toBe(512); // una sola muestra no decide
-    registrarMedicion(TEXTURAS.lentoMs * 2, 512);
-    expect(anchoEfectivo(512)).toBe(384);
-    // Una medición al ancho VIEJO ya no cuenta para el escalón nuevo.
-    registrarMedicion(TEXTURAS.lentoMs * 5, 512);
-    registrarMedicion(TEXTURAS.lentoMs * 5, 512);
-    expect(anchoEfectivo(512)).toBe(384);
-    // Y en el escalón nuevo hacen falta otra vez `muestras` lentas para bajar más.
-    registrarMedicion(TEXTURAS.lentoMs * 2, 384);
-    registrarMedicion(TEXTURAS.lentoMs * 2, 384);
-    expect(anchoEfectivo(512)).toBe(256);
-    // 256 es el piso.
-    registrarMedicion(TEXTURAS.lentoMs * 9, 256);
-    registrarMedicion(TEXTURAS.lentoMs * 9, 256);
-    expect(anchoEfectivo(512)).toBe(256);
-  });
-
-  it('una máquina rápida no baja nunca', () => {
-    for (let i = 0; i < 10; i += 1) registrarMedicion(TEXTURAS.lentoMs / 4, 512);
-    expect(anchoEfectivo(512)).toBe(512);
+describe('sin calidad adaptativa', () => {
+  it('el ancho de las texturas es fijo: no hay API para medir ni para bajarlo', async () => {
+    const modulo = await import('@/components/card-texture/fabrica');
+    expect(Object.keys(modulo)).not.toEqual(expect.arrayContaining(['anchoEfectivo']));
+    expect(Object.keys(modulo)).not.toEqual(expect.arrayContaining(['registrarMedicion']));
+    expect(TEXTURAS.ancho).toBe(512);
+    expect(TEXTURAS).not.toHaveProperty('anchos');
+    expect(TEXTURAS).not.toHaveProperty('lentoMs');
   });
 });
 

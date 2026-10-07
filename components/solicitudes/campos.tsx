@@ -6,6 +6,9 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { useI18n } from '@/lib/i18n';
+import type { Clave } from '@/lib/i18n/mensajes';
+
 export const claseInput =
   'mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm normal-case tracking-normal text-dex-ink outline-none placeholder:text-dex-muted/60 focus:border-dex-accent';
 
@@ -24,10 +27,11 @@ export function Campo({
   etiqueta: string;
   ayuda?: ReactNode;
   obligatorio?: boolean;
-  /** Marca los datos que NO se publican (correo, nombre civil). */
+  /** Marca los datos que NO se publican (correo). */
   confidencial?: boolean;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <label className={claseEtiqueta}>
       <span>
@@ -35,7 +39,7 @@ export function Campo({
         {obligatorio && <span className="ml-1 text-rose-300" aria-hidden>*</span>}
         {confidencial && (
           <span className="ml-2 rounded border border-dex-line px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-dex-muted">
-            confidencial · no se publica
+            {t('form.confidencial')}
           </span>
         )}
       </span>
@@ -50,10 +54,11 @@ export function Campo({
  * ve; un script que rellena todo lo que encuentra, sí. El servidor descarta en silencio el envío.
  */
 export function CampoTrampa({ valor, alCambiar }: { valor: string; alCambiar: (v: string) => void }) {
+  const { t } = useI18n();
   return (
     <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
       <label>
-        No rellenar este campo
+        {t('form.trampa')}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" value={valor} onChange={(e) => alCambiar(e.target.value)} />
       </label>
     </div>
@@ -73,6 +78,7 @@ export function AceptaTerminos({
   alCambiar: (v: boolean) => void;
   idUnico: string;
 }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-xl border border-dex-line bg-dex-panel-soft/60 p-4">
       <div className="flex items-start gap-3">
@@ -85,15 +91,15 @@ export function AceptaTerminos({
           className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-dex-accent)]"
         />
         <label htmlFor={idUnico} className="text-sm text-dex-ink">
-          He leído y acepto los{' '}
+          {t('form.terminosAcepto')}{' '}
           <Link href="/terminos" target="_blank" rel="noopener" className="text-dex-accent underline underline-offset-2">
-            Términos y Condiciones
+            {t('form.terminosNombre')}
           </Link>
-          , incluida la{' '}
+          {t('form.terminosIncluida')}{' '}
           <Link href="/terminos#salida" target="_blank" rel="noopener" className="text-dex-accent underline underline-offset-2">
-            cláusula de salida
+            {t('form.terminosSalida')}
           </Link>{' '}
-          (una ficha dada de baja no se elimina: se degrada). <span className="text-rose-300">*</span>
+          {t('form.terminosSalidaNota')} <span className="text-rose-300">*</span>
         </label>
       </div>
     </div>
@@ -106,5 +112,16 @@ export function Aviso({ tipo, children }: { tipo: 'error' | 'ok'; children: Reac
     <div role={tipo === 'error' ? 'alert' : 'status'} className={`rounded-xl border px-4 py-3 text-sm ${color}`}>
       {children}
     </div>
+  );
+}
+
+/** Título y párrafo de una página de formulario: cliente, para que sigan el idioma elegido (la página de servidor solo pasa claves). */
+export function Encabezado({ titulo, texto }: { titulo: Clave; texto: Clave }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <h1 className="text-2xl font-extrabold text-dex-ink">{t(titulo)}</h1>
+      <p className="mt-2 mb-8 text-sm text-dex-muted">{t(texto)}</p>
+    </>
   );
 }

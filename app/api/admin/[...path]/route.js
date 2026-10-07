@@ -6,7 +6,7 @@
  *   · **LOCAL** (`VTUBERDEX_ADMIN_URL`): se reenvía al servidor Express, que es el
  *     único que escribe sobre el SQLite de `data/` —subida de imágenes con `sharp`,
  *     cuerpo de 12 MB, auditoría—. Es como se ha trabajado siempre y no cambia.
- *   · **PRODUCCIÓN (Vercel)** (`TURSO_DATABASE_URL`): el sistema de archivos es
+ *   · **PRODUCCIÓN (Vercel)** (`VTUBERDEX_DB_URL`): el sistema de archivos es
  *     inmutable y la base viaja empaquetada, así que aquí NO se puede escribir en
  *     SQLite. Las ediciones y las imágenes van a Turso (`lib/ediciones.mjs`), y el
  *     catálogo se sigue leyendo del bundle. No es una degradación: es el único modo que
@@ -48,26 +48,35 @@ import {
   tokenDeCabecera,
   usuarioEsperado,
 } from '../../../../lib/admin-auth.mjs';
+import { entrarConEnlace, pedirEnlaceDeAcceso } from '../../../../lib/admin-enlace.mjs';
+import { ipDelCliente, origenPermitido } from '../../../../lib/likes.mjs';
 import {
   adminListQuerySchema,
   bulkStatusSchema,
   factionCreateSchema,
   factionUpdateSchema,
   formatIssues,
+  fichaCorreoSchema,
   vtuberCreateSchema,
   vtuberUpdateSchema,
 } from '../../../../server/src/validation.mjs';
 import { MutationError, listarFacciones, ultimoDex } from '../../../../server/src/mutations.mjs';
+import { resumenDeRechazos } from '../../../../server/src/rechazos.mjs';
 import { ejecutorDeSolicitudes } from '../../../../lib/solicitudes.mjs';
+import { correoDeBienvenida, enviarCorreo } from '../../../../lib/correo.mjs';
 import {
   SolicitudError,
   fichaDesdeInscripcion,
+  correosDeFichas,
+  fijarCorreoDeFicha,
   leerSolicitud,
   listarSolicitudes,
   resolverSolicitud,
 } from '../../../../server/src/solicitudes.mjs';
+import { listarConCorreo } from '../../../../server/src/correo-fichas.mjs';
 import { prepararModificacion } from '../../../../server/src/modificacion.mjs';
-import { getVtuberBySlug, searchVtubers } from '../../../../server/src/search.mjs';
+import { vistaPrevia } from '../../../../server/src/solicitud-vista.mjs';
+import { getVtuberBySlug } from '../../../../server/src/search.mjs';
 import { readWebpSize } from '../../../../server/src/seed.mjs';
 
 export const dynamic = 'force-dynamic';
@@ -219,6 +228,28 @@ async function login(request) {
 }
 
 /**
+ * `POST /api/admin/enlace` (pide el enlace por correo) y `POST /api/admin/enlace/entrar` (lo gasta).
+ *
+ * Son sin sesión por definición: son las que la crean. Pedir el enlace responde siempre lo mismo
+ * para cualquier correo bien formado (ver `lib/admin-enlace.mjs`).
+ */
+async function enlaceDeAcceso(request, accion) {
+  const cabeceras = { 'cache-control': 'no-store' };
+  if (!origenPermitido(request.headers)) return NextResponse.json({ error: 'origen_no_permitido' }, { status: 403, headers: cabeceras });
+  const cuerpo = await request.json().catch(() => null);
+  try {
+    const { status, cuerpo: respuesta } =
+      accion === 'entrar'
+        ? await entrarConEnlace(typeof cuerpo?.token === 'string' ? cuerpo.token : '')
+        : await pedirEnlaceDeAcceso({ email: cuerpo?.email, ip: ipDelCliente(request.headers) });
+    return NextResponse.json(respuesta, { status, headers: cabeceras });
+  } catch (error) {
+    console.error(`[admin] enlace de acceso: ${error.message}`);
+    return NextResponse.json({ error: 'no_disponible', detail: 'No se pudo procesar. Inténtalo de nuevo.' }, { status: 503, headers: cabeceras });
+  }
+}
+
+/**
  * `GET /api/admin/session` — valida el token que la UI guardó en `localStorage`.
  *
  * Con login configurado, un token inválido es un 401 y la UI borra el token y pide entrar de
@@ -353,10 +384,18 @@ async function listarVtubers(request) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'query_invalida', issues: formatIssues(parsed.error) }, { status: 400 });
   }
-  const { q, status, premium, page, perPage } = parsed.data;
+  const { q, status, premium, correo, page, perPage } = parsed.data;
   const db = await dbConDiario();
-  const resultado = searchVtubers(db, {
+  let ejecutor = null;
+  try {
+    ejecutor = await ejecutorDeSolicitudes();
+  } catch (error) {
+    console.error('[admin] sin cola de solicitudes: el listado sale sin datos de correo', error);
+  }
+  if (correo && !ejecutor) return NextResponse.json({ error: 'solicitudes_no_disponibles' }, { status: 503 });
+  const resultado = await listarConCorreo(db, ejecutor, {
     q,
+    correo,
     page,
     perPage,
     includeHidden: true,
@@ -373,7 +412,53 @@ async function detalleVtuber(id) {
   const actual = fichaPorId(db, id);
   const detalle = actual ? await detalleConReemplazos(db, actual.slug) : null;
   if (!detalle) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
-  return NextResponse.json(detalle);
+  // El correo va SOLO en el detalle del mantenedor; sin cola no tumba la ficha.
+  let email = null;
+  try {
+    const correos = await correosDeFichas(await ejecutorDeSolicitudes(), {
+      resolverFicha: (slug) => getVtuberBySlug(db, slug, { includeHidden: true }),
+    });
+    email = correos.get(actual.id) ?? null;
+  } catch (error) {
+    console.error('[admin] no se pudo leer el correo de la ficha', error);
+  }
+  return NextResponse.json({ ...detalle, email });
+}
+
+/** `PUT /api/admin/vtubers/:id/correo` — fija o quita el correo de una ficha (vive en la cola, no en el diario). */
+async function fijarCorreo(request, id) {
+  const parsed = fichaCorreoSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
+  }
+  const db = await dbConDiario();
+  const actual = fichaPorId(db, id);
+  if (!actual) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+  try {
+    const ejecutor = await ejecutorDeSolicitudes();
+    const resolverFicha = (slug) => getVtuberBySlug(db, slug, { includeHidden: true });
+    const anterior = (await correosDeFichas(ejecutor, { resolverFicha })).get(actual.id) ?? null;
+    const email = await fijarCorreoDeFicha(ejecutor, actual.id, parsed.data.email);
+    // Bienvenida solo si el correo es NUEVO para la ficha (guardar el mismo otra vez no reenvía). Si el
+    // envío falla el correo ya quedó guardado: se avisa en la respuesta en vez de deshacer el cambio.
+    let bienvenida = 'no';
+    if (email && email !== anterior) {
+      try {
+        const ficha = resolverFicha(actual.slug);
+        const { asunto, texto, html } = correoDeBienvenida({ nombre: ficha?.name, slug: actual.slug });
+        await enviarCorreo({ para: email, asunto, texto, html });
+        bienvenida = 'enviada';
+      } catch (error) {
+        console.error(`[admin] no se pudo enviar la bienvenida a la ficha ${actual.slug}: ${error.message}`);
+        bienvenida = 'fallo';
+      }
+    }
+    return NextResponse.json({ email, bienvenida });
+  } catch (error) {
+    if (error instanceof SolicitudError) return NextResponse.json({ error: error.code, detail: error.detail }, { status: error.status });
+    console.error('[admin] no se pudo guardar el correo', error);
+    return NextResponse.json({ error: 'solicitudes_no_disponibles', detail: error.message }, { status: 503 });
+  }
 }
 
 /** `GET /api/admin/dex/next` — el siguiente número libre al final de la dex. */
@@ -609,7 +694,41 @@ async function listarSolicitudesRuta(request) {
 }
 
 /**
- * `POST /api/admin/solicitudes/:id/resolver` con `{ accion, nota? }`.
+ * `GET /api/admin/solicitudes/rechazos?dias=7` — qué formulario rechazó qué y por qué campo en los últimos
+ * días (sin correos ni contenido): para saber dónde se atasca la gente.
+ */
+async function rechazosRuta(request) {
+  const dias = Math.min(30, Math.max(1, Number(new URL(request.url).searchParams.get('dias')) || 7));
+  try {
+    return NextResponse.json(await resumenDeRechazos(await ejecutorDeSolicitudes(), { dias }));
+  } catch (error) {
+    console.error('[admin] no se pudo leer el resumen de rechazos', error);
+    return NextResponse.json({ error: 'solicitudes_no_disponibles', detail: error.message }, { status: 503 });
+  }
+}
+
+/** Lo que el mantenedor puede escribir como dirección de una ficha: letras, números y guiones. */
+const SLUG_DE_FICHA = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * `GET /api/admin/solicitudes/:id/vista-previa?ficha=<slug>` — qué pasaría al aprobar, SIN escribir nada: si se
+ * puede, qué cambia (antes → después), a qué ficha afecta y, si la ficha no se encontró, candidatas para elegir.
+ * `ficha` elige a mano la ficha de una modificación (la misma que luego se manda al aprobar).
+ */
+async function vistaPreviaRuta(request, id) {
+  const fichaSlug = new URL(request.url).searchParams.get('ficha');
+  if (fichaSlug !== null && !SLUG_DE_FICHA.test(fichaSlug)) return NextResponse.json({ error: 'query_invalida' }, { status: 400 });
+  try {
+    const solicitud = await leerSolicitud(await ejecutorDeSolicitudes(), id);
+    if (!solicitud) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+    return NextResponse.json(vistaPrevia(await dbConDiario(), solicitud, { fichaSlug }), { headers: { 'cache-control': 'no-store' } });
+  } catch (error) {
+    return responderError(error);
+  }
+}
+
+/**
+ * `POST /api/admin/solicitudes/:id/resolver` con `{ accion, nota?, fichaSlug? }` (`fichaSlug`: la ficha elegida a mano en una modificación).
  *
  *   · `aprobar`  (inscripción): crea la ficha en BORRADOR por el mismo camino que «Nueva carta»
  *     (`vtuber.crear` del diario) y cierra la solicitud. Si la ficha no se puede crear (URL
@@ -637,7 +756,14 @@ async function resolverSolicitudRuta(request, id, usuario) {
     if (accion === 'aprobar' && solicitud.tipo === 'modificacion') {
       // Se aplica el parche a la ficha EXISTENTE (`vtuber.editar` del diario); avatar y logo (enlaces)
       // los sube el mantenedor aparte. La ficha se lee del diario ya reproducido, no de la base empaquetada.
-      const { id: fichaId, slug, patch } = prepararModificacion(await dbConDiario(), solicitud);
+      const db = await dbConDiario();
+      // El mantenedor puede haber ELEGIDO la ficha cuando lo escrito en el formulario no se resolvía solo.
+      let elegida = null;
+      if (typeof cuerpo?.fichaSlug === 'string' && cuerpo.fichaSlug) {
+        elegida = SLUG_DE_FICHA.test(cuerpo.fichaSlug) ? getVtuberBySlug(db, cuerpo.fichaSlug, { includeHidden: true }) : null;
+        if (!elegida) return NextResponse.json({ error: 'ficha_no_encontrada', detail: 'la ficha elegida no existe' }, { status: 404 });
+      }
+      const { id: fichaId, slug, patch } = prepararModificacion(db, solicitud, { ficha: elegida });
       const datos = vtuberUpdateSchema.safeParse(patch);
       if (!datos.success) {
         return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(datos.error) }, { status: 400 });
@@ -670,7 +796,7 @@ async function resolverSolicitudRuta(request, id, usuario) {
 }
 
 function sinBackend() {
-  return noDisponible('el mantenedor solo existe en local: en Vercel hace falta TURSO_DATABASE_URL');
+  return noDisponible('el mantenedor solo existe en local: hace falta VTUBERDEX_DB_URL (la base del mantenedor)');
 }
 
 export async function GET(request, context) {
@@ -692,6 +818,8 @@ export async function GET(request, context) {
   if (sufijo === 'dex/next') return siguienteDex();
   if (sufijo === 'factions') return listaDeFacciones();
   if (sufijo === 'solicitudes') return listarSolicitudesRuta(request);
+  if (sufijo === 'solicitudes/rechazos') return rechazosRuta(request);
+  if (partes[0] === 'solicitudes' && partes[1] && partes[2] === 'vista-previa' && partes.length === 3) return vistaPreviaRuta(request, partes[1]);
   return noDisponible(`ruta del mantenedor no soportada en producción: ${sufijo}`);
 }
 
@@ -707,6 +835,17 @@ export async function PATCH(request, context) {
   return noDisponible(`ruta del mantenedor no soportada en producción: ${partes.join('/')}`);
 }
 
+export async function PUT(request, context) {
+  if (ADMIN_UPSTREAM) return reenviar(request, context, 'PUT');
+  if (!tursoConfigurado()) return sinBackend();
+  const [, negado] = await exigirSesion(request);
+  if (negado) return negado;
+  const { path } = await context.params;
+  const partes = Array.isArray(path) ? path : [path];
+  if (partes[0] === 'vtubers' && partes[1] && partes[2] === 'correo' && partes.length === 3) return fijarCorreo(request, partes[1]);
+  return noDisponible(`ruta del mantenedor no soportada en producción: ${partes.join('/')}`);
+}
+
 export async function POST(request, context) {
   if (ADMIN_UPSTREAM) return reenviar(request, context, 'POST');
   if (!tursoConfigurado()) return sinBackend();
@@ -714,6 +853,7 @@ export async function POST(request, context) {
   const partes = Array.isArray(path) ? path : [path];
   // El login es la ÚNICA ruta sin sesión: es la que la crea.
   if (partes[0] === 'login') return login(request);
+  if (partes[0] === 'enlace') return enlaceDeAcceso(request, partes[1]);
   if (partes[0] === 'logout') return logout(request);
   const [usuario, negado] = await exigirSesion(request);
   if (negado) return negado;

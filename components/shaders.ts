@@ -1476,46 +1476,52 @@ export const glowFragmentShader = /* glsl */ `
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uCardRadius;
   }
 
-  // Ruido procedural: la base del humo que perturba el borde.
+  // Hash de celda y ruido de valor con interpolación QUINTICA: sin la rejilla visible del
+  // smoothstep cúbico, que en el halo anterior se leía como franjas.
   float hash21(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
     p += dot(p, p + 45.32);
     return fract(p.x * p.y);
   }
 
-  float smokeNoise(vec2 uv, vec2 dirRadial) {
-    // DOMAIN WARPING: distorsionamos las coordenadas de entrada con una pasada
-    // de ruido antes de calcular el humo. Es lo que diferencia el humo de
-    // cigarro (volutas que se enroscan y se rompen) de una nube uniforme: el
-    // campo de ruido NO se mueve rígido, se deforma a sí mismo.
-    vec2 warpBase = floor(uv * 2.0);
-    vec2 warpOffset = vec2(
-      hash21(warpBase + vec2(1.0, 0.0)),
-      hash21(warpBase + vec2(0.0, 1.0))
-    ) - 0.5;
-    // La deriva radial se calcula en main() desde vUv (espacio de la carta,
-    // centro 0.5) y se pasa aqui, porque uv ya viene escalada por uSmokeScale
-    // y su centro NO es 0.5.
-    vec2 p = uv + warpOffset * ${f(CFG.GLOW.smokeWarp)} + dirRadial * uTime * uSmokeSpeed;
+  float valueNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    return mix(
+      mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x),
+      mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x),
+      u.y
+    );
+  }
+
+  // Ruido fractal. Cada octava se ROTA y se desplaza: sin eso las octavas comparten ejes y el
+  // humo sale con direcciones privilegiadas (rayas), justo lo que lo hacía parecer god rays.
+  float fbm(vec2 p) {
     float suma = 0.0;
     float amp = 0.5;
     float norma = 0.0;
-    float freq = 1.0;
+    mat2 giro = mat2(0.8, -0.6, 0.6, 0.8);
     for (int i = 0; i < 6; i++) {
       if (float(i) >= uSmokeOctaves) break;
-      vec2 celda = floor(p * freq);
-      vec2 f = fract(p * freq);
-      vec2 w = f * f * (3.0 - 2.0 * f);
-      float n00 = hash21(celda);
-      float n10 = hash21(celda + vec2(1.0, 0.0));
-      float n01 = hash21(celda + vec2(0.0, 1.0));
-      float n11 = hash21(celda + vec2(1.0, 1.0));
-      suma += mix(mix(n00, n10, w.x), mix(n01, n11, w.x), w.y) * amp;
+      suma += valueNoise(p) * amp;
       norma += amp;
+      p = giro * p * 2.02 + vec2(17.0, 9.0);
       amp *= 0.5;
-      freq *= 2.0;
     }
     return suma / max(norma, 0.001);
+  }
+
+  // HUMO: doble distorsión de dominio (el campo se deforma a sí mismo, de ahí las volutas que
+  // se enroscan) sobre un viento que SUBE y se balancea. Devuelve (densidad, fase del campo).
+  vec2 humo(vec2 uv) {
+    float t = uTime * uSmokeSpeed;
+    vec2 p = (uv - vec2(0.5)) * uSmokeScale;
+    p.y -= t * ${f(CFG.GLOW.smokeRise)};
+    p.x += sin(t * ${f(CFG.GLOW.smokeSwayRate)} + p.y * ${f(CFG.GLOW.smokeSwayBend)}) * ${f(CFG.GLOW.smokeSway)};
+    vec2 q = vec2(fbm(p + vec2(0.0, t * ${f(CFG.GLOW.smokeFlowA)})), fbm(p + vec2(5.2, 1.3) - vec2(t * ${f(CFG.GLOW.smokeFlowB)}, 0.0)));
+    float r = fbm(p + ${f(CFG.GLOW.smokeWarp)} * q);
+    return vec2(smoothstep(${f(CFG.GLOW.smokeLow)}, ${f(CFG.GLOW.smokeHigh)}, r), r);
   }
 
   // Espectro visible -> RGB. Se genera desde CFG.SPECTRUM.stops.
@@ -1523,37 +1529,32 @@ ${SPECTRUM_FN}
 
   void main() {
     float dist = cardDistance(vUv);
-
-    // BRILLO BASE: el resplandor original que envuelve la carta. Se conserva
-    // intacto porque es lo que le da identidad de color (el acento del VTuber).
-    // El humo se añade ENCIMA como una capa de vapor sutil, no lo reemplaza.
     float ringDist = max(dist, 0.0);
 
-    float falloff = exp(-ringDist * ${f(CFG.GLOW.falloffRate)});
-    float core = exp(-ringDist * ${f(CFG.GLOW.coreRate)});
-    float glow = falloff * ${f(CFG.GLOW.falloffWeight)} + core * ${f(CFG.GLOW.coreWeight)};
+    // VELO de marca pegado a la carta: lo justo para despegarla del fondo y conservar el color
+    // del VTuber. Antes era el protagonista (un neón fino que se leía como rayo de luz); ahora
+    // es un fondo suave y el humo hace el trabajo.
+    float velo = exp(-ringDist * ${f(CFG.GLOW.falloffRate)}) * ${f(CFG.GLOW.falloffWeight)}
+               + exp(-ringDist * ${f(CFG.GLOW.coreRate)}) * ${f(CFG.GLOW.coreWeight)};
 
-    // HUMO ESPECTRAL: vapor caótico que fluye desde el centro de la carta hacia
-    // afuera, como humo de cigarro. La dirección radial se calcula desde vUv
-    // (centro 0.5) ANTES de escalar, para que el origen sea el centro real.
-    vec2 dirRadial = normalize(vUv - vec2(0.5) + vec2(0.001));
-    float smoke = smokeNoise(vUv * uSmokeScale, dirRadial);
-    // El humo hace que el brillo fluctúe suavemente: donde el ruido es más denso,
-    // el resplandor se intensifica; donde es más tenue, se atenúa.
-    float smokeMod = ${f(CFG.GLOW.smokeAmp)} * (smoke - 0.5);
-    glow *= 1.0 + smokeMod;
+    // Humo: más denso cerca de la carta y disipándose con la distancia, con un leve sesgo hacia
+    // arriba (el humo sube). Es el que se enrosca y viaja; el velo no se mueve.
+    vec2 campo = humo(vUv);
+    float alcance = exp(-ringDist * ${f(CFG.GLOW.smokeReach)}) * (1.0 + ${f(CFG.GLOW.smokeLift)} * (vUv.y - 0.5));
+    float vapor = campo.x * alcance * ${f(CFG.GLOW.smokeWeight)};
 
-    // Tinte espectral del humo: el arcoíris viaja por el vapor a lo largo del
-    // tiempo, pero se mezcla con el color de marca para que la carta no pierda
-    // su identidad. La mezcla es ponderada por la densidad del humo.
-    float spectralPhase = ringDist * uSpectralScale - uTime * uSpectralSpeed + smoke * ${f(CFG.GLOW.spectralDistort)};
-    vec3 spectral = wavelengthToRgb(fract(spectralPhase));
-    vec3 glowColor = mix(uGlowColor, spectral, uSpectralMix * smoke);
+    // Tinte espectral: el arcoíris viaja DENTRO de las volutas (pesa por la densidad), no por
+    // anillos concéntricos, que es lo que dibujaba los rayos.
+    float fase = ringDist * uSpectralScale - uTime * uSpectralSpeed + campo.y * ${f(CFG.GLOW.spectralDistort)};
+    vec3 espectral = wavelengthToRgb(fract(fase));
+    vec3 glowColor = mix(uGlowColor, espectral, uSpectralMix * campo.x);
+    // Pálido, no saturado: el humo espectral es translúcido, no una llama de color.
+    glowColor = mix(glowColor, vec3(1.0), ${f(CFG.GLOW.smokeGhost)} * campo.x);
 
-    // Suavizado de los cortes del resplandor, en PÍXELES.
+    float glow = velo + vapor;
+
+    // Suavizado y apagado en el borde del propio plano, para que no se vea el rectángulo.
     float aa = max(fwidth(dist) * ${f(CFG.GLOW.aaPixels)}, ${f(CFG.GLOW.aaMin)});
-
-    // Apagado en el borde del propio plano para que no se vea el rectángulo.
     vec2 d = abs(vUv - 0.5) * 2.0;
     float edgeFade =
       (1.0 - smoothstep(${f(CFG.GLOW.edgeFadeFrom)} - aa, 1.0, d.x))

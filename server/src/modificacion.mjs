@@ -19,20 +19,53 @@ import { getVtuberBySlug } from './search.mjs';
 import { normalizeText, slugify } from './text.mjs';
 
 /**
- * Busca la ficha que pidió la solicitud: por `/v/<slug>` (o una URL completa), por slug o por nombre
- * exacto. Un alias antiguo también resuelve. Si no hay UNA ficha clara no se adivina: el mantenedor
- * la corrige a mano o rechaza.
+ * Busca la ficha que pidió la solicitud: por `/v/<slug>` (o una URL completa), por slug, por nombre
+ * exacto o con el formato con que la gente la copia del catálogo, `#486 Nombre`. Un alias antiguo
+ * también resuelve. Si no hay UNA ficha clara no se adivina: el mantenedor la corrige a mano o rechaza.
+ *
+ * EL `#486` ES LO QUE LA GENTE ESCRIBE: el formulario es un campo de texto libre y en el catálogo cada
+ * carta se ve como «#486 NOMBRE». Antes ese texto no coincidía ni con un slug ni con un nombre, y
+ * aprobar daba `ficha_no_encontrada` (una solicitud real quedó atascada así). El número de dex se
+ * usa solo para DESEMPATAR o cuando es lo único que se escribió: los dex se pueden mover, así que
+ * nunca manda sobre un nombre que sí coincide con otra ficha.
  */
 export function fichaDeLaSolicitud(db, referencia) {
   const texto = String(referencia ?? '').trim();
   const delEnlace = texto.match(/\/v\/([^/?#\s]+)/i)?.[1];
-  const candidatos = [delEnlace, slugify(texto)].filter(Boolean);
-  for (const slug of candidatos) {
-    const ficha = getVtuberBySlug(db, decodeURIComponent(slug), { includeHidden: true });
+  const marcaDex = /(?:^|\s)#\s*(\d{1,4})(?=\s|$|[.,;:\-–—)])/;
+  const dex = delEnlace ? null : texto.match(marcaDex)?.[1];
+  const sinDex = delEnlace ? texto : texto.replace(marcaDex, ' ').replace(/\s+/g, ' ').trim();
+
+  const nombre = normalizeText(sinDex);
+
+  // Nombre Y número a la vez: la ficha que cumple las dos cosas gana a cualquier otra con el mismo
+  // slug o nombre (con dos fichas llamadas igual, «#77 GKuro» no puede caer en la primera por slug).
+  if (dex !== null && dex !== undefined && nombre) {
+    const exactas = db.prepare('SELECT slug FROM vtuber WHERE dex_number = ? AND search_name = ?').all(Number(dex), nombre);
+    if (exactas.length === 1) return getVtuberBySlug(db, exactas[0].slug, { includeHidden: true });
+  }
+
+  const candidatos = [delEnlace, slugify(sinDex), slugify(texto)].filter(Boolean);
+  for (const slug of new Set(candidatos)) {
+    let ficha = null;
+    try {
+      ficha = getVtuberBySlug(db, decodeURIComponent(slug), { includeHidden: true });
+    } catch {
+      /* un %xx mal formado en el enlace no debe tumbar la resolución */
+    }
     if (ficha) return ficha;
   }
-  const porNombre = db.prepare('SELECT slug FROM vtuber WHERE search_name = ?').all(normalizeText(texto));
+
+  const porNombre = nombre ? db.prepare('SELECT slug FROM vtuber WHERE search_name = ?').all(nombre) : [];
   if (porNombre.length === 1) return getVtuberBySlug(db, porNombre[0].slug, { includeHidden: true });
+
+  if (dex !== null && dex !== undefined) {
+    const porDex = db.prepare('SELECT slug FROM vtuber WHERE dex_number = ?').all(Number(dex));
+    // Varias con el mismo nombre: el número decide cuál. Sin nombre escrito: el número es todo lo que hay.
+    const pool = porNombre.length > 1 ? porNombre.filter((n) => porDex.some((d) => d.slug === n.slug)) : nombre ? [] : porDex;
+    if (pool.length === 1) return getVtuberBySlug(db, pool[0].slug, { includeHidden: true });
+  }
+
   const detalle = porNombre.length > 1 ? 'hay varias fichas con ese nombre: pídele su dirección /v/…' : 'no se encontró esa ficha';
   throw new SolicitudError(404, 'ficha_no_encontrada', detalle);
 }
@@ -42,11 +75,13 @@ const igual = (a, b) => normalizeText(String(a ?? '')) === normalizeText(String(
 /**
  * @param {import('node:sqlite').DatabaseSync} db
  * @param {{ datos: Record<string, any> }} solicitud una solicitud de tipo `modificacion`
+ * @param {{ ficha?: any }} [opciones] `ficha`: la ficha ya elegida por el mantenedor (cuando lo escrito en el formulario
+ *   no se resuelve solo); sin ella se busca la que pidió la solicitud.
  * @returns {{ id: number, slug: string, patch: Record<string, any>, imagenes: { imageUrl?: string, logoUrl?: string } }}
  */
-export function prepararModificacion(db, solicitud) {
+export function prepararModificacion(db, solicitud, { ficha = null } = {}) {
   const d = solicitud.datos;
-  const actual = fichaDeLaSolicitud(db, d.ficha);
+  const actual = ficha ?? fichaDeLaSolicitud(db, d.ficha);
   const { columnas, modeler, perfil } = camposDeFicha(d);
   const patch = { ...columnas };
 

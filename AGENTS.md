@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 451 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 692 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 94 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
 
@@ -221,23 +221,102 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   el Express). Si la ficha no se puede crear (URL repetida, país desconocido) la solicitud sigue pendiente.
 - **«Procesar» una baja NO degrada la ficha**: solo cierra la solicitud. La degradación de la cláusula de salida es un
   paso manual aparte (no está automatizada) y el mantenedor lo avisa.
-- **La inscripción es un formulario de 3 pasos** (`inscripcion-form.tsx`; el estado vive en el padre, así que «Volver» no pierde nada y la
-  validación nativa `required` de cada paso corre antes de avanzar): 1) lo básico y el contacto, 2) tu personaje (avatar y logo como ENLACE,
-  modelo, hashtag, estatura, cumpleaños, país, signo, lore), 3) gustos + términos. Obligatorios todos salvo país y signo. Los textos cortos
-  salen de `CAMPOS_PERFIL` (cliente) y `perfilObligatorio` (`solicitudes.mjs`): al añadir uno, tócalos a la vez. `fichaDesdeInscripcion`
+- **La inscripción es un formulario de 5 pasos** (`inscripcion-form.tsx`; el estado vive en el padre, así que «Volver» no pierde nada y la
+  validación nativa `required` de cada paso corre antes de avanzar): 1) nombre artístico y correo, 2) código del correo, 3) tu ficha
+  (color, idiomas, frase, redes), 4) tu personaje (avatar y logo como ENLACE, modelo, hashtag, estatura, cumpleaños, país, signo, lore),
+  5) gustos + términos. Obligatorios todos salvo país y signo. Los textos cortos
+  salen de `CAMPOS_PERFIL` (cliente) y `perfilObligatorio` (`solicitudes.mjs`): al añadir uno, tócalos a la vez (y `sanearBorrador` los toma de
+  `PERFIL_CAMPOS`, así que el borrador los sigue solo). `fichaDesdeInscripcion`
   mapea estatura/cumpleaños/hashtag/color a sus columnas, el modelador a `artists` y el resto a filas de `profile`.
-- **Modificación de una ficha ya registrada** (`/modificacion`, `components/solicitudes/modificacion-form.tsx`, tipo `modificacion`
-  en la MISMA cola y tabla): misma forma que la inscripción pero solo identifica la ficha (ficha + correo + cómo se comprueba la
-  titularidad, como la baja) y todo lo demás es opcional (en blanco = no cambia; el servidor exige al menos un cambio). Las preguntas
+- **Modificación de una ficha ya registrada** (4 pasos: correo → código → qué cambiar → gustos y envío; la ficha sale del correo, ver más abajo; `/modificacion`, `components/solicitudes/modificacion-form.tsx`, tipo `modificacion`
+  en la MISMA cola y tabla): misma forma que la inscripción pero solo identifica el correo (verificado antes de rellenar; la ficha sale de él: la de la inscripción
+  aprobada con ese correo, se elige si hay varias y se escribe solo si no hay ninguna, como en las del scrape; ya no hay «cómo comprobamos») y todo lo demás es opcional (en blanco = no cambia; el servidor exige al menos un cambio). Las preguntas
   salen de `campos-ficha.ts`, compartido con la inscripción. **Aprobar APLICA** el parche a la ficha existente
   (`server/src/modificacion.mjs`, `prepararModificacion`: lo comparten Express y Next; local escribe con `aplicarParche`, producción
   con `vtuber.editar` del diario, leyendo la ficha del diario ya reproducido): las redes se SUMAN o actualizan por plataforma, los
   gustos actualizan su fila de `profile` sin tocar las demás, el modelador pasa al frente de `artists` sin quitar a nadie. El nombre
   no se cambia por aquí. **Avatar y logo (enlaces) NO se aplican solos**: el mantenedor los sube por «Imágenes» y la cola lo avisa. Si la
   ficha no se resuelve (nombre ambiguo o inexistente) la solicitud sigue pendiente con `ficha_no_encontrada`.
+- **La cola del mantenedor** (`admin/solicitudes-manager.tsx`) es lista + detalle, no una tarjeta por solicitud con 30 campos en
+  un muro de texto. La lista es una línea por solicitud (tipo, nombre, «hace 5 min»), la más antigua primero (la cola se atiende en
+  orden); el detalle agrupa por secciones. **Antes de aprobar se sabe qué pasará**: `GET /api/admin/solicitudes/:id/vista-previa`
+  (`server/src/solicitud-vista.mjs`) calcula, SIN escribir, si se puede, qué ficha afecta y, en una modificación, **qué cambia
+  (antes → después)**. La simulación ejecuta las mismas `crearFicha`/`aplicarParche` que aprobar dentro de un `BEGIN … ROLLBACK`
+  (node:sqlite es síncrono: nada más usa la conexión en medio), así que «la regla lo rechaza» sale idéntico en ambos sitios. Si la ficha
+  de una modificación no se resuelve, el mantenedor la ELIGE (candidatas o búsqueda) y el resolver acepta `fichaSlug`. «Aprobar» queda
+  deshabilitado mientras se comprueba o si la regla lo rechaza; rechazar pide confirmación (borra el contacto). La vista previa solo
+  existe en la ruta de Next: el Express local no la tiene y la pantalla degrada (botón habilitado, datos crudos).
+- **La ficha de una modificación se escribe a mano** (campo libre) y la gente copia `#486 NOMBRE` del catálogo: `fichaDeLaSolicitud`
+  acepta ese formato (el número desempata, nunca manda sobre un nombre que coincide con otra ficha). Antes quedaba atascada con
+  `ficha_no_encontrada`.
 - **Antispam**: campo trampa `website`, un solo pendiente por correo y tipo, tope de 5 envíos por red y día. El arte del
   personaje se pide como ENLACE: un formulario público que recibe archivos es una puerta a subir basura.
 - `/api/admin/solicitudes*` sale 404 sin Turso ni proxy local, como el resto del mantenedor.
+- **Registro de rechazos** (`server/src/rechazos.mjs`, tabla `rechazo` en el MISMO ejecutor que `solicitud`): una validación que
+  falla responde 400/409/410 y antes no dejaba rastro (solo los 503 se imprimían), así que nadie sabía dónde se atascaba la gente.
+  `lib/solicitudes.mjs` (`responderRegistrando`) apunta todo 4xx/503 de los formularios públicos: **formulario, código, status y ruta del
+  campo** (`socials.0.url`). **Nunca** correo, contenido, red ni mensaje (puede citar lo escrito); se poda a los 30 días y no lanza jamás.
+  Se ve en el mantenedor, «Envíos rechazados (últimos 7 días)» (`GET /api/admin/solicitudes/rechazos?dias=`, Next y Express). Si añades
+  un formulario público, estrénalo con `responderRegistrando`.
+
+## Correo saliente, verificación de solicitudes y acceso por enlace mágico
+
+**Diseño de los correos**: una sola plantilla (`plantilla()` en `lib/correo.mjs`) con el sistema de diseño de la web
+(`docs/sistema-de-diseno.md`, tokens en `lib/diseno.mjs`). Un color nuevo va primero en `diseno.mjs`; `lib/diseno.test.ts` lo cruza con
+`globals.css` y rechaza cualquier hexadecimal del correo que no sea un token.
+
+La VPS envía correo con su propio **Exim4**, configurado como servidor SOLO DE SALIDA: escucha únicamente en
+`127.0.0.1:25` (no es accesible desde internet, no recibe correo), `disable_ipv6 = true` (el SPF declara solo la IPv4) y firma
+con DKIM (`/etc/exim4/dkim/vtuberdex.com.key`, selector `mail`; macros en `conf.d/main/00_local_macros`). La app le habla por
+SMTP local con nodemailer (`lib/correo.mjs`). Sin `VTUBERDEX_MAIL=smtp` el correo NO sale: el enlace se imprime en la consola del
+servidor (así local y CI funcionan sin servidor de correo). Variables: `VTUBERDEX_MAIL`, `VTUBERDEX_MAIL_FROM`,
+`VTUBERDEX_MAIL_REPLY_TO`, `VTUBERDEX_ADMIN_EMAILS` (por defecto los dos mantenedores). DNS necesario (Cloudflare): SPF, DKIM
+(`mail._domainkey`) y DMARC; sin ellos Gmail marca el correo como spam o lo rechaza.
+
+- **Tokens** (`server/src/verificacion.mjs`, tabla `token_correo` en el MISMO ejecutor que `solicitud`): un solo uso (`UPDATE …
+  WHERE usado = 0 AND expira > ahora` es el cerrojo), 24 h para solicitudes y 15 min para acceso, **solo se guarda el sha256**. El
+  enlace lleva el token en el **fragmento** (`/verificar#t=…`, `/admin#entrar=…`): no llega a nginx ni a los logs. Y se gasta con un
+  **botón (POST)**, no al abrir el enlace: antivirus y clientes de correo abren los enlaces y lo quemarían. La URL sale de
+  `SITE_URL`, nunca de la cabecera `Host`.
+- **Dos formas de demostrar el correo**:
+  · **Inscripción y actualización: el correo se demuestra ANTES de rellenar** (`pedirCodigo` / `verificarCodigo` en `lib/solicitudes.mjs`,
+    rutas `/api/inscripciones|modificaciones/codigo|verificar`). Se manda un CÓDIGO (1 h, un uso; el enlace del correo abre el formulario en el
+    paso 2 con el código puesto, `/inscripcion#t=…`) y se canjea por una credencial que vive solo en memoria del navegador: la **`sesion`**
+    de la inscripción (24 h, se puede usar muchas veces, se gasta al enviar) y el **`permiso`** de la actualización (2 h, un solo envío).
+    El envío final lleva la credencial y **el servidor toma el correo de ella, no del cuerpo** (`crearSolicitud(..., { permiso, propositoPermiso })`):
+    la solicitud nace `pendiente` sin segundo correo. La credencial se MIRA (`correoDelToken`) y se gasta (`consumirToken`) al final, con todo lo
+    demás validado: un error de validación no quema un formulario largo. Sin credencial, `recibirSolicitud` responde 400 `falta_verificacion`.
+    Tope de 1 código/min y 4/día por correo (`envioPermitido`); un código no sirve para otro formulario (propósitos distintos).
+  · **Baja: se envía primero y se confirma después** (la solicitud entra `sin_verificar` y el mantenedor NO la ve; su cola lista `pendiente`).
+    Pasa a `pendiente` al confirmar (`POST /api/verificar`). Reenviar reemplaza la anterior sin confirmar del mismo correo. Tope por correo
+    comprobado **antes** de guardar: crear reemplaza, y un doble clic no puede borrar la solicitud cuyo correo ya va en camino. Si el correo no se
+    puede enviar, la solicitud se descarta (503): nadie podría confirmarla.
+- **BORRADOR de la inscripción** (`server/src/borradores.mjs`, tabla `borrador (email, tipo)`, `PUT /api/inscripciones/borrador`): desde que se
+  valida el código, lo escrito se guarda solo (un instante después de dejar de teclear) atado al correo de la `sesion`. Para retomar: volver a
+  `/inscripcion`, escribir el MISMO correo y un código nuevo; `verificarCodigo` devuelve el borrador y el formulario carga todo y sigue en su paso
+  (3 a 5). **Solo se guarda por lista blanca** (`sanearBorrador`: nunca el correo dentro de `datos`, los términos ni el campo trampa); un
+  borrador por correo; se borra al enviar y a los 60 días sin cambios (se purga al guardar otro). **Antes de verificar el correo no se guarda
+  nada** en el servidor: nombre y correo del paso 1 viven en memoria; si hay un borrador, manda sobre lo recién escrito. El borrador está en la
+  cláusula 4.10 de los términos. Si la sesión caduca, el envío devuelve 410 y el formulario vuelve al paso 1 (el borrador sigue guardado).
+- **La baja es de DOS pasos y no pide ficha ni «cómo comprobamos»** (`baja-form.tsx`): 1) correo + motivo (+ términos) → se envía
+  el token; 2) la persona **pega el código** en la misma página (o pulsa el botón del correo, que va a `/verificar`) y se confirma
+  por `POST /api/verificar`. La ficha SALE DEL CORREO: `fichasDelTitular` busca las inscripciones APROBADAS con ese correo
+  (compara por id de ficha vigente, el slug pudo cambiar). Sin ficha escrita se dan de baja TODAS las de ese correo
+  (`premium: { grade: '1' }` por el diario, actor `baja-verificada`), la solicitud queda `procesada`, se borran los contactos y la
+  respuesta lista los nombres (`fichas`). Con ficha escrita solo se baja esa y solo si es de ese correo. **Las ~785 fichas del
+  scrape no tienen correo guardado**: sin ficha asociada ni escrita la baja queda `pendiente` y la respuesta es `sin_ficha` (el
+  mantenedor tiene el correo y el motivo para escribirle); con ficha escrita que no es del correo, `en_revision`. El campo «Ficha»
+  existe pero escondido y opcional. Cualquier fallo al aplicar también la deja pendiente. Los términos (3.2, 8.1 y 8.9) lo dicen:
+  quien controle ese buzón puede dar de baja las fichas inscritas con él, de forma irreversible. **La modificación tampoco pide
+  prueba de titularidad**: el enlace del correo es la comprobación y el mantenedor revisa igual.
+- **Acceso del mantenedor** (`lib/admin-enlace.mjs`, `POST /api/admin/enlace` y `/enlace/entrar`): pedir el enlace responde SIEMPRE
+  lo mismo y el envío va en segundo plano (ni la respuesta ni el tiempo delatan quién es admin). La sesión es la de siempre
+  (`emitirSesion`) con el correo como usuario, así que el diario dice quién editó. **La UI de `/admin` ya no tiene login por
+  contraseña** (solo correo). El endpoint `POST /api/admin/login` sigue en la ruta de Next y funciona mientras exista
+  `VTUBERDEX_ADMIN_PASSWORD_HASH`: **en producción se cierra quitando esa variable de `/etc/vtuberdex.env`**. El Express local
+  conserva su login por contraseña, pero ya no hay pantalla que lo use.
+- **No desplegar sin DNS**: sin SPF/DKIM/DMARC publicados el correo sale pero Gmail lo descarta o lo manda a spam, y las
+  inscripciones parecerían enviadas sin que nadie pueda confirmarlas.
 
 ## Cartas premium: grado, placa de acrílico y mantenedor
 
@@ -248,7 +327,7 @@ cada mes que sigue donando, hasta el 10 y luego la **Black Label**. Escala: `8 �
   (`validation.mjs`), regla (`mutations.mjs`), búsqueda (`search.mjs`) y cliente (`lib/premium.ts`
   la reexporta) la importan; no la copies. El grado es **texto** (`'BL'` no es un número).
 - **Datos**: tabla `premium (vtuber_id PK, grade, since, graded_at)`, sin CHECK de la escala (SQLite
-  no deja alterarlo). Sin fila = carta normal. El certificado (`VTD-000017`) se **deriva del id**, no se guarda.
+  no deja alterarlo). Sin fila = carta normal. El certificado y el código de donación (`VTD-016` para la carta `#016`) se **derivan del número de dex**, no se guardan (antes del id interno, que no coincidía con lo visible; los códigos viejos de 6 dígitos se rechazan a propósito).
   Se edita por el mismo PATCH de siempre: `{ premium: { grade } }` o `{ premium: null }` (`aplicarParche`),
   así que **local (Express) y producción (diario de Turso) comparten la regla** sin código nuevo en las rutas.
 - **El diario sella el DÍA, no las fechas.** `aplicarYAnotar` llama a `sellarPremium`, que guarda
@@ -268,8 +347,16 @@ cada mes que sigue donando, hasta el 10 y luego la **Black Label**. Escala: `8 �
 - **Trampa del bisel** (ya documentada en la skill de three): `ExtrudeGeometry` con bisel EXPANDE el contorno;
   `crearCuerpo` insetea la forma y `premium.test.tsx` mide la caja (`layout.width` exacto).
 - **Sección pública**: `?premium=1` es un filtro más (URL = estado): botón «★ Premium» en el catálogo y acceso
-  en la cabecera. **Mantenedor**: pestaña «Premium» (`admin/premium-manager.tsx`): alta, «Subir a …» (el gesto
-  mensual), fijar grado a mano, quitar. Avisa si el grado ya cambió este mes pero deja subir: la donación es
+  en la cabecera. **Mantenedor**: pestaña «Premium» (`admin/premium-manager.tsx`). Es una LISTA de una línea por carta, no
+  tarjetas: la versión anterior apilaba una tarjeta alta con 5 controles por carta y con decenas era una sábana (además
+  cortaba en 100 sin avisar; ahora trae todas las páginas). Qué hay: filtros por tramo CON contadores (`6–7,5`, `8–9,5`,
+  `10`, `Black Label`, `Deterioradas`) y **«Por subir este mes»** (el trabajo mensual: premium que pueden subir y aún no
+  cambiaron de grado este mes; la donación la sabe una persona, nada sube solo), búsqueda en la lista (sin tildes; por
+  nombre, `#NNN` o `VTD-…`), orden y paginación de 20. El botón relleno «Subir a …» solo lo lleva quien está por revisar;
+  quien ya subió se ve en contorno y el grado máximo en gris. Lo raro (corregir grado, degradar, quitar) va en «Más», bajo la
+  fila, de una a la vez. El alta es un panel que abre «+ Nueva premium» (abierto solo si no hay ninguna). El deterioro
+  arranca en el grado MÁS LEVE y el 1 (baja: ficha sin página pública) pide confirmación. La lógica pura está en
+  `admin/premium-lista.ts` (probada); `PremiumBadge` tiene `compacto` para listas. Avisa si el grado ya cambió este mes pero deja subir: la donación es
   un dato que sabe una persona, el mantenedor no la calcula.
 - **Un re-seed con `--reset` borra las premium** (cascada desde `vtuber`), igual que el resto de ediciones.
 - `madKoding` (dex 16) es premium **grado 10 en la base LOCAL** (`data/vtuberdex.db`, ignorada por git). En
@@ -323,6 +410,58 @@ calcula ni «procesar» una baja los aplica solo**.
   llegue a la ficha (URL, vecino, buscador) es una fuga del nombre.
 - Para ver el resultado sin WebGL ni base de datos: bundlear `drawCardFront` con `esbuild --alias:@=.` y dibujar los grados en
   Chromium (`/opt/pw-browsers`); es lo que se hizo para calibrar `DETERIORO`.
+
+## Experiencia, niveles y puntos de habilidad («Mi ficha»)
+
+- **La experiencia es función de los likes** (`server/src/experiencia.mjs`, `experienciaConLikes`): la barra (`current/max`) se
+  vacía al subir de nivel y cada nivel pide más que el anterior (`BASE_NIVEL + PASO_NIVEL × (n-1)`, nunca menos). **El contador
+  TOTAL no se reinicia** (`total`: lo que valían los niveles que la ficha ya traía + su barra + los likes; como en Ragnarok): sale
+  en `experience.total` y se ve como «EXP total» en `StatBars`.
+- **Puntos de habilidad**: cada nivel GANADO con likes (`nivelesGanados`, desde el nivel que traía la ficha, no el del scrape) da
+  `PUNTOS_POR_NIVEL` = 3. Cada punto sube un rango (`RANGO_MAXIMO` = 5) de una habilidad con nombre. Los disponibles NO se guardan:
+  `ganados − repartidos` (`server/src/mi-ficha.mjs`, tabla `punto_habilidad` por **nombre** de habilidad, no por id: el mantenedor
+  reescribe las filas). Gastar es UNA sentencia condicional (dos clics a la vez no gastan un punto inexistente). El rango sale
+  público en la ficha (`skills[].rank`, insignia en `SkillList`).
+- **Aviso de subida de nivel** (`lib/mi-ficha.mjs`, `avisarSubidaDeNivel`, llamado en segundo plano desde el POST del like):
+  `reclamarAvisoDeNivel` (tabla `aviso_nivel`) es un UPSERT condicional, así que solo UN like gana el derecho a mandar el correo; si
+  el envío falla se suelta y el siguiente like lo reintenta. Va al correo de la inscripción APROBADA (`correoDeLaFicha`); las fichas
+  del scrape no tienen correo: suben de nivel sin aviso.
+- **Enlace mágico** (propósito `ficha` en `token_correo`): vale 7 días y **NO se gasta** (se MIRA con `correoDelToken`), a
+  diferencia del resto: los puntos se reparten en varias visitas. Lleva el token en el fragmento (`/mi-ficha#t=…`) y la página lo deja
+  en la barra para que recargar funcione. Sin enlace, `/mi-ficha` pide el correo y responde siempre igual (`pedirEnlaceDeMiFicha`).
+  Rutas: `POST /api/mi-ficha`, `/enlace`, `/puntos`. Textos en `lib/i18n/textos/mificha.ts` (es/en/ja); el correo va en español.
+
+- **Página explicativa `/niveles`** (enlazada en el pie, trilingüe en `lib/i18n/textos/niveles.ts`, `components/niveles/niveles-contenido.tsx`): las cifras
+  y la tabla de niveles salen de `server/src/experiencia.mjs` (`umbralDeNivel`, `XP_POR_LIKE`…), no de números escritos en el texto: si cambias la
+  regla, la página se corrige sola (y `niveles-contenido.test.tsx` lo comprueba). Sus «capturas» NO son PNG: `components/niveles/graficos.tsx` dibuja
+  los gráficos en SVG desde `experienciaConLikes`/`umbralDeNivel` y las maquetas son los componentes REALES (`StatBars`, `SkillList`, `MiFichaVista`
+  — la pantalla de «Mi ficha» sin lógica) con datos de ejemplo, `inert` y marcadas «Ejemplo»: no se desfasan al cambiar el diseño y se traducen solas.
+
+## Idiomas (es / en / ja) y traducción de la historia
+
+La interfaz pública es trilingüe, **español por defecto**. Código en `lib/i18n/` (JS/TS puro, probado).
+
+- **Sin prefijo en la URL** (la URL es el estado de la búsqueda, regla 6) y **sin leer `Accept-Language` en el
+  servidor** (haría dinámica la home estática y su JSON-LD). El HTML del servidor es siempre español, que es lo que
+  indexan los buscadores; `I18nProvider` (en `app/layout.tsx`) arranca en `es` y, ya hidratado, aplica
+  `elegirLocale(localStorage 'vtuberdex:idioma', navigator.languages)`. Selector en la cabecera (`language-switcher.tsx`).
+  Sin proveedor `useI18n` devuelve español: los componentes se prueban sin envolver nada.
+- **Textos**: `lib/i18n/es.ts` es la fuente de claves; `en.ts`/`ja.ts` se tipan contra ella (falta o sobra una → `tsc`
+  falla) y `i18n.test.ts` exige mismas claves y mismos marcadores `{x}`. Plurales `x_one`/`x_other` con
+  `t('x', { n })`. **Al añadir texto a la UI pública, añade la clave en los tres.**
+- **Datos de la base** (`lib/i18n/nombres.ts`): países vía `Intl.DisplayNames` con el ISO sacado del emoji de bandera,
+  idiomas por su código, etiquetas de la ficha (con las erratas del scrape: `Pais`, `Hashtag arte`…), stats y tipos
+  de habilidad por tablas cerradas. El texto libre (frases, valores de la ficha, nombres de habilidades) no se traduce.
+- **Fuera de alcance, sigue en español**: formularios `/inscripcion`, `/modificacion`, `/baja`, `/terminos` (texto
+  legal versionado: `TERMINOS_VERSION`), el mantenedor, los textos pintados en el canvas de la carta 3D (etiqueta de la
+  placa premium) y los metadatos SEO del servidor.
+- **Traducción al vuelo de la historia/frase** (`components/texto-traducible.tsx`, `lib/traductor/`): si
+  `idiomaDelTexto` ve el texto en otro idioma que el de la interfaz, ofrece «Traducir a …». Corre EN EL DISPOSITIVO,
+  solo al pulsar: 1) API nativa `Translator` del navegador (Chrome 138+ escritorio); 2) respaldo Transformers.js con
+  `Xenova/opus-mt-{es-en,en-es,ja-en,en-jap}` (~100 MB cada uno, en caché del navegador), importado por URL desde jsDelivr
+  con `webpackIgnore` para que no entre en ningún bundle. No hay modelo directo es↔ja: pasa por inglés. La calidad
+  es↔ja por pivote es modesta. Sin medir en un navegador real (jsdom no tiene ninguno de los dos motores): las pruebas
+  cubren la lógica pura y la API nativa simulada, no la descarga del modelo.
 
 ## SEO: qué dice el servidor sin JavaScript
 
@@ -438,27 +577,24 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
 - **Generar las texturas de las cartas es lo que cuesta, no traer los datos.** Medido al
   cargar una página de 8: la API tarda 11-45 ms y el hilo principal quedó bloqueado 6,5 s
   (4 lienzos por carta más dos máscaras píxel a píxel). `card-texture/fabrica.ts` es la
-  única puerta de generación y aplica cuatro medidas, con sus perillas en `TEXTURAS`:
+  única puerta de generación y aplica tres medidas, con sus perillas en `TEXTURAS`:
   (1) PROGRESIVA: `generarRapida` (superficie, personaje, título) muestra la carta y
   `completar` añade marca y máscaras REUTILIZANDO esas capas (`reutilizar` en
-  `drawCardLayers`), nada se dibuja dos veces; (2) ADAPTATIVA: se mide la generación
-  completa y si la mediana de `muestras` supera `lentoMs` se baja un escalón de `anchos`
-  (512 -> 384 -> 256) para las siguientes, decide la máquina real y no
-  `hardwareConcurrency`; (3) CACHÉ LRU por carta y ancho con presupuesto en PÍXELES
+  `drawCardLayers`), nada se dibuja dos veces; (2) CACHÉ LRU por carta y ancho con presupuesto en PÍXELES
   (`cacheMaxPixels`), con las cartas montadas ancladas (`anclar`) para que no se
   desalojen debajo de quien las usa, los canvases se cachean y las `CanvasTexture` se crean
-  por montaje porque pertenecen a un renderer; (4) PREGENERACIÓN: `pregenerar` encola con
+  por montaje porque pertenecen a un renderer; (3) PREGENERACIÓN: `pregenerar` encola con
   prioridad BAJA y en `requestIdleCallback` las cartas de las páginas vecinas que trajo
   `cache-paginas`, y un trabajo bajo que ya tenía turno lo CEDE si llega uno alto. Las
   máscaras corren en un Web Worker (`mascaras.worker.ts`, matemática pura en
   `mascaras-puras.ts` compartida con el camino síncrono de respaldo): el hilo principal
   solo dibuja, lee y escribe píxeles. Dos trampas: la cola ejecuta de UNO en uno con un
   `setTimeout 0` entre trabajos (ocho a la vez bloqueaban en un tramo), y `buscarEnCache`
-  REJUVENECE la entrada (LRU), así que una consulta la aleja del desalojo. Y una tercera
-  que costó una vuelta: la calidad adaptativa mide SOLO CPU del hilo principal
-  (`Completada.msCpu`), nunca la espera del worker, porque su arranque (~0,7 s en una
-  máquina lenta) se colaba en la primera carta y bajaba un escalón sin motivo; además
-  `precalentarMascaras()` arranca el worker mientras se descargan las imágenes. Medido con
+  REJUVENECE la entrada (LRU), así que una consulta la aleja del desalojo. `precalentarMascaras()`
+  arranca el worker mientras se descargan las imágenes. **NO hay calidad adaptativa**: hubo una que medía la
+  generación y bajaba el ancho 512 -> 384 -> 256 (y otra, `card-quality.ts`, que elegía nivel por
+  `hardwareConcurrency`/`deviceMemory`/táctil/`saveData`/`prefers-reduced-motion`); se retiraron. El ancho es FIJO
+  (`TEXTURAS.ancho` = 512 en el libro, `CARD_TEXTURE_FULL_WIDTH` en el detalle) y el canvas usa `dpr={[1, RENDER.dprMax]}` (2; el único mando de resolución). Medido con
   canvas por CPU (`--disable-accelerated-2d-canvas`; con SwiftShader el canvas 2D también
   va por software y las cifras no valen): ~14 ms la etapa rápida y ~13 ms de CPU la
   completa por carta a 512, máximo 40 ms de pared, y 24 aciertos de caché al volver a una
@@ -472,16 +608,14 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
   contexto se pierde, `webgl-recovery.ts` remonta; si agota los intentos, el libro muestra
   `BinderUnavailable` («No se pudo mostrar el libro 3D», botón Recargar). La lista `sr-only` de enlaces
   (`data-testid="binder-link"`) queda SIEMPRE en el DOM: es la accesibilidad y lo que ve un rastreador.
-  `prefers-reduced-motion` ya no manda al 2D (el tier `static` solo baja textura/DPR y desactiva la
-  precarga). jsdom no tiene WebGL, así que `test/setup.ts` sustituye el `<Canvas>` de R3F por una caja
+  `prefers-reduced-motion` ya no cambia nada de la carta (no hay niveles de calidad). jsdom no tiene WebGL, así que `test/setup.ts` sustituye el `<Canvas>` de R3F por una caja
   inerte (`data-testid="r3f-canvas"`); lo que se prueba es el contrato de DOM, no la escena.
 - **El canvas NO corre a 60 fps continuos, y un `contextlost` ya no es permanente.** Antes el
   `<Canvas>` iba en `frameloop="always"` y el primer `webglcontextlost` dejaba un 2D hasta
   recargar (`setLost(true)` sin vuelta). Hoy (`components/render-governor.tsx`, lógica pura en
   `render-pacing.ts`, perillas en `RENDER` de `card3d-config.ts`): `frameloop="demand"` y un
   gobernador que (1) PAUSA del todo fuera de pantalla (IntersectionObserver) o con la pestaña
-  oculta, (2) baja a `idleFps` en reposo y con interacción topa a `RENDER.activeFps` = **60** (se probó 24: en 60 Hz alterna 33/50 ms y se ve menos suave; agenda FIJA `nextSchedule`, porque comparar con el último frame real rinde menos fps que los pedidos), (3) DPR adaptativo AGRESIVO (`RENDER.dpr`: ventana de 24 frames, escalón 0,3, dos escalones si la mediana pasa de 40 ms, mínimo 0,6, sube con calma tras 5 ventanas; `slowMs` 23 queda por encima de los 20,8 ms de 144 Hz con tope 60) si la cadencia de los frames ACTIVOS no se sostiene (nunca midiendo durante un giro: el hilo
-  está saturado por las texturas y realocar el framebuffer a mitad del giro es otro tirón).
+  oculta, (2) baja a `idleFps` en reposo y con interacción topa a `RENDER.activeFps` = **60** (se probó 24: en 60 Hz alterna 33/50 ms y se ve menos suave; agenda FIJA `nextSchedule`, porque comparar con el último frame real rinde menos fps que los pedidos), y NO hay DPR adaptativo (hubo uno que medía la cadencia y realocaba el framebuffer; se retiró: la resolución es fija).
   `advanceFlip` recorta el delta a `RENDER.maxDeltaMs` (70: debe superar el paso de 50 ms del reposo): el primer frame del giro llega tras uno de
   reposo (50 ms) y adelantaba la hoja de golpe. `webgl-recovery.ts` desmonta el canvas,
   espera `cooldownMs` y REMONTA un canvas nuevo (`key`); no sigue en sitio tras
@@ -489,9 +623,7 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
   Trampas: (a) desmontar un Canvas dispara `webglcontextlost` en el canvas viejo
   (`forceContextLoss`): el hook solo acepta el evento del canvas VIGENTE; (b) el reloj de three
   sigue corriendo en pausa, así que al reanudar se descarta con `clock.getDelta()` o `advanceFlip`
-  (integra por delta) saltaría el giro; (c) R3F reimpone la prop `dpr` en cada re-render del
-  Canvas, por eso el DPR adaptativo vive en estado de React del dueño y no en un `setDpr` directo;
-  (d) `PerformanceMonitor` de drei NO sirve: contaría el reposo (20 fps a propósito) como lento.
+  (integra por delta) saltaría el giro; (c) `PerformanceMonitor` de drei NO sirve: contaría el reposo (20 fps a propósito) como lento.
   Medido en chrome-headless con SwiftShader: fuera de pantalla = 0 frames/s y tras `loseContext()`
   el canvas vuelve a los ~2,5 s; los topes de fps no se pueden medir ahí (el rasterizador por
   software satura antes), los cubre `render-pacing.test.ts`. Sin medir aún: GPU real.
@@ -711,7 +843,13 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
   (785 cartas, 211 fichas, 31 países, 1055 habilidades); se obtienen ejecutando
   `verifySeed()` o consultando la base, no estimando.
 
-## Despliegue en Vercel
+## Despliegue en Vercel (HISTÓRICO)
+
+> **Ya no se despliega en Vercel.** Producción es la VPS (ver «Despliegue en VPS») y el workflow
+> `deploy.yml` se eliminó: el CI solo valida. Esta sección y el código de compatibilidad que conserva
+> (build `standalone` opt-in, rama de Blob en `/images`, `outputFileTracingIncludes`) describen cómo era.
+> Si el proyecto sigue enlazado en Vercel, su integración Git seguirá construyendo cada push a `master`:
+> se corta desconectando el repositorio en el panel de Vercel (no es algo que viva en este repo).
 
 La app es **Next.js con App Router** (Vercel la detecta como framework nativo). El
 catálogo corre como funciones con SQLite empaquetada; las imágenes y las ediciones del
@@ -731,7 +869,7 @@ npm install                      # deps del proyecto (root)
 npm run build                    # next build (usa deploy/ ya construido)
 npm run build:data               # regenera deploy/ desde data/ (local, tras scrape o edición)
 npm run verify                   # 32 comprobaciones sobre un escenario de producción
-npx vercel deploy --prod         # publica (o push a master, lo hace deploy.yml)
+npx vercel deploy --prod         # (HISTÓRICO) ya no se despliega en Vercel: ver «Despliegue en VPS»
 ```
 
 `npm run publish:images` sube las imágenes a **Turso** (`asset_remoto`), no a Blob; es
@@ -795,16 +933,13 @@ porque la mitad del contenido del mantenedor NO está en el disco de nadie más 
 
 ### CI en GitHub Actions
 
-El repositorio es **privado y de una organización en plan Hobby**, así que Vercel
-no lo conecta por integración Git. Eso NO impide tener CI: `deploy.yml` ya
-publicaba con un token, y **`ci.yml` valida sin necesitar ningún secreto**.
-
-Dos workflows con trabajos distintos, a propósito:
+Hay **un solo workflow, `ci.yml`**, que valida sin necesitar ningún secreto. No publica nada: el
+despliegue es `scripts/release.sh` en la VPS (antes existía `deploy.yml` con `vercel deploy --prod`; se eliminó).
+Corre con **Node 22**, el mismo que la VPS.
 
 | Workflow | Cuándo | Qué hace |
 |---|---|---|
 | `ci.yml` | todo push (cualquier rama) y cada PR | lint, typecheck, check:shaders, las 3 suites, build y `verify` |
-| `deploy.yml` | solo `master` | los mismos gates + `vercel deploy --prod` con el secret `VERCEL_TOKEN` |
 
 ```bash
 npm run lint      # eslint . — cubre front, scripts, server y scraper
@@ -910,6 +1045,117 @@ hay un script por sentido y **tienen reglas que no pueden divergir**:
   deja `npx vercel env pull --environment=development`). Las de **producción** están marcadas
   *sensitive* en Vercel y no se pueden releer; las de *development* apuntan a la MISMA base, así
   que sirven igual.
+
+## Despliegue en VPS (nginx + base local, sin Turso)
+
+`vtuberdex.com` y `www.vtuberdex.com` corren en una VPS, no en Vercel. `TURSO_DATABASE_URL` admite una URL `file:`
+(`@libsql/client` abre un SQLite local con el MISMO código), así que no hay rama aparte. (Hubo un `test.vtuberdex.com`;
+se retiró: ya no hay nada con ese nombre en nginx, systemd ni `/var/www`.)
+
+- **Release**: `./scripts/release.sh` compila con `VTUBERDEX_STANDALONE=1` (`output: 'standalone'`, opt-in para no afectar
+  a Vercel) y `SITE_URL=https://vtuberdex.com` **definida en el build** (la home es estática: sin ella el canonical se
+  congela como `http://localhost:3000`). Deja `/srv/vtuberdex/releases/<fecha>/` con `index.html`, `.well-known/` (legibles)
+  y `app/` (la app, **modo 700**), apunta `/var/www/vtuberdex.com` a él (`ln -sfn`) y reinicia el servicio `vtuberdex`
+  (`node server.js` en 127.0.0.1:3100, `WorkingDirectory=/var/www/vtuberdex.com/app`). Volver atrás = repuntar el enlace.
+- **Por qué `app/` cerrada y el release en `/srv`**: el script `ssl-dominios` de la VPS genera, al emitir un certificado, un
+  bloque 443 que sirve `/var/www/<dominio>` COMO ESTÁTICO; con la app en la raíz quedaban descargables `deploy/data/*.db` y
+  el código compilado. Y `www-data` no atraviesa `/home/madkoding`: el desafío ACME daba 404 (el primer intento de
+  certificado falló por eso). Comprobado: `app/` y la base responden 404 por HTTP y HTTPS.
+- **nginx**: `/etc/nginx/conf.d/00-a-vtuberdex.com.conf` (HTTP; `server_name` exacto gana al regex del multidominio) +
+  `snippets/vtuberdex-{locations,proxy}.conf`. Cachea `/images/` (clave con `?v=`) y `/_next/static/`. **No** servir el
+  release con `alias`/`root` salvo `/.well-known/acme-challenge/`. `www` comparte carpeta (mapa `$dominio_web`).
+- **HTTPS**: lo emite `ssl-dominios` (Let's Encrypt, cada 5 min, cuando el DNS apunta aquí); su 443 es estático y no sirve,
+  así que `/usr/local/sbin/vtuberdex-https` (drop-in `ExecStartPost` de `ssl-dominios.service`) escribe el 443 PROPIO
+  `conf.d/00-b-vtuberdex.com-https.conf` (carga antes y gana) y **amplía el certificado a `www`** si este resuelve a la VPS
+  pero el certificado no lo lleva (ssl-dominios exige un A directo; con CNAME dejaría www sin cubrir). Renueva `certbot.timer`
+  y `renewal-hooks/deploy/nginx-reload` recarga nginx. Vigente hasta 2027-01-03, `certbot renew --dry-run` pasa.
+  Sin HTTPS `navigator.clipboard` no existe (solo en contexto seguro): por eso el botón de copiar tiene respaldo `execCommand`.
+- **DNS**: `vtuberdex.com` y `www` con registros **A** a la IP de la VPS (169.58.75.176). Vercel sigue teniendo el dominio
+  asociado a su proyecto, pero ya no recibe tráfico.
+- **Entorno** en `/etc/vtuberdex.env` (600): URL `file:` de la base, usuario y hash del mantenedor, sal de likes,
+  `SITE_URL`, `VTUBERDEX_VOCES_DIR`.
+- **Base**: `~/data/vtuberdex/turso-local.db` (WAL). `npm run copiar:turso` la rellena desde Turso (una vez; lotes
+  de 5 filas en `asset_remoto`, porque Turso cortaba la conexión con lotes grandes de BLOB). `lib/ediciones.mjs`
+  aplica pragmas (WAL, `busy_timeout`, `mmap`) solo para URLs `file:`. **Es la única copia de las ediciones** desde que se
+  dejó Turso: producción en Vercel ya no recibe visitas, pero sus cambios previos al corte solo están en la copia de ese día.
+- **Respaldo**: `scripts/respaldo-db.mjs` (`VACUUM INTO`, consistente con WAL) vía `/etc/cron.d/vtuberdex-respaldo`,
+  03:30, 7 copias en `~/backups/vtuberdex/`. No copies solo el `.db`: pierdes lo que está en el `-wal`.
+- **Trampa de imports de imagen**: en Next, `import x from './a.webp'` da un OBJETO `{ src }`, no una cadena.
+  El mapa del metal se pedía como `/[object Object]` (404) y NUNCA cargaba, sin error visible; vitest sí da
+  cadena, por eso ningún test lo vio (`card-material.ts`, `metalEnvUrl`).
+- **Código de donación y certificado**: `VTD-` + **número de dex** (`#016` ⇒ `VTD-016`), no el id interno (que no coincide con
+  lo visible: madKoding es dex 16, id 17; las fichas nuevas tienen ids desde 100001). Los códigos viejos de 6 dígitos se
+  rechazan a propósito (`dexDeCodigo`): leídos como dex apuntarían a OTRA ficha. Si el mantenedor mueve el dex, el código cambia.
+  PayPal: el enlace `ncp/payment/<id>` solo admite `locale.x`/`country.x` (no lleva referencia); el botón copia el código al
+  pulsarlo. Con `PAYPAL_MERCHANT_ID` (lib/donar.ts) el enlace pasa a `paypal.com/donate?business=…&item_number=VTD-016`, que sí lo
+  transporta. Está vacío: hace falta el ID de comerciante de la cuenta.
+- **«← Catálogo» de la ficha** vuelve a la página/filtros donde se estaba: `use-vtuber-search` guarda el querystring en
+  `sessionStorage` (`lib/volver-al-catalogo.ts`).
+- **Medición del libro (VPS, CPU, Chromium + SwiftShader)**: texturas ~46 ms rápida / ~110 ms completa por carta;
+  el pico de 1,3-1,5 s al primer giro es compilación/enlazado de shaders y `texSubImage2D`, no las texturas. Se calientan
+  los shaders (`shader-warmup.tsx`: compilar Y dibujar una vez, que es lo que obliga al primer dibujo). Se probó
+  `debug.checkShaderErrors = false` en producción: solo movió la espera, y se revirtió. Medir en GPU real antes de tocar más.
+
+## Voz de la ficha (Piper + filtro, cola de regeneración)
+
+Cada ficha con historia tiene un clip `<slug>.mp3`: una voz femenina española «de aparato» que dice
+«Nombre. País. Historia.» al entrar a la ficha. Hay un parlantito con mute sobre la carta
+(`components/voice-button.tsx`). **La voz sintética es propia: nunca se clona la de la Pokédex** (personaje comercial).
+
+- **Dónde viven**: `VTUBERDEX_VOCES_DIR` (VPS: `~/data/vtuberdex/voces/`), junto a un `<slug>.txt` con el guion con que
+  se generó. La ruta `app/voces/[slug]/route.js` los sirve (con `Range`: Safari no reproduce `<audio>` sin 206).
+- **Qué se dice** (`lib/voz-guion.mjs`, pura y probada): se saltan las fichas sin historia (3), las de baja grado 1
+  (`deteriorada-*`: su nombre es secreto) y las cuyo TEXTO no está en español; la historia se corta en una frase completa a
+  700 caracteres (111 fichas pasan de eso); NFKC convierte las «letras matemáticas» de algunos nombres.
+  OJO: el facet `languages` de una ficha es el idioma del STREAMER, no el del texto (8 fichas no-`es` tienen historia en español).
+- **Generar**: `npm run voces -- --todas` (lote, ~1,5 h en 4 núcleos; reanudable: salta lo que no cambió comparando el `.txt`),
+  `--slug=x`, `--forzar`, `--seco`, `--limpiar`. Piper: `~/voces/venv`, modelo `es_ES-sharvard-medium` hablante 1 (F),
+  `--noise-scale 0.15` (entonación plana). El filtro es `scripts/voz/pokedex-voz.sh` (altura +30 %, anillo 110 Hz, bitcrush, eco,
+  pitidos). **`sine` de ffmpeg sale a −18 dBFS**: con `volume=0.25` los pitidos quedaban a −30 dB (inaudibles).
+- **Al crear/editar una ficha**: `aplicarYAnotar` (`lib/diario.mjs`) llama a `encolarVocesAfectadas` → `lib/voces-cola.mjs`
+  escribe `<VOCES>/.cola/<id>.json` (un trabajo por ficha). El servicio `vtuberdex-voces` (`scripts/voces-generar.mjs --vigilar`,
+  cada 5 s) lo procesa: regenera si el guion cambió, **retira el clip si la ficha ya no tiene guion** o quedó oculta/en borrador.
+  Piper tarda segundos de CPU y necesita Python: por eso NO corre dentro de la petición del mantenedor. Sin `VTUBERDEX_VOCES_DIR`
+  (Vercel, CI) la cola no hace nada y no falla.
+- **Trampas**: (1) el `id` de una ficha NO es su número de dex (madKoding: dex 16, **id 17**). Una prueba con `PATCH /vtubers/16`
+  sobrescribió la historia de otra ficha; se restauró desde el cambio nº 177 del diario, pero el diario conserva ambos cambios.
+  Resuelve siempre el id por slug y comprueba el nombre ANTES de editar. (2) Durante el lote, una ficha editada puede
+  procesarse con el texto viejo de su instantánea: corre `--todas` una vez más al terminar (idempotente). (3) Un slug
+  renombrado deja su clip viejo huérfano hasta el siguiente `--limpiar`. (4) El autoplay con sonido lo bloquea el navegador
+  sin gesto previo (enlace directo): el botón queda en «Escuchar». Entrando desde el catálogo hay un clic y suena sola.
+- **El servicio** corre desde el CHECKOUT (`~/projects/vtuberdex`, no desde el release): necesita `lib/` y `server/src` en
+  claro, y el `.env` es `/etc/vtuberdex.env` (el mismo del sitio).
+
+## Estadísticas de visitantes (panel de la IP)
+
+El panel de estado del servidor (lo que se ve al entrar por la IP, `/srv/estado`, fuera de este repo; copias de lo que se
+modificó en `~/backups/estado-*`) tiene una sección «Visitantes // vtuberdex.com» alimentada por la propia app. Todo es
+**anónimo y agregado**: no se guarda IP, cookies ni User-Agent. El servidor lee el `User-Agent` de la petición y lo
+reduce a una familia cerrada de navegador y de sistema (`lib/user-agent.mjs`; los robots no cuentan); lo que el cuerpo
+del latido diga de sí mismo (`navegador`, `so`, `fichaId`) se ignora. **Qué ficha se ve**: el cliente manda el slug SOLO
+en `/v/:slug`; el servidor lo valida (`lib/ficha-id.mjs`: publicada, no baja, alias resuelven), lo convierte en id y
+descarta el slug. Se cuentan vistas por id de ficha (ranking mensual) sin cruzarlas con navegador, sistema ni
+dispositivo. El panel pone los nombres al servir y una ficha retirada sale como «Ficha retirada». Un guardia limita a
+600 sesiones nuevas por minuto (no hay IP con la que limitar). Panel: donas, gráfica de 30 días y ranking, no tablas.
+
+- **Cliente** (`components/cliente-stats.tsx` + `lib/telemetria-cliente.ts`, montado en `app/layout.tsx`): un latido cada 20 s
+  (carga, LCP, fluidez, tareas largas, si la GPU es por software…) y un **aviso mínimo de navegación** inmediato al cargar y en cada
+  cambio de página (`usePathname`), con dispositivo y conexión. Respeta «No rastrear» y Global Privacy Control. El latido de 20 s se
+  perdería las navegaciones rápidas catálogo → ficha: por eso el aviso aparte.
+- **En vivo** (`lib/clientes-stats.mjs`, en memoria, estado en `globalThis` porque Next compila cada ruta como entrada distinta):
+  conectados, medianas de rendimiento y repartos. Valida y acota todo campo; claves de listas cerradas. Topes: 5.000 sesiones, un
+  latido cada 5 s y un aviso de navegación cada 2 s por sesión (sin IP no hay otro límite).
+- **Histórico mensual** (`lib/clientes-historial.mjs`, tabla `estadistica_mes(mes, clave, n)` en la base local, así entra en el
+  respaldo): por mes UTC cuenta `visitas` (cargas de página), `dispositivo:*`, `conexion:*` (por visita), `pagina:*` (vistas, contando
+  cada cambio de página), `cruce:dispositivo:pagina` y `pico` de conectados. Se acumula en memoria y se vuelca cada 15 s con un UPSERT
+  que SUMA (el pico usa MAX): al reiniciar el servicio se pierde, como mucho, lo de los últimos 15 s. Si la base falla, lo acumulado
+  se conserva para el siguiente intento. Sin base configurada solo hay histórico en memoria. Empezó a acumular el 2026-10-06.
+- **Entrega al panel**: `GET /api/stats/resumen` (`app/api/stats/resumen/route.js`) exige `X-Estado-Token` (= `VTUBERDEX_STATS_TOKEN`,
+  sin él o con otro responde 404 como si no existiera); lo consulta el nginx del panel (`location = /clientes.json` en
+  `00-multidominio.conf`, token en `snippets/estado-token.conf`, 600 root). Devuelve lo de ahora + `historial` (12 meses).
+- **Panel** (`/srv/estado/{index.html,estado.js,estado.css}`): tarjetas Dispositivo/Página/Conexión de ahora y el histórico mensual
+  (barras apiladas por mes + tabla resumen). Solo muestra los meses con datos y el actual. Su CSP es estricta (`connect-src 'self'`):
+  por eso consulta `clientes.json` del mismo origen y todo texto entra por `textContent`.
 
 ## Verificación antes de decir "listo"
 

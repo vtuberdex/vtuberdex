@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 
 import { api } from '@/lib/api';
-import type { AdminStatusFilter, VtuberCard } from '@/lib/types';
+import type { AdminCorreoFilter, AdminStatusFilter, VtuberCard } from '@/lib/types';
 import { percentOfCard } from '@/components/admin/completeness';
 import { ghostButton, inputClass, labelClass, primaryButton } from '@/components/admin/ui';
 
@@ -35,21 +35,22 @@ export function VtuberList({
 }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<AdminStatusFilter>('all');
+  const [correo, setCorreo] = useState<AdminCorreoFilter>('todos');
   const [page, setPage] = useState(1);
-  const [rows, setRows] = useState<VtuberCard[]>([]);
+  const [rows, setRows] = useState<(VtuberCard & { hasEmail?: boolean })[]>([]);
   const [meta, setMeta] = useState({ total: 0, pageCount: 1 });
 
   useEffect(() => {
     const controller = new AbortController();
     api
-      .adminList(token, { q: query, status, page, perPage: PER_PAGE }, controller.signal)
+      .adminList(token, { q: query, status, correo, page, perPage: PER_PAGE }, controller.signal)
       .then((response) => {
         setRows(response.items);
         setMeta({ total: response.total, pageCount: response.pageCount });
       })
       .catch(() => undefined);
     return () => controller.abort();
-  }, [token, query, status, page, refreshKey]);
+  }, [token, query, status, correo, page, refreshKey]);
 
   return (
     <aside className="rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
@@ -82,6 +83,22 @@ export function VtuberList({
           <option value="hidden">ocultos</option>
         </select>
       </label>
+      <label className={`${labelClass} mt-3`}>
+        Correo
+        <select
+          aria-label="Filtrar por correo"
+          value={correo}
+          onChange={(event) => {
+            setCorreo(event.target.value as AdminCorreoFilter);
+            setPage(1);
+          }}
+          className={inputClass}
+        >
+          <option value="todos">todos</option>
+          <option value="con">con correo</option>
+          <option value="sin">sin correo</option>
+        </select>
+      </label>
       <p className="mt-3 text-xs text-dex-muted">{meta.total} fichas</p>
       <ul className="dex-scroll mt-2 max-h-[60vh] space-y-1 overflow-y-auto">
         {rows.map((row) => (
@@ -98,6 +115,13 @@ export function VtuberList({
               <span className="font-mono text-[10px] text-dex-muted" title="Completitud de la carta" data-testid="row-percent">
                 {percentOfCard(row)}%
               </span>
+              <span
+                className={`font-mono text-[10px] ${row.hasEmail ? 'text-emerald-300' : 'text-dex-muted/60'}`}
+                title={row.hasEmail ? 'Tiene correo asociado' : 'Sin correo asociado'}
+                data-testid="row-email"
+              >
+                {row.hasEmail ? '✉' : '–'}
+              </span>
               {row.status !== 'published' && (
                 <span className="rounded bg-amber-500/20 px-1.5 text-[10px] text-amber-200">{STATUS_LABEL[row.status]}</span>
               )}
@@ -106,7 +130,7 @@ export function VtuberList({
         ))}
         {rows.length === 0 && (
           <li className="space-y-2 px-2 py-3 text-xs text-dex-muted" data-testid="list-empty">
-            {query || status !== 'all' ? (
+            {query || status !== 'all' || correo !== 'todos' ? (
               'Ninguna ficha coincide con la búsqueda.'
             ) : (
               <>

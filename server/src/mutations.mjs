@@ -114,7 +114,7 @@ const STAT_SLUGS = {
 };
 
 export function slugDeStat(label) {
-  return STAT_SLUGS[normalizeText(label)] ?? slugify(label);
+  return STAT_SLUGS[normalizeText(label)] ?? slugOCodigo(label, 'stat');
 }
 
 /** Recalcula los contadores desnormalizados de las facetas. */
@@ -154,8 +154,20 @@ export function refreshSearchIndex(db, vtuberId) {
   );
 }
 
+/**
+ * Slug de un texto libre que NUNCA queda vacío: «モデラー» o «★★» no dejan ninguna letra latina y
+ * `slugify` da ''. Vacío chocaba (todas las etiquetas así compartían la misma fila) o se rechazaba.
+ * Cae a `<prefijo>-<puntos de código en hex>`: determinista, así que el mismo texto da el mismo slug.
+ */
+export function slugOCodigo(valor, prefijo) {
+  const slug = slugify(valor).slice(0, 80).replace(/-+$/, '');
+  if (slug) return slug;
+  const codigo = [...String(valor ?? '').trim()].map((c) => c.codePointAt(0).toString(16)).join('').slice(0, 40);
+  return `${prefijo}-${codigo || 'x'}`;
+}
+
 function upsertTag(db, kind, label) {
-  const slug = slugify(label);
+  const slug = slugOCodigo(label, 'etiqueta');
   db.prepare(
     `INSERT INTO tag (kind, slug, label, vtuber_count) VALUES (?, ?, ?, 0)
      ON CONFLICT (kind, slug) DO UPDATE SET label = excluded.label`,
@@ -302,6 +314,15 @@ export function resolverDex(db, pedido, { excluirId = null } = {}) {
     throw new MutationError(409, 'dex_ocupado', `el #${numero} ya lo tiene ${dueño.name}`);
   }
   return numero;
+}
+
+/**
+ * Slug derivado de un nombre: sin tildes ni símbolos, ≤ 80 y nunca vacío (si el nombre no deja ninguna
+ * letra latina —japonés, emojis— cae a `vtuber-<dex>`). Un nombre repetido SÍ choca (409): es un
+ * posible duplicado y el mantenedor lo decide.
+ */
+function slugDesdeNombre(nombre, dex) {
+  return slugify(nombre).slice(0, 80).replace(/-+$/, '') || `vtuber-${dex}`;
 }
 
 /** Valida y normaliza un slug explícito. */
@@ -464,9 +485,12 @@ export function aplicarParche(db, id, patch) {
 export function crearFicha(db, datos, { id = null } = {}) {
   const nombre = String(datos.name ?? '').trim();
   if (!nombre) throw new MutationError(400, 'nombre_requerido', 'falta el nombre');
-  const slug = slugValido(datos.slug ?? nombre);
-  if (db.prepare('SELECT 1 FROM vtuber WHERE slug = ?').get(slug)) throw new MutationError(409, 'slug_duplicado', slug);
   const dex = resolverDex(db, datos.dexNumber ?? 'end');
+  // Un slug EXPLÍCITO se valida y no se toca. El que sale del NOMBRE se slugifica sin quejarse: los
+  // VTubers escriben «ミク», «★Luna★» o nombres de 100 letras, y rechazarlos por la URL dejaba la
+  // inscripción sin poder aprobarse (`slug_invalido`) por algo que la persona no controla.
+  const slug = datos.slug != null ? slugValido(datos.slug) : slugDesdeNombre(nombre, dex);
+  if (db.prepare('SELECT 1 FROM vtuber WHERE slug = ?').get(slug)) throw new MutationError(409, 'slug_duplicado', slug);
 
   const columnas = ['dex_number', 'slug', 'name', 'search_name', 'status', 'has_detail'];
   const valores = [dex, slug, nombre, normalizeText(nombre), datos.status ?? 'draft', 1];
@@ -551,7 +575,7 @@ export function listarFacciones(db) {
 export function crearFaccion(db, { label, icon = null }, { id = null } = {}) {
   const etiqueta = String(label ?? '').trim();
   if (!etiqueta) throw new MutationError(400, 'nombre_requerido', 'falta el nombre de la facción');
-  const slug = slugValido(etiqueta);
+  const slug = slugOCodigo(etiqueta, 'faccion');
   if (db.prepare('SELECT 1 FROM faction WHERE slug = ? OR lower(label) = lower(?)').get(slug, etiqueta)) {
     throw new MutationError(409, 'faccion_duplicada', `ya existe la facción ${etiqueta}`);
   }

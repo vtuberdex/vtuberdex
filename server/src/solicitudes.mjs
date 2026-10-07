@@ -16,7 +16,7 @@
  *
  * DATOS PERSONALES: DOS COLUMNAS, NO UNA
  * --------------------------------------
- * Los términos prometen que el correo y el nombre real son confidenciales y no se publican.
+ * Los términos prometen que el correo es confidencial y no se publican.
  * Esa promesa se cumple por estructura: lo que puede acabar en la ficha va en `datos` y lo
  * confidencial en `contacto`. `fichaDesdeInscripcion` solo lee `datos`, de modo que ni un
  * descuido del mantenedor puede copiar un correo a una carta pública. Al resolver una baja o
@@ -34,12 +34,21 @@ import crypto from 'node:crypto';
 import { z } from 'zod';
 
 import { TERMINOS_VERSION } from './terminos-version.mjs';
+import { consumirToken, correoDelToken } from './verificacion.mjs';
 
 export { TERMINOS_VERSION };
 
 /** Tipos y estados de una solicitud. */
 export const TIPOS = ['inscripcion', 'baja', 'modificacion'];
-export const ESTADOS = ['pendiente', 'aprobada', 'rechazada', 'procesada'];
+/**
+ * `sin_verificar`: entró por el formulario pero su correo aún no confirmó el token. El mantenedor NO la
+ * ve (su cola lista `pendiente`): así una solicitud con el correo de otra persona, o inventado, no
+ * llega nunca a su bandeja. Pasa a `pendiente` cuando se usa el enlace que se mandó a ese correo.
+ */
+export const ESTADOS = ['sin_verificar', 'pendiente', 'aprobada', 'rechazada', 'procesada'];
+
+/** Cuánto vive una solicitud sin confirmar antes de borrarla (el token caduca a las 24 h). */
+const VIDA_SIN_VERIFICAR_MS = 3 * 24 * 60 * 60 * 1000;
 
 /**
  * Envíos por red y por día. No es 1 porque las redes móviles y las casas comparten IP (NAT) y
@@ -66,6 +75,15 @@ const DDL = `
   );
   CREATE INDEX IF NOT EXISTS idx_solicitud_estado ON solicitud (estado, tipo, id);
   CREATE INDEX IF NOT EXISTS idx_solicitud_red ON solicitud (red, creado);
+  CREATE TABLE IF NOT EXISTS ficha_correo (
+    vtuber_id   INTEGER PRIMARY KEY,
+    email       TEXT NOT NULL,
+    actualizado TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS graduado (
+    vtuber_id INTEGER PRIMARY KEY,
+    desde     TEXT NOT NULL
+  );
 `;
 
 export class SolicitudError extends Error {
@@ -144,7 +162,7 @@ const aceptacion = {
  * Los textos cortos de la ficha que pide el formulario: `[clave, máximo, cómo se nombra en el mensaje]`.
  * La inscripción los exige todos; la modificación los acepta en blanco (en blanco = no cambia).
  */
-const PERFIL_CAMPOS = [
+export const PERFIL_CAMPOS = [
   ['height', 40, 'la estatura'],
   ['birthday', 80, 'el cumpleaños'],
   ['favoriteFood', 120, 'la comida favorita'],
@@ -178,8 +196,6 @@ export const inscripcionSchema = z.object({
   name: texto(160).min(1, 'falta el nombre artístico'),
   /** CONFIDENCIAL: solo para que el mantenedor pueda contestar. */
   email: correo,
-  /** CONFIDENCIAL y opcional. */
-  realName: textoOpcional(160),
   /** Opcional: se pide en la 2.ª página del formulario. */
   country: textoOpcional(60),
   languages: z.array(texto(8).min(2)).min(1, 'indica al menos un idioma').max(6),
@@ -205,12 +221,14 @@ export const inscripcionSchema = z.object({
 });
 
 export const bajaSchema = z.object({
-  /** Nombre o URL (`/v/<slug>`) de la ficha que se quiere dar de baja. */
-  ficha: texto(300).min(1, 'indica qué ficha quieres dar de baja'),
-  /** CONFIDENCIAL. */
+  /**
+   * Opcional: la ficha sale del correo (la de la inscripción aprobada con esa dirección). Solo hace falta
+   * para quien NO se inscribió con este correo (las fichas del scrape original no tienen uno guardado) o
+   * para elegir una cuando el mismo correo tiene varias.
+   */
+  ficha: textoOpcional(300),
+  /** CONFIDENCIAL. La titularidad la prueba el token que llega a este correo. */
   email: correo,
-  /** Cómo demostrar que quien pide la baja es el titular: un canal propio donde dejar una marca. */
-  prueba: texto(500).min(5, 'indica cómo podemos comprobar que eres el titular'),
   motivo: textoOpcional(2000),
   ...aceptacion,
 });
@@ -219,8 +237,8 @@ export const bajaSchema = z.object({
 const CAMPOS_MODIFICABLES = ['phrase', 'cardText', 'themeColor', 'country', 'zodiac', 'imageUrl', 'logoUrl', ...PERFIL_CAMPOS.map(([clave]) => clave)];
 
 /**
- * Pedir cambios en una ficha YA registrada. Se identifica como la baja (ficha + correo + cómo se
- * comprueba la titularidad) y todo lo demás es opcional: solo se tocan los campos que vengan con
+ * Pedir cambios en una ficha YA registrada. Se identifica con la ficha y el correo (que se confirma
+ * con un enlace de un solo uso: no se pide otra prueba de titularidad) y todo lo demás es opcional: solo se tocan los campos que vengan con
  * valor. El nombre no se puede cambiar por aquí (mueve la URL y tiene sus propias reglas).
  */
 export const modificacionSchema = z
@@ -229,8 +247,6 @@ export const modificacionSchema = z
     ficha: texto(300).min(1, 'indica qué ficha quieres modificar'),
     /** CONFIDENCIAL. */
     email: correo,
-    /** Cómo demostrar que quien pide el cambio es el titular (igual que en la baja). */
-    prueba: texto(500).min(5, 'indica cómo podemos comprobar que eres el titular'),
     phrase: textoOpcional(600),
     cardText: textoOpcional(4000),
     themeColor: z
@@ -279,15 +295,25 @@ export function hashearRed(ip, sal = process.env.VTUBERDEX_LIKES_SAL ?? 'vtuberd
  * @param {object} entrada cuerpo ya parseado por el esquema de su tipo
  * @param {{ tipo: 'inscripcion'|'baja', ip?: string, ahora?: Date }} contexto
  */
-export async function crearSolicitud(ejecutor, entrada, { tipo, ip, ahora = new Date() }) {
+export async function crearSolicitud(ejecutor, entrada, { tipo, ip, ahora = new Date(), permiso = null, propositoPermiso = 'permiso' }) {
   if (!TIPOS.includes(tipo)) throw new SolicitudError(400, 'tipo_invalido', tipo);
   const esquema = ESQUEMAS[tipo];
-  const parsed = esquema.safeParse(entrada ?? {});
+  // Con `permiso` el correo YA está verificado (lo canjeó por un código): sale del permiso, no de lo que
+  // diga el cuerpo, y la solicitud nace `pendiente` sin segundo correo. Se mira sin gastarlo: un error de
+  // validación de abajo no debe quemar el permiso, que cuesta rellenar un formulario largo.
+  let correoVerificado = null;
+  if (permiso !== null) {
+    correoVerificado = await correoDelToken(ejecutor, permiso, propositoPermiso, ahora.getTime());
+    if (!correoVerificado) {
+      throw new SolicitudError(410, 'permiso_invalido', 'La verificación de tu correo caducó o ya se usó. Vuelve al paso 1 y pide un código nuevo.');
+    }
+  }
+  const parsed = esquema.safeParse(correoVerificado ? { ...(entrada ?? {}), email: correoVerificado.email } : (entrada ?? {}));
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => ({ path: i.path.join('.') || '(root)', message: i.message }));
     throw Object.assign(new SolicitudError(400, 'payload_invalido', issues[0]?.message ?? 'datos no válidos'), { issues });
   }
-  const { aceptaTerminos: _acepta, terminosVersion, website, email, realName, ...datos } = parsed.data;
+  const { aceptaTerminos: _acepta, terminosVersion, website, email, ...datos } = parsed.data;
   // Un bot rellena el campo oculto. Se responde como si todo fuera bien (sin pista de qué lo delató)
   // pero no se guarda nada.
   if (website) return { id: null, descartada: true };
@@ -312,15 +338,217 @@ export async function crearSolicitud(ejecutor, entrada, { tipo, ip, ahora = new 
     throw new SolicitudError(409, 'solicitud_pendiente', 'ya hay una solicitud tuya en espera de revisión');
   }
 
-  const contacto = { email, ...(realName ? { realName } : {}) };
+  const contacto = { email };
   const fecha = ahora.toISOString();
+  if (correoVerificado) {
+    // Se gasta AHORA, con todo lo demás ya validado, y de forma atómica: dos envíos a la vez con el mismo
+    // permiso no crean dos solicitudes (el segundo ve 0 filas cambiadas).
+    if (!(await consumirToken(e, permiso, propositoPermiso, ahora.getTime()))) {
+      throw new SolicitudError(410, 'permiso_invalido', 'La verificación de tu correo caducó o ya se usó. Vuelve al paso 1 y pide un código nuevo.');
+    }
+    const directa = await e.execute(
+      `INSERT INTO solicitud (tipo, estado, datos, contacto, red, terminos_version, terminos_aceptados_en, creado)
+       VALUES (?, 'pendiente', ?, ?, ?, ?, ?, ?)`,
+      [tipo, aJson(datos), aJson(contacto), red, terminosVersion, fecha, fecha],
+    );
+    const { rows: ultima } = await e.execute('SELECT MAX(id) AS id FROM solicitud WHERE red = ?', [red]);
+    return { id: Number(directa.lastInsertRowid ?? ultima[0]?.id ?? 0) || null, descartada: false, email, tipo, verificada: true };
+  }
+  // Una solicitud sin confirmar del mismo correo y tipo se REEMPLAZA (la persona volvió a enviar porque
+  // el correo no le llegó): no se acumulan. Y las que nadie confirmó en días se borran aquí mismo, sin
+  // un trabajo aparte.
+  const sinConfirmar = await e.execute(
+    "SELECT id, contacto, creado FROM solicitud WHERE tipo = ? AND estado = 'sin_verificar'",
+    [tipo],
+  );
+  const caducadas = new Date(ahora.getTime() - VIDA_SIN_VERIFICAR_MS).toISOString();
+  for (const fila of sinConfirmar.rows) {
+    if (deJson(fila.contacto)?.email === email || String(fila.creado) < caducadas) {
+      await e.execute("DELETE FROM solicitud WHERE id = ? AND estado = 'sin_verificar'", [Number(fila.id)]);
+    }
+  }
   const insertada = await e.execute(
-    `INSERT INTO solicitud (tipo, datos, contacto, red, terminos_version, terminos_aceptados_en, creado)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO solicitud (tipo, estado, datos, contacto, red, terminos_version, terminos_aceptados_en, creado)
+     VALUES (?, 'sin_verificar', ?, ?, ?, ?, ?, ?)`,
     [tipo, aJson(datos), aJson(contacto), red, terminosVersion, fecha, fecha],
   );
   const { rows: ultimo } = await e.execute('SELECT MAX(id) AS id FROM solicitud WHERE red = ?', [red]);
-  return { id: Number(insertada.lastInsertRowid ?? ultimo[0]?.id ?? 0) || null, descartada: false };
+  return { id: Number(insertada.lastInsertRowid ?? ultimo[0]?.id ?? 0) || null, descartada: false, email, tipo };
+}
+
+/**
+ * Confirma el correo de una solicitud: de `sin_verificar` a `pendiente`. El `WHERE` hace de cerrojo
+ * (un doble clic no la confirma dos veces). Devuelve la solicitud, o `null` si ya no existe o ya no
+ * estaba sin verificar (p. ej. se reemplazó por un reenvío).
+ */
+export async function confirmarSolicitud(ejecutor, id) {
+  const e = await conTablas(ejecutor);
+  const cambio = await e.execute("UPDATE solicitud SET estado = 'pendiente' WHERE id = ? AND estado = 'sin_verificar'", [Number(id)]);
+  return cambio.rowsAffected === 0 ? null : leerSolicitud(e, id);
+}
+
+/** Descarta una solicitud sin confirmar (por ejemplo, si el correo no se pudo enviar). */
+export async function descartarSinVerificar(ejecutor, id) {
+  const e = await conTablas(ejecutor);
+  await e.execute("DELETE FROM solicitud WHERE id = ? AND estado = 'sin_verificar'", [Number(id)]);
+}
+
+/**
+ * Las fichas que este correo inscribió: las inscripciones APROBADAS cuyo contacto guarda ese correo.
+ * El slug pudo cambiar desde entonces: `resolverFicha` recibe el slug guardado y devuelve la ficha
+ * vigente (alias incluidos). Las fichas del scrape original no tienen correo guardado: nunca aparecen.
+ * A propósito NO incluye los correos fijados a mano por el mantenedor (`ficha_correo`): la baja automática
+ * y el borrador solo se fían de quien inscribió la ficha, no de un dato que escribió otra persona.
+ *
+ * @param {(slug: string) => ({ id: number, slug: string, name: string } | null)} resolverFicha
+ * @param {((id: number) => ({ id: number, slug: string, name: string } | null)) | null} [resolverPorId]
+ *   si se pasa, suma las fichas cuyo correo fijó el mantenedor (`inscripcion: null`); solo «Mi ficha» lo pide
+ * @returns {Promise<Array<{ inscripcion: number | null, ficha: { id: number, slug: string, name: string } }>>}
+ *   una entrada por ficha (si el mismo correo la inscribió dos veces, la primera inscripción)
+ */
+export async function fichasDelTitular(ejecutor, { email, resolverFicha, resolverPorId = null }) {
+  const e = await conTablas(ejecutor);
+  const { rows } = await e.execute(
+    "SELECT id, contacto, vtuber_slug FROM solicitud WHERE tipo = 'inscripcion' AND estado = 'aprobada' AND vtuber_slug IS NOT NULL ORDER BY id",
+  );
+  const vistas = new Set();
+  const salida = [];
+  for (const fila of rows) {
+    if (String(deJson(fila.contacto)?.email ?? '').toLowerCase() !== String(email).toLowerCase()) continue;
+    const ficha = resolverFicha(fila.vtuber_slug);
+    if (!ficha || vistas.has(ficha.id)) continue;
+    vistas.add(ficha.id);
+    salida.push({ inscripcion: Number(fila.id), ficha });
+  }
+  if (resolverPorId) {
+    // «Mi ficha»: quien tiene su correo fijado por el mantenedor (las fichas del scrape) también es titular.
+    // Baja y borrador NO lo piden: no se fían de un dato que escribió otra persona.
+    const { rows: manuales } = await e.execute('SELECT vtuber_id FROM ficha_correo WHERE lower(email) = ?', [String(email).toLowerCase()]);
+    for (const m of manuales) {
+      const id = Number(m.vtuber_id);
+      if (vistas.has(id)) continue;
+      const ficha = resolverPorId(id);
+      if (!ficha) continue;
+      vistas.add(id);
+      salida.push({ inscripcion: null, ficha });
+    }
+  }
+  return salida;
+}
+
+/**
+ * El correo con que se inscribió una ficha (la inversa de `fichasDelTitular`), o `null`: las fichas del
+ * scrape original no tienen correo guardado. Compara por id de ficha vigente, porque el slug pudo cambiar.
+ */
+export async function correoDeLaFicha(ejecutor, { fichaId, resolverFicha }) {
+  const e = await conTablas(ejecutor);
+  // Lo que el mantenedor fijó a mano manda sobre el de la inscripción (es la corrección).
+  const manual = await e.execute('SELECT email FROM ficha_correo WHERE vtuber_id = ?', [Number(fichaId)]);
+  if (manual.rows[0]?.email) return String(manual.rows[0].email);
+  const { rows } = await e.execute(
+    "SELECT contacto, vtuber_slug FROM solicitud WHERE tipo = 'inscripcion' AND estado = 'aprobada' AND vtuber_slug IS NOT NULL ORDER BY id",
+  );
+  for (const fila of rows) {
+    const email = deJson(fila.contacto)?.email;
+    if (!email) continue;
+    if (resolverFicha(fila.vtuber_slug)?.id === fichaId) return String(email);
+  }
+  return null;
+}
+
+/**
+ * Los correos de TODAS las fichas que tienen uno, en una sola pasada (el listado del mantenedor no puede
+ * preguntar ficha por ficha): inscripciones aprobadas y, encima, lo fijado a mano.
+ *
+ * @returns {Promise<Map<number, string>>} id de ficha vigente → correo
+ */
+export async function correosDeFichas(ejecutor, { resolverFicha }) {
+  const e = await conTablas(ejecutor);
+  const mapa = new Map();
+  const { rows } = await e.execute(
+    "SELECT contacto, vtuber_slug FROM solicitud WHERE tipo = 'inscripcion' AND estado = 'aprobada' AND vtuber_slug IS NOT NULL ORDER BY id DESC",
+  );
+  for (const fila of rows) {
+    const email = deJson(fila.contacto)?.email;
+    const id = email ? resolverFicha(fila.vtuber_slug)?.id : null;
+    if (id != null) mapa.set(id, String(email));
+  }
+  const { rows: manuales } = await e.execute('SELECT vtuber_id, email FROM ficha_correo');
+  for (const fila of manuales) mapa.set(Number(fila.vtuber_id), String(fila.email));
+  return mapa;
+}
+
+/**
+ * ¿Este correo está asociado a alguna ficha? Sí si inscribió una (inscripción aprobada) o si el mantenedor
+ * se lo fijó a mano. Lo exigen los formularios de modificación y de baja: sin una ficha detrás no hay nada
+ * que modificar ni dar de baja, y la persona debe hablar con un administrador.
+ */
+export async function correoTieneFicha(ejecutor, email) {
+  const e = await conTablas(ejecutor);
+  const limpio = String(email ?? '').trim().toLowerCase();
+  if (!limpio) return false;
+  const manual = await e.execute('SELECT 1 AS ok FROM ficha_correo WHERE email = ? LIMIT 1', [limpio]);
+  if (manual.rows.length) return true;
+  const inscrita = await e.execute(
+    "SELECT 1 AS ok FROM solicitud WHERE tipo = 'inscripcion' AND estado = 'aprobada' AND json_extract(contacto, '$.email') = ? LIMIT 1",
+    [limpio],
+  );
+  return inscrita.rows.length > 0;
+}
+
+/**
+ * Las fichas de personas GRADUADAS (dejaron de hacer streams): solo una marca, no toca el grado. Vive junto
+ * a `ficha_correo` (mismo almacén, mismo respaldo) porque la base del catálogo es de solo lectura en producción.
+ * @returns {Promise<Set<number>>} ids de ficha
+ */
+export async function idsGraduados(ejecutor) {
+  const e = await conTablas(ejecutor);
+  const { rows } = await e.execute('SELECT vtuber_id FROM graduado');
+  return new Set(rows.map((f) => Number(f.vtuber_id)));
+}
+
+/** Marca (`true`) o desmarca (`false`) una ficha como graduada. Idempotente. */
+export async function fijarGraduado(ejecutor, fichaId, graduado = true, ahora = new Date()) {
+  const e = await conTablas(ejecutor);
+  if (!graduado) {
+    await e.execute('DELETE FROM graduado WHERE vtuber_id = ?', [Number(fichaId)]);
+    return false;
+  }
+  await e.execute('INSERT OR IGNORE INTO graduado (vtuber_id, desde) VALUES (?, ?)', [Number(fichaId), ahora.toISOString().slice(0, 10)]);
+  return true;
+}
+
+/** Valida y normaliza un correo (minúsculas); lanza `SolicitudError` 400 si no lo es. */
+export function normalizarCorreo(valor) {
+  const parsed = correo.safeParse(valor);
+  if (!parsed.success) throw new SolicitudError(400, 'correo_invalido', 'El correo no es válido.');
+  return parsed.data;
+}
+
+/**
+ * Fija (o con `null`/'' quita) el correo de una ficha. Vive aquí y no en la ficha ni en el diario:
+ * es un dato confidencial que no debe viajar por la API pública ni por la base empaquetada.
+ */
+export async function fijarCorreoDeFicha(ejecutor, fichaId, email, ahora = new Date()) {
+  const e = await conTablas(ejecutor);
+  const limpio = String(email ?? '').trim();
+  if (!limpio) {
+    await e.execute('DELETE FROM ficha_correo WHERE vtuber_id = ?', [Number(fichaId)]);
+    return null;
+  }
+  const valido = normalizarCorreo(limpio);
+  await e.execute(
+    `INSERT INTO ficha_correo (vtuber_id, email, actualizado) VALUES (?, ?, ?)
+     ON CONFLICT(vtuber_id) DO UPDATE SET email = excluded.email, actualizado = excluded.actualizado`,
+    [Number(fichaId), valido, ahora.toISOString()],
+  );
+  return valido;
+}
+
+/** Borra el contacto confidencial de una solicitud ya cerrada (la inscripción de quien se dio de baja). */
+export async function borrarContacto(ejecutor, id) {
+  const e = await conTablas(ejecutor);
+  await e.execute('UPDATE solicitud SET contacto = NULL WHERE id = ?', [Number(id)]);
 }
 
 function mapear(fila) {
@@ -400,7 +628,7 @@ export async function resolverSolicitud(ejecutor, id, { estado, actor, nota = ''
 
 /**
  * Los datos de la ficha que nace de una inscripción aprobada. Solo lee `datos` (lo público):
- * el correo y el nombre real están en `contacto` y no pueden colarse. Siempre `draft`.
+ * el correo está en `contacto` y no pueden colarse. Siempre `draft`.
  */
 export function fichaDesdeInscripcion(solicitud) {
   const d = solicitud.datos;

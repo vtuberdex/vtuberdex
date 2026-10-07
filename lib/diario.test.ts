@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
 // --- Turso falso: SQLite en memoria con la misma interfaz que usa `lib/ediciones.mjs`.
 const turso = new DatabaseSync(':memory:');
@@ -227,7 +227,7 @@ describe('cartas premium en producción', () => {
     await instanciaFria();
     const enOtra = await premiumDe('gkuro');
     expect(enOtra).toEqual(enEstaInstancia);
-    expect(enOtra).toMatchObject({ grade: '10', cert: `VTD-${String(id).padStart(6, '0')}` });
+    expect(enOtra).toMatchObject({ grade: '10', cert: 'VTD-018' });
     expect(await premiumDe('drawchii')).toBeNull();
   });
 
@@ -252,5 +252,69 @@ describe('cartas premium en producción', () => {
       diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { premium: { grade: '11' } } }),
     ).rejects.toMatchObject({ code: 'grado_invalido' });
     expect((turso.prepare('SELECT COUNT(*) AS n FROM cambio').get() as { n: number }).n).toBe(antes);
+  });
+});
+
+describe('avisa al generador de voces cuando una ficha cambia', () => {
+  let voces: string;
+  const cola = () => (fs.existsSync(path.join(voces, '.cola')) ? fs.readdirSync(path.join(voces, '.cola')).sort() : []);
+  const trabajo = (id: number) => JSON.parse(fs.readFileSync(path.join(voces, '.cola', `${id}.json`), 'utf8')) as { id: number; slug: string };
+
+  beforeEach(() => {
+    voces = fs.mkdtempSync(path.join(os.tmpdir(), 'vtuberdex-voces-'));
+    process.env.VTUBERDEX_VOCES_DIR = voces;
+  });
+  afterEach(() => {
+    delete process.env.VTUBERDEX_VOCES_DIR;
+    fs.rmSync(voces, { recursive: true, force: true });
+  });
+
+  test('editar una ficha encola su id y su slug', async () => {
+    const id = await idDe('gkuro');
+    await diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { cardText: 'Nueva historia.' } });
+    expect(cola()).toEqual([`${id}.json`]);
+    expect(trabajo(id)).toMatchObject({ id, slug: 'gkuro' });
+  });
+
+  test('editar dos veces seguidas deja UN solo trabajo (no apila regeneraciones)', async () => {
+    const id = await idDe('gkuro');
+    await diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { cardText: 'Uno.' } });
+    await diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { cardText: 'Dos.' } });
+    expect(cola()).toHaveLength(1);
+  });
+
+  test('si se cambia el slug, el trabajo lleva el slug NUEVO', async () => {
+    const id = await idDe('gkuro');
+    await diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { slug: 'gkuro-nuevo' } });
+    expect(trabajo(id).slug).toBe('gkuro-nuevo');
+  });
+
+  test('crear una ficha la encola', async () => {
+    const { resultado } = await diario.aplicarYAnotar({
+      tipo: 'vtuber.crear',
+      datos: { name: 'Nueva', countries: ['chile'], languages: ['es'], cardText: 'Hola.' },
+    });
+    const { id } = resultado as { id: number };
+    expect(cola()).toContain(`${id}.json`);
+  });
+
+  test('publicar u ocultar encola CADA ficha afectada', async () => {
+    const a = await idDe('gkuro');
+    const b = await idDe('drawchii');
+    await diario.aplicarYAnotar({ tipo: 'vtuber.estado', ids: [a, b], status: 'hidden' });
+    expect(cola()).toEqual([`${a}.json`, `${b}.json`].sort());
+  });
+
+  test('una operación que las reglas rechazan NO encola nada', async () => {
+    const id = await idDe('gkuro');
+    await expect(diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { dexNumber: 30 } })).rejects.toThrow();
+    expect(cola()).toEqual([]);
+  });
+
+  test('sin VTUBERDEX_VOCES_DIR no hace nada y el guardado funciona igual', async () => {
+    delete process.env.VTUBERDEX_VOCES_DIR;
+    const id = await idDe('gkuro');
+    await expect(diario.aplicarYAnotar({ tipo: 'vtuber.editar', id, patch: { cardText: 'Sin voces.' } })).resolves.toBeTruthy();
+    expect(fs.existsSync(path.join(voces, '.cola'))).toBe(false);
   });
 });

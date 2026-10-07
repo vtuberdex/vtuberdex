@@ -61,7 +61,7 @@ export interface PremiumInfo {
   since: string;
   /** Último cambio de grado (AAAA-MM-DD). */
   gradedAt: string;
-  /** Número de certificado, derivado del id (`VTD-000017`). */
+  /** Número de certificado y código de donación, derivado del número de dex (`VTD-016` para la carta `#016`). */
   cert: string;
 }
 
@@ -99,6 +99,10 @@ export interface VtuberCard {
   socialCount: number;
   /** Carta premium: la 3D la dibuja dentro de una placa de acrílico con su etiqueta. */
   premium?: PremiumInfo | null;
+  /** La ficha no tiene correo asociado: se pinta con desgaste (grado 6) sin placa y la ficha lo avisa. */
+  sinCorreo?: boolean;
+  /** La persona se graduó (dejó de hacer streams). Solo una marca: no cambia la carta ni el grado. */
+  graduado?: boolean;
   images: VtuberImages;
 }
 
@@ -125,6 +129,8 @@ export interface SkillRow {
   effectHtml: string | null;
   factions: Array<{ src: string | null; name: string | null }>;
   position: number;
+  /** Rango que su titular le dio con los puntos de nivel (0 o ausente = sin subir). */
+  rank?: number;
 }
 
 export interface SocialRow {
@@ -144,12 +150,17 @@ export interface AssetRow {
 }
 
 export interface VtuberDetail extends VtuberCard {
+  /** Solo en el listado del mantenedor: si la ficha tiene un correo asociado (el correo mismo nunca sale ahí). */
+  hasEmail?: boolean;
+  /** Solo en el detalle del mantenedor: el correo asociado, o `null`. Nunca en la API pública. */
+  email?: string | null;
   profile: ProfileField[];
   stats: StatRow[];
   skills: SkillRow[];
   socials: SocialRow[];
   assets: AssetRow[];
-  experience: { current: number | null; max: number | null } | null;
+  /** `total` es la experiencia ACUMULADA de siempre: la barra se vacía al subir de nivel, el total no. */
+  experience: { current: number | null; max: number | null; total?: number } | null;
   /** Likes recibidos. La experiencia y el nivel ya vienen calculados con ellos (`server/src/experiencia.mjs`). */
   likes?: number;
 }
@@ -216,6 +227,9 @@ export type VtuberStatus = VtuberCard['status'];
 
 /** Filtro de estado del listado del mantenedor (`all` incluye borradores y ocultos). */
 export type AdminStatusFilter = 'all' | VtuberStatus;
+
+/** Filtro por correo asociado del listado del mantenedor (`todos` = sin filtrar). */
+export type AdminCorreoFilter = 'todos' | 'con' | 'sin';
 
 /** Fila del catálogo cerrado de facciones, con su uso (`total` = fichas, `publicadas` = visibles). */
 export interface FactionRow {

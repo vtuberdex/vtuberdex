@@ -4,6 +4,7 @@
  * Cada una es un `ListEditor` con su fila; el estado vive en el editor padre para que
  * un único «Guardar cambios» envíe un solo PATCH.
  */
+import { SocialIcon } from '@/components/social-icon';
 import { ListEditor } from '@/components/admin/list-editor';
 import {
   emptySkill,
@@ -149,7 +150,9 @@ export function SocialsEditor({ items, onChange }: { items: SocialForm[]; onChan
         return (
           <div className="grid gap-2 sm:grid-cols-3">
             <label className={labelClass}>
-              Plataforma
+              <span className="inline-flex items-center gap-1.5">
+                <SocialIcon platform={item.platform} url={item.url} className="h-3.5 w-3.5" /> Plataforma
+              </span>
               <input value={item.platform} onChange={(event) => update({ platform: event.target.value })} className={compact} placeholder="twitch" />
             </label>
             <label className={`${labelClass} sm:col-span-2`}>

@@ -11,7 +11,13 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { VoiceButton } from '@/components/voice-button';
+import { limpiarAbriendo } from '@/lib/abriendo-detalle';
+import { rutaDelCatalogo } from '@/lib/volver-al-catalogo';
+
 import { api, type LikeResumen } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
+import { nombreDePais } from '@/lib/i18n/nombres';
 import { cardPalette, gradientCss, mixHex, rgba } from '@/lib/color';
 import type { VtuberDetail, Neighbors } from '@/lib/types';
 import { HoloCard } from '@/components/holo-card';
@@ -23,10 +29,12 @@ import { SocialLinks } from '@/components/social-links';
 import { PremiumBadge } from '@/components/premium-badge';
 import { DonatePayPal } from '@/components/donate-paypal';
 import { LikeButton } from '@/components/like-button';
+import { TextoTraducible } from '@/components/texto-traducible';
 
 type Payload = (VtuberDetail & { neighbors: Neighbors }) | null;
 
 export function DetailPage({ slug }: { slug: string }) {
+  const { t, locale } = useI18n();
   const [data, setData] = useState<Payload>(null);
   /**
    * Panel de ajuste en vivo, SOLO si la URL trae `?tune=1`. Se importa de forma
@@ -36,6 +44,11 @@ export function DetailPage({ slug }: { slug: string }) {
   const [Tuner, setTuner] = useState<null | typeof import('@/components/card3d-tuner').Card3dTuner>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Dónde estaba el visitante en el catálogo (página y filtros); se lee tras hidratar: el servidor no tiene `sessionStorage`. */
+  const [volverA, setVolverA] = useState('/');
+  useEffect(() => {
+    setVolverA(rutaDelCatalogo());
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -70,6 +83,11 @@ export function DetailPage({ slug }: { slug: string }) {
     if (data && data.slug !== slug) window.history.replaceState(null, '', `/v/${data.slug}`);
   }, [data, slug]);
 
+  // Con datos (o con el error) ya no hace falta el aviso «Accediendo al detalle».
+  useEffect(() => {
+    if (!loading) limpiarAbriendo();
+  }, [loading]);
+
   useEffect(() => {
     document.title = data ? `${data.name} · VTuberDex` : 'VTuberDex';
     return () => {
@@ -101,12 +119,12 @@ export function DetailPage({ slug }: { slug: string }) {
   if (error || !data) {
     return (
       <div className="mx-auto max-w-xl px-4 py-20 text-center">
-        <h1 className="text-2xl font-extrabold text-dex-ink">VTuber no encontrado</h1>
+        <h1 className="text-2xl font-extrabold text-dex-ink">{t('detalle.noEncontrado')}</h1>
         <p className="mt-2 text-sm text-dex-muted">
-          {error === 'no_encontrado' ? 'Ese slug no existe en el catálogo.' : error}
+          {error === 'no_encontrado' ? t('detalle.slugInexistente') : error === 'error desconocido' ? t('detalle.errorDesconocido') : error}
         </p>
         <Link href="/" className="mt-6 inline-block rounded-lg border border-dex-accent/60 px-4 py-2 text-sm text-dex-accent">
-          Volver al catálogo
+          {t('detalle.volverCatalogo')}
         </Link>
       </div>
     );
@@ -120,8 +138,8 @@ export function DetailPage({ slug }: { slug: string }) {
       {Tuner ? <Tuner /> : null}
 
       <nav className="mb-5 flex items-center gap-3 text-xs text-dex-muted">
-        <Link href="/" className="hover:text-dex-ink">
-          ← Catálogo
+        <Link href={volverA} className="hover:text-dex-ink" data-testid="volver-catalogo">
+          {t('detalle.catalogo')}
         </Link>
         <span aria-hidden>/</span>
         <span className="font-mono">#{String(data.dexNumber).padStart(3, '0')}</span>
@@ -145,6 +163,10 @@ export function DetailPage({ slug }: { slug: string }) {
               background: `linear-gradient(160deg, ${palette.deep} 0%, ${mixHex(palette.accent, '#05060a', 0.92)} 42%, ${mixHex(palette.accent, '#080a10', 0.95)} 100%)`,
             }}
           >
+            {/* La voz vive sobre el borde de la carta: es de la carta, no un dato más de la ficha. */}
+            <div className="absolute right-3 top-3 z-10">
+              <VoiceButton slug={data.slug} flotante />
+            </div>
             <HoloCard
               card={data}
               holo={INTENSITY.holo.detail}
@@ -153,7 +175,7 @@ export function DetailPage({ slug }: { slug: string }) {
             />
           </div>
 
-          <DonatePayPal premium={data.premium} card={{ id: data.id, name: data.name }} />
+          <DonatePayPal premium={data.premium} card={{ dexNumber: data.dexNumber, name: data.name }} />
 
           {/*
             Aquí estaba el bloque del RADAR de atributos (una imagen raster del
@@ -176,19 +198,33 @@ export function DetailPage({ slug }: { slug: string }) {
                   {primary && (
                     <span className="inline-flex items-center gap-1">
                       <span aria-hidden>{primary.flag?.trim() || '🏳️'}</span>
-                      {data.countries.map((country) => country.name).join(' · ')}
+                      {data.countries.map((country) => nombreDePais(locale, country)).join(' · ')}
                     </span>
                   )}
-                  {!primary && <span>Sin país registrado</span>}
+                  {!primary && <span>{t('detalle.sinPais')}</span>}
                   <span aria-hidden>•</span>
-                  <span>{data.hasDetail ? 'Ficha completa' : 'Ficha básica'}</span>
+                  <span>{data.hasDetail ? t('detalle.fichaCompleta') : t('detalle.fichaBasica')}</span>
                 </p>
+                {data.graduado && (
+                  <p className="mt-3 inline-flex rounded border border-dex-muted/40 bg-black/30 px-2 py-1 text-xs" data-testid="graduado">
+                    <strong>🎓 {t('detalle.graduado')}</strong>
+                  </p>
+                )}
+                {data.sinCorreo && (
+                  <p
+                    className="mt-3 inline-flex flex-wrap items-center gap-x-2 rounded border border-dex-muted/40 bg-black/30 px-2 py-1 text-xs"
+                    data-testid="sin-correo"
+                  >
+                    <strong>{t('detalle.sinCorreoTitulo')}</strong>
+                    <span className="text-dex-muted">({t('detalle.sinCorreoAyuda', { correo: 'madkoding@gmail.com' })})</span>
+                  </p>
+                )}
                 {data.premium && (
                   <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-dex-muted" data-testid="premium-info">
                     <PremiumBadge premium={data.premium} />
                     <span className="font-mono">{data.premium.cert}</span>
                     <span aria-hidden>•</span>
-                    <span>Premium desde {data.premium.since}</span>
+                    <span>{t('detalle.premiumDesde', { fecha: data.premium.since })}</span>
                   </p>
                 )}
               </div>
@@ -203,11 +239,15 @@ export function DetailPage({ slug }: { slug: string }) {
               acabado de la pieza; este era un duplicado plano sin tratamiento.
             */}
 
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               <LikeButton slug={data.slug} likes={data.likes ?? 0} onChange={aplicarLikes} />
             </div>
 
-            {data.phrase && <p className="mt-4 max-w-3xl text-sm leading-relaxed text-dex-ink/90">{data.phrase}</p>}
+            {data.phrase && (
+              <div className="mt-4 max-w-3xl">
+                <TextoTraducible texto={data.phrase} className="text-sm leading-relaxed text-dex-ink/90" acento={palette.accent} />
+              </div>
+            )}
 
             {/* Texto personalizado impreso en la carta (OCR). Suele ser una
                 historia larga que NO está en el HTML: es el único sitio donde
@@ -216,18 +256,18 @@ export function DetailPage({ slug }: { slug: string }) {
               <section className="mt-5 rounded-2xl border border-dex-line/70 bg-black/25 p-4">
                 <header className="mb-2 flex flex-wrap items-center gap-2">
                   <h2 className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: palette.accent }}>
-                    Su historia
+                    {t('detalle.historia')}
                   </h2>
                   {data.cardTextConfidence !== null && (
                     <span
                       className="rounded-full border border-dex-line px-2 py-0.5 font-mono text-[10px] text-dex-muted"
-                      title="Fiabilidad de la lectura OCR del texto impreso en la carta"
+                      title={t('detalle.ocrAyuda')}
                     >
                       OCR {data.cardTextConfidence}%
                     </span>
                   )}
                 </header>
-                <p className="whitespace-pre-line text-sm leading-relaxed text-dex-ink/85">{data.cardText}</p>
+                <TextoTraducible texto={data.cardText} className="whitespace-pre-line text-sm leading-relaxed text-dex-ink/85" acento={palette.accent} />
               </section>
             )}
 

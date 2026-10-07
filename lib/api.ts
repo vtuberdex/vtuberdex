@@ -3,6 +3,7 @@
  * consume funciones tipadas y nunca arma URLs a mano.
  */
 import type {
+  AdminCorreoFilter,
   AdminListResponse,
   AdminStatusFilter,
   ApiListResponse,
@@ -33,7 +34,7 @@ export interface LikeResumen {
   /** ¿Ya le dio like HOY? */
   liked: boolean;
   level: number;
-  experience: { current: number; max: number };
+  experience: { current: number; max: number; total?: number };
   /** Experiencia que suma cada like. */
   xpPorLike: number;
 }
@@ -52,6 +53,49 @@ export interface SolicitudAdmin {
   resueltoPor: string | null;
   nota: string | null;
   vtuberSlug: string | null;
+}
+
+/** Resumen de una ficha en la vista previa de una solicitud. */
+export interface FichaResumen {
+  id: number;
+  slug: string;
+  name: string;
+  dexNumber: number;
+  status: string;
+  grado: string | null;
+}
+
+/** Lo que pasaría si se aprueba una solicitud (ver `server/src/solicitud-vista.mjs`). */
+export interface VistaPreviaSolicitud {
+  tipo: 'inscripcion' | 'baja' | 'modificacion';
+  estado: string;
+  puedeAprobar: boolean;
+  problema: { codigo: string; mensaje: string; detalles?: Array<{ path: string; message: string }> } | null;
+  avisos: string[];
+  /** Inscripción: la ficha que nacería. */
+  creara?: { name: string; slug: string; estado: string };
+  /** Modificación y baja: la ficha afectada. */
+  ficha?: FichaResumen | null;
+  cambios?: Array<{ campo: string; antes: string; despues: string; nuevo: boolean }>;
+  imagenes?: { imageUrl?: string; logoUrl?: string };
+  /** Modificación sin ficha resuelta: fichas parecidas para elegir. */
+  candidatas?: FichaResumen[];
+}
+
+/** Lo que el formulario de inscripción guarda como borrador (`server/src/borradores.mjs`): sus campos y el paso (3 a 5). */
+export type BorradorDeInscripcion = Record<string, unknown> & {
+  name: string;
+  languages: string[];
+  socials: Array<{ platform: string; url: string }>;
+  paso: 3 | 4 | 5;
+};
+
+/** Lo que responde `POST /api/verificar`: `fichas` solo viene con `baja_aplicada` (las que se dieron de baja). */
+export interface ResultadoDeVerificacion {
+  ok: true;
+  tipo: 'inscripcion' | 'baja' | 'modificacion';
+  resultado: 'en_revision' | 'baja_aplicada' | 'sin_ficha';
+  fichas?: string[];
 }
 
 export class ApiError extends Error {
@@ -82,12 +126,85 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const payload = text ? (JSON.parse(text) as unknown) : null;
   if (!response.ok) {
     const detail = payload as { error?: string; detail?: string; issues?: unknown } | null;
-    throw new ApiError(detail?.detail ?? detail?.error ?? `HTTP ${response.status}`, response.status, detail?.issues);
+    // Un 400 de validación traía `issues` (qué campo y por qué) y se perdía: la pantalla solo decía
+    // «payload_invalido» y nadie sabía qué corregir. Se añade el primero al mensaje.
+    const primero = Array.isArray(detail?.issues) ? (detail.issues[0] as { path?: string; message?: string } | undefined) : undefined;
+    const que = primero?.path ? ` (${primero.path}: ${primero.message ?? 'no válido'})` : '';
+    throw new ApiError(`${detail?.detail ?? detail?.error ?? `HTTP ${response.status}`}${detail?.detail ? '' : que}`, response.status, detail?.issues);
   }
   return payload as T;
 }
 
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+
+/** «Mi ficha»: una habilidad mejorable y su rango. */
+export interface HabilidadMejorable {
+  clave: string;
+  name: string;
+  category: 'active' | 'passive' | 'ultimate' | 'other';
+  type: string | null;
+  effect: string | null;
+  rango: number;
+}
+
+/** «Mi ficha»: un stat que se sube gastando puntos (HP, MP, ataques, defensas). */
+export interface StatMejorable {
+  slug: string;
+  label: string;
+  base: number;
+  puntos: number;
+  valor: number;
+  paso: number;
+  tope: number | null;
+  puedeSubir: boolean;
+}
+
+/** Un stat que sube solo con los niveles ganados (velocidad, evasión, precisión, crítico, suerte). */
+export interface StatAutomatico {
+  slug: string;
+  label: string;
+  base: number;
+  bono: number;
+  valor: number;
+  cada: number;
+  suma: number;
+  tope: number | null;
+}
+
+export interface EstadoDeStats {
+  stats: StatMejorable[];
+  automaticos: StatAutomatico[];
+  ganados: number;
+  repartidos: number;
+  disponibles: number;
+  puntosPorNivel: number;
+}
+
+export interface VistaMiFicha {
+  slug: string;
+  name: string;
+  level: number;
+  levelsGained: number;
+  likes: number;
+  experience: { current: number; max: number; total: number };
+  puntos: { habilidades: HabilidadMejorable[]; ganados: number; repartidos: number; disponibles: number; rangoMaximo: number; puntosPorNivel: number };
+  /** Puntos de stats (bolsa aparte de las habilidades). Opcional: la maqueta de /niveles no lo trae. */
+  statsPuntos?: EstadoDeStats;
+}
+
+export interface RespuestaMiFicha {
+  ok: true;
+  fichas: Array<{ slug: string; name: string }>;
+  ficha: VistaMiFicha;
+}
+
+export interface ResumenRechazos {
+  dias: number;
+  total: number;
+  porCodigo: Array<{ formulario: string; codigo: string; status: number; n: number }>;
+  porCampo: Array<{ formulario: string; campo: string; n: number }>;
+  ultimo: string | null;
+}
 
 export const api = {
   list(params: SearchParams, signal?: AbortSignal): Promise<ApiListResponse> {
@@ -107,10 +224,22 @@ export const api = {
    * `GET /api/meta` se retiró (ver `app/api/health/route.js`): las facetas viajan en
    * `api.list()` con `facet=all`, que es lo que el panel de filtros consume de verdad.
    */
-  login(username: string, password: string) {
-    return request<{ token: string; user: { username: string; role: string } }>('/api/admin/login', {
+  /** Pide el enlace mágico del mantenedor: responde igual para cualquier correo bien formado. */
+  pedirEnlaceDeAcceso(email: string) {
+    return request<{ ok: true }>('/api/admin/enlace', { method: 'POST', body: JSON.stringify({ email }) });
+  },
+  /** Gasta el enlace mágico (el token viaja en el fragmento de la URL, nunca en la ruta) y abre la sesión. */
+  entrarConEnlace(token: string) {
+    return request<{ token: string; user: { username: string; role: string } }>('/api/admin/enlace/entrar', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ token }),
+    });
+  },
+  /** Gasta el token del correo de una solicitud. */
+  verificarSolicitud(token: string) {
+    return request<ResultadoDeVerificacion>('/api/verificar', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
     });
   },
   session(token: string) {
@@ -131,13 +260,14 @@ export const api = {
    */
   adminList(
     token: string,
-    params: { q?: string; status?: AdminStatusFilter; premium?: boolean; page?: number; perPage?: number },
+    params: { q?: string; status?: AdminStatusFilter; premium?: boolean; correo?: AdminCorreoFilter; page?: number; perPage?: number },
     signal?: AbortSignal,
   ) {
     const query = new URLSearchParams();
     if (params.q) query.set('q', params.q);
     query.set('status', params.status ?? 'all');
     if (params.premium) query.set('premium', '1');
+    if (params.correo && params.correo !== 'todos') query.set('correo', params.correo);
     if (params.page) query.set('page', String(params.page));
     if (params.perPage) query.set('perPage', String(params.perPage));
     return request<AdminListResponse>(`/api/admin/vtubers?${query}`, { headers: bearer(token), signal });
@@ -145,6 +275,14 @@ export const api = {
   /** Detalle por id, sin filtrar por estado: `detail(slug)` da 404 en borradores. */
   adminDetail(token: string, id: number) {
     return request<VtuberDetail>(`/api/admin/vtubers/${id}`, { headers: bearer(token) });
+  },
+  /** Fija (o con `null` quita) el correo de una ficha: vive en la cola de solicitudes, no en la ficha. Si es nuevo, la ficha recibe un correo de bienvenida (`bienvenida`). */
+  setVtuberEmail(token: string, id: number, email: string | null) {
+    return request<{ email: string | null; bienvenida?: 'enviada' | 'fallo' | 'no' }>(`/api/admin/vtubers/${id}/correo`, {
+      method: 'PUT',
+      headers: bearer(token),
+      body: JSON.stringify({ email }),
+    });
   },
   /** Crea una ficha; nace en BORRADOR y al final de la dex. */
   createVtuber(token: string, body: VtuberCreate) {
@@ -225,15 +363,57 @@ export const api = {
   },
   /** Formulario público de inscripción: deja una solicitud pendiente, no crea la ficha. */
   enviarInscripcion(body: Record<string, unknown>) {
-    return request<{ ok: true; estado: 'pendiente'; id: number | null }>('/api/inscripciones', { method: 'POST', body: JSON.stringify(body) });
+    return request<{ ok: true; estado: 'pendiente' | 'sin_verificar' }>('/api/inscripciones', { method: 'POST', body: JSON.stringify(body) });
+  },
+  /** Paso 1 de la inscripción: manda un código al correo. No dice si ese correo tiene un borrador. */
+  pedirCodigoDeInscripcion(email: string, website = '') {
+    return request<{ ok: true }>('/api/inscripciones/codigo', { method: 'POST', body: JSON.stringify({ email, website }) });
+  },
+  /** Paso 2: canjea el código por una sesión y trae el borrador que esa persona dejó a medias (o `null`). */
+  verificarCodigoDeInscripcion(token: string) {
+    return request<{ ok: true; sesion: string; borrador: { datos: BorradorDeInscripcion; actualizado: string } | null }>(
+      '/api/inscripciones/verificar',
+      { method: 'POST', body: JSON.stringify({ token }) },
+    );
+  },
+  /** Guarda lo escrito hasta ahora, atado al correo de la sesión. */
+  guardarBorradorDeInscripcion(sesion: string, datos: BorradorDeInscripcion) {
+    return request<{ ok: true; actualizado: string }>('/api/inscripciones/borrador', { method: 'PUT', body: JSON.stringify({ sesion, datos }) });
   },
   /** Formulario público de baja. Mismos términos que la inscripción. */
   enviarBaja(body: Record<string, unknown>) {
-    return request<{ ok: true; estado: 'pendiente'; id: number | null }>('/api/bajas', { method: 'POST', body: JSON.stringify(body) });
+    return request<{ ok: true; estado: 'sin_verificar' }>('/api/bajas', { method: 'POST', body: JSON.stringify(body) });
   },
   /** Formulario público para pedir cambios en una ficha ya registrada. Mismos términos y misma cola. */
   enviarModificacion(body: Record<string, unknown>) {
-    return request<{ ok: true; estado: 'pendiente'; id: number | null }>('/api/modificaciones', { method: 'POST', body: JSON.stringify(body) });
+    return request<{ ok: true; estado: 'pendiente' | 'sin_verificar' }>('/api/modificaciones', { method: 'POST', body: JSON.stringify(body) });
+  },
+  /** Paso 1 de «actualizar ficha»: manda un código al correo. No dice si el correo tiene fichas. */
+  pedirCodigoDeModificacion(email: string, website = '') {
+    return request<{ ok: true }>('/api/modificaciones/codigo', { method: 'POST', body: JSON.stringify({ email, website }) });
+  },
+  /** Paso 2: canjea el código por un permiso de envío y trae las fichas inscritas con ese correo. */
+  verificarCodigoDeModificacion(token: string) {
+    return request<{ ok: true; permiso: string; fichas: Array<{ slug: string; name: string }> }>('/api/modificaciones/verificar', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+  /** «Mi ficha»: el estado de la ficha de quien llega con su enlace mágico (el token no se gasta). */
+  miFicha(token: string, slug?: string) {
+    return request<RespuestaMiFicha>('/api/mi-ficha', { method: 'POST', body: JSON.stringify({ token, slug }) });
+  },
+  /** Gasta un punto de habilidad (`subir`) o de stat (`subir-stat`, `clave` = slug), o devuelve los repartidos de esa bolsa. */
+  repartirPuntos(token: string, slug: string, accion: 'subir' | 'reiniciar' | 'subir-stat' | 'reiniciar-stats', clave?: string) {
+    return request<{ ok: true; ficha: VistaMiFicha }>('/api/mi-ficha/puntos', { method: 'POST', body: JSON.stringify({ token, slug, accion, clave }) });
+  },
+  /** Manda el enlace mágico a ese correo si tiene fichas; responde igual para cualquiera. */
+  pedirEnlaceDeMiFicha(email: string) {
+    return request<{ ok: true }>('/api/mi-ficha/enlace', { method: 'POST', body: JSON.stringify({ email }) });
+  },
+  /** Rechazos de los formularios públicos en los últimos días (sin correos ni contenido). */
+  rechazosDeSolicitudes(token: string, dias = 7) {
+    return request<ResumenRechazos>(`/api/admin/solicitudes/rechazos?dias=${dias}`, { headers: bearer(token) });
   },
   solicitudes(token: string, estado: string = 'pendiente', tipo?: 'inscripcion' | 'baja' | 'modificacion') {
     const query = new URLSearchParams({ estado, ...(tipo ? { tipo } : {}) });
@@ -241,12 +421,17 @@ export const api = {
       headers: bearer(token),
     });
   },
-  resolverSolicitud(token: string, id: number, accion: 'aprobar' | 'rechazar' | 'procesar', nota = '') {
+  resolverSolicitud(token: string, id: number, accion: 'aprobar' | 'rechazar' | 'procesar', nota = '', fichaSlug?: string) {
     return request<{ solicitud: SolicitudAdmin }>(`/api/admin/solicitudes/${id}/resolver`, {
       method: 'POST',
       headers: bearer(token),
-      body: JSON.stringify({ accion, nota }),
+      body: JSON.stringify({ accion, nota, ...(fichaSlug ? { fichaSlug } : {}) }),
     });
+  },
+  /** Qué pasaría al aprobar (sin escribir nada). `ficha` elige a mano la ficha de una modificación. */
+  vistaPreviaSolicitud(token: string, id: number, ficha?: string) {
+    const query = ficha ? `?${new URLSearchParams({ ficha })}` : '';
+    return request<VistaPreviaSolicitud>(`/api/admin/solicitudes/${id}/vista-previa${query}`, { headers: bearer(token) });
   },
   adminStats(token: string) {
     return request<{

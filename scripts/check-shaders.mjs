@@ -196,6 +196,20 @@ const LITERALES_LEGITIMOS = [
   // Suelo del normalize de la deriva radial del humo: evita división por cero
   // en el centro exacto (0.5, 0.5), donde uv - vec2(0.5) es vec2(0.0).
   { valor: '0.001', en: /vec2\(0\.001\)/ },
+  // RUIDO DEL HUMO (valueNoise/fbm): curva quíntica f*f*f*(f*(f*6-15)+10), matriz de giro de
+  // 36,87 grados (0.8/0.6 por construcción: 3-4-5), lacunaridad 2.02 y desfases que
+  // decorrelacionan octavas y campos de la distorsión. Son la definición del generador, no
+  // perillas: cambiarlos no ajusta el efecto, lo rompe o dibuja rejillas.
+  { valor: '6.0', en: /f\s*\*\s*\(\s*f\s*\*\s*6\.0\s*-\s*15\.0\s*\)\s*\+\s*10\.0/ },
+  { valor: '15.0', en: /f\s*\*\s*6\.0\s*-\s*15\.0/ },
+  { valor: '10.0', en: /-\s*15\.0\s*\)\s*\+\s*10\.0/ },
+  { valor: '0.8', en: /mat2\(\s*0\.8,\s*-0\.6,\s*0\.6,\s*0\.8\s*\)/ },
+  { valor: '0.6', en: /mat2\(\s*0\.8,\s*-0\.6,\s*0\.6,\s*0\.8\s*\)/ },
+  { valor: '2.02', en: /giro\s*\*\s*p\s*\*\s*2\.02/ },
+  { valor: '17.0', en: /vec2\(\s*17\.0,\s*9\.0\s*\)/ },
+  { valor: '9.0', en: /vec2\(\s*17\.0,\s*9\.0\s*\)/ },
+  { valor: '5.2', en: /vec2\(\s*5\.2,\s*1\.3\s*\)/ },
+  { valor: '1.3', en: /vec2\(\s*5\.2,\s*1\.3\s*\)/ },
   // HUMO ESPECTRAL DEL GLOW: modulación de intensidad y tinte del brillo.
   // Son perillas de la config escritas directamente por `f()`; sin una regla
   // explícita el guard las ve como literales sueltos.
