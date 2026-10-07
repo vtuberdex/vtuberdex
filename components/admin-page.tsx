@@ -1,7 +1,7 @@
 'use client';
 /**
- * Mantenedor: orquestador. Login, métricas y dos secciones («Fichas» y «Emblemas y
- * facciones»); el trabajo de cada una vive en `components/admin/`.
+ * Mantenedor: orquestador. Login y las pestañas (Fichas, Emblemas y facciones, Premium, Tarifas,
+ * Solicitudes y Estadísticas); el trabajo de cada una vive en `components/admin/`.
  * Reemplaza el "editar HTML a mano" del origen. Aquí solo está el estado que comparten
  * (sesión, catálogo de facciones, qué ficha está abierta) y los avisos.
  */
@@ -25,7 +25,7 @@ import { ToastContainer, useToasts } from '@/components/toast';
 
 const TOKEN_KEY = 'vtuberdex.admin.token';
 
-type Section = 'fichas' | 'emblemas' | 'premium' | 'tarifas' | 'solicitudes';
+type Section = 'fichas' | 'emblemas' | 'premium' | 'tarifas' | 'solicitudes' | 'estadisticas';
 type View = { kind: 'none' } | { kind: 'create'; n: number } | { kind: 'edit'; detail: VtuberDetail; epoch: number };
 
 export function AdminPage() {
@@ -257,6 +257,7 @@ export function AdminPage() {
     { id: 'premium', label: 'Premium' },
     { id: 'tarifas', label: 'Tarifas' },
     { id: 'solicitudes', label: 'Solicitudes' },
+    { id: 'estadisticas', label: 'Estadísticas' },
   ];
 
   return (
@@ -294,9 +295,6 @@ export function AdminPage() {
       )}
 
       <GettingStarted onGoFactions={() => setSection('emblemas')} onNewCard={startCreate} />
-
-      {/* Panel: medidores y gráficos del catálogo (components/admin/panel-estadisticas.tsx). */}
-      {stats && <PanelEstadisticas stats={stats} onVerSolicitudes={() => setSection('solicitudes')} />}
 
       <div role="tablist" aria-label="Secciones del mantenedor" className="mb-6 flex gap-1 border-b border-dex-line">
         {sections.map((item) => (
@@ -345,6 +343,13 @@ export function AdminPage() {
 
       <div role="tabpanel" id="section-solicitudes" aria-labelledby="section-tab-solicitudes" hidden={section !== 'solicitudes'}>
         {token && section === 'solicitudes' && <SolicitudesManager token={token} notify={notify} onChanged={changed} />}
+      </div>
+
+      {/* Medidores y gráficos del catálogo (components/admin/panel-estadisticas.tsx). Antes iban fijos sobre las
+          pestañas y empujaban el trabajo de todas hacia abajo; ahora tienen la suya. Los datos se piden igual al
+          entrar (`stats`), así que abrir la pestaña no espera a la red. */}
+      <div role="tabpanel" id="section-estadisticas" aria-labelledby="section-tab-estadisticas" hidden={section !== 'estadisticas'}>
+        {stats && <PanelEstadisticas stats={stats} onVerSolicitudes={() => setSection('solicitudes')} />}
       </div>
 
       <div role="tabpanel" id="section-fichas" aria-labelledby="section-tab-fichas" hidden={section !== 'fichas'}>

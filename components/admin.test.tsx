@@ -589,10 +589,15 @@ describe('AdminPage', () => {
     expect(await screen.findByTestId('admin-editor')).toBeInTheDocument();
   });
 
-  test('el panel muestra medidores y gráficos del catálogo', async () => {
+  test('el panel muestra medidores y gráficos del catálogo, en su propia pestaña', async () => {
     window.localStorage.setItem('vtuberdex.admin.token', 'tok');
     render(<AdminPage />);
-    const panel = await screen.findByTestId('panel-estadisticas');
+    const pestana = await screen.findByRole('tab', { name: 'Estadísticas' });
+    // Montado pero oculto mientras se trabaja en otra pestaña.
+    expect(await screen.findByTestId('panel-estadisticas', {}, { timeout: 2000 }).then((p) => p.closest('[role="tabpanel"]'))).toHaveAttribute('hidden');
+    fireEvent.click(pestana);
+    const panel = screen.getByTestId('panel-estadisticas');
+    expect(panel.closest('[role="tabpanel"]')).not.toHaveAttribute('hidden');
     expect(within(panel).getAllByTestId('medidor')).toHaveLength(4);
     expect(within(panel).getByRole('img', { name: /Publicadas: 100%/ })).toBeInTheDocument();
     expect(within(panel).getByRole('img', { name: /Con correo: 2%/ })).toBeInTheDocument();
