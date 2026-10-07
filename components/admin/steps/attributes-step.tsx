@@ -1,6 +1,7 @@
 'use client';
 /** Paso 5: atributos, habilidades y redes sociales. */
 import { emptyStat } from '@/components/admin/form-model';
+import { KitBuilder } from '@/components/admin/kit-builder';
 import { SkillsEditor, SocialsEditor, StatsEditor } from '@/components/admin/list-sections';
 import { SKILL_CATEGORY_HELP, SOCIAL_SHORTCUTS, STANDARD_STATS } from '@/components/admin/suggestions';
 import type { StepProps } from '@/components/admin/steps/types';
@@ -35,6 +36,7 @@ export function AttributesStep({ form, set }: StepProps) {
             </div>
           ))}
         </dl>
+        <KitBuilder skills={form.skills} facciones={form.factions} onApply={(next) => set('skills', next)} />
         <SkillsEditor items={form.skills} onChange={(next) => set('skills', next)} />
       </section>
 

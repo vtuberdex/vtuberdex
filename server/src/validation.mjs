@@ -4,6 +4,7 @@
  */
 import { z } from 'zod';
 
+import { htmlDeHabilidadSeguro } from './habilidades.mjs';
 import { TODOS_LOS_GRADOS } from './premium.mjs';
 
 export const listQuerySchema = z.object({
@@ -47,6 +48,16 @@ const skillSchema = z.object({
   type: optionalText(80),
   name: optionalText(160),
   effect: optionalText(2000),
+  /**
+   * El efecto con los estados en su color oficial (lo escribe el asistente de kit o viene del scrape).
+   * La ficha pública lo inyecta como HTML: solo se aceptan las etiquetas que el sistema escribe.
+   */
+  effectHtml: z
+    .string()
+    .max(6000)
+    .refine(htmlDeHabilidadSeguro, 'solo se admiten <br> y <span style> de estados')
+    .optional()
+    .nullable(),
   // Emblemas de facción de la habilidad: solo se conservan al editar, no se crean a mano.
   factions: z
     .array(z.object({ src: z.string().max(300).nullable().optional(), name: z.string().max(80).nullable().optional() }))

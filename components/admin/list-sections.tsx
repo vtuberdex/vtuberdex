@@ -127,7 +127,14 @@ export function SkillsEditor({ items, onChange }: { items: SkillForm[]; onChange
           </label>
           <label className={`${labelClass} sm:col-span-3`}>
             Efecto
-            <textarea rows={3} value={item.effect} onChange={(event) => update({ effect: event.target.value })} className={compact} />
+            {/* Reescribir el texto suelta el HTML de ESTA habilidad: el HTML ya no lo describiría. */}
+            <textarea rows={3} value={item.effect} onChange={(event) => update({ effect: event.target.value, effectHtml: null })} className={compact} />
+            {item.effectHtml && (
+              <span className="mt-1 block text-[11px] normal-case tracking-normal text-dex-muted">
+                Tiene los estados en sus colores oficiales. Si editas este texto, esta habilidad los pierde: para cambiarla
+                sin perderlos, rehaz el kit con el asistente.
+              </span>
+            )}
           </label>
         </div>
       )}

@@ -277,8 +277,13 @@ export function replaceChildren(db, vtuberId, patch) {
         skill.type ?? null,
         skill.name ?? null,
         skill.effect ?? null,
-        // El HTML original del scrape ya no describe el texto editado: se descarta.
-        null,
+        /**
+         * El HTML con colores viaja con la habilidad y se conserva. Antes se descartaba SIEMPRE («el
+         * HTML del scrape ya no describe el texto editado»), así que tocar UNA habilidad borraba los
+         * colores de todo el kit. Hoy el formulario lo reenvía tal cual en las que no se tocaron y lo
+         * suelta solo en la que se reescribió a mano (`SkillsEditor`).
+         */
+        skill.effectHtml ?? null,
         JSON.stringify(skill.factions ?? []),
         index,
       ),

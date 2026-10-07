@@ -497,16 +497,23 @@ describe('buildPatch', () => {
     expect(buildPatch(detail, formFromDetail(detail))).toEqual({ patch: {}, errors: [] });
   });
 
-  test('las facciones salen como slugs y las habilidades conservan sus emblemas', () => {
+  test('las facciones salen como slugs y las habilidades conservan sus emblemas y su HTML con colores', () => {
+    const html = 'Aplicas <span style="color:#074fcc; font-weight:bold;">Miedo</span>.<br>';
     const detail = makeDetail({
-      skills: [{ category: 'active', section: null, type: null, name: 'Golpe', effect: 'x', effectHtml: null, factions: [{ src: 'a.png', name: 'A' }], position: 0 }],
+      skills: [
+        { category: 'active', section: null, type: null, name: 'Golpe', effect: 'x', effectHtml: null, factions: [{ src: 'a.png', name: 'A' }], position: 0 },
+        { category: 'passive', section: null, type: null, name: 'Calma', effect: 'Aplicas Miedo.', effectHtml: html, factions: [], position: 1 },
+      ],
     });
     const form = formFromDetail(detail);
     expect(form.factions).toEqual(['mythical-legacy']);
     form.skills[0].name = 'Golpe fuerte';
     const { patch } = buildPatch(detail, form);
+    // Tocar UNA habilidad reenvía el kit entero: la que no se tocó tiene que volver con su HTML,
+    // o el servidor la guardaría sin colores (lo que pasaba antes de `effectHtml` en el formulario).
     expect(patch.skills).toEqual([
-      { category: 'active', section: null, type: null, name: 'Golpe fuerte', effect: 'x', factions: [{ src: 'a.png', name: 'A' }] },
+      { category: 'active', section: null, type: null, name: 'Golpe fuerte', effect: 'x', effectHtml: null, factions: [{ src: 'a.png', name: 'A' }] },
+      { category: 'passive', section: null, type: null, name: 'Calma', effect: 'Aplicas Miedo.', effectHtml: html, factions: [] },
     ]);
   });
 });

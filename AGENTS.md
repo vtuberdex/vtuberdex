@@ -39,9 +39,9 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 692 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 857 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
-cd server  && npm test     # 94 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
+cd server  && npm test     # 136 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
 
 # Linter (raíz; cubre también server/ y scraper/)
 npm run lint               # eslint . — falla con cualquier error
@@ -54,6 +54,7 @@ npm run lint && npm run typecheck && npm run check:shaders && npm run build
 npm run probe:timings      # piso de SQLite local, sin red — el "cuánto debería costar"
 npm run bench:ediciones    # A/B del camino de Turso contra el de HEAD (stub, sin credenciales)
 npm run sweep:dead-code    # exports sin consumidores (informa, no borra)
+npm run informe:habilidades  # reglas del kit de habilidades rotas, por ficha (--slug, --codigo, --json)
 
 # Puesta en marcha
 cd scraper && npm install && npm run scrape      # reanudable: cachea el HTML
@@ -436,6 +437,31 @@ calcula ni «procesar» una baja los aplica solo**.
   regla, la página se corrige sola (y `niveles-contenido.test.tsx` lo comprueba). Sus «capturas» NO son PNG: `components/niveles/graficos.tsx` dibuja
   los gráficos en SVG desde `experienciaConLikes`/`umbralDeNivel` y las maquetas son los componentes REALES (`StatBars`, `SkillList`, `MiFichaVista`
   — la pantalla de «Mi ficha» sin lógica) con datos de ejemplo, `inert` y marcadas «Ejemplo»: no se desfasan al cambiar el diseño y se traducen solas.
+
+## Habilidades del RPG: catálogo de estados y validador
+
+Las reglas MECÁNICAS del «prompt maestro» de habilidades viven en `server/src/habilidades.mjs` (JS puro, probado en
+`server/test/habilidades.test.mjs`): los 42 estados con su color oficial, polaridad (`positivo` se obtiene, `negativo` se
+aplica, `ambos` para Hackeo/Hemofagia/Drenaje Arcano/Usurpación/Soul Trader, que las fichas usan de las dos formas), su
+evolución con los efectos OFICIALES y la facción exclusiva (Juramento, Requiem, Soul Trader, Epopeya, Fortificación).
+`spanDeEstado`/`bloqueDeEvolucion` pintan el HTML; `validarKit` dice qué regla se rompe (error) o qué conviene revisar (aviso).
+- **Solo valida lo que se lee en el HTML**: si sale del lore, si hay narrativa, si la Habilidad Única es única o si está
+  balanceado NO se comprueba (eso lo decide una persona). El MP no está en `effect_html`: no se valida.
+- **El estado se cuenta si lo ENTREGA un verbo** («obtienes/aplicas X [y Y]»); nombrarlo en una condición no cuenta.
+- La evolución lleva el color de su base; Hackeo y System Override, el degradado. Nombres canónicos = lista de colores
+  (`Deux ex Machina`, `Mente Agil`, `Glotoneria`); los alias se aceptan con aviso.
+- Medido al escribirlo (base empaquetada, 211 kits): 18 limpias, 150 con algún error; 114 Ultimates con estado base.
+- **Asistente de kit en el mantenedor** (paso «Atributos», `components/admin/kit-builder.tsx`; lógica pura y probada en
+  `kit-habilidades.ts`): arriba muestra qué reglas rompe el kit ACTUAL; «Armar/Rehacer el kit» abre menús (estado por polaridad,
+  exclusivos de otra facción deshabilitados, 3 fórmulas de Ultimate, Habilidad Única opcional) y el texto libre admite `[[Estado]]`
+  → `<span>` oficial. Lo escrito a mano se ESCAPA. «Usar este kit» solo reemplaza las habilidades del formulario (las `other` se
+  conservan); se publica con el Guardar de siempre. Precarga nombres y pasivas del kit existente; activas y Ultimate se rehacen.
+  Ojo: los puntos de «Mi ficha» van por NOMBRE de habilidad: renombrar los deja de contar (la confirmación lo avisa).
+- **`effectHtml` viaja en el PATCH y se GUARDA** (`skillSchema`, `aplicarParche`). Antes `mutations` lo ponía a `null` siempre, así
+  que tocar UNA habilidad borraba los colores de TODO el kit (el PATCH reenvía la lista entera). Hoy el formulario lo devuelve tal
+  cual y solo lo suelta en la habilidad cuyo texto se reescribe a mano. Como la ficha pública lo inyecta como HTML, el servidor
+  acepta solo lista blanca (`htmlDeHabilidadSeguro`: `<br>`, `<span style>` sin `url(`, `<b>/<i>`, el `<div>` del scrape y
+  comentarios; las 1.055 habilidades del scrape pasan, comprobado: si no, reenviar su kit daría 400).
 
 ## Idiomas (es / en / ja) y traducción de la historia
 

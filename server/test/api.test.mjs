@@ -404,6 +404,21 @@ test('el mantenedor edita lore, atributos, habilidades y redes de una ficha', as
   assert.equal(peligrosa.status, 400);
 });
 
+test('el HTML con colores de una habilidad se guarda tal cual y el HTML ajeno se rechaza', async () => {
+  const html = 'Ataque Base +45 y aplicas <span style="color:#074fcc; font-weight:bold;">Miedo</span> durante 2 turnos.<br>';
+  const ok = await admin('PATCH', '/vtubers/1', {
+    skills: [{ category: 'active', name: 'Golpe', effect: 'Ataque Base +45 y aplicas Miedo durante 2 turnos.', effectHtml: html }],
+  });
+  assert.equal(ok.status, 200);
+  // Antes `mutations` lo ponía a null siempre: tocar una habilidad borraba los colores de todo el kit.
+  assert.equal((await ok.json()).skills[0].effectHtml, html);
+
+  for (const malo of ['<img src=x onerror=alert(1)>', '<span style="color:red" onclick="x">a</span>', '<span style="background:url(x)">a</span>']) {
+    const r = await admin('PATCH', '/vtubers/1', { skills: [{ category: 'active', name: 'Golpe', effectHtml: malo }] });
+    assert.equal(r.status, 400, malo);
+  }
+});
+
 test('crear una carta nueva: nace en borrador, al final de la dex y visible solo en el mantenedor', async () => {
   const response = await admin('POST', '/vtubers', { name: 'Nueva Estrella', phrase: 'Recién llegada' });
   assert.equal(response.status, 201);

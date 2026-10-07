@@ -30,7 +30,8 @@
     "admin:publicar": "node scripts/publicar-admin-prod.mjs",
     "admin:verificar": "node scripts/verificar-admin-prod.mjs",
     "ficha:prod": "node scripts/aplicar-ficha-prod.mjs",
-    "correos:vista": "node scripts/vista-correos.mjs"
+    "correos:vista": "node scripts/vista-correos.mjs",
+    "informe:habilidades": "node scripts/informe-habilidades.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.15.15",

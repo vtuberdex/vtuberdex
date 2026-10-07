@@ -277,6 +277,8 @@ export interface SkillInput {
   type?: string | null;
   name?: string | null;
   effect?: string | null;
+  /** El efecto con los estados en su color oficial (`<br>` y `<span style>`); manda sobre `effect`. */
+  effectHtml?: string | null;
   /** Emblemas de la habilidad: solo se conservan al reenviar, no se crean a mano. */
   factions?: Array<{ src: string | null; name: string | null }>;
 }
