@@ -144,7 +144,7 @@ const correo = z
   .trim()
   .toLowerCase()
   .max(200)
-  .refine((valor) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(valor), 'correo no válido');
+  .refine((valor) => valor.length <= 200 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(valor), 'correo no válido');
 
 /**
  * El «he leído y acepto». `z.literal(true)` y no `z.boolean()`: un `false` o un campo ausente

@@ -20,6 +20,7 @@ export function createApp({ dbPath, imageRoot = path.join(ROOT, 'data', 'images'
   const db = openDatabase(dbPath);
   const sessions = createSessionStore();
   const app = express();
+  app.disable('x-powered-by'); // no anunciar el framework
 
   app.use(express.json({ limit: '1mb' }));
 
