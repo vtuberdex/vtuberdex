@@ -376,12 +376,13 @@ export function EditorRedes({
 }
 
 /**
- * La botonera: «Volver» (si `conVolver`) y el botón principal, cuyo texto depende del paso (1: pedir código,
+ * El error del envío (si hay) y la botonera: «Volver» (si `conVolver`) y el botón principal, cuyo texto depende del paso (1: pedir código,
  * 2: confirmarlo, intermedios: siguiente, último: `textoEnviar`).
  */
 export function BotoneraPasos({
   paso,
   total,
+  error,
   enviando,
   acepta,
   conVolver,
@@ -389,6 +390,7 @@ export function BotoneraPasos({
   textoEnviar,
 }: {
   paso: number;
+  error: string | null;
   total: number;
   enviando: boolean;
   acepta: boolean;
@@ -403,16 +405,19 @@ export function BotoneraPasos({
   else if (paso < total) texto = t('ficha.siguiente');
   else texto = enviando ? t('ficha.enviando') : textoEnviar;
   return (
-    <div className="flex flex-wrap items-center gap-4">
-      {conVolver && (
-        <button type="button" className="rounded-xl border border-dex-line px-5 py-2.5 text-sm text-dex-muted hover:text-dex-ink" onClick={alVolver}>
-          {t('ficha.volver')}
+    <>
+      {error && <Aviso tipo="error">{error}</Aviso>}
+      <div className="flex flex-wrap items-center gap-4">
+        {conVolver && (
+          <button type="button" className="rounded-xl border border-dex-line px-5 py-2.5 text-sm text-dex-muted hover:text-dex-ink" onClick={alVolver}>
+            {t('ficha.volver')}
+          </button>
+        )}
+        <button type="submit" className={claseBoton} disabled={enviando || (paso === total && !acepta)}>
+          {texto}
         </button>
-      )}
-      <button type="submit" className={claseBoton} disabled={enviando || (paso === total && !acepta)}>
-        {texto}
-      </button>
-      {paso === total && <span className="text-xs text-dex-muted">{t('ficha.enEspera')}</span>}
-    </div>
+        {paso === total && <span className="text-xs text-dex-muted">{t('ficha.enEspera')}</span>}
+      </div>
+    </>
   );
 }

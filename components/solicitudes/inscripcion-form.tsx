@@ -339,10 +339,10 @@ export function InscripcionForm() {
         </>
       )}
 
-      {error && <Aviso tipo="error">{error}</Aviso>}
       <BotoneraPasos
         paso={paso}
         total={TOTAL_PASOS}
+        error={error}
         enviando={enviando}
         acepta={acepta}
         conVolver={paso === 2 || paso >= 4}

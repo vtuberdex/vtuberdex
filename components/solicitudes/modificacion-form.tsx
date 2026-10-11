@@ -26,7 +26,7 @@ import type { Clave } from '@/lib/i18n/mensajes';
 import { ApiError, api } from '@/lib/api';
 import { TERMINOS_VERSION } from '@/lib/terminos';
 import { useOpcionesFicha } from '@/components/solicitudes/use-opciones-ficha';
-import { AceptaTerminos, Aviso, Campo, claseInput } from '@/components/solicitudes/campos';
+import { AceptaTerminos, Campo, claseInput } from '@/components/solicitudes/campos';
 import {
   BarraDePasos,
   BotoneraPasos,
@@ -41,8 +41,6 @@ import {
   redesEscritas,
   useCodigoDelEnlace,
   useEnvio,
-  type Perfil,
-  type Red,
 } from '@/components/solicitudes/pasos-ficha';
 
 const TOTAL_PASOS = 4;
@@ -58,7 +56,7 @@ export function ModificacionForm() {
   /** Lo que canjea el código: autoriza un envío con el correo verificado. Solo vive en memoria. */
   const [permiso, setPermiso] = useState('');
   const [fichasDelCorreo, setFichasDelCorreo] = useState<Array<{ slug: string; name: string }>>([]);
-  const [perfil, setPerfil] = useState<Perfil>(perfilVacio);
+  const [perfil, setPerfil] = useState(perfilVacio);
   const [country, setCountry] = useState('');
   const [zodiac, setZodiac] = useState('');
   const [languages, setLanguages] = useState<string[]>([]);
@@ -69,7 +67,7 @@ export function ModificacionForm() {
   const [themeColor, setThemeColor] = useState('#5eead4');
   const [imageUrl, setImageUrl] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
-  const [socials, setSocials] = useState<Red[]>([{ platform: '', url: '' }]);
+  const [socials, setSocials] = useState([{ platform: '', url: '' }]);
   const [nota, setNota] = useState('');
   const [acepta, setAcepta] = useState(false);
   const [website, setWebsite] = useState('');
@@ -288,10 +286,10 @@ export function ModificacionForm() {
         </>
       )}
 
-      {error && <Aviso tipo="error">{error}</Aviso>}
       <BotoneraPasos
         paso={paso}
         total={TOTAL_PASOS}
+        error={error}
         enviando={enviando}
         acepta={acepta}
         conVolver={paso === 2 || paso === 4}
