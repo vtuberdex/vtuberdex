@@ -50,6 +50,7 @@
 import crypto from 'node:crypto';
 
 import { XP_JUEGO_MAX_DIA } from './experiencia.mjs';
+import { preparadorDeTablas } from './db/tablas.mjs';
 
 /** Vida del código de vínculo. */
 export const CODIGO_TTL_MS = 10 * 60 * 1000;
@@ -113,18 +114,7 @@ export class MinecraftError extends Error {
   }
 }
 
-const tablasListas = new WeakMap();
-async function conTablas(ejecutor) {
-  if (!tablasListas.has(ejecutor)) {
-    const promesa = Promise.resolve(ejecutor.exec(DDL)).catch((error) => {
-      tablasListas.delete(ejecutor);
-      throw error;
-    });
-    tablasListas.set(ejecutor, promesa);
-  }
-  await tablasListas.get(ejecutor);
-  return ejecutor;
-}
+const conTablas = preparadorDeTablas(DDL);
 
 const hash = (codigo) => crypto.createHash('sha256').update(codigo).digest('hex');
 /** Lo que escribe la persona: sin espacios ni guiones y en mayúsculas («abcd-2345» vale). */

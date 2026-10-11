@@ -35,6 +35,7 @@ import { z } from 'zod';
 
 import { TERMINOS_VERSION } from './terminos-version.mjs';
 import { consumirToken, correoDelToken } from './verificacion.mjs';
+import { preparadorDeTablas } from './db/tablas.mjs';
 
 export { TERMINOS_VERSION };
 
@@ -113,19 +114,8 @@ export function ejecutorSqlite(db) {
   };
 }
 
-/** DDL memoizado como PROMESA por ejecutor; si falla se suelta para no dejar rotas las lecturas siguientes. */
-const tablasListas = new WeakMap();
-export async function conTablas(ejecutor) {
-  if (!tablasListas.has(ejecutor)) {
-    const promesa = Promise.resolve(ejecutor.exec(DDL)).catch((error) => {
-      tablasListas.delete(ejecutor);
-      throw error;
-    });
-    tablasListas.set(ejecutor, promesa);
-  }
-  await tablasListas.get(ejecutor);
-  return ejecutor;
-}
+/** Crea las tablas de este módulo la primera vez que se tocan (ver `db/tablas.mjs`). */
+export const conTablas = preparadorDeTablas(DDL);
 
 /* ----------------------------------------------------------------- validación */
 
