@@ -44,7 +44,7 @@ import { listarConCorreo } from './correo-fichas.mjs';
 import { estadisticasDelMantenedor } from './estadisticas-admin.mjs';
 import { resumenDeRechazos } from './rechazos.mjs';
 import { prepararModificacion } from './modificacion.mjs';
-import { UPLOADABLE_KINDS, MAX_UPLOAD_BYTES, saveUploadedImage, saveFactionEmblem, removeUploadedImage } from './uploads.mjs';
+import { UPLOADABLE_KINDS, MAX_UPLOAD_BYTES, specDeKind, saveUploadedImage, saveFactionEmblem, removeUploadedImage } from './uploads.mjs';
 
 const splitCsv = (value) => String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
 
@@ -494,7 +494,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
       res.status(404).json({ error: 'no_encontrado' });
       return;
     }
-    if (!UPLOADABLE_KINDS[kind]) {
+    if (!specDeKind(kind)) {
       res.status(400).json({ error: 'kind_invalido', allowed: Object.keys(UPLOADABLE_KINDS) });
       return;
     }
@@ -540,7 +540,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
       res.status(404).json({ error: 'no_encontrado' });
       return;
     }
-    if (!UPLOADABLE_KINDS[kind]) {
+    if (!specDeKind(kind)) {
       res.status(400).json({ error: 'kind_invalido', allowed: Object.keys(UPLOADABLE_KINDS) });
       return;
     }
