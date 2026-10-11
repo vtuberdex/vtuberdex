@@ -72,6 +72,64 @@ describe('token del servidor', () => {
   });
 });
 
+describe('repartir puntos de stats desde el juego', () => {
+  const STATS = [
+    { slug: 'hp', label: 'HP', value: 1000, max: 1000 },
+    { slug: 'attack', label: 'Ataque', value: 100 },
+    { slug: 'speed', label: 'Velocidad', value: 50 },
+  ];
+  const repartir = (cuerpo: unknown, token: string | null = TOKEN) => mc.repartirDesdeElJuego(pedir('/api/minecraft/puntos', { cuerpo, token }), { ejecutor: e, db: DB, env: ENV });
+  const progreso = async () => (await (await mc.jugador(pedir(`/api/minecraft/jugador/${JUGADOR}`, { metodo: 'GET' }), JUGADOR, { ejecutor: e, db: DB, env: ENV })).json()).progreso;
+
+  beforeEach(async () => {
+    FICHAS.luna.stats = STATS as never[];
+    const codigo = await codigoDeMiFicha(await enlaceDeMiFicha());
+    await mc.vincularDesdeElJuego(pedir('/api/minecraft/vincular', { cuerpo: { codigo, uuid: JUGADOR, jugador: 'LunaMC' } }), { ejecutor: e, db: DB, env: ENV });
+    // Un lote de 100 XP = el nivel 1 entero = 10 puntos de stats.
+    await mc.recibirXp(pedir('/api/minecraft/xp', { cuerpo: { uuid: JUGADOR, idLote: randomUUID(), detalle: { mob: 60, tiempo: 40 } } }), { ejecutor: e, db: DB, env: ENV, avisar: async () => true });
+  });
+  afterEach(() => {
+    FICHAS.luna.stats = [];
+  });
+
+  test('sin token no existe (404)', async () => {
+    expect((await repartir({ uuid: JUGADOR, stat: 'hp' }, null)).status).toBe(404);
+  });
+
+  test('gasta de a uno o varios y el panel ve los puntos que quedan', async () => {
+    expect((await progreso()).puntosStats).toBe(10);
+    const uno = await repartir({ uuid: JUGADOR, stat: 'hp' });
+    expect(await uno.json()).toEqual({ ok: true, aplicados: 1, puntosStats: 9 });
+    const cinco = await repartir({ uuid: JUGADOR, stat: 'attack', cantidad: 5 });
+    expect(await cinco.json()).toEqual({ ok: true, aplicados: 5, puntosStats: 4 });
+    expect((await progreso()).puntosStats).toBe(4);
+  });
+
+  test('si faltan puntos a mitad aplica los que alcanzan; sin ninguno, 409', async () => {
+    const r = await repartir({ uuid: JUGADOR, stat: 'hp', cantidad: 50 });
+    expect(await r.json()).toEqual({ ok: true, aplicados: 10, puntosStats: 0 });
+    const vacio = await repartir({ uuid: JUGADOR, stat: 'hp' });
+    expect(vacio.status).toBe(409);
+    expect((await vacio.json()).error).toBe('sin_puntos_stats');
+  });
+
+  test('un stat que no se compra (automático o inexistente) da 404 y no gasta nada', async () => {
+    const r = await repartir({ uuid: JUGADOR, stat: 'speed' });
+    expect(r.status).toBe(404);
+    expect((await r.json()).error).toBe('stat_no_encontrado');
+    expect((await progreso()).puntosStats).toBe(10);
+  });
+
+  test('datos inválidos (400) y cuenta sin vínculo (404)', async () => {
+    for (const cuerpo of [{}, { uuid: 'x', stat: 'hp' }, { uuid: JUGADOR }, { uuid: JUGADOR, stat: 'hp', cantidad: 0 }, { uuid: JUGADOR, stat: 'hp', cantidad: 1.5 }, { uuid: JUGADOR, stat: 'hp', cantidad: 51 }]) {
+      expect((await repartir(cuerpo)).status).toBe(400);
+    }
+    const ajeno = await repartir({ uuid: '61699b2e-d327-4a01-9f1e-0ea8c3f06bc6', stat: 'hp' });
+    expect(ajeno.status).toBe(404);
+    expect((await ajeno.json()).error).toBe('sin_vinculo');
+  });
+});
+
 describe('vínculo y XP de punta a punta', () => {
   test('código en «Mi ficha» → vincular en el juego → la XP sube el nivel de la ficha', async () => {
     const enlace = await enlaceDeMiFicha();

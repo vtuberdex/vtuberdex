@@ -484,8 +484,8 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
   pública, el like y «Mi ficha» (`xpJuegoDe` vale 0 si el almacén falla). El LISTADO no la aplica (tampoco los likes).
 - **Lotes idempotentes con tope en UNA sentencia**: lotes de ≤ `XP_POR_LOTE_MAX` (100) con `idLote` UUID fijado al crearlo (un
   reintento no suma dos veces); el INSERT recorta a lo que cabe en `XP_JUEGO_MAX_DIA` (300, día de Chile). Motivos: `MOTIVOS_XP`.
-- **Rutas**: `GET /api/minecraft/reglas` pública; `email`, `vincular`, `jugador/:uuid` (GET/DELETE) y `xp` exigen `X-Minecraft-Token` =
-  `VTUBERDEX_MINECRAFT_TOKEN` (≥16; sin él, 404). «Mi ficha»: `POST /api/mi-ficha/minecraft`. No usan `responderRegistrando`.
+- **Rutas**: `GET /api/minecraft/reglas` pública; `email`, `vincular`, `jugador/:uuid` (GET/DELETE), `xp` y `puntos` exigen `X-Minecraft-Token` =
+  `VTUBERDEX_MINECRAFT_TOKEN` (≥16; sin él, 404). `POST /api/minecraft/puntos` `{ uuid, stat, cantidad? }` (1..50) gasta puntos de stats con `subirStat` (las mismas reglas que «Mi ficha»; lo usa la ventana `/vtd stats` del plugin) y responde `{ ok, aplicados, puntosStats }`; si se acaban a mitad, vale lo aplicado. «Mi ficha»: `POST /api/mi-ficha/minecraft`. No usan `responderRegistrando`.
 - **En el juego**: stats como `AttributeModifier` `vtuberdex:stat_<slug>` escalados/topados en `config.yml` (se quitan al salir: se
   guardan con el jugador); nivel/EXP en una BossBar, NO en la barra vanilla (es la de encantar). Fase 2 pendiente: habilidades jugables.
 - **Panel lateral con el progreso** (`Panel.java`, sidebar por jugador; `/vtd panel` lo oculta, se recuerda en el PDC): nombre, nivel,
