@@ -26,6 +26,8 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const STAGE = path.join(ROOT, '.verify-stage');
+// El CLI de Next se lanza con el mismo Node, sin pasar por `npx` ni por el PATH.
+const NEXT_BIN = path.join(ROOT, 'node_modules', 'next', 'dist', 'bin', 'next');
 const BLOB_BASE = process.env.VTUBERDEX_BLOB_BASE ?? 'https://verify.public.blob.vercel-storage.com';
 
 const results = [];
@@ -195,7 +197,7 @@ async function main() {
 
   // 2. El build de Next, del que depende todo lo demás.
   if (!fs.existsSync(path.join(ROOT, '.next', 'BUILD_ID'))) {
-    const build = spawnSync('npx', ['next', 'build'], { cwd: ROOT, stdio: 'inherit' });
+    const build = spawnSync(process.execPath, [NEXT_BIN, 'build'], { cwd: ROOT, stdio: 'inherit' });
     check('build de Next disponible', build.status === 0);
     if (build.status !== 0) return finish();
   } else {
@@ -216,7 +218,7 @@ async function main() {
    * un `rmSync` recursivo sobre un directorio en uso puede quedarse trabado; el verify se
    * arrastraba minutos y no limpiaba nada. Con el grupo propio se mata el árbol completo.
    */
-  const child = spawn('npx', ['next', 'start', '--port', String(port)], {
+  const child = spawn(process.execPath, [NEXT_BIN, 'start', '--port', String(port)], {
     cwd: STAGE,
     env: { ...process.env, PORT: String(port), VTUBERDEX_BLOB_BASE: BLOB_BASE, NODE_ENV: 'production' },
     stdio: ['ignore', 'pipe', 'pipe'],
