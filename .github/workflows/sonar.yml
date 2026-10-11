@@ -66,6 +66,12 @@ jobs:
   sonar:
     needs: [semgrep, codeql]
     runs-on: ubuntu-latest
+    # El escáner publica el resultado en el PR (checks y comentarios): con solo `contents: read` aborta con
+    # «Missing permissions; permission granted on checks is 'null', should be 'write'».
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v5
         with:
