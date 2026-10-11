@@ -169,13 +169,10 @@ async function main() {
 
   if (flag('vigilar')) {
     console.log(`[${hora()}] vigilando ${path.join(CARPETA, '.cola')} cada ${SONDEO_COLA_MS / 1000} s`);
-    let parar = false;
-    for (const senal of ['SIGTERM', 'SIGINT']) {
-      process.on(senal, () => {
-        parar = true;
-      });
-    }
-    while (!parar) {
+    // La señal llega por un manejador: un AbortController deja ver que el bucle SÍ tiene salida.
+    const corte = new AbortController();
+    for (const senal of ['SIGTERM', 'SIGINT']) process.on(senal, () => corte.abort());
+    while (!corte.signal.aborted) {
       try {
         await procesarCola();
       } catch (e) {
