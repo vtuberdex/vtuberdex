@@ -7,6 +7,7 @@ import type { Clave } from '@/lib/i18n/mensajes';
 import { tipoDeHabilidad } from '@/lib/i18n/nombres';
 import type { SkillRow } from '@/lib/types';
 import { RANGO_MAXIMO } from '@/server/src/experiencia.mjs';
+import { htmlDeEfecto } from '@/server/src/habilidades.mjs';
 
 const CATEGORY_LABEL: Record<SkillRow['category'], Clave> = {
   active: 'habilidades.activas',
@@ -94,7 +95,7 @@ export function SkillList({ skills, palette }: SkillListProps) {
                     <div className="border-t border-dex-line/70 px-4 py-3 text-sm leading-relaxed text-dex-ink/85">
                       {/* El efecto viene con <span style="color:…"> del origen: se conserva el color
                           de cada estado alterado porque es información semántica del juego. */}
-                      <div dangerouslySetInnerHTML={{ __html: skill.effectHtml ?? skill.effect }} />
+                      <div dangerouslySetInnerHTML={{ __html: htmlDeEfecto(skill) }} />
                     </div>
                   )}
                 </li>

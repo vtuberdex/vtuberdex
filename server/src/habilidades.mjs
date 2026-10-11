@@ -516,6 +516,18 @@ export function escaparHtml(texto) {
 }
 
 /**
+ * El HTML que se inyecta de una habilidad. `effectHtml` ya pasó la lista blanca del servidor; el
+ * respaldo `effect` es texto libre (hasta 2000 caracteres) y se ESCAPA: inyectarlo crudo era un XSS
+ * almacenado en cuanto una habilidad llegaba sin `effectHtml`.
+ * @param {{ effect?: string | null, effectHtml?: string | null } | null | undefined} habilidad
+ * @returns {string}
+ */
+export function htmlDeEfecto(habilidad) {
+  if (habilidad?.effectHtml) return habilidad.effectHtml;
+  return escaparHtml(habilidad?.effect ?? '').replace(/\r?\n/g, '<br>');
+}
+
+/**
  * ¿El HTML de una habilidad usa SOLO lo que el sistema escribe? La ficha pública lo inyecta tal cual
  * (`SkillList`, `dangerouslySetInnerHTML`), así que el servidor no puede aceptar cualquier etiqueta:
  * se admiten `<br>`, `<span style="…">` con un estilo de solo color/negrita/degradado y el `<div
@@ -545,6 +557,8 @@ export function textoPlanoDe(html) {
   return String(html ?? '')
     .replace(/<br\s*\/?>\r?\n?/gi, '\n')
     .replace(/<[^>]+>/g, '')
+    // Un `<` o `>` suelto que sobrevive al quitar etiquetas (`<<b>script>`) no es texto: fuera.
+    .replace(/[<>]/g, '')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&')

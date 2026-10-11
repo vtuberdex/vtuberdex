@@ -16,7 +16,7 @@ import { KitBuilder, ListaDeProblemas, type Problema } from '@/components/admin/
 import { MP_ACTIVA, MP_ULTIMATE } from '@/components/admin/kit-habilidades';
 import type { StepProps } from '@/components/admin/steps/types';
 import { ghostButton, inputClass, labelClass, primaryButton } from '@/components/admin/ui';
-import { validarKit } from '@/server/src/habilidades.mjs';
+import { htmlDeEfecto, validarKit } from '@/server/src/habilidades.mjs';
 
 const compact = `${inputClass} !mt-1`;
 
@@ -141,7 +141,7 @@ export function SkillsStep({ form, set }: StepProps) {
                     {abiertaEsta && (
                       <div className="space-y-3 border-t border-dex-line/70 px-3 py-3">
                         {/* El HTML viene del asistente (escapado) o del scrape, y el servidor solo acepta su lista blanca. */}
-                        <div className="text-sm leading-relaxed text-dex-ink/85" dangerouslySetInnerHTML={{ __html: s.effectHtml ?? s.effect }} />
+                        <div className="text-sm leading-relaxed text-dex-ink/85" dangerouslySetInnerHTML={{ __html: htmlDeEfecto(s) }} />
                         {suyos.length > 0 && <ListaDeProblemas problemas={suyos} />}
                         <details className="rounded-lg border border-dex-line/70 p-2">
                           <summary className="cursor-pointer text-xs text-dex-muted">Editar a mano</summary>
