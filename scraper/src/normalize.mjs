@@ -131,7 +131,7 @@ export function languagesForCountries(countrySlugs) {
     langs.add(country?.lang ?? 'es');
   }
   if (langs.size === 0) langs.add('es');
-  return [...langs].sort();
+  return [...langs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
 /** Listas separadas por coma dentro de un atributo (grupos, artistas). */

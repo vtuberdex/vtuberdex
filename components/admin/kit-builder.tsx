@@ -28,7 +28,7 @@ import {
   type CarasDelDado,
 } from '@/components/admin/kit-habilidades';
 import { ghostButton, inputClass, labelClass, primaryButton } from '@/components/admin/ui';
-import { buscarEstado, type validarKit } from '@/server/src/habilidades.mjs';
+import { buscarEstado, htmlDeEfecto, type validarKit } from '@/server/src/habilidades.mjs';
 
 const compact = `${inputClass} !mt-1`;
 const AYUDA_TOKENS = 'Una línea por efecto. Escribe [[Miedo]] para poner un estado con su color oficial.';
@@ -428,7 +428,7 @@ export function KitBuilder({
                 {/* HTML ya guardado en la ficha: el servidor solo acepta su lista blanca. */}
                 <div
                   className="mt-1 text-sm leading-relaxed text-dex-ink/75"
-                  dangerouslySetInnerHTML={{ __html: anteriores[paso]?.effectHtml ?? anteriores[paso]?.effect ?? '' }}
+                  dangerouslySetInnerHTML={{ __html: htmlDeEfecto(anteriores[paso]) }}
                 />
               </details>
             )}

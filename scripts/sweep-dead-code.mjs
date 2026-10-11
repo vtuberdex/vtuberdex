@@ -62,7 +62,8 @@ function exportsDe(fuente) {
  */
 function consumidores(nombre, propio) {
   const usos = { fuente: [], test: [] };
-  const patron = new RegExp(`\\b${nombre.replace(/\$/g, '\\$')}\\b`);
+  // Se escapan TODOS los metacaracteres (no solo `$`): un nombre con `\` o `.` rompía o ensanchaba el patrón.
+  const patron = new RegExp(`\\b${nombre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
   for (const f of ARCHIVOS) {
     if (f === propio) continue;
     const contenido = leer(f);

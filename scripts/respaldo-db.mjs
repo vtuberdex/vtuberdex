@@ -23,6 +23,6 @@ const { integrity_check: ok } = check.prepare('PRAGMA integrity_check').get();
 check.close();
 if (ok !== 'ok') { console.error(`✖ la copia ${destino} no pasa integrity_check: ${ok}`); process.exit(1); }
 
-const copias = readdirSync(carpeta).filter((f) => /^turso-local-.*\.db$/.test(f)).sort();
+const copias = readdirSync(carpeta).filter((f) => /^turso-local-.*\.db$/.test(f)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 for (const f of copias.slice(0, Math.max(0, copias.length - conservar))) rmSync(join(carpeta, f));
 console.log(`✓ ${destino} (${(statSync(destino).size / 1048576).toFixed(0)} MB); ${Math.min(copias.length, conservar)} copias`);

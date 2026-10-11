@@ -10,6 +10,8 @@ import {
   bloqueDeEvolucion,
   buscarEstado,
   estadosEntregados,
+  htmlDeEfecto,
+  textoPlanoDe,
   spanDeEstado,
   validarKit,
 } from '../src/habilidades.mjs';
@@ -153,4 +155,15 @@ test('repetir un estado entre piezas es aviso, y la evolución cuenta como su ba
 test('la forma del kit: 2 activas, 2 pasivas y 1 Ultimate', () => {
   const kit = kitValido().filter((h) => h.category !== 'passive');
   assert.ok(codigos(validarKit({ habilidades: kit })).includes('forma_del_kit'));
+});
+
+test('htmlDeEfecto: el efecto en texto plano se escapa antes de inyectarse', () => {
+  assert.equal(htmlDeEfecto({ effect: '<img src=x onerror=alert(1)>\nfin' }), '&lt;img src=x onerror=alert(1)&gt;<br>fin');
+  assert.equal(htmlDeEfecto({ effect: 'a', effectHtml: `Aplica ${s('Sangrado')}` }), `Aplica ${s('Sangrado')}`);
+  assert.equal(htmlDeEfecto(undefined), '');
+});
+
+test('textoPlanoDe no deja etiquetas reconstruidas al quitar las de dentro', () => {
+  assert.equal(textoPlanoDe('<<b>script>alert(1)<</b>/script>'), 'scriptalert(1)/script');
+  assert.equal(textoPlanoDe('Ataque &lt;base&gt;<br>+10'), 'Ataque <base>\n+10');
 });

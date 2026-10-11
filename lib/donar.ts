@@ -61,6 +61,6 @@ export function codigoDeReferencia(dexNumber: number): string {
  */
 export function dexDeCodigo(texto: string): number | null {
   const coincide = /^\s*VTD-?(\d{1,4})\s*$/i.exec(texto);
-  const dex = coincide ? Number(coincide[1]) : NaN;
+  const dex = coincide ? Number(coincide[1]) : Number.NaN;
   return Number.isInteger(dex) && dex >= 0 ? dex : null;
 }

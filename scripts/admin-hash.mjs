@@ -61,7 +61,7 @@ function leerLineaDeStdin() {
 
 const deArgumento = process.argv[2];
 let password = deArgumento;
-if (password === undefined) {
+if (!password) {
   if (process.stdin.isTTY) {
     password = await preguntarOculto('Contraseña del mantenedor: ');
   } else {

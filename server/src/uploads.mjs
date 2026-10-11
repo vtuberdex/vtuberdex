@@ -106,9 +106,9 @@ export function alphaBounds(data, width, height, channels) {
  * @returns {Promise<{path:string,width:number,height:number,bytes:number}>}
  */
 export async function saveUploadedImage({ buffer, kind, slug, imageRoot, sharp }) {
-  const spec = UPLOADABLE_KINDS[kind];
+  const spec = specDeKind(kind);
   if (!spec) throw new Error('kind_invalido');
-  if (!buffer || buffer.length === 0) throw new Error('archivo_vacio');
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw new Error('archivo_vacio');
   if (buffer.length > MAX_UPLOAD_BYTES) throw new Error('archivo_demasiado_grande');
 
   // Validación por CONTENIDO: si sharp no lo decodifica, no es una imagen.
@@ -205,11 +205,19 @@ export async function saveUploadedImage({ buffer, kind, slug, imageRoot, sharp }
 
 /** Borra la imagen de un asset (deja el VTuber sin esa imagen). */
 export async function removeUploadedImage({ kind, slug, imageRoot }) {
-  const spec = UPLOADABLE_KINDS[kind];
+  const spec = specDeKind(kind);
   if (!spec) throw new Error('kind_invalido');
   const file = path.join(imageRoot, spec.folder, `${slug}.webp`);
   if (fs.existsSync(file)) await fsP.unlink(file);
   return { path: `images/${spec.folder}/${slug}.webp` };
+}
+
+/**
+ * La especificación de un `kind` subible, o `null`. Solo claves PROPIAS: `kind` llega de la URL y
+ * con `UPLOADABLE_KINDS[kind]` a secas, `constructor` o `__proto__` pasaban la validación.
+ */
+export function specDeKind(kind) {
+  return typeof kind === 'string' && Object.hasOwn(UPLOADABLE_KINDS, kind) ? UPLOADABLE_KINDS[kind] : null;
 }
 
 /**
@@ -221,7 +229,7 @@ export async function removeUploadedImage({ kind, slug, imageRoot }) {
  * Turso). Se valida por contenido con `sharp`, igual que el resto de subidas.
  */
 export async function saveFactionEmblem({ buffer, slug, imageRoot, sharp }) {
-  if (!buffer || buffer.length === 0) throw new Error('archivo_vacio');
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw new Error('archivo_vacio');
   if (buffer.length > MAX_UPLOAD_BYTES) throw new Error('archivo_demasiado_grande');
   let meta;
   try {

@@ -20,6 +20,7 @@ import {
   alphaBounds,
   removeUploadedImage,
   saveUploadedImage,
+  specDeKind,
 } from '../src/uploads.mjs';
 
 // Se borran al acabar: antes quedaban (774 carpetas en /tmp de la VPS, que es RAM).
@@ -364,4 +365,17 @@ test('el FONDO se borra de su propia carpeta y no toca al personaje', async () =
   assert.equal(removed.path, 'images/background/kuro.webp');
   assert.equal(fs.existsSync(path.join(root, 'background', 'kuro.webp')), false, 'el fondo se borró');
   assert.ok(fs.existsSync(path.join(root, 'character', 'kuro.webp')), 'el personaje sigue intacto');
+});
+
+test('specDeKind solo acepta claves propias: nada de constructor ni __proto__', () => {
+  assert.equal(specDeKind('constructor'), null);
+  assert.equal(specDeKind('__proto__'), null);
+  assert.equal(specDeKind(['background']), null);
+  assert.deepEqual(specDeKind('background'), UPLOADABLE_KINDS.background);
+});
+
+test('una subida que no es Buffer (string o array) se rechaza como vacía', async () => {
+  const root = tmpRoot();
+  await assert.rejects(saveUploadedImage({ buffer: 'x'.repeat(10), kind: 'background', slug: 'kuro', imageRoot: root, sharp }), /archivo_vacio/);
+  await assert.rejects(saveUploadedImage({ buffer: [1, 2, 3], kind: 'background', slug: 'kuro', imageRoot: root, sharp }), /archivo_vacio/);
 });
