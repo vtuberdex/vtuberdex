@@ -179,12 +179,14 @@ function replaceChildren(db, vtuberId, payload) {
     let bytes = null;
     let size = { width: null, height: null };
     try {
-      bytes = fs.statSync(absolute).size;
+      // Una sola lectura (sin `stat` previo): el tamaño y la cabecera salen del mismo contenido.
+      const contenido = fs.readFileSync(absolute);
+      bytes = contenido.length;
       // Las dimensiones se leen de la cabecera del WebP: antes se guardaban en
       // NULL aunque el archivo ya estuviera en disco, y eso dejaba la ficha sin
       // datos de tamaño (y hacía que una subida del mantenedor pareciera la única
       // fuente fiable de ese dato).
-      size = readWebpSize(fs.readFileSync(absolute).subarray(0, 64));
+      size = readWebpSize(contenido.subarray(0, 64));
     } catch {
       // asset aún no generado
     }

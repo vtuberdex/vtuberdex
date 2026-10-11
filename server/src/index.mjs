@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 
 import { openDatabase } from './db/index.mjs';
 import { createSessionStore } from './auth.mjs';
@@ -48,7 +49,9 @@ export function createApp({ dbPath, imageRoot = path.join(ROOT, 'data', 'images'
 
   if (fs.existsSync(webRoot)) {
     app.use(express.static(webRoot, { maxAge: '1h' }));
-    app.get(/^(?!\/api|\/images).*/, (req, res) => {
+    // El respaldo de la SPA lee del disco: con un tope por IP no sirve para martillar el servidor.
+    const limiteSpa = rateLimit({ windowMs: 60 * 1000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false });
+    app.get(/^(?!\/api|\/images).*/, limiteSpa, (req, res) => {
       res.sendFile(path.join(webRoot, 'index.html'));
     });
   }
