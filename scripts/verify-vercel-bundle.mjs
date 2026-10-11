@@ -152,6 +152,15 @@ const request = (port, pathname) =>
     req.end();
   });
 
+/** ¿`url` apunta al mismo origen que `base`? Comparar el origen parseado y no un prefijo de texto. */
+function mismoOrigen(url, base) {
+  try {
+    return new URL(String(url)).origin === new URL(base).origin;
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
   // 1. El artefacto de datos.
   /**
@@ -300,7 +309,7 @@ async function main() {
   const img = await request(port, '/images/character/gkuro-monochrome.webp');
   check(
     'imagen publicada redirige a Vercel Blob',
-    img.status === 301 && String(img.location).startsWith(BLOB_BASE.endsWith('/') ? BLOB_BASE : `${BLOB_BASE}/`),
+    img.status === 301 && mismoOrigen(img.location, BLOB_BASE),
     `${img.status} -> ${img.location}`,
   );
 
