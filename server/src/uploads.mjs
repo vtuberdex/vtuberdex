@@ -18,6 +18,17 @@ import fs from "node:fs";
 import { promises as fsP } from "node:fs";
 import path from "node:path";
 
+/**
+ * El slug se concatena en rutas de disco: debe ser una cadena (un parámetro HTTP puede llegar
+ * como arreglo u objeto) y un nombre simple, sin separadores ni `..`.
+ */
+export function assertSlug(slug) {
+  if (typeof slug !== 'string' || !/^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(slug) || slug.includes('..')) {
+    throw new Error('slug_invalido');
+  }
+  return slug;
+}
+
 /** Tipos de asset que el mantenedor puede reemplazar. */
 export const UPLOADABLE_KINDS = {
   /**
@@ -136,6 +147,7 @@ export async function saveUploadedImage({
 }) {
   const spec = specDeKind(kind);
   if (!spec) throw new Error("kind_invalido");
+  assertSlug(slug);
   if (!Buffer.isBuffer(buffer) || buffer.length === 0)
     throw new Error("archivo_vacio");
   if (buffer.length > MAX_UPLOAD_BYTES)
@@ -272,6 +284,7 @@ export async function saveUploadedImage({
 export async function removeUploadedImage({ kind, slug, imageRoot }) {
   const spec = specDeKind(kind);
   if (!spec) throw new Error("kind_invalido");
+  assertSlug(slug);
   const file = path.join(imageRoot, spec.folder, `${slug}.webp`);
   if (fs.existsSync(file)) await fsP.unlink(file);
   return { path: `images/${spec.folder}/${slug}.webp` };
@@ -296,6 +309,7 @@ export function specDeKind(kind) {
  * Turso). Se valida por contenido con `sharp`, igual que el resto de subidas.
  */
 export async function saveFactionEmblem({ buffer, slug, imageRoot, sharp }) {
+  assertSlug(slug);
   if (!Buffer.isBuffer(buffer) || buffer.length === 0)
     throw new Error("archivo_vacio");
   if (buffer.length > MAX_UPLOAD_BYTES)

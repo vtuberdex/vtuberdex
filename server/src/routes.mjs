@@ -695,6 +695,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
         const known = [
           "no_es_imagen",
           "archivo_vacio",
+          "slug_invalido",
           "archivo_demasiado_grande",
         ];
         const status =
@@ -780,6 +781,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
           "no_es_imagen",
           "archivo_vacio",
           "kind_invalido",
+          "slug_invalido",
           "archivo_demasiado_grande",
         ];
         const status = known.includes(error.message) ? 400 : 500;
