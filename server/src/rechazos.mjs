@@ -13,6 +13,8 @@
  * producción (Turso/`file:`) y en los tests (SQLite). `registrarRechazo` NUNCA lanza: si la base
  * falla, perder un apunte es mejor que convertir un 400 en un 500.
  */
+import { preparadorDeTablas } from './db/tablas.mjs';
+
 const DDL = `
   CREATE TABLE IF NOT EXISTS rechazo (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,19 +31,7 @@ const DDL = `
 export const VIDA_RECHAZOS_DIAS = 30;
 
 const DIA_MS = 24 * 60 * 60 * 1000;
-const tablasListas = new WeakMap();
-
-async function conTabla(ejecutor) {
-  if (!tablasListas.has(ejecutor)) {
-    const promesa = Promise.resolve(ejecutor.exec(DDL)).catch((error) => {
-      tablasListas.delete(ejecutor);
-      throw error;
-    });
-    tablasListas.set(ejecutor, promesa);
-  }
-  await tablasListas.get(ejecutor);
-  return ejecutor;
-}
+const conTabla = preparadorDeTablas(DDL);
 
 /** Solo rutas de campo (`socials.0.url`): una lista blanca de caracteres, acotada, sin texto libre. */
 function camposDeLasIssues(issues) {

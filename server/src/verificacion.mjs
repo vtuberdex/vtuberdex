@@ -26,6 +26,8 @@
  */
 import crypto from 'node:crypto';
 
+import { preparadorDeTablas } from './db/tablas.mjs';
+
 /**
  * `solicitud`: confirma una inscripción/baja ya enviada. `admin`: acceso al mantenedor. `modificacion`:
  * el CÓDIGO que se manda ANTES de rellenar el formulario de cambios (demuestra que el correo es de quien lo
@@ -69,18 +71,7 @@ const DDL = `
   CREATE INDEX IF NOT EXISTS idx_token_correo_email ON token_correo (email, proposito, creado);
 `;
 
-const tablasListas = new WeakMap();
-async function conTablas(ejecutor) {
-  if (!tablasListas.has(ejecutor)) {
-    const promesa = Promise.resolve(ejecutor.exec(DDL)).catch((error) => {
-      tablasListas.delete(ejecutor);
-      throw error;
-    });
-    tablasListas.set(ejecutor, promesa);
-  }
-  await tablasListas.get(ejecutor);
-  return ejecutor;
-}
+const conTablas = preparadorDeTablas(DDL);
 
 const hashDe = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 

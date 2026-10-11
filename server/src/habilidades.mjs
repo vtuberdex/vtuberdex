@@ -554,9 +554,13 @@ export function htmlDeHabilidadSeguro(html) {
 
 /** El texto plano de una habilidad (columna `effect`: búsqueda y respaldo sin formato). */
 export function textoPlanoDe(html) {
-  return String(html ?? '')
-    .replace(/<br\s*\/?>\r?\n?/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+  let sinEtiquetas = String(html ?? '').replace(/<br\s*\/?>\r?\n?/gi, '\n');
+  // Hasta que no quede ninguna: quitar `<b>` de `<<b>script>` no debe dejar otra etiqueta armada.
+  for (let previo = ''; previo !== sinEtiquetas; ) {
+    previo = sinEtiquetas;
+    sinEtiquetas = sinEtiquetas.replace(/<[^>]*>/g, '');
+  }
+  return sinEtiquetas
     // Un `<` o `>` suelto que sobrevive al quitar etiquetas (`<<b>script>`) no es texto: fuera.
     .replace(/[<>]/g, '')
     .replace(/&lt;/g, '<')

@@ -25,19 +25,14 @@
  * `verifyPassword` en local, así que distingue "el hash está mal pegado" de "la contraseña
  * no es la del hash". La contraseña no se imprime nunca, ni se guarda en ningún archivo.
  */
-import readline from 'node:readline';
-
 import { formatoDeHash } from '../lib/admin-auth.mjs';
 import { verifyPassword } from '../server/src/auth.mjs';
+import { leerOpciones, pedirCredencial, pedirJson } from './lib/terminal.mjs';
 
 /** Alias de producción del proyecto. Se puede apuntar a otro con `--url`. */
 const URL_POR_DEFECTO = 'https://vtuberdex.com';
 
-const args = process.argv.slice(2);
-const opcion = (nombre, porDefecto) => {
-  const i = args.indexOf(`--${nombre}`);
-  return i >= 0 && args[i + 1] ? args[i + 1] : porDefecto;
-};
+const { opcion } = leerOpciones();
 
 const base = opcion('url', URL_POR_DEFECTO).replace(/\/$/, '');
 const usuario = opcion('user', process.env.VTUBERDEX_ADMIN_USER || 'admin');
@@ -49,58 +44,13 @@ const comprobar = (nombre, ok, detalle = '') => {
   console.log(`${ok ? '✔' : '✖'} ${nombre}${detalle ? ` — ${detalle}` : ''}`);
 };
 
-/** Pide la contraseña sin eco (no queda en pantalla ni en el historial). */
-function preguntarOculto(prompt) {
-  return new Promise((resolve) => {
-    process.stdout.write(prompt);
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    const escribirOriginal = rl._writeToOutput?.bind(rl);
-    rl._writeToOutput = function _oculto(texto) {
-      if (escribirOriginal && texto !== '\r\n' && texto !== '\n') return escribirOriginal('');
-      return escribirOriginal ? escribirOriginal(texto) : undefined;
-    };
-    rl.question('', (respuesta) => {
-      rl.close();
-      process.stdout.write('\n');
-      resolve(respuesta);
-    });
-  });
-}
-
-/**
- * Sin TTY hay que leer una línea cruda: `readline.question` no recibe `line` nunca y el
- * `await` se queda colgado (Node sale con "unsettled top-level await" en vez de un error).
- * Es la misma trampa que documenta `admin-hash.mjs`.
- */
-function leerLineaDeStdin() {
-  return new Promise((resolve) => {
-    let datos = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (trozo) => {
-      datos += trozo;
-    });
-    process.stdin.on('end', () => resolve(datos.split('\n')[0].trim()));
-  });
-}
-
-async function pedirCredencial() {
-  return process.stdin.isTTY ? preguntarOculto('Contraseña del mantenedor: ') : leerLineaDeStdin();
-}
-
 /** POST/GET contra producción sin lanzar por un status no-2xx: el status es el dato. */
-async function pedir(ruta, init = {}) {
-  const respuesta = await fetch(`${base}${ruta}`, {
-    ...init,
-    headers: { 'content-type': 'application/json', ...(init.headers ?? {}) },
-  });
-  const texto = await respuesta.text();
-  let cuerpo = null;
-  try {
-    cuerpo = texto ? JSON.parse(texto) : null;
-  } catch {
-    cuerpo = { crudo: texto.slice(0, 200) };
-  }
-  return { status: respuesta.status, cuerpo };
+function pedir(ruta, init = {}) {
+  return pedirJson(
+    `${base}${ruta}`,
+    { ...init, headers: { 'content-type': 'application/json', ...(init.headers ?? {}) } },
+    (texto) => ({ crudo: texto.slice(0, 200) }),
+  );
 }
 
 const password = await pedirCredencial();

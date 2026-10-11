@@ -10,7 +10,7 @@
  * El slug se valida contra una lista blanca de caracteres: es lo único que llega de la URL y
  * compone una ruta de archivo.
  */
-import { readFile, stat } from 'node:fs/promises';
+import { open } from 'node:fs/promises';
 import path from 'node:path';
 
 export const dynamic = 'force-dynamic';
@@ -43,14 +43,19 @@ export async function GET(request, { params }) {
   if (!SLUG_VALIDO.test(slug)) return Response.json({ error: 'no_encontrado' }, { status: 404 });
 
   const archivo = path.join(carpeta(), `${slug}.mp3`);
+  // Un solo descriptor para la fecha y el contenido: sin carrera entre `stat` y la lectura.
   let info;
+  let cuerpo;
+  let manejador;
   try {
-    info = await stat(archivo);
+    manejador = await open(archivo, 'r');
+    info = await manejador.stat();
+    cuerpo = await manejador.readFile();
   } catch {
     return Response.json({ error: 'sin_voz' }, { status: 404 });
+  } finally {
+    await manejador?.close();
   }
-
-  const cuerpo = await readFile(archivo);
   const base = {
     'content-type': 'audio/mpeg',
     'accept-ranges': 'bytes',

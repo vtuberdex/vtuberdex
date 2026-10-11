@@ -84,6 +84,66 @@ function Rango({ n, max, etiqueta }: { n: number; max: number; etiqueta: string 
  * Los stats de «Mi ficha»: su propia bolsa de puntos (aparte de las habilidades) y la lista de los que se suben
  * gastándolos, más los que crecen solos con los niveles (solo lectura).
  */
+const claseSubir =
+  'rounded-lg border border-dex-accent px-3 py-1.5 text-xs font-bold text-dex-accent hover:bg-dex-accent/15 disabled:cursor-not-allowed disabled:border-dex-line disabled:text-dex-muted disabled:hover:bg-transparent';
+const claseSecundario = 'rounded-xl border border-dex-line px-4 py-2 text-sm text-dex-muted hover:text-dex-ink';
+
+/** Una fila con lo que se puede mejorar (habilidad o stat) y su botón «+ Subir». */
+function FilaSubible({
+  testId,
+  nombre,
+  detalle,
+  deshabilitado,
+  enMaximo,
+  subiendo,
+  alSubir,
+}: {
+  testId: string;
+  nombre: string;
+  detalle: React.ReactNode;
+  deshabilitado: boolean;
+  enMaximo: boolean;
+  subiendo: boolean;
+  alSubir: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <li className="flex items-center gap-3 rounded-xl border border-dex-line/80 bg-black/25 px-4 py-3" data-testid={testId}>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-dex-ink">{nombre}</span>
+        {detalle}
+      </span>
+      <button type="button" disabled={deshabilitado} onClick={alSubir} className={claseSubir} aria-label={`${t('mificha.subir')}: ${nombre}`}>
+        {enMaximo ? t('mificha.maximo') : subiendo ? t('mificha.subiendo') : `+ ${t('mificha.subir')}`}
+      </button>
+    </li>
+  );
+}
+
+/** «¿Seguro?» antes de devolver los puntos repartidos de una bolsa. */
+function ConfirmarReinicio({
+  texto,
+  ocupada,
+  alReiniciar,
+  alConfirmar,
+}: {
+  texto: string;
+  ocupada: string | null;
+  alReiniciar: () => void;
+  alConfirmar: (abierto: boolean) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="space-y-3 rounded-xl border border-amber-300/40 bg-amber-300/10 p-4 text-sm text-dex-ink">
+      <p>{texto}</p>
+      <div className="flex gap-2">
+        <button type="button" disabled={ocupada !== null} onClick={() => alReiniciar()} className={claseBoton}>{t('mificha.reiniciarSi')}</button>
+        <button type="button" onClick={() => alConfirmar(false)} className={claseSecundario}>{t('mificha.reiniciarNo')}</button>
+      </div>
+    </div>
+  );
+}
+
 function SeccionStats({
   estado,
   ocupada,
@@ -110,36 +170,32 @@ function SeccionStats({
       </div>
       <ul className="space-y-2">
         {estado.stats.map((s) => (
-          <li key={s.slug} className="flex items-center gap-3 rounded-xl border border-dex-line/80 bg-black/25 px-4 py-3" data-testid="mificha-stat">
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-bold text-dex-ink">{s.label}</span>
+          <FilaSubible
+            key={s.slug}
+            testId="mificha-stat"
+            nombre={s.label}
+            detalle={
               <span className="block font-mono text-xs text-dex-muted">
                 {s.valor.toLocaleString()} <span className="opacity-70">({t('mificha.statsPaso', { paso: s.paso })})</span>
               </span>
-            </span>
-            <button
-              type="button"
-              disabled={estado.disponibles < 1 || !s.puedeSubir || ocupada !== null}
-              onClick={() => alSubir(s.slug, s.label)}
-              className="rounded-lg border border-dex-accent px-3 py-1.5 text-xs font-bold text-dex-accent hover:bg-dex-accent/15 disabled:cursor-not-allowed disabled:border-dex-line disabled:text-dex-muted disabled:hover:bg-transparent"
-              aria-label={`${t('mificha.subir')}: ${s.label}`}
-            >
-              {!s.puedeSubir ? t('mificha.maximo') : ocupada === s.slug ? t('mificha.subiendo') : `+ ${t('mificha.subir')}`}
-            </button>
-          </li>
+            }
+            deshabilitado={estado.disponibles < 1 || !s.puedeSubir || ocupada !== null}
+            enMaximo={!s.puedeSubir}
+            subiendo={ocupada === s.slug}
+            alSubir={() => alSubir(s.slug, s.label)}
+          />
         ))}
       </ul>
       {estado.repartidos > 0 &&
         (confirmando ? (
-          <div className="space-y-3 rounded-xl border border-amber-300/40 bg-amber-300/10 p-4 text-sm text-dex-ink">
-            <p>{t('mificha.statsReiniciarConfirma', { n: estado.repartidos })}</p>
-            <div className="flex gap-2">
-              <button type="button" disabled={ocupada !== null} onClick={() => alReiniciar()} className={claseBoton}>{t('mificha.reiniciarSi')}</button>
-              <button type="button" onClick={() => alConfirmar(false)} className="rounded-xl border border-dex-line px-4 py-2 text-sm text-dex-muted hover:text-dex-ink">{t('mificha.reiniciarNo')}</button>
-            </div>
-          </div>
+          <ConfirmarReinicio
+            texto={t('mificha.statsReiniciarConfirma', { n: estado.repartidos })}
+            ocupada={ocupada}
+            alReiniciar={alReiniciar}
+            alConfirmar={alConfirmar}
+          />
         ) : (
-          <button type="button" onClick={() => alConfirmar(true)} className="rounded-xl border border-dex-line px-4 py-2 text-sm text-dex-muted hover:text-dex-ink">{t('mificha.statsReiniciar')}</button>
+          <button type="button" onClick={() => alConfirmar(true)} className={claseSecundario}>{t('mificha.statsReiniciar')}</button>
         ))}
       {estado.automaticos.length > 0 && (
         <div data-testid="mificha-stats-auto">
@@ -241,6 +297,12 @@ export function MiFicha() {
     if (tk) void cargar(tk);
   }, [cargar]);
 
+  /** Un enlace caducado vuelve a pedir el enlace; cualquier otro fallo se avisa sin perder la ficha. */
+  const avisarFallo = (causa: unknown) => {
+    if (causa instanceof ApiError && causa.status === 410) setError({ tipo: 'caducado' });
+    else setAviso({ tipo: 'error', texto: causa instanceof ApiError ? causa.message : t('mificha.errorGeneral') });
+  };
+
   const aplicar = async (accion: 'subir' | 'reiniciar' | 'subir-stat' | 'reiniciar-stats', ficha: VistaMiFicha, clave?: string, nombre?: string) => {
     if (!token) return;
     setOcupada(clave ?? 'reiniciar');
@@ -259,8 +321,7 @@ export function MiFicha() {
         setConfirmandoStats(false);
       }
     } catch (causa) {
-      if (causa instanceof ApiError && causa.status === 410) setError({ tipo: 'caducado' });
-      else setAviso({ tipo: 'error', texto: causa instanceof ApiError ? causa.message : t('mificha.errorGeneral') });
+      avisarFallo(causa);
     } finally {
       setOcupada(null);
     }
@@ -276,8 +337,7 @@ export function MiFicha() {
       setCodigoMinecraft(r.codigo?.codigo ?? null);
       if (accion === 'desvincular') setAviso({ tipo: 'ok', texto: t('mificha.minecraftDesvinculado') });
     } catch (causa) {
-      if (causa instanceof ApiError && causa.status === 410) setError({ tipo: 'caducado' });
-      else setAviso({ tipo: 'error', texto: causa instanceof ApiError ? causa.message : t('mificha.errorGeneral') });
+      avisarFallo(causa);
     } finally {
       setOcupada(null);
     }
@@ -429,21 +489,16 @@ export function MiFichaVista({
                   const enMaximo = h.rango >= puntos.rangoMaximo;
                   const puede = puntos.disponibles > 0 && !enMaximo;
                   return (
-                    <li key={h.clave} className="flex items-center gap-3 rounded-xl border border-dex-line/80 bg-black/25 px-4 py-3" data-testid="mificha-habilidad">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-bold text-dex-ink">{h.name}</span>
-                        <span className="mt-1 block"><Rango n={h.rango} max={puntos.rangoMaximo} etiqueta={t('mificha.rango', { n: h.rango, max: puntos.rangoMaximo })} /></span>
-                      </span>
-                      <button
-                        type="button"
-                        disabled={!puede || ocupada !== null}
-                        onClick={() => alSubir(h.clave, h.name)}
-                        className="rounded-lg border border-dex-accent px-3 py-1.5 text-xs font-bold text-dex-accent hover:bg-dex-accent/15 disabled:cursor-not-allowed disabled:border-dex-line disabled:text-dex-muted disabled:hover:bg-transparent"
-                        aria-label={`${t('mificha.subir')}: ${h.name}`}
-                      >
-                        {enMaximo ? t('mificha.maximo') : ocupada === h.clave ? t('mificha.subiendo') : `+ ${t('mificha.subir')}`}
-                      </button>
-                    </li>
+                    <FilaSubible
+                      key={h.clave}
+                      testId="mificha-habilidad"
+                      nombre={h.name}
+                      detalle={<span className="mt-1 block"><Rango n={h.rango} max={puntos.rangoMaximo} etiqueta={t('mificha.rango', { n: h.rango, max: puntos.rangoMaximo })} /></span>}
+                      deshabilitado={!puede || ocupada !== null}
+                      enMaximo={enMaximo}
+                      subiendo={ocupada === h.clave}
+                      alSubir={() => alSubir(h.clave, h.name)}
+                    />
                   );
                 })}
               </ul>
@@ -455,16 +510,15 @@ export function MiFichaVista({
       {puntos.repartidos > 0 && (
         <div className="space-y-2">
           {confirmando ? (
-            <div className="space-y-3 rounded-xl border border-amber-300/40 bg-amber-300/10 p-4 text-sm text-dex-ink">
-              <p>{t('mificha.reiniciarConfirma', { n: puntos.repartidos })}</p>
-              <div className="flex gap-2">
-                <button type="button" disabled={ocupada !== null} onClick={() => alReiniciar()} className={claseBoton}>{t('mificha.reiniciarSi')}</button>
-                <button type="button" onClick={() => alConfirmar(false)} className="rounded-xl border border-dex-line px-4 py-2 text-sm text-dex-muted hover:text-dex-ink">{t('mificha.reiniciarNo')}</button>
-              </div>
-            </div>
+            <ConfirmarReinicio
+              texto={t('mificha.reiniciarConfirma', { n: puntos.repartidos })}
+              ocupada={ocupada}
+              alReiniciar={alReiniciar}
+              alConfirmar={alConfirmar}
+            />
           ) : (
             <>
-              <button type="button" onClick={() => alConfirmar(true)} className="rounded-xl border border-dex-line px-4 py-2 text-sm text-dex-muted hover:text-dex-ink">{t('mificha.reiniciar')}</button>
+              <button type="button" onClick={() => alConfirmar(true)} className={claseSecundario}>{t('mificha.reiniciar')}</button>
               <p className="text-xs text-dex-muted">{t('mificha.reiniciarAyuda')}</p>
             </>
           )}

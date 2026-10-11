@@ -26,9 +26,9 @@
  * nunca aparece en el historial, en la pantalla ni en un archivo.
  */
 import { spawnSync } from 'node:child_process';
-import readline from 'node:readline';
 
 import { hashPassword, verifyPassword } from '../server/src/auth.mjs';
+import { ejecutable, pedirCredencial } from './lib/terminal.mjs';
 
 const args = process.argv.slice(2);
 const tiene = (nombre) => args.includes(`--${nombre}`);
@@ -52,48 +52,11 @@ const paso = (nombre, ok, detalle = '') => {
 
 /** Ejecuta el CLI de Vercel sin heredar la salida (puede contener el valor). */
 function vercel(argumentos, entrada) {
-  return spawnSync('vercel', argumentos, {
+  return spawnSync(ejecutable('vercel'), argumentos, {
     input: entrada,
     encoding: 'utf8',
     stdio: [entrada === undefined ? 'inherit' : 'pipe', 'pipe', 'pipe'],
   });
-}
-
-/**
- * Pide la contraseña sin eco. Es la MISMA trampa que documenta `admin-hash.mjs`: sin TTY,
- * `rl.question` no recibe `line` nunca y el `await` se queda colgado (Node sale con
- * "unsettled top-level await" en vez de un error útil), así que se lee una línea de stdin.
- */
-function preguntarOculto(prompt) {
-  return new Promise((resolve) => {
-    process.stdout.write(prompt);
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    const escribirOriginal = rl._writeToOutput?.bind(rl);
-    rl._writeToOutput = function _oculto(texto) {
-      if (escribirOriginal && texto !== '\r\n' && texto !== '\n') return escribirOriginal('');
-      return escribirOriginal ? escribirOriginal(texto) : undefined;
-    };
-    rl.question('', (respuesta) => {
-      rl.close();
-      process.stdout.write('\n');
-      resolve(respuesta);
-    });
-  });
-}
-
-function leerLineaDeStdin() {
-  return new Promise((resolve) => {
-    let datos = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (trozo) => {
-      datos += trozo;
-    });
-    process.stdin.on('end', () => resolve(datos.split('\n')[0].trim()));
-  });
-}
-
-async function pedirCredencial() {
-  return process.stdin.isTTY ? preguntarOculto(`Contraseña nueva para ${USUARIO}: `) : leerLineaDeStdin();
 }
 
 /** El deployment que está sirviendo producción, para redeployarlo. */
@@ -128,7 +91,7 @@ async function pedir(ruta, init = {}) {
 }
 
 // --- 1. la contraseña ------------------------------------------------------
-const password = await pedirCredencial();
+const password = await pedirCredencial(`Contraseña nueva para ${USUARIO}: `);
 if (!password || password.length < 8) {
   console.error('✖ la contraseña debe tener al menos 8 caracteres.');
   process.exit(1);

@@ -21,6 +21,8 @@ const canal = self as unknown as {
 };
 
 canal.onmessage = (event) => {
+  // Un worker dedicado solo recibe de quien lo creó (origen vacío o el propio); cualquier otro se ignora.
+  if (event.origin && event.origin !== self.location.origin) return;
   const { id, tipo, data } = event.data;
   const out = new Uint8ClampedArray(data.length);
   calcularMascara(tipo, data, out);

@@ -36,6 +36,7 @@ jobs:
             --config p/owasp-top-ten --config p/security-audit \
             --config p/javascript --config p/typescript --config p/nodejs \
             --exclude node_modules --exclude .next --exclude deploy --exclude data \
+            --exclude '*.test.*' \
             --sarif --output semgrep.sarif --metrics=off
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -53,6 +54,10 @@ jobs:
         with:
           languages: javascript-typescript
           queries: security-extended
+          # Los tests quedan fuera, igual que en sonar.exclusions: sus datos hostiles son a propósito.
+          config: |
+            paths-ignore:
+              - '**/*.test.*'
       - uses: github/codeql-action/analyze@9f759ee644a3e7c15c1390abf49868036c00067b # v3
         with:
           output: codeql-sarif

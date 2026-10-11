@@ -22,6 +22,7 @@
  */
 import { PUNTOS_POR_NIVEL, PUNTOS_STATS_POR_NIVEL, RANGO_MAXIMO } from './experiencia.mjs';
 import { normalizeText } from './text.mjs';
+import { preparadorDeTablas } from './db/tablas.mjs';
 
 const DDL = `
   CREATE TABLE IF NOT EXISTS punto_habilidad (
@@ -53,18 +54,7 @@ export class PuntosError extends Error {
   }
 }
 
-const tablasListas = new WeakMap();
-async function conTablas(ejecutor) {
-  if (!tablasListas.has(ejecutor)) {
-    const promesa = Promise.resolve(ejecutor.exec(DDL)).catch((error) => {
-      tablasListas.delete(ejecutor);
-      throw error;
-    });
-    tablasListas.set(ejecutor, promesa);
-  }
-  await tablasListas.get(ejecutor);
-  return ejecutor;
-}
+const conTablas = preparadorDeTablas(DDL);
 
 /** La clave estable de una habilidad, o `null` si no tiene nombre (no se puede mejorar). */
 export function claveDeHabilidad(skill) {

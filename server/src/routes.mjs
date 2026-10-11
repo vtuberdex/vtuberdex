@@ -5,6 +5,7 @@
  * para que el panel de administración no pueda dejar datos huérfanos.
  */
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 
 import { facetCounts, getNeighbors, getVtuberBySlug, searchVtubers } from './search.mjs';
 import { hashPassword, verifyPassword } from './auth.mjs';
@@ -83,6 +84,8 @@ function enTransaccion(db, fn) {
  */
 export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
   const router = express.Router();
+  // Freno a la fuerza bruta del login: de sobra para una persona, corto para un diccionario.
+  const limiteLogin = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false });
 
   // ---------------------------------------------------------------- catálogo
   router.get('/health', (req, res) => {
@@ -139,7 +142,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
   });
 
   // ------------------------------------------------------------ mantenedor
-  router.post('/admin/login', (req, res) => {
+  router.post('/admin/login', limiteLogin, (req, res) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'payload_invalido', issues: formatIssues(parsed.error) });

@@ -46,19 +46,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createClient } from '@libsql/client/node';
 
 import { CARPETAS_PUBLICADAS } from '../lib/carpetas.mjs';
+import { leerOpciones } from './lib/terminal.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 
-const args = process.argv.slice(2);
-const has = (name) => args.includes(`--${name}`);
-const value = (name, fallback) => {
-  const flag = `--${name}`;
-  const inline = args.find((a) => a.startsWith(`${flag}=`));
-  if (inline) return inline.slice(flag.length + 1) || fallback;
-  const i = args.indexOf(flag);
-  return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
-};
+const { tiene: has, opcion: value } = leerOpciones(process.argv.slice(2), { conIgual: true });
 
 const DRY_RUN = has('dry-run');
 const FORCE = has('force');

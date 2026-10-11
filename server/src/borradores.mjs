@@ -17,6 +17,7 @@
  * términos.
  */
 import { PERFIL_CAMPOS, SolicitudError } from './solicitudes.mjs';
+import { preparadorDeTablas } from './db/tablas.mjs';
 
 export const VIDA_BORRADOR_MS = 60 * 24 * 60 * 60 * 1000;
 /** Tope del JSON guardado: el formulario completo no llega ni a 20 KB. */
@@ -32,18 +33,7 @@ const DDL = `
   );
 `;
 
-const tablasListas = new WeakMap();
-async function conTablas(ejecutor) {
-  if (!tablasListas.has(ejecutor)) {
-    const promesa = Promise.resolve(ejecutor.exec(DDL)).catch((error) => {
-      tablasListas.delete(ejecutor);
-      throw error;
-    });
-    tablasListas.set(ejecutor, promesa);
-  }
-  await tablasListas.get(ejecutor);
-  return ejecutor;
-}
+const conTablas = preparadorDeTablas(DDL);
 
 /** Campos de texto del formulario y su largo máximo (los mismos del esquema de la inscripción). */
 const TEXTOS = {

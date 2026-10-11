@@ -18,46 +18,9 @@
  * NO guarda nada: imprime el hash y el comando de Vercel para pegarlo.
  */
 import crypto from 'node:crypto';
-import readline from 'node:readline';
 
 import { hashPassword } from '../server/src/auth.mjs';
-
-/** Pide la contraseña sin eco (no queda en el historial ni en la pantalla). */
-function preguntarOculto(prompt) {
-  return new Promise((resolve) => {
-    process.stdout.write(prompt);
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    // Se oculta el eco: sin esto la contraseña se ve mientras se escribe.
-    const escribirOriginal = rl._writeToOutput?.bind(rl);
-    rl._writeToOutput = function _oculto(texto) {
-      if (escribirOriginal && texto !== '\r\n' && texto !== '\n') return escribirOriginal('');
-      return escribirOriginal ? escribirOriginal(texto) : undefined;
-    };
-    rl.question('', (respuesta) => {
-      rl.close();
-      process.stdout.write('\n');
-      resolve(respuesta);
-    });
-  });
-}
-
-/**
- * Sin TTY (redirección, CI, pipe) no se puede ocultar el eco NI leer una respuesta:
- * `rl.question` no recibe `line` nunca y el `await` de arriba quedaba colgado, con
- * Node saliendo por el aviso "unsettled top-level await" en lugar de un error útil.
- * Se lee una línea cruda de stdin, que es lo que espera quien hace
- * `printf '%s' "$CLAVE" | npm run admin:hash`.
- */
-function leerLineaDeStdin() {
-  return new Promise((resolve) => {
-    let datos = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (trozo) => {
-      datos += trozo;
-    });
-    process.stdin.on('end', () => resolve(datos.split('\n')[0].trim()));
-  });
-}
+import { leerLineaDeStdin, preguntarOculto } from './lib/terminal.mjs';
 
 const deArgumento = process.argv[2];
 let password = deArgumento;
