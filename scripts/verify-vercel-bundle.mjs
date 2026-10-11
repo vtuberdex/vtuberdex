@@ -300,7 +300,7 @@ async function main() {
   const img = await request(port, '/images/character/gkuro-monochrome.webp');
   check(
     'imagen publicada redirige a Vercel Blob',
-    img.status === 301 && String(img.location).startsWith(BLOB_BASE),
+    img.status === 301 && String(img.location).startsWith(BLOB_BASE.endsWith('/') ? BLOB_BASE : `${BLOB_BASE}/`),
     `${img.status} -> ${img.location}`,
   );
 

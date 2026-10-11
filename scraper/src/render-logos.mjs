@@ -5,6 +5,8 @@ const all = fs.readdirSync('../data/images/logo').filter(f=>f.endsWith('.webp'))
 const step = Math.floor(all.length/24);
 const picks = all.filter((_,i)=>i%step===0).slice(0,24);
 const COLS=4, W=340, H=200, PAD=6, LH=18;
+// Salida dentro del repo (`scraper/out/`, ignorado): /tmp es escribible por cualquiera.
+fs.mkdirSync('out',{recursive:true});
 const comps=[];
 for(let i=0;i<picks.length;i++){
   const f=picks[i];
@@ -21,5 +23,5 @@ for(let i=0;i<picks.length;i++){
   }catch{}
 }
 const rowsN=Math.ceil(picks.length/COLS);
-await sharp({create:{width:COLS*(W+PAD)+PAD,height:rowsN*(H+PAD+LH)+PAD,channels:3,background:'#111'}}).composite(comps).png().toFile('/tmp/logo-final-check.png');
+await sharp({create:{width:COLS*(W+PAD)+PAD,height:rowsN*(H+PAD+LH)+PAD,channels:3,background:'#111'}}).composite(comps).png().toFile('out/logo-final-check.png');
 console.log('rejilla final:', picks.length, 'logos de', all.length);
