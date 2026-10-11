@@ -69,7 +69,7 @@ for (const slug of ["yeicokp-harv", "ex-porygon-z-explicador-de-vtubers"]) {
   }
 }
 
-const metricas = { peticiones: 0, tipos: {} };
+const metricas = { peticiones: 0, tipos: new Map() };
 
 function aJson(valor) {
   if (valor === null || valor === undefined) return { type: "null" };
@@ -94,7 +94,7 @@ function deJson(valor) {
 }
 
 function ejecutar(req) {
-  metricas.tipos[req.type] = (metricas.tipos[req.type] ?? 0) + 1;
+  metricas.tipos.set(req.type, (metricas.tipos.get(req.type) ?? 0) + 1);
 
   if (req.type === "sequence") {
     db.exec(req.sql);
@@ -338,9 +338,7 @@ console.log(
 const aplicadas = b.filter((c) => c.assets?.some((x) => x.bytes === 90000));
 console.log(`fichas de la muestra con reemplazo aplicado: ${aplicadas.length}`);
 
-console.log(
-  `\ntipos de petición que hizo el código: ${JSON.stringify(metricas.tipos)}`,
-);
+console.log(`\ntipos de petición que hizo el código: ${JSON.stringify(Object.fromEntries(metricas.tipos))}`);
 
 servidor.close();
 db.close();
