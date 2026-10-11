@@ -39,9 +39,9 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 692 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 912 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
-cd server  && npm test     # 94 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones
+cd server  && npm test     # 154 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
 
 # Linter (raíz; cubre también server/ y scraper/)
 npm run lint               # eslint . — falla con cualquier error
@@ -54,6 +54,7 @@ npm run lint && npm run typecheck && npm run check:shaders && npm run build
 npm run probe:timings      # piso de SQLite local, sin red — el "cuánto debería costar"
 npm run bench:ediciones    # A/B del camino de Turso contra el de HEAD (stub, sin credenciales)
 npm run sweep:dead-code    # exports sin consumidores (informa, no borra)
+npm run informe:habilidades  # reglas del kit de habilidades rotas, por ficha (--slug, --codigo, --json)
 
 # Puesta en marcha
 cd scraper && npm install && npm run scrape      # reanudable: cachea el HTML
@@ -436,6 +437,170 @@ calcula ni «procesar» una baja los aplica solo**.
   regla, la página se corrige sola (y `niveles-contenido.test.tsx` lo comprueba). Sus «capturas» NO son PNG: `components/niveles/graficos.tsx` dibuja
   los gráficos en SVG desde `experienciaConLikes`/`umbralDeNivel` y las maquetas son los componentes REALES (`StatBars`, `SkillList`, `MiFichaVista`
   — la pantalla de «Mi ficha» sin lógica) con datos de ejemplo, `inert` y marcadas «Ejemplo»: no se desfasan al cambiar el diseño y se traducen solas.
+
+## Minecraft: servidor para VTubers con ficha (`minecraft/`, `server/src/minecraft.mjs`)
+
+Un plugin de Paper **26.2** (Java 25, `minecraft/`; `./gradlew build` → `build/libs/vtuberdex-mc-*.jar`, el wrapper es Gradle
+9.8.1 porque Gradle 8 no corre en Java 25; compila contra `paper-api:26.2.build.*-stable` con `api-version: '26.2'`: Paper NO carga un
+plugin con `api-version` más nueva que el servidor) hace del servidor uno **solo para VTubers con ficha**: se juega con los stats de la ficha
+PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verdad**: el plugin no calcula niveles, topes ni dueños.
+- **Casa-lobby para quien no está vinculado** (`Lobby.java` + `SalaDeEspera.java`): un MUNDO APARTE vacío (`vtuberdex_lobby`, generador
+  sin terreno, pacífico, mediodía fijo, sin mobs) con una casa de 13x13 construida por código en cada arranque (idempotente; paredes,
+  techo y barreras arriba y abajo) y carteles ENCERADOS con los pasos (los textos están en `CARTELES`: ~15 caracteres por línea, más se
+  corta; texto BLANCO con borde oscuro: brillante con tinte GRIS, porque el tinte negro pone borde claro y no se leía). Estados: COMPROBANDO (recién entra: quieto donde aparece mientras la web responde; reintenta cada 20 s; falla CERRADO),
+  ENCERRADO (sin vínculo: a la casa en modo aventura, camina dentro, solo `/vtd`; si sale de los límites vuelve al centro; se guarda en
+  el PDC dónde estaba en el mundo y su modo de juego) y LIBRE (vinculado: si estaba en la casa sale a donde estaba o al spawn del
+  mundo). Los NUEVOS aparecen ya en la casa (`AsyncPlayerSpawnLocationEvent`): nunca ven el mundo. Expulsión a los `minutos-de-espera`
+  (15). `vtuberdex.admin` (op) no queda retenido y puede visitar la casa con `/vtd lobby`, **pero solo con identidad verificada**
+  (`adminVerificado`: UUID que no sea versión 3): en modo offline un op dado POR NOMBRE lo heredaría cualquiera con ese nombre. Sin verificar a la vista: falta mirarla
+  con un cliente. `/vtd email <correo>` → `POST /api/minecraft/email` manda al correo un código por cada ficha de ese correo
+  (`fichasDelCorreo`: inscripción aprobada o `ficha_correo`), **atado al UUID que lo pidió**; `/vtd codigo <código>` lo canjea. El
+  código se ESCRIBE en el juego, nunca se canjea con un clic en el correo: quien pide con el correo de otra persona no ve el código, y
+  un clic de la víctima vincularía la cuenta del intruso. Responde igual tenga o no fichas el correo; topes (`ENVIOS`): 1/min y 5/día
+  por correo (solo su hash), 10/día por cuenta. «Mi ficha» también da códigos (sin cuenta atada). Ya NO existe elegir una ficha a mano.
+- **Modo híbrido: Java NO premium también entra** (`online-mode=false`, `enforce-secure-profile=false`). En offline el UUID de Java
+  sale del NOMBRE (versión 3), así que para esas cuentas (`requiereSesion`) el vínculo guardado no basta: hace falta una SESIÓN
+  (`sesion_minecraft`) para la RED desde la que entra, que nace al canjear un código del correo y dura `SESION_DIAS` (7). Misma red y
+  plazo → entra directo; otra red o vencida → `/vtd email` + `/vtd codigo` otra vez (`jugador` responde `necesitaSesion` SIN decir de
+  quién es la ficha). La red viaja en `X-Jugador-Red` desde el plugin y la web solo guarda su hash (`hashearRed`). La XP de una cuenta v3
+  sin sesión no suma. Bedrock (Floodgate) y premium verificadas (UUID v4) siguen con vínculo permanente. `/vtd email` añade un tope
+  por RED (`ENVIOS.porRedDia` = 20): sin cuentas de pago cambiar de nombre es gratis. **FastLogin** (que haría entrar directo a los
+  premium) NO se instaló: en Paper exige ProtocolLib, que no tiene versión para 26.x (última 5.4.0, 2025-08); la alternativa sería un
+  proxy Velocity. Por eso hoy los premium Java también confirman el correo cada 7 días o al cambiar de red. Las skins las pone
+  **SkinsRestorer** 15.12.6 (declara hasta 26.1.1; carga en 26.2 sin errores) con `offlineModeWarning.enabled: false` (por defecto
+  muestra a cada jugador offline un aviso enorme sobre launchers «cracked»: la identidad la da el código del correo, no el launcher).
+  **FreedomChat** 1.7.9 reescribe el chat como mensajes del servidor (sin la marca de «no verificado» en cada mensaje).
+  `claim-secure-chat-enforced` sigue en `false` A PROPÓSITO: escondería el aviso «Chat messages can't be verified» de Java mintiéndole
+  al cliente, y su propia config advierte que puede violar las reglas de uso de Minecraft (riesgo de bloqueo del dominio por Mojang).
+  Decidido así con el usuario (2026-10-08); el aviso es del juego y Bedrock no lo muestra. Riesgo aceptado: misma red (casa, cibercafé) + mismo
+  nombre comparte la sesión de 7 días.
+- **Una ficha, UNA conexión a la vez**: (1) una ficha tiene una cuenta (vincular otra reemplaza; la anterior, si está conectada, va
+  al lobby en el acto, `VtdCommand`) y una cuenta tiene UNA red de sesión (`abrirSesion` borra las demás: confirmar desde otra red
+  olvida la anterior); (2) `alIntentarEntrar` (`AsyncPlayerPreLoginEvent`) RECHAZA una conexión nueva de una cuenta o nombre que ya
+  juega desde OTRA IP. Por defecto Minecraft hace lo contrario (expulsa al que ya estaba), y en offline cualquiera echaría a una VTuber
+  escribiendo su nombre. Desde la MISMA IP sí entra (reconexión tras un corte). Sin probar con dos clientes reales.
+- **La XP del juego es un dato más de la curva**: `experienciaConLikes(base, likes, xpJuego)` la suma como la de los likes; niveles,
+  puntos y aviso de subida salen solos. `xpJuego` = `SUM(cantidad)` de `xp_juego` (ejecutor de `lib/solicitudes.mjs`), la leen la ficha
+  pública, el like y «Mi ficha» (`xpJuegoDe` vale 0 si el almacén falla). El LISTADO no la aplica (tampoco los likes).
+- **Lotes idempotentes con tope en UNA sentencia**: lotes de ≤ `XP_POR_LOTE_MAX` (100) con `idLote` UUID fijado al crearlo (un
+  reintento no suma dos veces); el INSERT recorta a lo que cabe en `XP_JUEGO_MAX_DIA` (300, día de Chile). Motivos: `MOTIVOS_XP`.
+- **Rutas**: `GET /api/minecraft/reglas` pública; `email`, `vincular`, `jugador/:uuid` (GET/DELETE) y `xp` exigen `X-Minecraft-Token` =
+  `VTUBERDEX_MINECRAFT_TOKEN` (≥16; sin él, 404). «Mi ficha»: `POST /api/mi-ficha/minecraft`. No usan `responderRegistrando`.
+- **En el juego**: stats como `AttributeModifier` `vtuberdex:stat_<slug>` escalados/topados en `config.yml` (se quitan al salir: se
+  guardan con el jugador); nivel/EXP en una BossBar, NO en la barra vanilla (es la de encantar). Fase 2 pendiente: habilidades jugables.
+- **Panel lateral con el progreso** (`Panel.java`, sidebar por jugador; `/vtd panel` lo oculta, se recuerda en el PDC): nombre, nivel,
+  barra de EXP, EXP total, XP de juego de HOY con su tope, likes, stats de dos en dos, puntos por repartir (→ `/mi-ficha`) y la hora
+  de la última sincronización. **Todo sale de la web**: la ficha pública (nivel, EXP, stats con puntos y bonos aplicados) y
+  `progreso` de `GET /api/minecraft/jugador/:uuid` (`progresoDe`: likes, XP de juego total y de hoy, puntos de habilidad y de stats
+  con `estadoDePuntos`/`estadoDeStats`; si falla, el jugador entra igual sin esa parte). Se refresca al entrar, tras cada lote de XP
+  y **cada minuto** (así llegan los likes y los puntos repartidos sin jugar). `FichaService` compara con el refresco anterior: subir
+  de nivel → título, sonido y aviso a todo el servidor; más EXP → barra de acción «+N EXP · ✔ vtuberdex.com»; stats distintos →
+  chat «Tus stats se actualizaron desde la web: ATQ 215 → 220». Llegar al tope diario se avisa una vez al día. `/vtd ficha` lista
+  todos los stats en el chat.
+- **Java y Bedrock en el mismo servidor**: Paper **26.2** (estable) + **ViaVersion** (deja entrar a clientes Java 26.3, protocolo
+  777; el servidor es 776) + **Geyser** (traduce Bedrock: Android, iOS, Windows de la tienda; UDP **19132**) + **Floodgate** (Bedrock
+  entra con su cuenta Xbox sin comprar Java; `auth-type: floodgate` en `plugins/Geyser-Spigot/config.yml`, que nace en `online` y
+  hay que cambiarlo). Se bajó de 26.3 a 26.2 porque Geyser solo soportaba Java 26.2; el mundo 26.3 (sin jugar) quedó en
+  `/srv/minecraft-respaldo-26.3-*` (borrado el 2026-10-08). Cuando Geyser soporte la versión nueva, subir Paper y quitar ViaVersion si ya no hace falta.
+  Floodgate da a Bedrock un UUID `00000000-0000-0000-0009-…` (válido para el vínculo) y el nombre con «.» delante (`JUGADOR` lo admite).
+  Las consolas (Xbox/PS/Switch) no dejan añadir servidores propios. `api.mcsrvstat.us/bedrock` daba «offline» con Bedrock
+  funcionando: para comprobarlo, `tcpdump -ni eth0 udp port 19132` o un ping RakNet, no ese servicio.
+- **Trampa: las copias del diario llenaban /tmp (que es RAM).** `lib/diario.mjs` copia la base a `/tmp/vtuberdex-<pid>-<ms>.db`;
+  `retirar` borraba las reemplazadas, pero la VIGENTE de cada proceso que terminaba (reinicio, script, test) quedaba para siempre:
+  2.916 copias (9.201 archivos con -wal/-shm, 1,9 GB) en 4 días, /tmp al 100 %, 2,9 GB de swap y las voces con ENOSPC. Hoy cada
+  proceso borra la suya al salir y la primera construcción barre las de PIDs muertos (`barrerCopiasHuerfanas`, probado). Lo mismo
+  hacían los tests del server (`migrations`, `uploads`): ahora limpian en `after`.
+- **Trampa: el cliente HTTP de Java pide `Upgrade: h2c`** en conexiones sin TLS y el servidor Node de la app cierra la conexión sin
+  responder («HTTP/1.1 header parser received no bytes»; `curl --http2` reproduce: exit 52). `ApiClient` fuerza HTTP/1.1. Ningún
+  gate lo vio: salió en la primera entrada real (Bedrock) y dejaba a todos en la sala de espera.
+- **Producción (VPS)**: servicio `vtuberdex-minecraft` (usuario `minecraft`, `/srv/minecraft`, Java 25 de apt, `-Xmx1536M`
+  `-XX:ActiveProcessorCount=2`, `ProtectSystem=strict`), puertos **25565/tcp** (Java) y **19132/udp** (Bedrock) públicos, `online-mode=false` (híbrido, ver arriba), sin RCON. **No hagas
+  op por nombre a cuentas Java**: el permiso lo hereda quien use ese nombre (el plugin no lo deja saltarse el lobby, pero el op sigue
+  siendo op en el resto del servidor). Se entra con `vtuberdex.com`
+  (el registro A no pasa por el proxy de Cloudflare). El plugin habla con la app LOCAL (`api-url: http://127.0.0.1:3100`; `sitio-url`
+  es lo que se enseña en el chat); el token está en `/etc/vtuberdex.env` y en `plugins/VTuberDex/config.yml` (600). Actualizar el
+  plugin = copiar el jar a `/srv/minecraft/plugins/` (dueño `minecraft`) y `sudo systemctl restart vtuberdex-minecraft`. Compilar:
+  JDK 25 y Gradle viven en `~/.local/share/vtuberdex-build/` (NO en /tmp, que es RAM): `GRADLE_USER_HOME=…/gradle-home
+  JAVA_HOME=…/jdk25 ./gradlew build`.
+- **Reparto de recursos de la VPS** (drop-ins `recursos.conf` en `/etc/systemd/system/<servicio>.service.d/`): Minecraft
+  `CPUQuota=200%` (2 de 4 núcleos), `CPUWeight=40`, `Nice=5`, `MemoryHigh=2300M`/`MemoryMax=2700M`, `OOMScoreAdjust=300` (el núcleo
+  lo mata antes que a la web); `view-distance=6`, `simulation-distance=4`, Paper `worker-threads: 2`/`io-threads: 1` (generar chunks es
+  lo que más CPU come). Voces (Piper usa todos los núcleos al generar) `CPUQuota=150%`, `CPUWeight=20`, `MemoryMax=1200M`. La web y
+  nginx `CPUWeight=200`, `OOMScoreAdjust=-300`. Medido tras aplicarlo: 4,8 GB disponibles y 101 MB de swap (antes ~2 GB y 2,9 GB).
+- **Más ahorro (2026-10-08)**: `pause-when-empty-seconds=60` (el servidor deja de simular sin jugadores; mientras Chunky
+  pregenera NO se pausa: lo comprobé, sigue a ~13 chunks/s con el servidor vacío), heap `-Xms512M` + `G1PeriodicGCInterval` (sin
+  `AlwaysPreTouch`: devuelve memoria al sistema en reposo), `sync-chunk-writes=false` (sin tirones al guardar; se pueden perder
+  segundos si la VPS se corta de golpe), menos mobs (`bukkit.yml` monsters 50, ambient 8, water-ambient 12; `spigot.yml`
+  activation-range 24 y `mob-spawn-range` 4). **Borde del mundo** (`Mundo.java`, `borde-radio` 5000 en `config.yml`): 10.000×10.000
+  en el mundo, /8 en el Nether, igual en el End; **Chunky** 1.5.3 lo pregenera una vez (el plugin le da la orden por la consola y deja
+  la marca `plugins/VTuberDex/pregeneracion-encargada`; Chunky sigue tras reiniciar). Primera pasada: ~8 h a 2 núcleos, la web siguió
+  respondiendo en 30-55 ms. Respaldos de cada archivo tocado: `*.bak-<fecha>` junto a cada uno.
+- **Respaldo del MUNDO** (antes no había: el de las 03:30 es solo la base de la web): `/usr/local/sbin/vtuberdex-mc-respaldo`
+  vía `/etc/cron.d/vtuberdex-mc-respaldo` (04:00-05:30 cada 30 min, espera a que el servidor esté VACÍO —pausado, no escribe— y a las
+  05:30 copia igual), `tar.gz` de `/srv/minecraft/world` (en 26.x incluye todas las dimensiones y el lobby) en
+  `/srv/minecraft-respaldos/`, 7 copias. Log en `/var/log/vtuberdex-mc-respaldo.log`.
+- **Textos cortos en el juego**: el tamaño de letra lo decide el cliente (escala de interfaz), así que se achica CUÁNTO se muestra:
+  prefijo `✦`, sin títulos grandes (solo subtítulo), panel de 7 líneas, BossBar «Nv N · x/y», recordatorio del lobby en chat UNA vez.
+- **Probado a medias con un cliente real**: un Bedrock (Android) entró por Geyser/Floodgate el 2026-10-08 y destapó la trampa h2c;
+  tras el arreglo falta jugar el flujo completo (sala de espera → `/vtd email` → `/vtd codigo` → stats y BossBar).
+
+## Habilidades del RPG: catálogo de estados y validador
+
+Las reglas MECÁNICAS del «prompt maestro» de habilidades viven en `server/src/habilidades.mjs` (JS puro, probado en
+`server/test/habilidades.test.mjs`): los 42 estados con su color oficial, polaridad (`positivo` se obtiene, `negativo` se
+aplica, `ambos` para Hackeo/Hemofagia/Drenaje Arcano/Usurpación/Soul Trader, que las fichas usan de las dos formas), su
+evolución con los efectos OFICIALES y la facción exclusiva (Juramento, Requiem, Soul Trader, Epopeya, Fortificación).
+`spanDeEstado`/`bloqueDeEvolucion` pintan el HTML; `validarKit` dice qué regla se rompe (error) o qué conviene revisar (aviso).
+- **Solo valida lo que se lee en el HTML**: si sale del lore, si hay narrativa, si la Habilidad Única es única o si está
+  balanceado NO se comprueba (eso lo decide una persona). El MP no está en `effect_html`: no se valida.
+- **El estado se cuenta si lo ENTREGA un verbo** («obtienes/aplicas X [y Y]»); nombrarlo en una condición no cuenta.
+- La evolución lleva el color de su base; Hackeo y System Override, el degradado. Nombres canónicos = lista de colores
+  (`Deux ex Machina`, `Mente Agil`, `Glotoneria`); los alias se aceptan con aviso.
+- Medido al escribirlo (base empaquetada, 211 kits): 18 limpias, 150 con algún error; 114 Ultimates con estado base.
+- **Pasos de la ficha en el mantenedor**: Atributos, Habilidades y Redes sociales son TRES pasos (antes uno solo, una
+  sábana). Atributos es una línea por atributo con su barra (`steps/attributes-step.tsx`); Habilidades, una línea por
+  habilidad con su estado (punto verde/ámbar/rojo según `validarKit`) que se despliega para ver y editar a mano
+  (`steps/skills-step.tsx`).
+- **Asistente de kit** (`components/admin/kit-builder.tsx`, sustituye a la lista mientras está abierto; lógica pura y
+  probada en `kit-habilidades.ts`): va PIEZA POR PIEZA (Activa 1 … Ultimate, Revisar), cada una con su vista previa y lo
+  que dice hoy la ficha al lado. Menús (estado por polaridad,
+  exclusivos de otra facción deshabilitados, 3 fórmulas de Ultimate, Habilidad Única opcional) y el texto libre admite `[[Estado]]`
+  → `<span>` oficial. Lo escrito a mano se ESCAPA. «Usar este kit» solo reemplaza las habilidades del formulario (las `other` se
+  conservan); se publica con el Guardar de siempre. Precarga nombres y pasivas del kit existente; activas y Ultimate se rehacen.
+  Ojo: los puntos de «Mi ficha» van por NOMBRE de habilidad: renombrar los deja de contar (la confirmación lo avisa).
+- **`effectHtml` viaja en el PATCH y se GUARDA** (`skillSchema`, `aplicarParche`). Antes `mutations` lo ponía a `null` siempre, así
+  que tocar UNA habilidad borraba los colores de TODO el kit (el PATCH reenvía la lista entera). Hoy el formulario lo devuelve tal
+  cual y solo lo suelta en la habilidad cuyo texto se reescribe a mano. Como la ficha pública lo inyecta como HTML, el servidor
+  acepta solo lista blanca (`htmlDeHabilidadSeguro`: `<br>`, `<span style>` sin `url(`, `<b>/<i>`, el `<div>` del scrape y
+  comentarios; las 1.055 habilidades del scrape pasan, comprobado: si no, reenviar su kit daría 400).
+
+## Datos personales ocultos en el mantenedor (streaming)
+
+El mantenedor se usa en directo: todo correo y el nombre civil nacen OCULTOS (`components/admin/dato-oculto.tsx`) y se revelan
+uno a uno con «Mostrar»; al volver a montar, se ocultan otra vez (no se guarda). Cubre la cabecera («Sesión de …», el usuario es el
+correo del admin), el correo de la ficha (paso Identidad: «Mostrar y editar»; si nace vacío, lo que se escribe queda a la vista),
+el contacto de una solicitud (correo y nombre civil), «resuelta por» y el actor de «Actividad reciente» (`QuizasCorreo`: solo si
+parece un correo). La máscara es de largo FIJO (`MASCARA_CORREO`): copiar el largo o el dominio ya daría pistas. Si añades una vista
+que muestre un correo, envuélvelo igual. Ojo: un botón dentro de un `<label>` (`Field`) hereda el texto de la etiqueta como nombre
+accesible; por eso los botones llevan `aria-label` explícito.
+
+## Dados de rol 3D (pestaña «Dados» del mantenedor)
+
+El admin tira los dados de la partida (la X de una Ultimate «Lanza 2d6», o cualquier tirada) en `components/admin/dados-panel.tsx`;
+la escena es `components/dados/` (un canvas, montado solo con la pestaña abierta).
+- **El resultado NO sale de la animación**: `tirar` (`dados-geometria.ts`) usa `crypto.getRandomValues` con rechazo (sin sesgo de
+  módulo) y el dado rueda hasta `orientacionFinal`, que deja ESA cara arriba (el d4, ese vértice). No hay motor de física: el tumbo
+  es un giro que se deshace y rebotes que decrecen. El panel muestra el número al acabar la duración conocida (`DADOS.duracionMs`),
+  no por aviso de la escena, así que se prueba sin WebGL.
+- **Forma**: vértices → envolvente convexa → caras (triángulos coplanares fundidos). Opuestas suman N+1; el d10 es un trapezoedro
+  pentagonal cuyas cometas solo son planas con el zigzag `H·(1−cos36°)/(1+cos36°)`. Bisel = envolvente de las caras encogidas
+  (`DADOS.bisel`). Todo probado en `dados-geometria.test.ts` (planitud, N+1, la cara de arriba es el resultado, UV no espejadas).
+- **Cristal**: `MeshPhysicalMaterial` con transmisión, `dispersion` y atenuación; reflejos de un `RoomEnvironment` local (sin HDR
+  descargado). Un atlas GRIS por tipo (`atlas.ts`) hace de `roughnessMap` (grabado esmerilado), `bumpMap` con escala NEGATIVA
+  (relieve inverso: el número se hunde) y `emissiveMap`. Sin la trama del tapete la refracción no se nota.
+- **Humo espectral** (`humo.ts`): cuadro-billboard con fbm, aditivo y SIN prueba de profundidad (el cuerpo con transmisión escribe
+  profundidad y lo taparía); la luz puntual de cada dado usa el mismo matiz y tiñe el tapete: es lo que asienta los dados en la mesa.
+- Calibrado mirando la escena en Chromium con SwiftShader (página temporal + CDP). Sin medir en GPU real; perillas en `ESCENA` y `HUMO`.
 
 ## Idiomas (es / en / ja) y traducción de la historia
 
@@ -1055,8 +1220,16 @@ se retiró: ya no hay nada con ese nombre en nginx, systemd ni `/var/www`.)
 - **Release**: `./scripts/release.sh` compila con `VTUBERDEX_STANDALONE=1` (`output: 'standalone'`, opt-in para no afectar
   a Vercel) y `SITE_URL=https://vtuberdex.com` **definida en el build** (la home es estática: sin ella el canonical se
   congela como `http://localhost:3000`). Deja `/srv/vtuberdex/releases/<fecha>/` con `index.html`, `.well-known/` (legibles)
-  y `app/` (la app, **modo 700**), apunta `/var/www/vtuberdex.com` a él (`ln -sfn`) y reinicia el servicio `vtuberdex`
-  (`node server.js` en 127.0.0.1:3100, `WorkingDirectory=/var/www/vtuberdex.com/app`). Volver atrás = repuntar el enlace.
+  y `app/` (la app, **modo 750, grupo `vtuberdex`**: nginx/`www-data` no la lee), apunta `/var/www/vtuberdex.com` a él
+  (`ln -sfn`) y reinicia el servicio `vtuberdex` (`node server.js` en 127.0.0.1:3100,
+  `WorkingDirectory=/var/www/vtuberdex.com/app`). Volver atrás = repuntar el enlace.
+- **Usuario del servicio (desde 2026-10-10)**: `vtuberdex` corre como el usuario de sistema `vtuberdex` (sin shell, no ve
+  `/home`), con Node del sistema en `/opt/node-v22.23.3` (copia del de nvm; al subir de versión hay que recopiarlo y editar
+  `ExecStart`) y aislado por systemd (`ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `NoNewPrivileges`; solo escribe en
+  `/var/lib/vtuberdex`). `madkoding` está en el grupo `vtuberdex` para desplegar (`release.sh` hace `chgrp vtuberdex`; si el
+  shell es anterior al alta en el grupo, `sg vtuberdex -c ./scripts/release.sh`). `vtuberdex-voces` sigue como `madkoding`
+  (necesita Piper). Si la web falla con `EACCES` tras un deploy, casi seguro es el grupo/permisos de `app/`. Copias previas al
+  cambio: `/etc/systemd/system/vtuberdex.service.bak-20261010-135103` y `/etc/vtuberdex.env.bak-20261010-135103`.
 - **Por qué `app/` cerrada y el release en `/srv`**: el script `ssl-dominios` de la VPS genera, al emitir un certificado, un
   bloque 443 que sirve `/var/www/<dominio>` COMO ESTÁTICO; con la app en la raíz quedaban descargables `deploy/data/*.db` y
   el código compilado. Y `www-data` no atraviesa `/home/madkoding`: el desafío ACME daba 404 (el primer intento de
@@ -1074,7 +1247,9 @@ se retiró: ya no hay nada con ese nombre en nginx, systemd ni `/var/www`.)
   asociado a su proyecto, pero ya no recibe tráfico.
 - **Entorno** en `/etc/vtuberdex.env` (600): URL `file:` de la base, usuario y hash del mantenedor, sal de likes,
   `SITE_URL`, `VTUBERDEX_VOCES_DIR`.
-- **Base**: `~/data/vtuberdex/turso-local.db` (WAL). `npm run copiar:turso` la rellena desde Turso (una vez; lotes
+- **Base**: `/var/lib/vtuberdex/data/turso-local.db` (WAL; propiedad de `vtuberdex`, grupo con escritura; `~/data/vtuberdex`
+  es un enlace simbólico a ese directorio, así que respaldo y scripts siguen funcionando; el original quedó en
+  `~/data/vtuberdex.old-20261010-135103`, borrar cuando se dé por bueno). `npm run copiar:turso` la rellena desde Turso (una vez; lotes
   de 5 filas en `asset_remoto`, porque Turso cortaba la conexión con lotes grandes de BLOB). `lib/ediciones.mjs`
   aplica pragmas (WAL, `busy_timeout`, `mmap`) solo para URLs `file:`. **Es la única copia de las ediciones** desde que se
   dejó Turso: producción en Vercel ya no recibe visitas, pero sus cambios previos al corte solo están en la copia de ese día.
@@ -1102,7 +1277,7 @@ Cada ficha con historia tiene un clip `<slug>.mp3`: una voz femenina española �
 «Nombre. País. Historia.» al entrar a la ficha. Hay un parlantito con mute sobre la carta
 (`components/voice-button.tsx`). **La voz sintética es propia: nunca se clona la de la Pokédex** (personaje comercial).
 
-- **Dónde viven**: `VTUBERDEX_VOCES_DIR` (VPS: `~/data/vtuberdex/voces/`), junto a un `<slug>.txt` con el guion con que
+- **Dónde viven**: `VTUBERDEX_VOCES_DIR` (VPS: `/var/lib/vtuberdex/data/voces/`), junto a un `<slug>.txt` con el guion con que
   se generó. La ruta `app/voces/[slug]/route.js` los sirve (con `Range`: Safari no reproduce `<audio>` sin 206).
 - **Qué se dice** (`lib/voz-guion.mjs`, pura y probada): se saltan las fichas sin historia (3), las de baja grado 1
   (`deteriorada-*`: su nombre es secreto) y las cuyo TEXTO no está en español; la historia se corta en una frase completa a

@@ -21,8 +21,10 @@ import { dbConDiario } from '../../../../lib/diario.mjs';
 import { conExperiencia, contarLikes } from '../../../../lib/likes.mjs';
 import { aplicarImagenesDelMantenedor, reemplazosDelMantenedor } from '../../../../lib/ediciones.mjs';
 import { KINDS_GESTIONABLES } from '../../../../lib/carpetas.mjs';
+import { xpJuegoDe } from '../../../../lib/minecraft.mjs';
 import { ejecutorDeSolicitudes } from '../../../../lib/solicitudes.mjs';
 import { marcarSinCorreo } from '../../../../lib/sin-correo.mjs';
+import { equilibrarStats } from '../../../../server/src/equilibrio.mjs';
 import { aplicarPuntosAStats, claveDeHabilidad, leerPuntosDeStats, leerRangos } from '../../../../server/src/mi-ficha.mjs';
 import { getNeighbors, getVtuberBySlug } from '../../../../server/src/search.mjs';
 
@@ -56,7 +58,9 @@ export async function GET(_request, { params }) {
    */
   let conLikes = { ...conImagenes, likes: 0 };
   try {
-    conLikes = conExperiencia(conImagenes, await contarLikes(card.id));
+    // La XP de Minecraft (`lib/minecraft.mjs`) se suma como la de los likes; si su almacén falla, vale 0.
+    const [likes, xpJuego] = await Promise.all([contarLikes(card.id), xpJuegoDe(card.id)]);
+    conLikes = conExperiencia(conImagenes, likes, xpJuego);
   } catch (error) {
     console.error(`[likes] la ficha ${slug} sale sin likes: ${error.message}`);
   }
@@ -70,6 +74,7 @@ export async function GET(_request, { params }) {
   }
   // Los stats que la persona subió con sus puntos y el bono automático por niveles (velocidad, evasión…) se ven
   // en la ficha pública. Si el almacén falla, la ficha sale con sus valores base.
+  conLikes = { ...conLikes, stats: equilibrarStats(conLikes.stats) };
   try {
     const puestos = await leerPuntosDeStats(await ejecutorDeSolicitudes(), card.id);
     conLikes = { ...conLikes, stats: aplicarPuntosAStats(conLikes.stats, puestos, conLikes.levelsGained ?? 0) };

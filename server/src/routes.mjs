@@ -41,6 +41,7 @@ import {
   resolverSolicitud,
 } from './solicitudes.mjs';
 import { listarConCorreo } from './correo-fichas.mjs';
+import { estadisticasDelMantenedor } from './estadisticas-admin.mjs';
 import { resumenDeRechazos } from './rechazos.mjs';
 import { prepararModificacion } from './modificacion.mjs';
 import { UPLOADABLE_KINDS, MAX_UPLOAD_BYTES, saveUploadedImage, saveFactionEmblem, removeUploadedImage } from './uploads.mjs';
@@ -579,21 +580,12 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
     res.json({ items: rows });
   });
 
-  router.get('/admin/stats', requireAdmin, (req, res) => {
-    const totals = db
-      .prepare(
-        `SELECT COUNT(*) AS total,
-                SUM(CASE WHEN has_detail = 1 THEN 1 ELSE 0 END) AS withDetail,
-                SUM(CASE WHEN status != 'published' THEN 1 ELSE 0 END) AS notPublished
-           FROM vtuber`,
-      )
-      .get();
-    const quality = db
-      .prepare(`SELECT data_quality AS flags, COUNT(*) AS count FROM vtuber GROUP BY data_quality ORDER BY count DESC`)
-      .all()
-      .map((row) => ({ flags: JSON.parse(row.flags ?? '[]'), count: row.count }));
-    const themes = db.prepare('SELECT COUNT(DISTINCT theme_color) AS n FROM vtuber').get().n;
-    res.json({ totals, themes, quality });
+  router.get('/admin/stats', requireAdmin, async (req, res, next) => {
+    try {
+      res.json(await estadisticasDelMantenedor(db, solicitudes));
+    } catch (error) {
+      next(error);
+    }
   });
 
   void imageRoot;

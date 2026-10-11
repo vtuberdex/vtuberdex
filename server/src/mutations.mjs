@@ -19,6 +19,7 @@
  */
 import { TODOS_LOS_GRADOS, esGradoPremium, esGradoValido, hoy, mesesCalendario } from './premium.mjs';
 import { normalizeText, slugify } from './text.mjs';
+import { valorEquilibrado } from './equilibrio.mjs';
 
 /**
  * Transacción local. NO se importa la de `db/index.mjs` a propósito: ese módulo importa éste
@@ -77,6 +78,9 @@ export class MutationError extends Error {
 }
 
 /** Mismo puntaje que usa el seed para el orden por "poder" (ver `seed.mjs`). */
+/** Nivel y EXP son progreso (salen de `experiencia.mjs`), no poder de combate. */
+const FUERA_DEL_PODER = new Set(['level', 'exp']);
+
 const POWERS = { attack: 1.2, magicAttack: 1.3, speed: 1.1, defense: 0.8, magicDefense: 0.9, critic: 0.6 };
 
 /**
@@ -88,9 +92,9 @@ export function calcularPoder(stats) {
   if (!stats || stats.length === 0) return 0;
   const porSlug = new Map(stats.map((stat) => [stat.slug, Number(stat.value) || 0]));
   let total = 0;
-  for (const [slug, peso] of Object.entries(POWERS)) total += (porSlug.get(slug) ?? 0) * peso;
+  for (const [slug, peso] of Object.entries(POWERS)) total += valorEquilibrado(slug, porSlug.get(slug) ?? 0) * peso;
   for (const stat of stats) {
-    if (!(stat.slug in POWERS)) total += (Number(stat.value) || 0) * 0.3;
+    if (!(stat.slug in POWERS) && !FUERA_DEL_PODER.has(stat.slug)) total += valorEquilibrado(stat.slug, stat.value) * 0.3;
   }
   return Math.round(total);
 }
@@ -277,8 +281,13 @@ export function replaceChildren(db, vtuberId, patch) {
         skill.type ?? null,
         skill.name ?? null,
         skill.effect ?? null,
-        // El HTML original del scrape ya no describe el texto editado: se descarta.
-        null,
+        /**
+         * El HTML con colores viaja con la habilidad y se conserva. Antes se descartaba SIEMPRE («el
+         * HTML del scrape ya no describe el texto editado»), así que tocar UNA habilidad borraba los
+         * colores de todo el kit. Hoy el formulario lo reenvía tal cual en las que no se tocaron y lo
+         * suelta solo en la que se reescribió a mano (`SkillsEditor`).
+         */
+        skill.effectHtml ?? null,
         JSON.stringify(skill.factions ?? []),
         index,
       ),

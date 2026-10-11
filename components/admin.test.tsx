@@ -58,7 +58,17 @@ beforeEach(() => {
   mocks.dexNext.mockResolvedValue({ next: 786 });
   mocks.factions.mockResolvedValue({ items: FACTIONS });
   mocks.session.mockResolvedValue({ user: { username: 'admin', role: 'admin' } });
-  mocks.adminStats.mockResolvedValue({ totals: { total: 785, withDetail: 211, notPublished: 1 }, themes: 205, quality: [] });
+  mocks.adminStats.mockResolvedValue({
+    totals: { total: 785, withDetail: 211, notPublished: 1, sinProblemas: 700 },
+    estados: { published: 784, draft: 1, hidden: 0 },
+    themes: 205,
+    quality: [],
+    paises: [{ name: 'Chile', flag: '🇨🇱', count: 120 }],
+    facciones: [{ name: 'Netherbane', count: 40 }],
+    grados: [{ grade: '10', count: 1 }, { grade: '1', count: 2 }],
+    correo: { con: 12, sin: 773 },
+    solicitudes: { pendientes: { inscripcion: 2, modificacion: 1, baja: 0 } },
+  });
   mocks.audit.mockResolvedValue({ items: [] });
   mocks.list.mockResolvedValue(makeList());
   mocks.adminList.mockResolvedValue({ items: [], total: 0, page: 1, perPage: 40, pageCount: 1 });
@@ -148,6 +158,9 @@ describe('Asistente de carta: edición', () => {
     const { notify } = await renderWizard();
     expect(screen.queryByRole('button', { name: 'Guardar cambio de correo' })).not.toBeInTheDocument();
     mocks.setVtuberEmail.mockResolvedValue({ email: 'ana@ejemplo.com', bienvenida: 'enviada' });
+    // Si la ficha ya trae correo, nace oculto (streaming): hay que pedir verlo para editarlo.
+    const mostrar = screen.queryByRole('button', { name: /Mostrar y editar/ });
+    if (mostrar) fireEvent.click(mostrar);
     fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: ' Ana@Ejemplo.com ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambio de correo' }));
     await waitFor(() => expect(mocks.setVtuberEmail).toHaveBeenCalledWith('t', 18, 'Ana@Ejemplo.com'));
@@ -155,6 +168,15 @@ describe('Asistente de carta: edición', () => {
     await waitFor(() => expect(notify).toHaveBeenCalledWith('ok', expect.stringContaining('bienvenida')));
     expect(screen.getByLabelText('Correo electrónico')).toHaveValue('ana@ejemplo.com');
     expect(screen.queryByRole('button', { name: 'Guardar cambio de correo' })).not.toBeInTheDocument();
+  });
+
+  test('el correo de la ficha nace OCULTO (streaming) y se revela solo al pedirlo', async () => {
+    await renderWizard({ initial: makeDetail({ id: 18, email: 'secreto@ejemplo.com' }) });
+    expect(screen.getByTestId('correo-oculto')).toHaveTextContent('••••••@••••');
+    expect(document.body).not.toHaveTextContent('secreto@ejemplo.com');
+    expect(screen.queryByDisplayValue('secreto@ejemplo.com')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Mostrar y editar/ }));
+    expect(screen.getByLabelText('Correo electrónico')).toHaveValue('secreto@ejemplo.com');
   });
 
   test('un 409 de número ocupado se explica y propone cómo resolverlo', async () => {
@@ -179,7 +201,7 @@ describe('Asistente de carta: edición', () => {
 
   test('una red con URL sin http bloquea el guardado y lo explica', async () => {
     await renderWizard();
-    fireEvent.click(stepButton(/Atributos, habilidades y redes/));
+    fireEvent.click(stepButton(/Redes sociales/));
     fireEvent.click(screen.getByRole('button', { name: '+ Twitch' }));
     fireEvent.change(screen.getByPlaceholderText('https://twitch.tv/tu_canal'), { target: { value: 'javascript:alert(1)' } });
     expect(screen.getByTestId('admin-editor-invalid')).toHaveTextContent(/http/);
@@ -487,16 +509,23 @@ describe('buildPatch', () => {
     expect(buildPatch(detail, formFromDetail(detail))).toEqual({ patch: {}, errors: [] });
   });
 
-  test('las facciones salen como slugs y las habilidades conservan sus emblemas', () => {
+  test('las facciones salen como slugs y las habilidades conservan sus emblemas y su HTML con colores', () => {
+    const html = 'Aplicas <span style="color:#074fcc; font-weight:bold;">Miedo</span>.<br>';
     const detail = makeDetail({
-      skills: [{ category: 'active', section: null, type: null, name: 'Golpe', effect: 'x', effectHtml: null, factions: [{ src: 'a.png', name: 'A' }], position: 0 }],
+      skills: [
+        { category: 'active', section: null, type: null, name: 'Golpe', effect: 'x', effectHtml: null, factions: [{ src: 'a.png', name: 'A' }], position: 0 },
+        { category: 'passive', section: null, type: null, name: 'Calma', effect: 'Aplicas Miedo.', effectHtml: html, factions: [], position: 1 },
+      ],
     });
     const form = formFromDetail(detail);
     expect(form.factions).toEqual(['mythical-legacy']);
     form.skills[0].name = 'Golpe fuerte';
     const { patch } = buildPatch(detail, form);
+    // Tocar UNA habilidad reenvía el kit entero: la que no se tocó tiene que volver con su HTML,
+    // o el servidor la guardaría sin colores (lo que pasaba antes de `effectHtml` en el formulario).
     expect(patch.skills).toEqual([
-      { category: 'active', section: null, type: null, name: 'Golpe fuerte', effect: 'x', factions: [{ src: 'a.png', name: 'A' }] },
+      { category: 'active', section: null, type: null, name: 'Golpe fuerte', effect: 'x', effectHtml: null, factions: [{ src: 'a.png', name: 'A' }] },
+      { category: 'passive', section: null, type: null, name: 'Calma', effect: 'Aplicas Miedo.', effectHtml: html, factions: [] },
     ]);
   });
 });
@@ -551,7 +580,7 @@ describe('AdminPage', () => {
     render(<AdminPage />);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Nueva carta' }))[0]);
     expect(await screen.findByTestId('admin-editor')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Paso 1 de 6: Identidad/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Paso 1 de 8: Identidad/ })).toBeInTheDocument();
   });
 
   test('abre una ficha por id con la ruta del mantenedor, con insignia de completitud', async () => {
@@ -560,10 +589,49 @@ describe('AdminPage', () => {
     mocks.adminList.mockResolvedValue({ items: [detail], total: 1, page: 1, perPage: 40, pageCount: 1 });
     mocks.adminDetail.mockResolvedValue(detail);
     render(<AdminPage />);
+    // Sin búsqueda ni filtro la lista no pide nada: es un buscador, no un índice.
+    expect(await screen.findByTestId('list-idle')).toBeInTheDocument();
+    expect(mocks.adminList).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByPlaceholderText('nombre o número'), { target: { value: 'gkuro' } });
     const row = await screen.findByRole('button', { name: /GKuro Monochrome/ });
+    expect(mocks.adminList).toHaveBeenLastCalledWith('tok', expect.objectContaining({ q: 'gkuro', perPage: 10 }), expect.anything());
     expect(within(row).getByTestId('row-percent')).toHaveTextContent(/%/);
     fireEvent.click(row);
     await waitFor(() => expect(mocks.adminDetail).toHaveBeenCalledWith('tok', 18));
     expect(await screen.findByTestId('admin-editor')).toBeInTheDocument();
+  });
+
+  test('al buscar sale un spinner hasta que llega la respuesta, sin decir «ninguna coincide» antes de tiempo', async () => {
+    window.localStorage.setItem('vtuberdex.admin.token', 'tok');
+    let responder: (value: unknown) => void = () => {};
+    mocks.adminList.mockReturnValue(new Promise((resolve) => (responder = resolve)));
+    render(<AdminPage />);
+    await screen.findByTestId('list-idle');
+    expect(screen.queryByTestId('list-spinner')).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText('nombre o número'), { target: { value: 'nadie' } });
+    expect(await screen.findByTestId('list-spinner')).toBeInTheDocument();
+    expect(screen.getByTestId('list-count')).toHaveTextContent('Buscando…');
+    expect(screen.queryByTestId('list-empty')).toBeNull();
+    await act(async () => responder({ items: [], total: 0, page: 1, perPage: 10, pageCount: 0 }));
+    expect(screen.queryByTestId('list-spinner')).toBeNull();
+    expect(screen.getByTestId('list-empty')).toBeInTheDocument();
+  });
+
+  test('el panel muestra medidores y gráficos del catálogo, en su propia pestaña', async () => {
+    window.localStorage.setItem('vtuberdex.admin.token', 'tok');
+    render(<AdminPage />);
+    const pestana = await screen.findByRole('tab', { name: 'Estadísticas' });
+    // Montado pero oculto mientras se trabaja en otra pestaña.
+    expect(await screen.findByTestId('panel-estadisticas', {}, { timeout: 2000 }).then((p) => p.closest('[role="tabpanel"]'))).toHaveAttribute('hidden');
+    fireEvent.click(pestana);
+    const panel = screen.getByTestId('panel-estadisticas');
+    expect(panel.closest('[role="tabpanel"]')).not.toHaveAttribute('hidden');
+    expect(within(panel).getAllByTestId('medidor')).toHaveLength(4);
+    expect(within(panel).getByRole('img', { name: /Publicadas: 100%/ })).toBeInTheDocument();
+    expect(within(panel).getByRole('img', { name: /Con correo: 2%/ })).toBeInTheDocument();
+    expect(within(panel).getByText('Top 10 países')).toBeInTheDocument();
+    expect(within(panel).getByTitle('🇨🇱 Chile: 120')).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole('button', { name: 'revisar' }));
+    expect(screen.getByRole('tab', { name: 'Solicitudes' })).toHaveAttribute('aria-selected', 'true');
   });
 });

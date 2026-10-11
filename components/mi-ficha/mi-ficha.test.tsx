@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { MiFicha } from '@/components/mi-ficha/mi-ficha';
 import { ApiError, type VistaMiFicha } from '@/lib/api';
 
-const mocks = vi.hoisted(() => ({ miFicha: vi.fn(), repartirPuntos: vi.fn(), pedirEnlaceDeMiFicha: vi.fn() }));
+const mocks = vi.hoisted(() => ({ miFicha: vi.fn(), repartirPuntos: vi.fn(), pedirEnlaceDeMiFicha: vi.fn(), minecraftDeMiFicha: vi.fn() }));
 vi.mock('@/lib/api', async (importActual) => {
   const actual = await importActual<typeof import('@/lib/api')>();
   return { ...actual, api: { ...mocks } };
@@ -88,5 +88,32 @@ describe('MiFicha', () => {
     render(<MiFicha />);
     expect(await screen.findByText(/caducó o ya no sirve/)).toBeTruthy();
     expect(screen.getByTestId('mificha-pedir')).toBeTruthy();
+  });
+
+  test('Minecraft: pide el código, lo muestra con el comando y deja desvincular', async () => {
+    const sinVinculo = { ...vista(0), minecraft: { vinculado: false, jugador: null, desde: null, xpJuego: 0 } };
+    const vinculada = { ...vista(0), minecraft: { vinculado: true, jugador: 'LunaMC', desde: '2026-10-07', xpJuego: 120 } };
+    mocks.miFicha.mockResolvedValue({ ok: true, fichas: [{ slug: 'luna', name: 'Luna' }], ficha: sinVinculo });
+    mocks.minecraftDeMiFicha.mockResolvedValueOnce({ ok: true, ficha: sinVinculo, codigo: { codigo: 'ABCD2345', expira: 'x' } });
+    render(<MiFicha />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Obtener código' }));
+    expect((await screen.findByTestId('mificha-minecraft-codigo')).textContent).toBe('/vtd vincular ABCD2345');
+    expect(mocks.minecraftDeMiFicha).toHaveBeenCalledWith('abc', 'luna', 'codigo');
+
+    mocks.miFicha.mockResolvedValue({ ok: true, fichas: [{ slug: 'luna', name: 'Luna' }], ficha: vinculada });
+    mocks.minecraftDeMiFicha.mockResolvedValueOnce({ ok: true, ficha: sinVinculo });
+    fireEvent.click(await screen.findByRole('button', { name: 'Obtener código' }));
+    await waitFor(() => expect(screen.queryByTestId('mificha-minecraft-codigo')).toBeNull());
+  });
+
+  test('Minecraft: vinculada muestra el jugador y la XP del juego', async () => {
+    mocks.miFicha.mockResolvedValue({ ok: true, fichas: [{ slug: 'luna', name: 'Luna' }], ficha: { ...vista(0), minecraft: { vinculado: true, jugador: 'LunaMC', desde: '2026-10-07', xpJuego: 120 } } });
+    mocks.minecraftDeMiFicha.mockResolvedValue({ ok: true, ficha: { ...vista(0), minecraft: { vinculado: false, jugador: null, desde: null, xpJuego: 120 } } });
+    render(<MiFicha />);
+    expect(await screen.findByText('Vinculada a LunaMC.')).toBeTruthy();
+    expect(screen.getByText(/jugando: 120/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Desvincular' }));
+    expect(await screen.findByText(/se desvinculó/)).toBeTruthy();
+    expect(mocks.minecraftDeMiFicha).toHaveBeenCalledWith('abc', 'luna', 'desvincular');
   });
 });

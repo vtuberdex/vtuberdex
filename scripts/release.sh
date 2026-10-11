@@ -44,7 +44,10 @@ cat > "$destino/index.html" <<'H'
 H
 chmod 755 "$destino" "$destino/.well-known" "$destino/.well-known/acme-challenge"
 chmod 644 "$destino/index.html"
-chmod -R go-rwx "$destino/app"   # nginx no puede leer la app: solo el servicio (madkoding)
+# nginx (www-data) no puede leer la app: solo el servicio, que corre como `vtuberdex`.
+# Grupo `vtuberdex` = lectura; madkoding (dueño, miembro del grupo) sigue siendo quien despliega.
+chgrp -R vtuberdex "$destino/app"
+chmod -R u+rwX,g+rX,o-rwx "$destino/app"
 
 for dominio in $DOMINIOS; do
   sudo ln -sfn "$destino" "/var/www/$dominio"

@@ -22,6 +22,7 @@ import {
   visitanteValido,
   yaDioLikeHoy,
 } from '../../../../../lib/likes.mjs';
+import { xpJuegoDe } from '../../../../../lib/minecraft.mjs';
 import { avisarSubidaDeNivel } from '../../../../../lib/mi-ficha.mjs';
 import { getVtuberBySlug } from '../../../../../server/src/search.mjs';
 
@@ -53,8 +54,8 @@ export async function GET(request, { params }) {
   if (!card) return responder({ error: 'no_encontrado' }, 404);
   const { visitante, cabeceras } = identificar(request);
   try {
-    const [likes, liked] = await Promise.all([contarLikes(card.id), yaDioLikeHoy({ vtuberId: card.id, visitante })]);
-    return responder(resumenDeLikes(card, likes, liked), 200, cabeceras);
+    const [likes, liked, xpJuego] = await Promise.all([contarLikes(card.id), yaDioLikeHoy({ vtuberId: card.id, visitante }), xpJuegoDe(card.id)]);
+    return responder(resumenDeLikes(card, likes, liked, xpJuego), 200, cabeceras);
   } catch (error) {
     console.error(`[likes] no se pudo leer el estado de ${slug}: ${error.message}`);
     return responder({ error: 'likes_no_disponibles' }, 503);
@@ -69,18 +70,18 @@ export async function POST(request, { params }) {
   const { visitante, cabeceras } = identificar(request);
   try {
     const resultado = await darLike({ vtuberId: card.id, visitante, ip: ipDelCliente(request.headers) });
-    const likes = await contarLikes(card.id);
+    const [likes, xpJuego] = await Promise.all([contarLikes(card.id), xpJuegoDe(card.id)]);
     if (!resultado.ok) {
       const detalle =
         resultado.motivo === 'ya_dio_like_hoy'
           ? 'Ya le diste like a este VTuber hoy. Vuelve mañana.'
           : 'Se alcanzó el máximo de likes de hoy desde esta red.';
-      return responder({ error: resultado.motivo, detail: detalle, ...resumenDeLikes(card, likes, resultado.motivo === 'ya_dio_like_hoy') }, 409, cabeceras);
+      return responder({ error: resultado.motivo, detail: detalle, ...resumenDeLikes(card, likes, resultado.motivo === 'ya_dio_like_hoy', xpJuego) }, 409, cabeceras);
     }
     // Si este like hizo subir de nivel a la ficha, su titular recibe el enlace para repartir puntos. En segundo
     // plano: el correo no retrasa ni puede romper el like (`avisarSubidaDeNivel` nunca lanza).
-    void avisarSubidaDeNivel({ card, likes });
-    return responder(resumenDeLikes(card, likes, true), 200, cabeceras);
+    void avisarSubidaDeNivel({ card, likes, xpJuego });
+    return responder(resumenDeLikes(card, likes, true, xpJuego), 200, cabeceras);
   } catch (error) {
     console.error(`[likes] no se pudo registrar el like de ${slug}: ${error.message}`);
     return responder({ error: 'likes_no_disponibles', detail: 'No se pudo registrar el like. Inténtalo de nuevo.' }, 503);

@@ -1,0 +1,94 @@
+# Análisis de seguridad y calidad -> SonarQube (sonar.kodingvibes.com).
+#
+# Sonar Community Build no hace análisis de taint (SQLi, XSS, path traversal...).
+# Lo hacen Semgrep OSS y CodeQL, y sus resultados SARIF se importan a Sonar para
+# verlos en un solo panel y poder usarlos en el quality gate.
+#
+# Secrets requeridos: SONAR_TOKEN y SONAR_HOST_URL (https://sonar.kodingvibes.com).
+
+name: sonar
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Semgrep OSS
+        run: |
+          pip install semgrep
+          semgrep scan \
+            --config p/owasp-top-ten --config p/security-audit \
+            --config p/javascript --config p/typescript --config p/nodejs \
+            --exclude node_modules --exclude .next --exclude deploy --exclude data \
+            --sarif --output semgrep.sarif --metrics=off
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sarif-semgrep
+          path: semgrep.sarif
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+        with:
+          output: codeql-sarif
+      # El SARIF queda en codeql-sarif/javascript.sarif; se renombra para Sonar.
+      - run: cp codeql-sarif/javascript.sarif codeql.sarif
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sarif-codeql
+          path: codeql.sarif
+
+  sonar:
+    needs: [semgrep, codeql]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Sonar necesita el historial para atribuir código nuevo
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Cobertura (vitest)
+        run: npx vitest run --coverage
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sarif-*
+          path: sarif
+          merge-multiple: true
+      - uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      # Falla el job si el quality gate no pasa.
+      - uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

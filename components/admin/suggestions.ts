@@ -20,9 +20,3 @@ export function placeholderFor(platform: string): string {
 
 export const BRAND_SWATCHES = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899', '#e5e7eb', '#616161'];
 
-export const SKILL_CATEGORY_HELP: Array<{ label: string; text: string }> = [
-  { label: 'Activa', text: 'Se usa a voluntad durante el combate.' },
-  { label: 'Pasiva', text: 'Siempre está funcionando, sin activarla.' },
-  { label: 'Definitiva', text: 'La habilidad más poderosa, de uso limitado.' },
-  { label: 'Otra', text: 'Cualquier cosa que no encaje en las anteriores.' },
-];

@@ -318,3 +318,25 @@ describe('avisa al generador de voces cuando una ficha cambia', () => {
     expect(fs.existsSync(path.join(voces, '.cola'))).toBe(false);
   });
 });
+
+describe('copias huérfanas en /tmp', () => {
+  test('borra las de procesos muertos y respeta la propia, las vivas y los archivos ajenos', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'diario-barrido-'));
+    try {
+      const muerto = 2 ** 22 + 12345; // por encima del pid_max por defecto: no puede existir
+      const nombres = [
+        `vtuberdex-${muerto}-1.db`,
+        `vtuberdex-${muerto}-1.db-wal`,
+        `vtuberdex-${muerto}-1.db-shm`,
+        `vtuberdex-${process.pid}-2.db`,
+        `vtuberdex-1-3.db`, // pid 1 (init): vivo
+        'otra-cosa.db',
+      ];
+      for (const n of nombres) fs.writeFileSync(path.join(dir, n), '');
+      expect(diario.barrerCopiasHuerfanas(dir)).toBe(3);
+      expect(fs.readdirSync(dir).sort()).toEqual([`vtuberdex-${process.pid}-2.db`, 'vtuberdex-1-3.db', 'otra-cosa.db'].sort());
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

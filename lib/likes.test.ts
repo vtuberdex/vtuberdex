@@ -122,8 +122,8 @@ describe('experiencia en la ficha', () => {
     expect(conExperiencia(base, 0)).toMatchObject({ likes: 0, level: 1, experience: { current: 0, max: 100 } });
     expect(conExperiencia(base, 3)).toMatchObject({ likes: 3, level: 1, experience: { current: 30, max: 100 } });
     expect(conExperiencia(base, 10)).toMatchObject({ level: 2, experience: { current: 0 } });
-    // Una ficha con experiencia propia suma sobre ella.
-    expect(conExperiencia({ level: 3, experience: { current: 65, max: 500 } }, 2).experience).toEqual({ current: 85, max: 500, total: 335 });
+    // El nivel y la barra que traiga la ficha (manuales) NO cuentan: manda la fórmula.
+    expect(conExperiencia({ level: 3, experience: { current: 65, max: 500 } }, 2).experience).toEqual({ current: 20, max: 100, total: 20 });
   });
 
   test('el resumen del visitante lleva el estado «ya dio like»', () => {

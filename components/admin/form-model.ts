@@ -38,6 +38,11 @@ export interface SkillForm {
   type: string;
   name: string;
   effect: string;
+  /**
+   * El efecto con colores (`<span>` de estado y `<br>`). Viaja de vuelta tal cual: sin él, guardar
+   * cualquier cambio del kit borraba los colores de TODAS las habilidades. `null` = solo texto.
+   */
+  effectHtml: string | null;
   factions: Array<{ src: string | null; name: string | null }>;
 }
 
@@ -129,6 +134,7 @@ export function formFromDetail(detail: VtuberDetail): EditorForm {
       type: skill.type ?? '',
       name: skill.name ?? '',
       effect: skill.effect ?? '',
+      effectHtml: skill.effectHtml ?? null,
       // Se conservan tal cual: no se crean a mano y perderlas borraría los emblemas.
       factions: skill.factions ?? [],
     })),
@@ -142,7 +148,7 @@ export function formFromDetail(detail: VtuberDetail): EditorForm {
 }
 
 export const emptyStat = (): StatForm => ({ label: '', value: '', max: '', valueText: '', slug: '' });
-export const emptySkill = (): SkillForm => ({ category: 'active', section: '', type: '', name: '', effect: '', factions: [] });
+export const emptySkill = (): SkillForm => ({ category: 'active', section: '', type: '', name: '', effect: '', effectHtml: null, factions: [] });
 export const emptySocial = (): SocialForm => ({ platform: '', label: '', url: '', icon: '' });
 
 const orNull = (value: string): string | null => value.trim() || null;
@@ -216,6 +222,7 @@ export function toPayload(form: EditorForm): { payload: VtuberPatch; errors: Pay
       type: orNull(skill.type),
       name: orNull(skill.name),
       effect: orNull(skill.effect),
+      effectHtml: skill.effectHtml || null,
       factions: skill.factions,
     });
   }
