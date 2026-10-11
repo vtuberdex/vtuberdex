@@ -191,6 +191,16 @@ export interface VistaMiFicha {
   puntos: { habilidades: HabilidadMejorable[]; ganados: number; repartidos: number; disponibles: number; rangoMaximo: number; puntosPorNivel: number };
   /** Puntos de stats (bolsa aparte de las habilidades). Opcional: la maqueta de /niveles no lo trae. */
   statsPuntos?: EstadoDeStats;
+  /** Cuenta de Minecraft vinculada y XP traída del juego. Opcional: la maqueta de /niveles no lo trae. */
+  minecraft?: EstadoMinecraft;
+}
+
+/** «Mi ficha»: el vínculo con Minecraft (el UUID no se muestra; basta el nombre de jugador). */
+export interface EstadoMinecraft {
+  vinculado: boolean;
+  jugador: string | null;
+  desde: string | null;
+  xpJuego: number;
 }
 
 export interface RespuestaMiFicha {
@@ -407,6 +417,13 @@ export const api = {
   /** Gasta un punto de habilidad (`subir`) o de stat (`subir-stat`, `clave` = slug), o devuelve los repartidos de esa bolsa. */
   repartirPuntos(token: string, slug: string, accion: 'subir' | 'reiniciar' | 'subir-stat' | 'reiniciar-stats', clave?: string) {
     return request<{ ok: true; ficha: VistaMiFicha }>('/api/mi-ficha/puntos', { method: 'POST', body: JSON.stringify({ token, slug, accion, clave }) });
+  },
+  /** Código de un uso para vincular la cuenta de Minecraft (`codigo`) o soltar el vínculo (`desvincular`). */
+  minecraftDeMiFicha(token: string, slug: string, accion: 'codigo' | 'desvincular') {
+    return request<{ ok: true; ficha: VistaMiFicha; codigo?: { codigo: string; expira: string } }>('/api/mi-ficha/minecraft', {
+      method: 'POST',
+      body: JSON.stringify({ token, slug, accion }),
+    });
   },
   /** Manda el enlace mágico a ese correo si tiene fichas; responde igual para cualquiera. */
   pedirEnlaceDeMiFicha(email: string) {

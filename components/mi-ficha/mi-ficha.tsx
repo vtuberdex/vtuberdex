@@ -15,9 +15,10 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 import { Aviso, claseBoton, claseInput, claseEtiqueta } from '@/components/solicitudes/campos';
-import { ApiError, api, type EstadoDeStats, type HabilidadMejorable, type RespuestaMiFicha, type VistaMiFicha } from '@/lib/api';
+import { ApiError, api, type EstadoDeStats, type EstadoMinecraft, type HabilidadMejorable, type RespuestaMiFicha, type VistaMiFicha } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import type { Clave } from '@/lib/i18n/mensajes';
+import { XP_JUEGO_MAX_DIA } from '@/server/src/experiencia.mjs';
 
 const CATEGORIAS: Array<HabilidadMejorable['category']> = ['active', 'passive', 'ultimate', 'other'];
 
@@ -161,6 +162,55 @@ function SeccionStats({
   );
 }
 
+/**
+ * Vincular la cuenta de Minecraft: un código de un uso que se escribe en el chat del juego. El código se muestra UNA
+ * vez (solo se guarda su hash) y caduca en 10 minutos; pedir otro invalida el anterior.
+ */
+function SeccionMinecraft({
+  estado,
+  codigo,
+  ocupada,
+  alPedirCodigo,
+  alDesvincular,
+}: {
+  estado: EstadoMinecraft;
+  codigo: string | null;
+  ocupada: string | null;
+  alPedirCodigo: () => void;
+  alDesvincular: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <section className="space-y-3 rounded-2xl border border-dex-line bg-dex-panel/60 p-5" data-testid="mificha-minecraft">
+      <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">{t('mificha.minecraftTitulo')}</h3>
+      <p className="text-sm text-dex-ink/85">{t('mificha.minecraftTexto', { tope: XP_JUEGO_MAX_DIA })}</p>
+      {estado.vinculado && (
+        <p className="text-sm text-dex-ink">
+          {estado.jugador ? t('mificha.minecraftVinculado', { jugador: estado.jugador }) : t('mificha.minecraftVinculadoSinNombre')}
+        </p>
+      )}
+      {estado.xpJuego > 0 && <p className="text-xs text-dex-muted">{t('mificha.minecraftXp', { n: estado.xpJuego.toLocaleString() })}</p>}
+      {codigo && (
+        <div className="rounded-xl border border-dex-accent/40 bg-black/30 p-4">
+          <p className="text-xs text-dex-muted">{t('mificha.minecraftCodigo')}</p>
+          <p className="mt-1 select-all font-mono text-lg font-bold text-dex-ink" data-testid="mificha-minecraft-codigo">/vtd vincular {codigo}</p>
+          <p className="mt-1 text-xs text-dex-muted">{t('mificha.minecraftCodigoVence')}</p>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={ocupada !== null} onClick={alPedirCodigo} className={claseBoton}>
+          {ocupada === 'minecraft' ? t('mificha.minecraftPidiendo') : t('mificha.minecraftPedir')}
+        </button>
+        {estado.vinculado && (
+          <button type="button" disabled={ocupada !== null} onClick={alDesvincular} className="rounded-xl border border-dex-line px-4 py-2 text-sm text-dex-muted hover:text-dex-ink">
+            {t('mificha.minecraftDesvincular')}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function MiFicha() {
   const { t } = useI18n();
   const [token, setToken] = useState<string | null>(null);
@@ -171,6 +221,7 @@ export function MiFicha() {
   const [aviso, setAviso] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [confirmando, setConfirmando] = useState(false);
   const [confirmandoStats, setConfirmandoStats] = useState(false);
+  const [codigoMinecraft, setCodigoMinecraft] = useState<string | null>(null);
 
   const cargar = useCallback(async (tk: string, slug?: string) => {
     try {
@@ -215,6 +266,23 @@ export function MiFicha() {
     }
   };
 
+  const minecraft = async (accion: 'codigo' | 'desvincular', ficha: VistaMiFicha) => {
+    if (!token) return;
+    setOcupada('minecraft');
+    setAviso(null);
+    try {
+      const r = await api.minecraftDeMiFicha(token, ficha.slug, accion);
+      setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
+      setCodigoMinecraft(r.codigo?.codigo ?? null);
+      if (accion === 'desvincular') setAviso({ tipo: 'ok', texto: t('mificha.minecraftDesvinculado') });
+    } catch (causa) {
+      if (causa instanceof ApiError && causa.status === 410) setError({ tipo: 'caducado' });
+      else setAviso({ tipo: 'error', texto: causa instanceof ApiError ? causa.message : t('mificha.errorGeneral') });
+    } finally {
+      setOcupada(null);
+    }
+  };
+
   if (!listo) return <p className="text-sm text-dex-muted">{t('mificha.cargando')}</p>;
   if (!token) return <PedirEnlace />;
   if (error?.tipo === 'caducado') return <PedirEnlace aviso={t('mificha.enlaceCaducado')} />;
@@ -232,7 +300,13 @@ export function MiFicha() {
       alSubirStat={(slug, nombre) => void aplicar('subir-stat', datos.ficha, slug, nombre)}
       alReiniciarStats={() => void aplicar('reiniciar-stats', datos.ficha)}
       alConfirmarStats={setConfirmandoStats}
-      alElegirFicha={(slug) => token && void cargar(token, slug)}
+      codigoMinecraft={codigoMinecraft}
+      alPedirCodigo={() => void minecraft('codigo', datos.ficha)}
+      alDesvincular={() => void minecraft('desvincular', datos.ficha)}
+      alElegirFicha={(slug) => {
+        setCodigoMinecraft(null);
+        if (token) void cargar(token, slug);
+      }}
       alSubir={(clave, nombre) => void aplicar('subir', datos.ficha, clave, nombre)}
       alReiniciar={() => void aplicar('reiniciar', datos.ficha)}
       alConfirmar={setConfirmando}
@@ -253,6 +327,9 @@ export function MiFichaVista({
   alSubirStat = () => {},
   alReiniciarStats = () => {},
   alConfirmarStats = () => {},
+  codigoMinecraft = null,
+  alPedirCodigo = () => {},
+  alDesvincular = () => {},
   alElegirFicha = () => {},
   alSubir = () => {},
   alReiniciar = () => {},
@@ -266,6 +343,9 @@ export function MiFichaVista({
   alSubirStat?: (slug: string, nombre: string) => void;
   alReiniciarStats?: () => void;
   alConfirmarStats?: (abierto: boolean) => void;
+  codigoMinecraft?: string | null;
+  alPedirCodigo?: () => void;
+  alDesvincular?: () => void;
   alElegirFicha?: (slug: string) => void;
   alSubir?: (clave: string, nombre: string) => void;
   alReiniciar?: () => void;
@@ -389,6 +469,10 @@ export function MiFichaVista({
             </>
           )}
         </div>
+      )}
+
+      {ficha.minecraft && (
+        <SeccionMinecraft estado={ficha.minecraft} codigo={codigoMinecraft} ocupada={ocupada} alPedirCodigo={alPedirCodigo} alDesvincular={alDesvincular} />
       )}
 
       <Link href={`/v/${ficha.slug}`} className="inline-block text-sm text-dex-accent underline underline-offset-2">

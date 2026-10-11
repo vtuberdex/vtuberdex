@@ -14,6 +14,8 @@
  */
 import { dbConDiario } from '../../../lib/diario.mjs';
 import { aplicarReemplazosALista } from '../../../lib/ediciones.mjs';
+import { conExperiencia, contarLikesVarios } from '../../../lib/likes.mjs';
+import { xpJuegoDeVarias } from '../../../lib/minecraft.mjs';
 import { marcarSinCorreo } from '../../../lib/sin-correo.mjs';
 import { facetCounts, searchVtubers } from '../../../server/src/search.mjs';
 import { formatIssues, listQuerySchema } from '../../../server/src/validation.mjs';
@@ -68,6 +70,14 @@ export async function GET(request) {
    * Una sola consulta para toda la página (ver `reemplazosDePagina`).
    */
   const conImagenes = await aplicarReemplazosALista(result.items);
-  const items = await marcarSinCorreo(db, conImagenes);
+  /**
+   * El nivel de cada carta sale de la fórmula de experiencia (likes, juego, antigüedad, premium), no de la
+   * columna guardada. Dos consultas para toda la página; si el almacén falla se queda el nivel de fórmula con
+   * 0 likes, nunca el manual.
+   */
+  const ids = conImagenes.map((c) => c.id);
+  const [likes, juego] = await Promise.all([contarLikesVarios(ids).catch(() => new Map()), xpJuegoDeVarias(ids)]);
+  const conNivel = conImagenes.map((c) => conExperiencia(c, likes.get(c.id) ?? 0, juego.get(c.id) ?? 0));
+  const items = await marcarSinCorreo(db, conNivel);
   return Response.json({ ...result, items, facets }, { headers: { 'cache-control': CACHE_PUBLICA } });
 }

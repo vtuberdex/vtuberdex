@@ -8,6 +8,7 @@
  *   · orden configurable (dex, A-Z, poder),
  *   · conteos de facetas calculados en la base, no recorriendo 785 divs.
  */
+import { valorEquilibrado } from './equilibrio.mjs';
 import { GRADOS, GRADO_DE_BAJA, numeroDeCertificado } from './premium.mjs';
 import { ocultarFichaDeteriorada } from './ficha-deteriorada.mjs';
 import { normalizeText } from './text.mjs';
@@ -49,7 +50,7 @@ const armarSelect = (premium) => `
     v.theme_color AS themeColor, v.secondary_color AS secondaryColor,
     v.palette AS paletteJson, v.level, v.power_score AS powerScore,
     v.exp_current AS expCurrent, v.exp_max AS expMax,
-    v.has_detail AS hasDetail, v.status,
+    v.has_detail AS hasDetail, v.status, v.created_at AS createdAt,
     v.birthday, v.height, v.hashtag, v.favorite_color AS favoriteColor,
     a_card.path  AS cardImage,
     a_thumb.path AS thumbImage,
@@ -74,8 +75,8 @@ const armarSelect = (premium) => `
        FROM (SELECT faction_id FROM vtuber_faction WHERE vtuber_id = v.id ORDER BY position) vf
        JOIN faction f ON f.id = vf.faction_id) AS factionIconsJson,
     (SELECT json_group_array(code) FROM vtuber_language WHERE vtuber_id = v.id) AS languagesJson,
-    (SELECT json_group_array(value) FROM (
-        SELECT value FROM stat WHERE vtuber_id = v.id AND value IS NOT NULL
+    (SELECT json_group_array(json_object('slug', slug, 'value', value)) FROM (
+        SELECT slug, value FROM stat WHERE vtuber_id = v.id AND value IS NOT NULL AND slug NOT IN ('level', 'exp')
         ORDER BY position LIMIT 5)) AS statsPreviewJson,
     (SELECT COUNT(*) FROM social WHERE vtuber_id = v.id) AS socialCount
     ${premium ? PREMIUM_COLUMNAS : SIN_PREMIUM_COLUMNAS}
@@ -136,6 +137,8 @@ export function mapCard(row) {
     powerScore: row.powerScore,
     hasDetail: Boolean(row.hasDetail),
     status: row.status,
+    /** Alta de la ficha en el sitio: de ahí se cuenta la antigüedad de su experiencia. */
+    createdAt: row.createdAt ?? null,
     birthday: row.birthday,
     height: row.height,
     hashtag: row.hashtag,
@@ -149,7 +152,10 @@ export function mapCard(row) {
       .map((f) => ({ label: f?.label ?? null, slug: f?.slug ?? null, icon: f?.icon ? toPublicPath(f.icon) : null }))
       .filter((f) => f.label),
     languages: parseJsonArray(row.languagesJson),
-    statsPreview: parseJsonArray(row.statsPreviewJson).filter((value) => typeof value === 'number'),
+    // Sin nivel/EXP y con cada valor limitado por el equilibrio: la barra de la carta no la domina una ficha inflada.
+    statsPreview: parseJsonArray(row.statsPreviewJson)
+      .filter((s) => typeof s?.value === 'number')
+      .map((s) => valorEquilibrado(s.slug, s.value)),
     socialCount: row.socialCount ?? 0,
     /**
      * Carta premium: `null` en una carta normal (la inmensa mayoría). El certificado se DERIVA

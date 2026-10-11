@@ -5,7 +5,7 @@
  * validación: que un archivo que NO es imagen se rechace por CONTENIDO, que se
  * respeten los límites, y que el guardado use la ruta canónica del asset.
  */
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,7 +22,16 @@ import {
   saveUploadedImage,
 } from '../src/uploads.mjs';
 
-const tmpRoot = () => fs.mkdtempSync(path.join(os.tmpdir(), 'uploads-'));
+// Se borran al acabar: antes quedaban (774 carpetas en /tmp de la VPS, que es RAM).
+const raices = [];
+const tmpRoot = () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uploads-'));
+  raices.push(dir);
+  return dir;
+};
+after(() => {
+  for (const dir of raices) fs.rmSync(dir, { recursive: true, force: true });
+});
 
 /** PNG opaco de color plano. */
 async function pngBuffer(width = 120, height = 90, color = { r: 200, g: 40, b: 90 }) {

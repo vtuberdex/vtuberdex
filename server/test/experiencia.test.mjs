@@ -83,3 +83,57 @@ test('los puntos de habilidad salen solo de los niveles GANADOS con likes, no de
 test('cada nivel pide más que el anterior: sube más lento a medida que avanza', () => {
   for (let n = 1; n < 60; n += 1) assert.ok(umbralDeNivel(n + 1) > umbralDeNivel(n));
 });
+
+/* ------------------------------------------------- fórmula única (experienciaDeFicha) */
+
+import { ANTIGUEDAD_TOPE_DIAS, RACHA_TOPE_MESES, XP_POR_DIA, XP_POR_MES_RACHA, diasEntre, experienciaDeFicha, multiplicadorPremium } from '../src/experiencia.mjs';
+import { GRADOS } from '../src/premium.mjs';
+
+test('sin datos una ficha es nivel 1 con la barra vacía, sin importar su base manual', () => {
+  const r = experienciaDeFicha({});
+  assert.deepEqual({ level: r.level, current: r.current, total: r.total }, { level: 1, current: 0, total: 0 });
+});
+
+test('la suma es likes + antigüedad + juego, y cada fuente sale en el desglose', () => {
+  const r = experienciaDeFicha({ likes: 5, dias: 10, xpJuego: 20 });
+  assert.equal(r.desglose.total, 5 * XP_POR_LIKE + 10 * XP_POR_DIA + 20);
+  assert.equal(r.total, r.desglose.total);
+});
+
+test('la antigüedad tiene tope: pasado un año no sigue dando XP', () => {
+  assert.equal(experienciaDeFicha({ dias: ANTIGUEDAD_TOPE_DIAS }).total, experienciaDeFicha({ dias: ANTIGUEDAD_TOPE_DIAS * 10 }).total);
+});
+
+test('el multiplicador premium sube 0,05 por grado hasta 1,50 en la BL y no existe sin premium ni degradado', () => {
+  assert.equal(multiplicadorPremium(undefined), 1);
+  assert.equal(multiplicadorPremium('3'), 1);
+  assert.equal(multiplicadorPremium(GRADOS[0]), 1.05);
+  assert.equal(multiplicadorPremium('BL'), 1.5);
+  for (let i = 1; i < GRADOS.length; i += 1) assert.ok(multiplicadorPremium(GRADOS[i]) > multiplicadorPremium(GRADOS[i - 1]));
+});
+
+test('un premium gana más que una ficha normal con los mismos datos, y la racha suma aparte con tope', () => {
+  const datos = { likes: 50, dias: 100 };
+  const normal = experienciaDeFicha(datos);
+  const premium = experienciaDeFicha({ ...datos, premium: { grade: '8', since: '2025-01-01', gradedAt: '2026-10-01' }, ahora: '2026-10-10' });
+  assert.ok(premium.total > normal.total);
+  assert.equal(premium.desglose.racha, RACHA_TOPE_MESES * XP_POR_MES_RACHA);
+});
+
+test('es monótona en cada fuente', () => {
+  for (const campo of ['likes', 'dias', 'xpJuego']) {
+    let anterior = -1;
+    for (let n = 0; n < 500; n += 7) {
+      const { total } = experienciaDeFicha({ [campo]: n });
+      assert.ok(total >= anterior, campo);
+      anterior = total;
+    }
+  }
+});
+
+test('diasEntre cuenta días enteros y tolera fechas rotas', () => {
+  assert.equal(diasEntre('2026-09-20 21:32:45', new Date('2026-10-10T00:00:00Z')), 19);
+  assert.equal(diasEntre('2026-09-20', '2026-10-10'), 20);
+  assert.equal(diasEntre(null), 0);
+  assert.equal(diasEntre('2999-01-01', '2026-10-10'), 0);
+});

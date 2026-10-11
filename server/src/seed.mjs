@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { DEFAULT_DB_PATH, getMeta, openDatabase, setMeta, transaction } from './db/index.mjs';
 import { FACCION_ALIAS, MAX_FACCIONES } from './mutations.mjs';
 import { normalizeText, slugify } from './text.mjs';
+import { valorEquilibrado } from './equilibrio.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..');
@@ -59,6 +60,13 @@ const STAT_SLUGS = {
   suerte: 'luck',
 };
 
+/**
+ * Nivel y EXP NO son poder de combate: son progreso, y ahora salen de la fórmula de experiencia
+ * (`experiencia.mjs`). Contarlos dejaba a una ficha con EXP editada a mano (5.980.260 × 0,3) a 1.800.000 de
+ * poder frente a ~2.000 del resto.
+ */
+const FUERA_DEL_PODER = new Set(['level', 'exp']);
+
 const POWERS = { attack: 1.2, magicAttack: 1.3, speed: 1.1, defense: 0.8, magicDefense: 0.9, critic: 0.6 };
 
 /** Puntaje de "poder" usado para ordenar; 0 si la ficha no trae stats. */
@@ -67,10 +75,10 @@ function powerScore(stats) {
   const bySlug = new Map(stats.map((stat) => [stat.slug, Number(stat.value) || 0]));
   let total = 0;
   for (const [slug, weight] of Object.entries(POWERS)) {
-    total += (bySlug.get(slug) ?? 0) * weight;
+    total += valorEquilibrado(slug, bySlug.get(slug) ?? 0) * weight;
   }
   for (const stat of stats) {
-    if (!(stat.slug in POWERS)) total += (Number(stat.value) || 0) * 0.3;
+    if (!(stat.slug in POWERS) && !FUERA_DEL_PODER.has(stat.slug)) total += valorEquilibrado(stat.slug, stat.value) * 0.3;
   }
   return Math.round(total);
 }
