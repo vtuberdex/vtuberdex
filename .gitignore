@@ -68,3 +68,11 @@ public/
 !deploy/data/
 !deploy/data/vtuberdex.db
 !deploy/data/images.json
+
+# Salidas del análisis de Sonar
+coverage/
+sarif/
+.scannerwork/
+
+# Plugin de Paper: vive en su propio repo (vtuberdex/vtuberdex-minecraft)
+/minecraft/
