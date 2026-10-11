@@ -74,16 +74,20 @@ async function cargarTodas(token: string, signal: AbortSignal): Promise<VtuberCa
   return todas;
 }
 
+/** El aviso bajo la fecha del último cambio de grado; ninguno si la ficha está degradada. */
+function avisoDeGrado(premium: NonNullable<VtuberCard['premium']>, siguiente: ReturnType<typeof gradoSiguiente>): { texto: string; clase: string } | null {
+  if (esGradoDegradado(premium.grade)) return null;
+  if (siguiente === null) return { texto: 'grado máximo', clase: 'text-dex-muted' };
+  if (mismoMes(premium.gradedAt)) return { texto: '✓ subió este mes', clase: 'text-emerald-300' };
+  return { texto: 'por revisar', clase: 'text-amber-200' };
+}
+
 /** Cuándo se cambió el grado por última vez y si toca revisarla este mes. */
 function UltimoCambio({ row }: { row: VtuberCard }) {
   const premium = row.premium;
   if (!premium) return null;
   const siguiente = gradoSiguiente(premium.grade);
-  let aviso: { texto: string; clase: string } | null = null;
-  if (esGradoDegradado(premium.grade)) aviso = null;
-  else if (siguiente === null) aviso = { texto: 'grado máximo', clase: 'text-dex-muted' };
-  else if (mismoMes(premium.gradedAt)) aviso = { texto: '✓ subió este mes', clase: 'text-emerald-300' };
-  else aviso = { texto: 'por revisar', clase: 'text-amber-200' };
+  const aviso = avisoDeGrado(premium, siguiente);
   return (
     <span className="flex flex-col leading-tight">
       <span className="font-mono text-xs text-dex-ink">{premium.gradedAt}</span>
