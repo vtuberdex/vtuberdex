@@ -76,12 +76,12 @@ export function DadosPanel() {
       tipo,
       valor: tirar(CARAS[tipo]),
       // La semilla solo decide el tumbo y el humo (lo visual): el número ya está decidido arriba.
-      semilla: Math.random() * 1000,
+      semilla: tirar(1000),
       animar: true,
     }));
     setBandeja(tipos);
     setAtajo(deAtajo);
-    setSemillaMesa(Math.random() * 1000);
+    setSemillaMesa(tirar(1000));
     setTirada({ id, dados, revelada: false });
     if (temporizador.current) clearTimeout(temporizador.current);
     temporizador.current = setTimeout(() => {

@@ -81,12 +81,14 @@ function Toast({ toast, onRemove }: { toast: ToastItem; onRemove: (id: string) =
   );
 }
 
+let secuenciaDeToasts = 0;
+
 /**
  * Hook para consumir toasts desde cualquier componente de cliente.
  *
  * Devuelve la lista actual, una función para añadir un toast y otra para quitarlo.
  * El id se genera con crypto.randomUUID cuando existe; en tests o entornos antiguos
- * cae a Date.now + Math.random.
+ * cae a Date.now + un contador: basta con que sea único, no impredecible.
  */
 export function useToasts() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -95,7 +97,7 @@ export function useToasts() {
     const id =
       typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        : `${Date.now()}-${++secuenciaDeToasts}`;
     setToasts((current) => [...current, { id, kind, text }]);
     return id;
   }, []);
