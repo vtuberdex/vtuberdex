@@ -28,7 +28,7 @@
 import { spawnSync } from 'node:child_process';
 
 import { hashPassword, verifyPassword } from '../server/src/auth.mjs';
-import { pedirCredencial } from './lib/terminal.mjs';
+import { ejecutable, pedirCredencial } from './lib/terminal.mjs';
 
 const args = process.argv.slice(2);
 const tiene = (nombre) => args.includes(`--${nombre}`);
@@ -52,7 +52,7 @@ const paso = (nombre, ok, detalle = '') => {
 
 /** Ejecuta el CLI de Vercel sin heredar la salida (puede contener el valor). */
 function vercel(argumentos, entrada) {
-  return spawnSync('vercel', argumentos, {
+  return spawnSync(ejecutable('vercel'), argumentos, {
     input: entrada,
     encoding: 'utf8',
     stdio: [entrada === undefined ? 'inherit' : 'pipe', 'pipe', 'pipe'],

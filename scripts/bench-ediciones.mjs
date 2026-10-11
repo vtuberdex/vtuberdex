@@ -29,6 +29,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { performance } from 'node:perf_hooks';
 
+import { ejecutable } from './lib/terminal.mjs';
+
 const args = process.argv.slice(2);
 const RETARDO = Number(args[args.indexOf('--delay') + 1]) || 0;
 
@@ -173,7 +175,7 @@ const rutaVieja = join(temp, 'ediciones-old.mjs');
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 let fuenteVieja;
 try {
-  fuenteVieja = execFileSync('git', ['show', 'HEAD:lib/ediciones.mjs'], {
+  fuenteVieja = execFileSync(ejecutable('git'), ['show', 'HEAD:lib/ediciones.mjs'], {
     cwd: RAIZ,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],

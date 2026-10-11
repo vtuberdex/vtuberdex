@@ -3,7 +3,30 @@
  * contraseña sin mostrarla (`admin-hash`, `verificar-admin-prod`, `aplicar-ficha-prod`) y hablar
  * con la API de producción sin lanzar por un status no-2xx.
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import readline from 'node:readline';
+
+/**
+ * Ruta absoluta de un CLI (`git`, `vercel`) buscada en el PATH una sola vez, con las extensiones
+ * de Windows. El proceso hijo arranca ese archivo concreto y no vuelve a resolver por el PATH.
+ * Si no aparece se devuelve el nombre tal cual: el `spawn` falla igual que antes, con su error.
+ */
+export function ejecutable(nombre) {
+  const extensiones = process.platform === 'win32' ? (process.env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';') : [''];
+  for (const carpeta of (process.env.PATH ?? '').split(path.delimiter)) {
+    if (!path.isAbsolute(carpeta)) continue;
+    for (const extension of extensiones) {
+      const candidato = path.join(carpeta, nombre + extension.toLowerCase());
+      try {
+        if (fs.statSync(candidato).isFile()) return candidato;
+      } catch {
+        // no está en esta carpeta
+      }
+    }
+  }
+  return nombre;
+}
 
 /**
  * Lee `--nombre valor` y `--bandera` de una lista de argumentos (por defecto, los del proceso).
