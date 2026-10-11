@@ -1,16 +1,22 @@
 /**
- * Utilidades de terminal compartidas por los scripts del mantenedor (`admin-hash`,
- * `verificar-admin-prod`, `aplicar-ficha-prod`): leer opciones `--nombre valor`, pedir la
- * contraseña sin mostrarla y hablar con la API de producción sin lanzar por un status no-2xx.
+ * Utilidades de terminal compartidas por los scripts: leer opciones `--nombre valor`, pedir la
+ * contraseña sin mostrarla (`admin-hash`, `verificar-admin-prod`, `aplicar-ficha-prod`) y hablar
+ * con la API de producción sin lanzar por un status no-2xx.
  */
 import readline from 'node:readline';
 
-/** Lee `--nombre valor` y `--bandera` de una lista de argumentos (por defecto, los del proceso). */
-export function leerOpciones(args = process.argv.slice(2)) {
+/**
+ * Lee `--nombre valor` y `--bandera` de una lista de argumentos (por defecto, los del proceso).
+ * Con `conIgual` también vale `--nombre=valor` (un `--nombre=` vacío cae al valor por defecto).
+ */
+export function leerOpciones(args = process.argv.slice(2), { conIgual = false } = {}) {
   return {
     tiene: (nombre) => args.includes(`--${nombre}`),
     opcion: (nombre, porDefecto) => {
-      const i = args.indexOf(`--${nombre}`);
+      const bandera = `--${nombre}`;
+      const enLinea = conIgual ? args.find((a) => a.startsWith(`${bandera}=`)) : undefined;
+      if (enLinea) return enLinea.slice(bandera.length + 1) || porDefecto;
+      const i = args.indexOf(bandera);
       return i >= 0 && args[i + 1] ? args[i + 1] : porDefecto;
     },
   };

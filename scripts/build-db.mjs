@@ -23,18 +23,12 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
 import { CARPETAS_PUBLICADAS } from '../lib/carpetas.mjs';
+import { leerOpciones } from './lib/terminal.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 
-const args = process.argv.slice(2);
-const value = (name, fallback) => {
-  const flag = `--${name}`;
-  const inline = args.find((a) => a.startsWith(`${flag}=`));
-  if (inline) return inline.slice(flag.length + 1) || fallback;
-  const i = args.indexOf(flag);
-  return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
-};
+const { tiene: has, opcion: value } = leerOpciones(process.argv.slice(2), { conIgual: true });
 
 const SRC_DB = path.resolve(ROOT, value('from', 'data/vtuberdex.db'));
 const OUT_DIR = path.resolve(ROOT, value('out', 'deploy/data'));
@@ -49,7 +43,7 @@ const OUT_MANIFEST = path.join(OUT_DIR, 'images.json');
  * esta bandera el build usa el artefacto ya versionado en `deploy/` y solo lo
  * regenera quien tiene los datos locales (el scraper y el seed).
  */
-const IF_MISSING = args.includes('--if-missing');
+const IF_MISSING = has('if-missing');
 
 /**
  * Tablas que NO deben viajar a producción: identifican al mantenedor y
