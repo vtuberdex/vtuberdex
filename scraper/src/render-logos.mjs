@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import fs from 'node:fs';
 // Muestra aleatoria determinista amplia: 24 logos
-const all = fs.readdirSync('../data/images/logo').filter(f=>f.endsWith('.webp')).sort();
+const all = fs.readdirSync('../data/images/logo').filter(f=>f.endsWith('.webp')).sort((a,b)=>(a<b?-1:a>b?1:0));
 const step = Math.floor(all.length/24);
 const picks = all.filter((_,i)=>i%step===0).slice(0,24);
 const COLS=4, W=340, H=200, PAD=6, LH=18;

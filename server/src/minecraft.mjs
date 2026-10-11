@@ -186,7 +186,7 @@ export async function crearCodigoDeVinculo(ejecutor, { vtuberId, uuid = null, ah
     hash(codigo),
     Number(vtuberId),
     ahora + CODIGO_TTL_MS,
-    uuidValido(uuid) ? uuid.toLowerCase() : null,
+    typeof uuid === 'string' && uuidValido(uuid) ? uuid.toLowerCase() : null,
   ]);
   return { codigo, expira: new Date(ahora + CODIGO_TTL_MS).toISOString() };
 }
@@ -244,7 +244,7 @@ export async function vinculoDeFicha(ejecutor, vtuberId) {
  */
 export async function desvincular(ejecutor, { vtuberId = null, uuid = null }) {
   const e = await conTablas(ejecutor);
-  let cuenta = uuidValido(uuid) ? uuid.toLowerCase() : null;
+  let cuenta = typeof uuid === 'string' && uuidValido(uuid) ? uuid.toLowerCase() : null;
   if (vtuberId !== null) {
     const { rows } = await e.execute('SELECT uuid FROM vinculo_minecraft WHERE vtuber_id = ?', [Number(vtuberId)]);
     cuenta = rows.length ? String(rows[0].uuid) : null;
