@@ -20,16 +20,11 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import readline from 'node:readline';
 
 import { formatIssues, vtuberUpdateSchema } from '../server/src/validation.mjs';
+import { leerOpciones, pedirCredencial, pedirJson } from './lib/terminal.mjs';
 
-const args = process.argv.slice(2);
-const tiene = (nombre) => args.includes(`--${nombre}`);
-const opcion = (nombre, porDefecto) => {
-  const i = args.indexOf(`--${nombre}`);
-  return i >= 0 && args[i + 1] ? args[i + 1] : porDefecto;
-};
+const { tiene, opcion } = leerOpciones();
 
 const URL_BASE = opcion('url', 'https://vtuberdex.com').replace(/\/$/, '');
 const USUARIO = opcion('user', process.env.VTUBERDEX_ADMIN_USER || 'admin');
@@ -60,46 +55,10 @@ const parche = validado.data;
 console.log(`✔ ${ARCHIVO} válido (${Object.keys(parche).length} campos: ${Object.keys(parche).join(', ')})`);
 
 /* ------------------------------------------------------------ credenciales */
-function preguntarOculto(prompt) {
-  return new Promise((resolve) => {
-    process.stdout.write(prompt);
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    const escribirOriginal = rl._writeToOutput?.bind(rl);
-    rl._writeToOutput = function _oculto(texto) {
-      if (escribirOriginal && texto !== '\r\n' && texto !== '\n') return escribirOriginal('');
-      return escribirOriginal ? escribirOriginal(texto) : undefined;
-    };
-    rl.question('', (respuesta) => {
-      rl.close();
-      process.stdout.write('\n');
-      resolve(respuesta);
-    });
-  });
-}
-
-function leerLineaDeStdin() {
-  return new Promise((resolve) => {
-    let datos = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (trozo) => {
-      datos += trozo;
-    });
-    process.stdin.on('end', () => resolve(datos.split('\n')[0].trim()));
-  });
-}
-
-async function pedir(ruta, { token, ...init } = {}) {
+function pedir(ruta, { token, ...init } = {}) {
   const cabeceras = { 'content-type': 'application/json' };
   if (token) cabeceras.authorization = ['Bearer', token].join(' ');
-  const respuesta = await fetch(`${URL_BASE}${ruta}`, { ...init, headers: cabeceras });
-  const texto = await respuesta.text();
-  let cuerpo = null;
-  try {
-    cuerpo = texto ? JSON.parse(texto) : null;
-  } catch {
-    cuerpo = texto;
-  }
-  return { status: respuesta.status, cuerpo };
+  return pedirJson(`${URL_BASE}${ruta}`, { ...init, headers: cabeceras });
 }
 
 /* ------------------------------------------------------------ lo que hay hoy */
@@ -136,7 +95,7 @@ if (!APLICAR) {
 }
 
 /* ---------------------------------------------------------------- escribir */
-const password = process.stdin.isTTY ? await preguntarOculto(`Contraseña de ${USUARIO} en ${URL_BASE}: `) : await leerLineaDeStdin();
+const password = await pedirCredencial(`Contraseña de ${USUARIO} en ${URL_BASE}: `);
 if (!password) {
   console.error('✖ sin contraseña');
   process.exit(1);
