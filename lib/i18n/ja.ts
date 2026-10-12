@@ -1,6 +1,7 @@
 import { formulariosJa } from './textos/formularios';
 import { miFichaJa } from './textos/mificha';
 import { nivelesJa } from './textos/niveles';
+import { minecraftJa } from './textos/minecraft';
 import { fichasJa } from './textos/fichas';
 import type { Mensajes } from './es';
 
@@ -182,4 +183,5 @@ export const ja: Mensajes = {
   ...fichasJa,
   ...miFichaJa,
   ...nivelesJa,
+  ...minecraftJa,
 };

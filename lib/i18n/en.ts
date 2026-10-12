@@ -1,6 +1,7 @@
 import { formulariosEn } from './textos/formularios';
 import { miFichaEn } from './textos/mificha';
 import { nivelesEn } from './textos/niveles';
+import { minecraftEn } from './textos/minecraft';
 import { fichasEn } from './textos/fichas';
 import type { Mensajes } from './es';
 
@@ -182,4 +183,5 @@ export const en: Mensajes = {
   ...fichasEn,
   ...miFichaEn,
   ...nivelesEn,
+  ...minecraftEn,
 };

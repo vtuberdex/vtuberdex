@@ -10,7 +10,7 @@ import { useI18n } from '@/lib/i18n';
 import type { Clave } from '@/lib/i18n/mensajes';
 
 export const claseInput =
-  'mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm normal-case tracking-normal text-dex-ink outline-none placeholder:text-dex-muted/60 focus:border-dex-accent';
+  'mt-1 w-full rounded-lg border border-dex-line aria-invalid:border-rose-400 aria-invalid:bg-rose-400/5 bg-dex-void px-3 py-2 text-sm normal-case tracking-normal text-dex-ink outline-none placeholder:text-dex-muted/60 focus:border-dex-accent';
 
 export const claseEtiqueta = 'block text-xs uppercase tracking-[0.14em] text-dex-muted';
 
@@ -73,7 +73,9 @@ export function AceptaTerminos({
   marcada,
   alCambiar,
   idUnico,
+  invalida,
 }: {
+  invalida?: boolean;
   marcada: boolean;
   alCambiar: (v: boolean) => void;
   idUnico: string;
@@ -85,6 +87,8 @@ export function AceptaTerminos({
         <input
           id={idUnico}
           type="checkbox"
+          data-campo="acepta"
+          aria-invalid={invalida}
           required
           checked={marcada}
           onChange={(e) => alCambiar(e.target.checked)}

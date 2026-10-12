@@ -152,11 +152,35 @@ describe('InscripcionForm', () => {
     render(<InscripcionForm />);
     await llegarAlPaso5();
     const enviar = await screen.findByRole('button', { name: /enviar inscripción/i });
-    expect(enviar).toBeDisabled();
+    const enviarSpy = vi.spyOn(api, 'enviarInscripcion');
     const enlace = screen.getAllByRole('link', { name: /términos y condiciones/i })[0];
     expect(enlace).toHaveAttribute('href', '/terminos');
+    // Sin aceptar, el botón NO está apagado: al pulsarlo dice qué falta en vez de quedarse mudo.
+    await userEvent.click(enviar);
+    expect(enviarSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('inscripcion-faltas')).toHaveTextContent(/aceptar los términos/i);
     await userEvent.click(screen.getByRole('checkbox', { name: /he leído y acepto/i }));
-    expect(enviar).toBeEnabled();
+    expect(screen.getByTestId('inscripcion-faltas')).not.toHaveTextContent(/aceptar los términos/i);
+  });
+
+  it('lista TODO lo que falta de un paso junto, marca los campos y no avanza', async () => {
+    render(<InscripcionForm />);
+    vi.spyOn(api, 'pedirCodigoDeInscripcion').mockResolvedValue({ ok: true });
+    await userEvent.type(screen.getByLabelText(/nombre artístico/i), 'Luna');
+    await userEvent.type(screen.getByLabelText(/correo electrónico/i), 'luna@example.com');
+    await userEvent.click(screen.getByRole('button', { name: /enviarme el código/i }));
+    vi.spyOn(api, 'verificarCodigoDeInscripcion').mockResolvedValue({ ok: true, sesion: 'SESION'.repeat(8), borrador: null });
+    await userEvent.type(await screen.findByLabelText(/código del correo/i), CODIGO_INSCRIPCION);
+    await userEvent.click(screen.getByRole('button', { name: /confirmar el código/i }));
+    // Paso 3 vacío: faltan idiomas y redes.
+    await userEvent.click(await screen.findByRole('button', { name: /siguiente/i }));
+    const lista = screen.getByTestId('inscripcion-faltas');
+    expect(lista).toHaveTextContent(/al menos un idioma/i);
+    expect(lista).toHaveTextContent(/redes y canales/i);
+    expect(screen.getByTestId('inscripcion-paso')).toHaveTextContent(/paso 3 de 5/i);
+    // La lista se recalcula al corregir.
+    await userEvent.click(screen.getByText('Español'));
+    expect(screen.getByTestId('inscripcion-faltas')).not.toHaveTextContent(/al menos un idioma/i);
   });
 
   it('envía con la sesión (no el correo) y la versión de los términos, y queda en revisión', async () => {
