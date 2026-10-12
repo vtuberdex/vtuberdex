@@ -310,7 +310,8 @@ async function main() {
                   .resize({ width: 360, withoutEnlargement: true })
                   .webp({ quality: 84, alphaQuality: 100, effort: 6 })
                   .toBuffer();
-                await fs.writeFile(
+                await writeInside(
+                  IMAGES,
                   path.join(IMAGES, "thumb", `${slug}.webp`),
                   buf,
                 );
