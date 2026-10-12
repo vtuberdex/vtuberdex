@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Fábrica de texturas de carta: cola con prioridades, generación progresiva, caché
  * acotada y pregeneración de páginas vecinas.
@@ -29,34 +29,50 @@
  * ancho (512 → 384 → 256) en máquinas lentas. Se retiró: el ancho es FIJO (`TEXTURAS.ancho`), la
  * misma carta se ve igual en todos los equipos y no hay estado oculto que dependa del historial.
  */
-import type { VtuberCard } from '@/lib/types';
-import { TEXTURAS } from '@/components/card3d-config';
-import { CARD_TEXTURE_FULL_WIDTH } from './dimensiones';
-import { drawCardLayers } from './componer';
-import { esFichaDeteriorada, gradoDeDibujo } from '@/lib/premium';
-import { deteriorarArte, deteriorarCabecera, planDeCarta, tarjetaParaTitulo } from './deterioro';
-import { drawSurfaceLayer } from './capa-superficie';
-import { drawCharacterLayer } from './capa-personaje';
-import { drawTitleLayer } from './capa-titulo';
-import { emptyLayer } from './lienzo';
-import { loadImage } from './imagen';
-import { inkAndSkinMaskAsync, logoMaskAsync, logoSticker, precalentarMascaras } from './mascaras';
-import { colorPredominante, type ColorPredominante } from './predominante';
+import type { VtuberCard } from "@/lib/types";
+import { TEXTURAS } from "@/components/card3d-config";
+import { CARD_TEXTURE_FULL_WIDTH } from "./dimensiones";
+import { drawCardLayers } from "./componer";
+import { esFichaDeteriorada, gradoDeDibujo } from "@/lib/premium";
+import {
+  deteriorarArte,
+  deteriorarCabecera,
+  planDeCarta,
+  tarjetaParaTitulo,
+} from "./deterioro";
+import { drawSurfaceLayer } from "./capa-superficie";
+import { drawCharacterLayer } from "./capa-personaje";
+import { drawTitleLayer } from "./capa-titulo";
+import { emptyLayer } from "./lienzo";
+import { loadImage } from "./imagen";
+import {
+  inkAndSkinMaskAsync,
+  logoMaskAsync,
+  logoSticker,
+  precalentarMascaras,
+} from "./mascaras";
+import { colorPredominante, type ColorPredominante } from "./predominante";
 
 /* ----------------------------------------------------------------------------
  * Cola con prioridades.
  * ------------------------------------------------------------------------- */
 
 type Trabajo = () => void | Promise<void>;
-type Prioridad = 'alta' | 'baja';
+type Prioridad = "alta" | "baja";
 
 const colaAlta: Array<{ trabajo: Trabajo; listo: () => void }> = [];
 const colaBaja: Array<{ trabajo: Trabajo; listo: () => void }> = [];
 let corriendo = false;
 
 const enOcio = (fn: () => void) => {
-  const w = globalThis as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
-  if (typeof w.requestIdleCallback === 'function') w.requestIdleCallback(fn, { timeout: TEXTURAS.esperaOciosaMaxMs });
+  const w = globalThis as unknown as {
+    requestIdleCallback?: (
+      cb: () => void,
+      opts?: { timeout: number },
+    ) => number;
+  };
+  if (typeof w.requestIdleCallback === "function")
+    w.requestIdleCallback(fn, { timeout: TEXTURAS.esperaOciosaMaxMs });
   else setTimeout(fn, TEXTURAS.retrasoOciosoMs);
 };
 
@@ -64,7 +80,7 @@ async function ejecutar(entrada: { trabajo: Trabajo; listo: () => void }) {
   try {
     await entrada.trabajo();
   } catch (error) {
-    console.warn('[fabrica] fallo al generar texturas', error);
+    console.warn("[fabrica] fallo al generar texturas", error);
   } finally {
     entrada.listo();
     corriendo = false;
@@ -102,9 +118,12 @@ function bombear() {
  * antes que los de BAJA (pregeneración), que además esperan un hueco ocioso. Se ejecutan
  * de UNO en uno: ocho cartas a la vez bloqueaban el hilo en un solo tramo largo.
  */
-export function encolarTrabajo(trabajo: Trabajo, prioridad: Prioridad = 'alta'): Promise<void> {
+export function encolarTrabajo(
+  trabajo: Trabajo,
+  prioridad: Prioridad = "alta",
+): Promise<void> {
   return new Promise<void>((listo) => {
-    (prioridad === 'alta' ? colaAlta : colaBaja).push({ trabajo, listo });
+    (prioridad === "alta" ? colaAlta : colaBaja).push({ trabajo, listo });
     bombear();
   });
 }
@@ -138,19 +157,29 @@ interface Fuentes {
 }
 
 const urlsDeCarta = (card: VtuberCard) => [
-  card.images.character ?? card.images.card ?? '',
-  card.images.logo ?? '',
-  card.images.background ?? '',
+  card.images.character ?? card.images.card ?? "",
+  card.images.logo ?? "",
+  card.images.background ?? "",
 ];
 
 async function cargarFuentes(card: VtuberCard): Promise<Fuentes> {
-  const [art, logo, background] = await Promise.all(urlsDeCarta(card).map((src) => loadImage(src)));
+  const [art, logo, background] = await Promise.all(
+    urlsDeCarta(card).map((src) => loadImage(src)),
+  );
   return { art, logo, background };
 }
 
 /** Etapa RÁPIDA: superficie, personaje y título. La carta ya se reconoce; falta el acabado. */
-export function generarRapida(card: VtuberCard, fuentes: Fuentes, width: number): TexturasDeCarta {
-  const background = drawSurfaceLayer({ card, background: fuentes.background, width });
+export function generarRapida(
+  card: VtuberCard,
+  fuentes: Fuentes,
+  width: number,
+): TexturasDeCarta {
+  const background = drawSurfaceLayer({
+    card,
+    background: fuentes.background,
+    width,
+  });
   const character = drawCharacterLayer({ art: fuentes.art, width });
   const title = drawTitleLayer({ card: tarjetaParaTitulo(card), width });
   const vacia = emptyLayer();
@@ -186,7 +215,11 @@ export interface Completada {
 }
 
 /** Etapa COMPLETA: marca, máscaras (en el worker) y wordmark, reutilizando las capas rápidas. */
-export async function completar(card: VtuberCard, fuentes: Fuentes, rapida: TexturasDeCarta): Promise<Completada> {
+export async function completar(
+  card: VtuberCard,
+  fuentes: Fuentes,
+  rapida: TexturasDeCarta,
+): Promise<Completada> {
   const { width } = rapida;
   let msCpu = 0;
   let t0 = performance.now();
@@ -216,19 +249,29 @@ export async function completar(card: VtuberCard, fuentes: Fuentes, rapida: Text
    * vive en memoria de CPU y `getImageData` no fuerza una lectura sincrónica desde la GPU. La
    * máscara lo lee directamente (ver `prepararTinta`), sin copiarlo a otro canvas.
    */
-  const flat = document.createElement('canvas');
+  const flat = document.createElement("canvas");
   flat.width = width;
   flat.height = height;
-  const flatCtx = flat.getContext('2d', { willReadFrequently: true });
+  const flatCtx = flat.getContext("2d", { willReadFrequently: true });
   if (flatCtx) {
-    for (const capa of [capas.background, capas.character, capas.logo, capas.title, capas.texts, capas.tags, capas.wordmark]) {
+    for (const capa of [
+      capas.background,
+      capas.character,
+      capas.logo,
+      capas.title,
+      capas.texts,
+      capas.tags,
+      capas.wordmark,
+    ]) {
       flatCtx.drawImage(capa, 0, 0);
     }
   }
 
   const logoBox = capas.info.logoBox;
   const conLogo = Boolean(logoBox && logoVisible);
-  const sticker = conLogo ? logoSticker(logoVisible!, logoBox!, width, height) : emptyLayer();
+  const sticker = conLogo
+    ? logoSticker(logoVisible!, logoBox!, width, height)
+    : emptyLayer();
   msCpu += performance.now() - t0;
 
   // Las máscaras preparan su origen en este hilo y calculan en el worker: el tiempo de
@@ -236,14 +279,24 @@ export async function completar(card: VtuberCard, fuentes: Fuentes, rapida: Text
   t0 = performance.now();
   const [edge, logoMask] = await Promise.all([
     inkAndSkinMaskAsync(flat, width, height),
-    conLogo ? logoMaskAsync(logoVisible!, logoBox!, width, height) : Promise.resolve(emptyLayer()),
+    conLogo
+      ? logoMaskAsync(logoVisible!, logoBox!, width, height)
+      : Promise.resolve(emptyLayer()),
   ]);
   const esperaMascaras = performance.now() - t0;
 
   return {
     texturas: {
       dominant: rapida.dominant,
-      layers: [capas.background, capas.character, capas.logo, capas.title, capas.texts, capas.tags, capas.wordmark],
+      layers: [
+        capas.background,
+        capas.character,
+        capas.logo,
+        capas.title,
+        capas.texts,
+        capas.tags,
+        capas.wordmark,
+      ],
       edge,
       logoMask,
       logoSticker: sticker,
@@ -275,11 +328,15 @@ let pixelesEnCache = 0;
  * la clave anterior el mantenedor seguiría viendo la textura vieja hasta recargar. Va ANTES de las
  * URLs porque `buscarEnCache` compara prefijo (`id|`) y sufijo (URLs) para encontrar otro ancho.
  */
-const claveDe = (card: VtuberCard, width: number) => `${card.id}|${width}|${gradoDeCarta(card)}|${urlsDeCarta(card).join('|')}`;
-const gradoDeCarta = (card: VtuberCard) => gradoDeDibujo(card) ?? '';
+const claveDe = (card: VtuberCard, width: number) =>
+  `${card.id}|${width}|${gradoDeCarta(card)}|${urlsDeCarta(card).join("|")}`;
+const gradoDeCarta = (card: VtuberCard) => gradoDeDibujo(card) ?? "";
 
 const pixelesDe = (t: TexturasDeCarta) =>
-  [...t.layers, t.edge, t.logoMask, t.logoSticker].reduce((suma, c) => suma + c.width * c.height, 0);
+  [...t.layers, t.edge, t.logoMask, t.logoSticker].reduce(
+    (suma, c) => suma + c.width * c.height,
+    0,
+  );
 
 function podar() {
   for (const [clave, entrada] of cache) {
@@ -291,7 +348,10 @@ function podar() {
 }
 
 /** Texturas COMPLETAS ya generadas para la carta: al ancho pedido o, si no, a cualquier otro. */
-export function buscarEnCache(card: VtuberCard, width: number): TexturasDeCarta | null {
+export function buscarEnCache(
+  card: VtuberCard,
+  width: number,
+): TexturasDeCarta | null {
   const exacta = cache.get(claveDe(card, width));
   if (exacta) {
     cache.delete(claveDe(card, width));
@@ -299,14 +359,18 @@ export function buscarEnCache(card: VtuberCard, width: number): TexturasDeCarta 
     return exacta.texturas;
   }
   const prefijo = `${card.id}|`;
-  const sufijo = `|${gradoDeCarta(card)}|${urlsDeCarta(card).join('|')}`;
+  const sufijo = `|${gradoDeCarta(card)}|${urlsDeCarta(card).join("|")}`;
   for (const [clave, entrada] of cache) {
-    if (clave.startsWith(prefijo) && clave.endsWith(sufijo)) return entrada.texturas;
+    if (clave.startsWith(prefijo) && clave.endsWith(sufijo))
+      return entrada.texturas;
   }
   return null;
 }
 
-export function guardarEnCache(card: VtuberCard, texturas: TexturasDeCarta): void {
+export function guardarEnCache(
+  card: VtuberCard,
+  texturas: TexturasDeCarta,
+): void {
   if (!texturas.completa) return;
   const clave = claveDe(card, texturas.width);
   const previa = cache.get(clave);
@@ -375,12 +439,15 @@ export interface OpcionesGeneracion {
  * completa pueden colarse las etapas rápidas de las demás, y las 8 cartas de la página
  * aparecen reconocibles antes de que ninguna tenga el acabado.
  */
-export async function generarTexturas(card: VtuberCard, opciones: OpcionesGeneracion): Promise<TexturasDeCarta | null> {
-  const { prioridad = 'alta', alRapida, cancelada = () => false } = opciones;
+export async function generarTexturas(
+  card: VtuberCard,
+  opciones: OpcionesGeneracion,
+): Promise<TexturasDeCarta | null> {
+  const { prioridad = "alta", alRapida, cancelada = () => false } = opciones;
   const width = opciones.width;
   const enCache = buscarEnCache(card, width);
   if (enCache) {
-    medir('textura-cache', 0);
+    medir("textura-cache", 0);
     return enCache;
   }
 
@@ -395,7 +462,7 @@ export async function generarTexturas(card: VtuberCard, opciones: OpcionesGenera
     const t0 = performance.now();
     rapida = generarRapida(card, fuentes, width);
     medir(`textura-rapida:${width}`, performance.now() - t0);
-    if (prioridad === 'alta') alRapida?.(rapida);
+    if (prioridad === "alta") alRapida?.(rapida);
   }, prioridad);
   if (!rapida || cancelada()) return null;
 
@@ -416,9 +483,12 @@ export async function generarTexturas(card: VtuberCard, opciones: OpcionesGenera
  * Pregenera, con prioridad baja y en tiempo ocioso, las texturas de unas cartas (las
  * páginas vecinas que `lib/cache-paginas.ts` ya trajo). Lo que ya está en caché no cuesta.
  */
-export function pregenerar(cards: readonly VtuberCard[], anchoDelPlan: number): void {
+export function pregenerar(
+  cards: readonly VtuberCard[],
+  anchoDelPlan: number,
+): void {
   for (const card of cards) {
-    void generarTexturas(card, { width: anchoDelPlan, prioridad: 'baja' });
+    void generarTexturas(card, { width: anchoDelPlan, prioridad: "baja" });
   }
 }
 

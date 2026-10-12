@@ -24,7 +24,7 @@
  * El modo NO se elige por `NODE_ENV` sino por lo que esté configurado: así el mismo
  * build puede correr en local (proxy al Express) y en Vercel (Turso) sin ramas ocultas.
  */
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 import {
   aplicarImagenesDelMantenedor,
@@ -35,9 +35,12 @@ import {
   renombrarAssetsDelMantenedor,
   reemplazosDelMantenedor,
   tursoConfigurado,
-} from '../../../../lib/ediciones.mjs';
-import { aplicarYAnotar, dbConDiario } from '../../../../lib/diario.mjs';
-import { KINDS_GESTIONABLES, EXTENSION_DE_CARPETA } from '../../../../lib/carpetas.mjs';
+} from "../../../../lib/ediciones.mjs";
+import { aplicarYAnotar, dbConDiario } from "../../../../lib/diario.mjs";
+import {
+  KINDS_GESTIONABLES,
+  EXTENSION_DE_CARPETA,
+} from "../../../../lib/carpetas.mjs";
 import {
   cerrarSesion,
   credencialesConfiguradas,
@@ -47,9 +50,12 @@ import {
   leerSesion,
   tokenDeCabecera,
   usuarioEsperado,
-} from '../../../../lib/admin-auth.mjs';
-import { entrarConEnlace, pedirEnlaceDeAcceso } from '../../../../lib/admin-enlace.mjs';
-import { ipDelCliente, origenPermitido } from '../../../../lib/likes.mjs';
+} from "../../../../lib/admin-auth.mjs";
+import {
+  entrarConEnlace,
+  pedirEnlaceDeAcceso,
+} from "../../../../lib/admin-enlace.mjs";
+import { ipDelCliente, origenPermitido } from "../../../../lib/likes.mjs";
 import {
   adminListQuerySchema,
   bulkStatusSchema,
@@ -59,11 +65,15 @@ import {
   fichaCorreoSchema,
   vtuberCreateSchema,
   vtuberUpdateSchema,
-} from '../../../../server/src/validation.mjs';
-import { MutationError, listarFacciones, ultimoDex } from '../../../../server/src/mutations.mjs';
-import { resumenDeRechazos } from '../../../../server/src/rechazos.mjs';
-import { ejecutorDeSolicitudes } from '../../../../lib/solicitudes.mjs';
-import { correoDeBienvenida, enviarCorreo } from '../../../../lib/correo.mjs';
+} from "../../../../server/src/validation.mjs";
+import {
+  MutationError,
+  listarFacciones,
+  ultimoDex,
+} from "../../../../server/src/mutations.mjs";
+import { resumenDeRechazos } from "../../../../server/src/rechazos.mjs";
+import { ejecutorDeSolicitudes } from "../../../../lib/solicitudes.mjs";
+import { correoDeBienvenida, enviarCorreo } from "../../../../lib/correo.mjs";
 import {
   SolicitudError,
   fichaDesdeInscripcion,
@@ -72,23 +82,24 @@ import {
   leerSolicitud,
   listarSolicitudes,
   resolverSolicitud,
-} from '../../../../server/src/solicitudes.mjs';
-import { listarConCorreo } from '../../../../server/src/correo-fichas.mjs';
-import { estadisticasDelMantenedor } from '../../../../server/src/estadisticas-admin.mjs';
-import { prepararModificacion } from '../../../../server/src/modificacion.mjs';
-import { vistaPrevia } from '../../../../server/src/solicitud-vista.mjs';
-import { getVtuberBySlug } from '../../../../server/src/search.mjs';
-import { readWebpSize } from '../../../../server/src/seed.mjs';
+} from "../../../../server/src/solicitudes.mjs";
+import { listarConCorreo } from "../../../../server/src/correo-fichas.mjs";
+import { estadisticasDelMantenedor } from "../../../../server/src/estadisticas-admin.mjs";
+import { prepararModificacion } from "../../../../server/src/modificacion.mjs";
+import { vistaPrevia } from "../../../../server/src/solicitud-vista.mjs";
+import { getVtuberBySlug } from "../../../../server/src/search.mjs";
+import { readWebpSize } from "../../../../server/src/seed.mjs";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 /** Servidor de escritura para desarrollo; en producción no existe. */
 const ADMIN_UPSTREAM = process.env.VTUBERDEX_ADMIN_URL ?? null;
 
 const noDisponible = (detail) =>
-  NextResponse.json({ error: 'no_encontrado', detail }, { status: 404 });
+  NextResponse.json({ error: "no_encontrado", detail }, { status: 404 });
 
-const noAutenticado = () => NextResponse.json({ error: 'no_autenticado' }, { status: 401 });
+const noAutenticado = () =>
+  NextResponse.json({ error: "no_autenticado" }, { status: 401 });
 
 /**
  * Exige sesión válida y devuelve el usuario, o una respuesta 401.
@@ -111,10 +122,16 @@ async function exigirSesion(request) {
  */
 function responderError(error) {
   if (error instanceof MutationError) {
-    return NextResponse.json({ error: error.code, detail: error.detail }, { status: error.status });
+    return NextResponse.json(
+      { error: error.code, detail: error.detail },
+      { status: error.status },
+    );
   }
-  console.error('[admin] error al guardar', error);
-  return NextResponse.json({ error: 'error_al_guardar', detail: error.message }, { status: 500 });
+  console.error("[admin] error al guardar", error);
+  return NextResponse.json(
+    { error: "error_al_guardar", detail: error.message },
+    { status: 500 },
+  );
 }
 
 /**
@@ -135,19 +152,25 @@ function responderError(error) {
 async function detalleConReemplazos(db, slug) {
   const detalle = getVtuberBySlug(db, slug, { includeHidden: true });
   if (!detalle) return null;
-  return aplicarImagenesDelMantenedor(detalle, await reemplazosDelMantenedor(detalle.slug));
+  return aplicarImagenesDelMantenedor(
+    detalle,
+    await reemplazosDelMantenedor(detalle.slug),
+  );
 }
 
 /** Ficha por id sobre la base materializada, o `null`. */
 function fichaPorId(db, id) {
-  return db.prepare('SELECT id, slug FROM vtuber WHERE id = ?').get(Number(id)) ?? null;
+  return (
+    db.prepare("SELECT id, slug FROM vtuber WHERE id = ?").get(Number(id)) ??
+    null
+  );
 }
 
 /** Reenvía al Express local (comportamiento de siempre, sin cambios). */
 async function reenviar(request, context, method) {
   const { path } = await context.params;
-  const suffix = Array.isArray(path) ? path.join('/') : (path ?? '');
-  const url = `${ADMIN_UPSTREAM.replace(/\/$/, '')}/api/admin/${suffix}${new URL(request.url).search}`;
+  const suffix = Array.isArray(path) ? path.join("/") : (path ?? "");
+  const url = `${ADMIN_UPSTREAM.replace(/\/$/, "")}/api/admin/${suffix}${new URL(request.url).search}`;
   let response;
   try {
     response = await fetch(url, {
@@ -158,15 +181,20 @@ async function reenviar(request, context, method) {
         ...Object.fromEntries(request.headers),
         host: new URL(ADMIN_UPSTREAM).host,
       },
-      body: method === 'GET' ? undefined : await request.arrayBuffer(),
+      body: method === "GET" ? undefined : await request.arrayBuffer(),
     });
   } catch (error) {
     // El mantenedor está configurado pero no responde (ECONNREFUSED: se levantó
     // solo Next, o el contenedor del admin se cayó). Sin este `catch`, el
     // `fetch` lanzaba y la ruta devolvía **500** en vez del 404 documentado.
-    return noDisponible(`el mantenedor no responde en ${ADMIN_UPSTREAM}: ${error.message}`);
+    return noDisponible(
+      `el mantenedor no responde en ${ADMIN_UPSTREAM}: ${error.message}`,
+    );
   }
-  return new NextResponse(response.body, { status: response.status, headers: response.headers });
+  return new NextResponse(response.body, {
+    status: response.status,
+    headers: response.headers,
+  });
 }
 
 /**
@@ -180,18 +208,18 @@ async function login(request) {
   if (!credencialesConfiguradas()) {
     return NextResponse.json(
       {
-        error: 'sin_credenciales',
-        detail: 'falta VTUBERDEX_ADMIN_PASSWORD_HASH: genera el hash con `node scripts/admin-hash.mjs`',
+        error: "sin_credenciales",
+        detail:
+          "falta VTUBERDEX_ADMIN_PASSWORD_HASH: genera el hash con `node scripts/admin-hash.mjs`",
       },
       { status: 500 },
     );
   }
   const body = await request.json().catch(() => null);
-  const {
-    ok,
-    usuarioOk,
-    claveOk,
-  } = diagnosticarCredenciales(body?.username, body?.password);
+  const { ok, usuarioOk, claveOk } = diagnosticarCredenciales(
+    body?.username,
+    body?.password,
+  );
   if (!ok) {
     /**
      * 401 CON DIAGNÓSTICO, no un 401 mudo.
@@ -209,11 +237,11 @@ async function login(request) {
      * de una ruta sin sesión sin filtrar nada de la credencial.
      */
     const hash = !credencialesConfiguradas()
-      ? { valido: false, problemas: ['falta VTUBERDEX_ADMIN_PASSWORD_HASH'] }
+      ? { valido: false, problemas: ["falta VTUBERDEX_ADMIN_PASSWORD_HASH"] }
       : formatoDeHash();
     return NextResponse.json(
       {
-        error: 'credenciales_invalidas',
+        error: "credenciales_invalidas",
         usuarioOk,
         claveOk,
         usuarioEsperado: usuarioEsperado(),
@@ -222,10 +250,14 @@ async function login(request) {
       { status: 401 },
     );
   }
-  const user = { id: 0, username: usuarioEsperado(), role: 'admin' };
+  const user = { id: 0, username: usuarioEsperado(), role: "admin" };
   const token = await emitirSesion(user);
-  if (!token) return noDisponible('no se pudo emitir la sesión (¿Turso configurado?)');
-  return NextResponse.json({ token, user: { username: user.username, role: user.role } });
+  if (!token)
+    return noDisponible("no se pudo emitir la sesión (¿Turso configurado?)");
+  return NextResponse.json({
+    token,
+    user: { username: user.username, role: user.role },
+  });
 }
 
 /**
@@ -235,18 +267,33 @@ async function login(request) {
  * para cualquier correo bien formado (ver `lib/admin-enlace.mjs`).
  */
 async function enlaceDeAcceso(request, accion) {
-  const cabeceras = { 'cache-control': 'no-store' };
-  if (!origenPermitido(request.headers)) return NextResponse.json({ error: 'origen_no_permitido' }, { status: 403, headers: cabeceras });
+  const cabeceras = { "cache-control": "no-store" };
+  if (!origenPermitido(request.headers))
+    return NextResponse.json(
+      { error: "origen_no_permitido" },
+      { status: 403, headers: cabeceras },
+    );
   const cuerpo = await request.json().catch(() => null);
   try {
     const { status, cuerpo: respuesta } =
-      accion === 'entrar'
-        ? await entrarConEnlace(typeof cuerpo?.token === 'string' ? cuerpo.token : '')
-        : await pedirEnlaceDeAcceso({ email: cuerpo?.email, ip: ipDelCliente(request.headers) });
+      accion === "entrar"
+        ? await entrarConEnlace(
+            typeof cuerpo?.token === "string" ? cuerpo.token : "",
+          )
+        : await pedirEnlaceDeAcceso({
+            email: cuerpo?.email,
+            ip: ipDelCliente(request.headers),
+          });
     return NextResponse.json(respuesta, { status, headers: cabeceras });
   } catch (error) {
     console.error(`[admin] enlace de acceso: ${error.message}`);
-    return NextResponse.json({ error: 'no_disponible', detail: 'No se pudo procesar. Inténtalo de nuevo.' }, { status: 503, headers: cabeceras });
+    return NextResponse.json(
+      {
+        error: "no_disponible",
+        detail: "No se pudo procesar. Inténtalo de nuevo.",
+      },
+      { status: 503, headers: cabeceras },
+    );
   }
 }
 
@@ -261,14 +308,18 @@ async function enlaceDeAcceso(request, accion) {
 async function sesionTurso(request) {
   if (!credencialesConfiguradas()) {
     return NextResponse.json({
-      mode: 'turso',
+      mode: "turso",
       login: false,
-      note: 'falta VTUBERDEX_ADMIN_PASSWORD_HASH: define la contraseña con `node scripts/admin-hash.mjs`',
+      note: "falta VTUBERDEX_ADMIN_PASSWORD_HASH: define la contraseña con `node scripts/admin-hash.mjs`",
     });
   }
   const user = await leerSesion(tokenDeCabecera(request));
   if (!user) return noAutenticado();
-  return NextResponse.json({ mode: 'turso', login: true, user: { username: user.username, role: user.role } });
+  return NextResponse.json({
+    mode: "turso",
+    login: true,
+    user: { username: user.username, role: user.role },
+  });
 }
 
 /**
@@ -301,9 +352,14 @@ async function estadisticas() {
   try {
     ejecutor = await ejecutorDeSolicitudes();
   } catch (error) {
-    console.error('[admin] sin cola de solicitudes: las estadísticas salen sin correos ni pendientes', error);
+    console.error(
+      "[admin] sin cola de solicitudes: las estadísticas salen sin correos ni pendientes",
+      error,
+    );
   }
-  return NextResponse.json(await estadisticasDelMantenedor(db, ejecutor), { headers: { 'cache-control': 'no-store' } });
+  return NextResponse.json(await estadisticasDelMantenedor(db, ejecutor), {
+    headers: { "cache-control": "no-store" },
+  });
 }
 
 /**
@@ -328,23 +384,30 @@ async function editarVtuber(request, id, usuario) {
   const body = await request.json().catch(() => null);
   const parsed = vtuberUpdateSchema.safeParse(body ?? {});
   if (!parsed.success) {
-    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
+    return NextResponse.json(
+      { error: "payload_invalido", issues: formatIssues(parsed.error) },
+      { status: 400 },
+    );
   }
   if (Object.keys(parsed.data).length === 0) {
-    return NextResponse.json({ error: 'sin_cambios' }, { status: 400 });
+    return NextResponse.json({ error: "sin_cambios" }, { status: 400 });
   }
   try {
     const db = await dbConDiario();
     const actual = fichaPorId(db, id);
-    if (!actual) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+    if (!actual)
+      return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
     const { db: dbNueva, resultado } = await aplicarYAnotar(
-      { tipo: 'vtuber.editar', id: actual.id, patch: parsed.data },
+      { tipo: "vtuber.editar", id: actual.id, patch: parsed.data },
       usuario.username,
     );
     // Los reemplazos de imagen del mantenedor se guardan por slug: al cambiar la URL se mudan
     // con la ficha, o la imagen subida dejaría de verse.
-    if (resultado.slug !== actual.slug) await renombrarAssetsDelMantenedor(actual.slug, resultado.slug);
-    return NextResponse.json(await detalleConReemplazos(dbNueva, resultado.slug));
+    if (resultado.slug !== actual.slug)
+      await renombrarAssetsDelMantenedor(actual.slug, resultado.slug);
+    return NextResponse.json(
+      await detalleConReemplazos(dbNueva, resultado.slug),
+    );
   } catch (error) {
     return responderError(error);
   }
@@ -355,11 +418,19 @@ async function crearVtuber(request, usuario) {
   const body = await request.json().catch(() => null);
   const parsed = vtuberCreateSchema.safeParse(body ?? {});
   if (!parsed.success) {
-    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
+    return NextResponse.json(
+      { error: "payload_invalido", issues: formatIssues(parsed.error) },
+      { status: 400 },
+    );
   }
   try {
-    const { db, resultado } = await aplicarYAnotar({ tipo: 'vtuber.crear', datos: parsed.data }, usuario.username);
-    return NextResponse.json(await detalleConReemplazos(db, resultado.slug), { status: 201 });
+    const { db, resultado } = await aplicarYAnotar(
+      { tipo: "vtuber.crear", datos: parsed.data },
+      usuario.username,
+    );
+    return NextResponse.json(await detalleConReemplazos(db, resultado.slug), {
+      status: 201,
+    });
   } catch (error) {
     return responderError(error);
   }
@@ -367,9 +438,14 @@ async function crearVtuber(request, usuario) {
 
 /** `GET /api/admin/vtubers` — listado del mantenedor: incluye borradores y ocultos. */
 async function listarVtubers(request) {
-  const parsed = adminListQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  const parsed = adminListQuerySchema.safeParse(
+    Object.fromEntries(new URL(request.url).searchParams),
+  );
   if (!parsed.success) {
-    return NextResponse.json({ error: 'query_invalida', issues: formatIssues(parsed.error) }, { status: 400 });
+    return NextResponse.json(
+      { error: "query_invalida", issues: formatIssues(parsed.error) },
+      { status: 400 },
+    );
   }
   const { q, status, premium, correo, page, perPage } = parsed.data;
   const db = await dbConDiario();
@@ -377,20 +453,30 @@ async function listarVtubers(request) {
   try {
     ejecutor = await ejecutorDeSolicitudes();
   } catch (error) {
-    console.error('[admin] sin cola de solicitudes: el listado sale sin datos de correo', error);
+    console.error(
+      "[admin] sin cola de solicitudes: el listado sale sin datos de correo",
+      error,
+    );
   }
-  if (correo && !ejecutor) return NextResponse.json({ error: 'solicitudes_no_disponibles' }, { status: 503 });
+  if (correo && !ejecutor)
+    return NextResponse.json(
+      { error: "solicitudes_no_disponibles" },
+      { status: 503 },
+    );
   const resultado = await listarConCorreo(db, ejecutor, {
     q,
     correo,
     page,
     perPage,
     includeHidden: true,
-    status: status === 'all' ? null : status,
-    premium: premium ? 'todas' : false,
-    sort: 'dex',
+    status: status === "all" ? null : status,
+    premium: premium ? "todas" : false,
+    sort: "dex",
   });
-  return NextResponse.json({ ...resultado, items: await aplicarReemplazosALista(resultado.items) });
+  return NextResponse.json({
+    ...resultado,
+    items: await aplicarReemplazosALista(resultado.items),
+  });
 }
 
 /** `GET /api/admin/vtubers/:id` — detalle sin filtrar por estado: es lo que abre el editor. */
@@ -398,53 +484,80 @@ async function detalleVtuber(id) {
   const db = await dbConDiario();
   const actual = fichaPorId(db, id);
   const detalle = actual ? await detalleConReemplazos(db, actual.slug) : null;
-  if (!detalle) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+  if (!detalle)
+    return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
   // El correo va SOLO en el detalle del mantenedor; sin cola no tumba la ficha.
   let email = null;
   try {
     const correos = await correosDeFichas(await ejecutorDeSolicitudes(), {
-      resolverFicha: (slug) => getVtuberBySlug(db, slug, { includeHidden: true }),
+      resolverFicha: (slug) =>
+        getVtuberBySlug(db, slug, { includeHidden: true }),
     });
     email = correos.get(actual.id) ?? null;
   } catch (error) {
-    console.error('[admin] no se pudo leer el correo de la ficha', error);
+    console.error("[admin] no se pudo leer el correo de la ficha", error);
   }
   return NextResponse.json({ ...detalle, email });
 }
 
 /** `PUT /api/admin/vtubers/:id/correo` — fija o quita el correo de una ficha (vive en la cola, no en el diario). */
 async function fijarCorreo(request, id) {
-  const parsed = fichaCorreoSchema.safeParse(await request.json().catch(() => null));
+  const parsed = fichaCorreoSchema.safeParse(
+    await request.json().catch(() => null),
+  );
   if (!parsed.success) {
-    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
+    return NextResponse.json(
+      { error: "payload_invalido", issues: formatIssues(parsed.error) },
+      { status: 400 },
+    );
   }
   const db = await dbConDiario();
   const actual = fichaPorId(db, id);
-  if (!actual) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+  if (!actual)
+    return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
   try {
     const ejecutor = await ejecutorDeSolicitudes();
-    const resolverFicha = (slug) => getVtuberBySlug(db, slug, { includeHidden: true });
-    const anterior = (await correosDeFichas(ejecutor, { resolverFicha })).get(actual.id) ?? null;
-    const email = await fijarCorreoDeFicha(ejecutor, actual.id, parsed.data.email);
+    const resolverFicha = (slug) =>
+      getVtuberBySlug(db, slug, { includeHidden: true });
+    const anterior =
+      (await correosDeFichas(ejecutor, { resolverFicha })).get(actual.id) ??
+      null;
+    const email = await fijarCorreoDeFicha(
+      ejecutor,
+      actual.id,
+      parsed.data.email,
+    );
     // Bienvenida solo si el correo es NUEVO para la ficha (guardar el mismo otra vez no reenvía). Si el
     // envío falla el correo ya quedó guardado: se avisa en la respuesta en vez de deshacer el cambio.
-    let bienvenida = 'no';
+    let bienvenida = "no";
     if (email && email !== anterior) {
       try {
         const ficha = resolverFicha(actual.slug);
-        const { asunto, texto, html } = correoDeBienvenida({ nombre: ficha?.name, slug: actual.slug });
+        const { asunto, texto, html } = correoDeBienvenida({
+          nombre: ficha?.name,
+          slug: actual.slug,
+        });
         await enviarCorreo({ para: email, asunto, texto, html });
-        bienvenida = 'enviada';
+        bienvenida = "enviada";
       } catch (error) {
-        console.error(`[admin] no se pudo enviar la bienvenida a la ficha ${actual.slug}: ${error.message}`);
-        bienvenida = 'fallo';
+        console.error(
+          `[admin] no se pudo enviar la bienvenida a la ficha ${actual.slug}: ${error.message}`,
+        );
+        bienvenida = "fallo";
       }
     }
     return NextResponse.json({ email, bienvenida });
   } catch (error) {
-    if (error instanceof SolicitudError) return NextResponse.json({ error: error.code, detail: error.detail }, { status: error.status });
-    console.error('[admin] no se pudo guardar el correo', error);
-    return NextResponse.json({ error: 'solicitudes_no_disponibles', detail: error.message }, { status: 503 });
+    if (error instanceof SolicitudError)
+      return NextResponse.json(
+        { error: error.code, detail: error.detail },
+        { status: error.status },
+      );
+    console.error("[admin] no se pudo guardar el correo", error);
+    return NextResponse.json(
+      { error: "solicitudes_no_disponibles", detail: error.message },
+      { status: 503 },
+    );
   }
 }
 
@@ -465,26 +578,46 @@ async function listaDeFacciones() {
 async function mutarFaccion(operacion, usuario, status = 200) {
   try {
     const { db, resultado } = await aplicarYAnotar(operacion, usuario.username);
-    return NextResponse.json({ faction: resultado, items: listarFacciones(db) }, { status });
+    return NextResponse.json(
+      { faction: resultado, items: listarFacciones(db) },
+      { status },
+    );
   } catch (error) {
     return responderError(error);
   }
 }
 
 async function crearFaccionRuta(request, usuario) {
-  const parsed = factionCreateSchema.safeParse(await request.json().catch(() => null));
+  const parsed = factionCreateSchema.safeParse(
+    await request.json().catch(() => null),
+  );
   if (!parsed.success) {
-    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
+    return NextResponse.json(
+      { error: "payload_invalido", issues: formatIssues(parsed.error) },
+      { status: 400 },
+    );
   }
-  return mutarFaccion({ tipo: 'faccion.crear', datos: parsed.data }, usuario, 201);
+  return mutarFaccion(
+    { tipo: "faccion.crear", datos: parsed.data },
+    usuario,
+    201,
+  );
 }
 
 async function editarFaccionRuta(request, id, usuario) {
-  const parsed = factionUpdateSchema.safeParse(await request.json().catch(() => null));
+  const parsed = factionUpdateSchema.safeParse(
+    await request.json().catch(() => null),
+  );
   if (!parsed.success) {
-    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
+    return NextResponse.json(
+      { error: "payload_invalido", issues: formatIssues(parsed.error) },
+      { status: 400 },
+    );
   }
-  return mutarFaccion({ tipo: 'faccion.editar', id: Number(id), patch: parsed.data }, usuario);
+  return mutarFaccion(
+    { tipo: "faccion.editar", id: Number(id), patch: parsed.data },
+    usuario,
+  );
 }
 
 /**
@@ -493,7 +626,8 @@ async function editarFaccionRuta(request, id, usuario) {
  */
 function leerMedidasPng(bytes) {
   const firma = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  if (bytes.length < 24 || firma.some((valor, i) => bytes[i] !== valor)) return null;
+  if (bytes.length < 24 || firma.some((valor, i) => bytes[i] !== valor))
+    return null;
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 }
 
@@ -508,33 +642,62 @@ function leerMedidasPng(bytes) {
 async function subirEmblema(request, id, usuario) {
   try {
     const db = await dbConDiario();
-    const faccion = db.prepare('SELECT id, slug FROM faction WHERE id = ?').get(Number(id));
-    if (!faccion) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+    const faccion = db
+      .prepare("SELECT id, slug FROM faction WHERE id = ?")
+      .get(Number(id));
+    if (!faccion)
+      return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
     const bytes = Buffer.from(await request.arrayBuffer());
     if (bytes.length > 2 * 1024 * 1024) {
-      return NextResponse.json({ error: 'archivo_demasiado_grande', detail: 'el emblema admite hasta 2 MB' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "archivo_demasiado_grande",
+          detail: "el emblema admite hasta 2 MB",
+        },
+        { status: 400 },
+      );
     }
     const medidas = leerMedidasPng(bytes);
-    if (!medidas) return NextResponse.json({ error: 'formato_invalido', detail: 'se esperaba un PNG' }, { status: 400 });
-    await guardarAssetDelMantenedor(faccion.slug, 'faction', bytes, 'image/png', medidas);
+    if (!medidas)
+      return NextResponse.json(
+        { error: "formato_invalido", detail: "se esperaba un PNG" },
+        { status: 400 },
+      );
+    await guardarAssetDelMantenedor(
+      faccion.slug,
+      "faction",
+      bytes,
+      "image/png",
+      medidas,
+    );
     const ruta = `images/faction/${faccion.slug}.png?v=${Date.now()}`;
     const { db: dbNueva, resultado } = await aplicarYAnotar(
-      { tipo: 'faccion.editar', id: faccion.id, patch: { icon: ruta } },
+      { tipo: "faccion.editar", id: faccion.id, patch: { icon: ruta } },
       usuario.username,
     );
-    return NextResponse.json({ faction: resultado, items: listarFacciones(dbNueva), asset: { path: ruta, ...medidas, bytes: bytes.length } });
+    return NextResponse.json({
+      faction: resultado,
+      items: listarFacciones(dbNueva),
+      asset: { path: ruta, ...medidas, bytes: bytes.length },
+    });
   } catch (error) {
     return responderError(error);
   }
 }
 
 async function eliminarFaccionRuta(request, id, usuario) {
-  const bruto = new URL(request.url).searchParams.get('mergeInto');
+  const bruto = new URL(request.url).searchParams.get("mergeInto");
   const destino = bruto === null ? null : Number(bruto);
   if (destino !== null && !Number.isInteger(destino)) {
-    return NextResponse.json({ error: 'fusion_invalida', detail: 'mergeInto debe ser un id' }, { status: 400 });
+    return NextResponse.json(
+      { error: "fusion_invalida", detail: "mergeInto debe ser un id" },
+      { status: 400 },
+    );
   }
-  return mutarFaccion({ tipo: 'faccion.eliminar', id: Number(id), fusionarEn: destino }, usuario);
+  return mutarFaccion(
+    { tipo: "faccion.eliminar", id: Number(id), fusionarEn: destino },
+    usuario,
+  );
 }
 
 /**
@@ -554,21 +717,30 @@ async function subirImagen(request, id, kind) {
    */
   if (!KINDS_GESTIONABLES.includes(kind)) {
     return NextResponse.json(
-      { error: 'kind_invalido', detail: `use: ${KINDS_GESTIONABLES.join(', ')}` },
+      {
+        error: "kind_invalido",
+        detail: `use: ${KINDS_GESTIONABLES.join(", ")}`,
+      },
       { status: 400 },
     );
   }
   const db = await dbConDiario();
   const actual = fichaPorId(db, id);
-  if (!actual) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+  if (!actual)
+    return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
 
   const bytes = Buffer.from(await request.arrayBuffer());
   // Firma de WebP: "RIFF" + 4 bytes de tamaño + "WEBP". Es el contenedor que usan las
   // carpetas publicadas, así que no hace falta aceptar nada más.
   const esWebp =
-    bytes.length > 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+    bytes.length > 12 &&
+    bytes.toString("ascii", 0, 4) === "RIFF" &&
+    bytes.toString("ascii", 8, 12) === "WEBP";
   if (!esWebp) {
-    return NextResponse.json({ error: 'formato_invalido', detail: 'se esperaba WebP (RIFF/WEBP)' }, { status: 400 });
+    return NextResponse.json(
+      { error: "formato_invalido", detail: "se esperaba WebP (RIFF/WEBP)" },
+      { status: 400 },
+    );
   }
 
   /**
@@ -583,7 +755,13 @@ async function subirImagen(request, id, kind) {
    * una imagen que sí está guardada: el síntoma que confundía al mantenedor.
    */
   const medidas = readWebpSize(bytes);
-  await guardarAssetDelMantenedor(actual.slug, kind, bytes, 'image/webp', medidas);
+  await guardarAssetDelMantenedor(
+    actual.slug,
+    kind,
+    bytes,
+    "image/webp",
+    medidas,
+  );
 
   /**
    * Se devuelve el MISMO contrato que el Express: `{ok, kind, asset, vtuber}`.
@@ -598,13 +776,13 @@ async function subirImagen(request, id, kind) {
    * cliente ya normaliza el encuadre antes de mandar el archivo.
    */
   const fila = await leerAssetDelMantenedor(actual.slug, kind);
-  const ext = EXTENSION_DE_CARPETA[kind] ?? 'webp';
+  const ext = EXTENSION_DE_CARPETA[kind] ?? "webp";
   const asset = {
     path: `images/${kind}/${actual.slug}.${ext}`,
     width: fila?.width ?? null,
     height: fila?.height ?? null,
     bytes: bytes.length,
-    format: 'webp',
+    format: "webp",
     hasAlpha: false,
     alphaLost: false,
   };
@@ -616,10 +794,14 @@ async function subirImagen(request, id, kind) {
 async function borrarImagen(id, kind) {
   const db = await dbConDiario();
   const actual = fichaPorId(db, id);
-  if (!actual) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
+  if (!actual)
+    return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
   if (!KINDS_GESTIONABLES.includes(kind)) {
     return NextResponse.json(
-      { error: 'kind_invalido', detail: `use: ${KINDS_GESTIONABLES.join(', ')}` },
+      {
+        error: "kind_invalido",
+        detail: `use: ${KINDS_GESTIONABLES.join(", ")}`,
+      },
       { status: 400 },
     );
   }
@@ -635,7 +817,7 @@ async function borrarImagen(id, kind) {
     ok: true,
     slug: actual.slug,
     kind,
-    restaurado: habia ? 'catalogo' : 'no_habia_reemplazo',
+    restaurado: habia ? "catalogo" : "no_habia_reemplazo",
     vtuber,
   });
 }
@@ -647,13 +829,21 @@ async function borrarImagen(id, kind) {
  * escritura a Turso.
  */
 async function estadoMasivo(request, usuario) {
-  const parsed = bulkStatusSchema.safeParse(await request.json().catch(() => null));
+  const parsed = bulkStatusSchema.safeParse(
+    await request.json().catch(() => null),
+  );
   if (!parsed.success) {
-    return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(parsed.error) }, { status: 400 });
+    return NextResponse.json(
+      { error: "payload_invalido", issues: formatIssues(parsed.error) },
+      { status: 400 },
+    );
   }
   try {
     const { ids, status } = parsed.data;
-    const { resultado } = await aplicarYAnotar({ tipo: 'vtuber.estado', ids, status }, usuario.username);
+    const { resultado } = await aplicarYAnotar(
+      { tipo: "vtuber.estado", ids, status },
+      usuario.username,
+    );
     return NextResponse.json({ updated: resultado.ids.length, status });
   } catch (error) {
     return responderError(error);
@@ -667,16 +857,26 @@ async function estadoMasivo(request, usuario) {
  */
 async function listarSolicitudesRuta(request) {
   const consulta = new URL(request.url).searchParams;
-  const estado = consulta.get('estado') ?? 'pendiente';
-  const tipo = consulta.get('tipo');
-  if (!['pendiente', 'aprobada', 'rechazada', 'procesada', 'todas'].includes(estado) || (tipo && !['inscripcion', 'baja', 'modificacion'].includes(tipo))) {
-    return NextResponse.json({ error: 'query_invalida' }, { status: 400 });
+  const estado = consulta.get("estado") ?? "pendiente";
+  const tipo = consulta.get("tipo");
+  if (
+    !["pendiente", "aprobada", "rechazada", "procesada", "todas"].includes(
+      estado,
+    ) ||
+    (tipo && !["inscripcion", "baja", "modificacion"].includes(tipo))
+  ) {
+    return NextResponse.json({ error: "query_invalida" }, { status: 400 });
   }
   try {
-    return NextResponse.json(await listarSolicitudes(await ejecutorDeSolicitudes(), { estado, tipo }));
+    return NextResponse.json(
+      await listarSolicitudes(await ejecutorDeSolicitudes(), { estado, tipo }),
+    );
   } catch (error) {
-    console.error('[admin] no se pudo leer la cola de solicitudes', error);
-    return NextResponse.json({ error: 'solicitudes_no_disponibles', detail: error.message }, { status: 503 });
+    console.error("[admin] no se pudo leer la cola de solicitudes", error);
+    return NextResponse.json(
+      { error: "solicitudes_no_disponibles", detail: error.message },
+      { status: 503 },
+    );
   }
 }
 
@@ -685,12 +885,20 @@ async function listarSolicitudesRuta(request) {
  * días (sin correos ni contenido): para saber dónde se atasca la gente.
  */
 async function rechazosRuta(request) {
-  const dias = Math.min(30, Math.max(1, Number(new URL(request.url).searchParams.get('dias')) || 7));
+  const dias = Math.min(
+    30,
+    Math.max(1, Number(new URL(request.url).searchParams.get("dias")) || 7),
+  );
   try {
-    return NextResponse.json(await resumenDeRechazos(await ejecutorDeSolicitudes(), { dias }));
+    return NextResponse.json(
+      await resumenDeRechazos(await ejecutorDeSolicitudes(), { dias }),
+    );
   } catch (error) {
-    console.error('[admin] no se pudo leer el resumen de rechazos', error);
-    return NextResponse.json({ error: 'solicitudes_no_disponibles', detail: error.message }, { status: 503 });
+    console.error("[admin] no se pudo leer el resumen de rechazos", error);
+    return NextResponse.json(
+      { error: "solicitudes_no_disponibles", detail: error.message },
+      { status: 503 },
+    );
   }
 }
 
@@ -703,12 +911,17 @@ const SLUG_DE_FICHA = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
  * `ficha` elige a mano la ficha de una modificación (la misma que luego se manda al aprobar).
  */
 async function vistaPreviaRuta(request, id) {
-  const fichaSlug = new URL(request.url).searchParams.get('ficha');
-  if (fichaSlug !== null && !SLUG_DE_FICHA.test(fichaSlug)) return NextResponse.json({ error: 'query_invalida' }, { status: 400 });
+  const fichaSlug = new URL(request.url).searchParams.get("ficha");
+  if (fichaSlug !== null && !SLUG_DE_FICHA.test(fichaSlug))
+    return NextResponse.json({ error: "query_invalida" }, { status: 400 });
   try {
     const solicitud = await leerSolicitud(await ejecutorDeSolicitudes(), id);
-    if (!solicitud) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
-    return NextResponse.json(vistaPrevia(await dbConDiario(), solicitud, { fichaSlug }), { headers: { 'cache-control': 'no-store' } });
+    if (!solicitud)
+      return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+    return NextResponse.json(
+      vistaPrevia(await dbConDiario(), solicitud, { fichaSlug }),
+      { headers: { "cache-control": "no-store" } },
+    );
   } catch (error) {
     return responderError(error);
   }
@@ -728,143 +941,242 @@ async function vistaPreviaRuta(request, id) {
 async function resolverSolicitudRuta(request, id, usuario) {
   const cuerpo = await request.json().catch(() => null);
   const accion = cuerpo?.accion;
-  if (!['aprobar', 'rechazar', 'procesar'].includes(accion)) {
-    return NextResponse.json({ error: 'payload_invalido', detail: 'accion: aprobar | rechazar | procesar' }, { status: 400 });
+  if (!["aprobar", "rechazar", "procesar"].includes(accion)) {
+    return NextResponse.json(
+      {
+        error: "payload_invalido",
+        detail: "accion: aprobar | rechazar | procesar",
+      },
+      { status: 400 },
+    );
   }
-  const nota = typeof cuerpo?.nota === 'string' ? cuerpo.nota : '';
+  const nota = typeof cuerpo?.nota === "string" ? cuerpo.nota : "";
   try {
     const ejecutor = await ejecutorDeSolicitudes();
     const solicitud = await leerSolicitud(ejecutor, id);
-    if (!solicitud) return NextResponse.json({ error: 'no_encontrado' }, { status: 404 });
-    if (solicitud.estado !== 'pendiente') {
-      return NextResponse.json({ error: 'ya_resuelta', detail: 'esta solicitud ya fue resuelta' }, { status: 409 });
+    if (!solicitud)
+      return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+    if (solicitud.estado !== "pendiente") {
+      return NextResponse.json(
+        { error: "ya_resuelta", detail: "esta solicitud ya fue resuelta" },
+        { status: 409 },
+      );
     }
     let vtuberSlug = null;
-    if (accion === 'aprobar' && solicitud.tipo === 'modificacion') {
+    if (accion === "aprobar" && solicitud.tipo === "modificacion") {
       // Se aplica el parche a la ficha EXISTENTE (`vtuber.editar` del diario); avatar y logo (enlaces)
       // los sube el mantenedor aparte. La ficha se lee del diario ya reproducido, no de la base empaquetada.
       const db = await dbConDiario();
       // El mantenedor puede haber ELEGIDO la ficha cuando lo escrito en el formulario no se resolvía solo.
       let elegida = null;
-      if (typeof cuerpo?.fichaSlug === 'string' && cuerpo.fichaSlug) {
-        elegida = SLUG_DE_FICHA.test(cuerpo.fichaSlug) ? getVtuberBySlug(db, cuerpo.fichaSlug, { includeHidden: true }) : null;
-        if (!elegida) return NextResponse.json({ error: 'ficha_no_encontrada', detail: 'la ficha elegida no existe' }, { status: 404 });
+      if (typeof cuerpo?.fichaSlug === "string" && cuerpo.fichaSlug) {
+        elegida = SLUG_DE_FICHA.test(cuerpo.fichaSlug)
+          ? getVtuberBySlug(db, cuerpo.fichaSlug, { includeHidden: true })
+          : null;
+        if (!elegida)
+          return NextResponse.json(
+            {
+              error: "ficha_no_encontrada",
+              detail: "la ficha elegida no existe",
+            },
+            { status: 404 },
+          );
       }
-      const { id: fichaId, slug, patch } = prepararModificacion(db, solicitud, { ficha: elegida });
+      const {
+        id: fichaId,
+        slug,
+        patch,
+      } = prepararModificacion(db, solicitud, { ficha: elegida });
       const datos = vtuberUpdateSchema.safeParse(patch);
       if (!datos.success) {
-        return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(datos.error) }, { status: 400 });
+        return NextResponse.json(
+          { error: "payload_invalido", issues: formatIssues(datos.error) },
+          { status: 400 },
+        );
       }
       vtuberSlug = slug;
       if (Object.keys(datos.data).length) {
-        const { resultado } = await aplicarYAnotar({ tipo: 'vtuber.editar', id: fichaId, patch: datos.data }, usuario.username);
+        const { resultado } = await aplicarYAnotar(
+          { tipo: "vtuber.editar", id: fichaId, patch: datos.data },
+          usuario.username,
+        );
         vtuberSlug = resultado.slug;
       }
-    } else if (accion === 'aprobar') {
-      if (solicitud.tipo !== 'inscripcion') {
-        return NextResponse.json({ error: 'estado_invalido', detail: 'solo se aprueban inscripciones y modificaciones' }, { status: 400 });
+    } else if (accion === "aprobar") {
+      if (solicitud.tipo !== "inscripcion") {
+        return NextResponse.json(
+          {
+            error: "estado_invalido",
+            detail: "solo se aprueban inscripciones y modificaciones",
+          },
+          { status: 400 },
+        );
       }
-      const datos = vtuberCreateSchema.safeParse(fichaDesdeInscripcion(solicitud));
+      const datos = vtuberCreateSchema.safeParse(
+        fichaDesdeInscripcion(solicitud),
+      );
       if (!datos.success) {
-        return NextResponse.json({ error: 'payload_invalido', issues: formatIssues(datos.error) }, { status: 400 });
+        return NextResponse.json(
+          { error: "payload_invalido", issues: formatIssues(datos.error) },
+          { status: 400 },
+        );
       }
-      const { resultado } = await aplicarYAnotar({ tipo: 'vtuber.crear', datos: datos.data }, usuario.username);
+      const { resultado } = await aplicarYAnotar(
+        { tipo: "vtuber.crear", datos: datos.data },
+        usuario.username,
+      );
       vtuberSlug = resultado.slug;
     }
-    const estado = accion === 'aprobar' ? 'aprobada' : accion === 'procesar' ? 'procesada' : 'rechazada';
-    const resuelta = await resolverSolicitud(ejecutor, id, { estado, actor: usuario.username, nota, vtuberSlug });
+    const estado =
+      accion === "aprobar"
+        ? "aprobada"
+        : accion === "procesar"
+          ? "procesada"
+          : "rechazada";
+    const resuelta = await resolverSolicitud(ejecutor, id, {
+      estado,
+      actor: usuario.username,
+      nota,
+      vtuberSlug,
+    });
     return NextResponse.json({ solicitud: resuelta });
   } catch (error) {
     if (error instanceof SolicitudError) {
-      return NextResponse.json({ error: error.code, detail: error.detail }, { status: error.status });
+      return NextResponse.json(
+        { error: error.code, detail: error.detail },
+        { status: error.status },
+      );
     }
     return responderError(error);
   }
 }
 
 function sinBackend() {
-  return noDisponible('el mantenedor solo existe en local: hace falta VTUBERDEX_DB_URL (la base del mantenedor)');
+  return noDisponible(
+    "el mantenedor solo existe en local: hace falta VTUBERDEX_DB_URL (la base del mantenedor)",
+  );
 }
 
 export async function GET(request, context) {
-  if (ADMIN_UPSTREAM) return reenviar(request, context, 'GET');
+  if (ADMIN_UPSTREAM) return reenviar(request, context, "GET");
   if (!tursoConfigurado()) return sinBackend();
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
-  const sufijo = partes.join('/');
-  if (sufijo === 'session') return sesionTurso(request);
+  const sufijo = partes.join("/");
+  if (sufijo === "session") return sesionTurso(request);
   const [, negado] = await exigirSesion(request);
   if (negado) return negado;
-  if (sufijo === 'stats') return estadisticas();
+  if (sufijo === "stats") return estadisticas();
   // `audit` va vacío a propósito: el registro vive en `audit_log`, que la base que se
   // despliega sanea (contiene el hash de la contraseña). Se devuelve `{items: []}` para que
   // la UI muestre "sin registros" en vez de un error que parecería una avería.
-  if (sufijo === 'audit') return NextResponse.json({ items: [] });
-  if (sufijo === 'vtubers') return listarVtubers(request);
-  if (partes[0] === 'vtubers' && partes[1] && partes.length === 2) return detalleVtuber(partes[1]);
-  if (sufijo === 'dex/next') return siguienteDex();
-  if (sufijo === 'factions') return listaDeFacciones();
-  if (sufijo === 'solicitudes') return listarSolicitudesRuta(request);
-  if (sufijo === 'solicitudes/rechazos') return rechazosRuta(request);
-  if (partes[0] === 'solicitudes' && partes[1] && partes[2] === 'vista-previa' && partes.length === 3) return vistaPreviaRuta(request, partes[1]);
-  return noDisponible(`ruta del mantenedor no soportada en producción: ${sufijo}`);
+  if (sufijo === "audit") return NextResponse.json({ items: [] });
+  if (sufijo === "vtubers") return listarVtubers(request);
+  if (partes[0] === "vtubers" && partes[1] && partes.length === 2)
+    return detalleVtuber(partes[1]);
+  if (sufijo === "dex/next") return siguienteDex();
+  if (sufijo === "factions") return listaDeFacciones();
+  if (sufijo === "solicitudes") return listarSolicitudesRuta(request);
+  if (sufijo === "solicitudes/rechazos") return rechazosRuta(request);
+  if (
+    partes[0] === "solicitudes" &&
+    partes[1] &&
+    partes[2] === "vista-previa" &&
+    partes.length === 3
+  )
+    return vistaPreviaRuta(request, partes[1]);
+  return noDisponible(
+    `ruta del mantenedor no soportada en producción: ${sufijo}`,
+  );
 }
 
 export async function PATCH(request, context) {
-  if (ADMIN_UPSTREAM) return reenviar(request, context, 'PATCH');
+  if (ADMIN_UPSTREAM) return reenviar(request, context, "PATCH");
   if (!tursoConfigurado()) return sinBackend();
   const [usuario, negado] = await exigirSesion(request);
   if (negado) return negado;
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
-  if (partes[0] === 'vtubers' && partes[1]) return editarVtuber(request, partes[1], usuario);
-  if (partes[0] === 'factions' && partes[1]) return editarFaccionRuta(request, partes[1], usuario);
-  return noDisponible(`ruta del mantenedor no soportada en producción: ${partes.join('/')}`);
+  if (partes[0] === "vtubers" && partes[1])
+    return editarVtuber(request, partes[1], usuario);
+  if (partes[0] === "factions" && partes[1])
+    return editarFaccionRuta(request, partes[1], usuario);
+  return noDisponible(
+    `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
+  );
 }
 
 export async function PUT(request, context) {
-  if (ADMIN_UPSTREAM) return reenviar(request, context, 'PUT');
+  if (ADMIN_UPSTREAM) return reenviar(request, context, "PUT");
   if (!tursoConfigurado()) return sinBackend();
   const [, negado] = await exigirSesion(request);
   if (negado) return negado;
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
-  if (partes[0] === 'vtubers' && partes[1] && partes[2] === 'correo' && partes.length === 3) return fijarCorreo(request, partes[1]);
-  return noDisponible(`ruta del mantenedor no soportada en producción: ${partes.join('/')}`);
+  if (
+    partes[0] === "vtubers" &&
+    partes[1] &&
+    partes[2] === "correo" &&
+    partes.length === 3
+  )
+    return fijarCorreo(request, partes[1]);
+  return noDisponible(
+    `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
+  );
 }
 
 export async function POST(request, context) {
-  if (ADMIN_UPSTREAM) return reenviar(request, context, 'POST');
+  if (ADMIN_UPSTREAM) return reenviar(request, context, "POST");
   if (!tursoConfigurado()) return sinBackend();
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
   // El login es la ÚNICA ruta sin sesión: es la que la crea.
-  if (partes[0] === 'login') return login(request);
-  if (partes[0] === 'enlace') return enlaceDeAcceso(request, partes[1]);
-  if (partes[0] === 'logout') return logout(request);
+  if (partes[0] === "login") return login(request);
+  if (partes[0] === "enlace") return enlaceDeAcceso(request, partes[1]);
+  if (partes[0] === "logout") return logout(request);
   const [usuario, negado] = await exigirSesion(request);
   if (negado) return negado;
-  if (partes[0] === 'vtubers' && partes.length === 1) return crearVtuber(request, usuario);
-  if (partes[0] === 'vtubers' && partes[1] === 'bulk-status') return estadoMasivo(request, usuario);
-  if (partes[0] === 'vtubers' && partes[1] && partes[2] === 'image' && partes[3]) {
+  if (partes[0] === "vtubers" && partes.length === 1)
+    return crearVtuber(request, usuario);
+  if (partes[0] === "vtubers" && partes[1] === "bulk-status")
+    return estadoMasivo(request, usuario);
+  if (
+    partes[0] === "vtubers" &&
+    partes[1] &&
+    partes[2] === "image" &&
+    partes[3]
+  ) {
     return subirImagen(request, partes[1], partes[3]);
   }
-  if (partes[0] === 'solicitudes' && partes[1] && partes[2] === 'resolver') return resolverSolicitudRuta(request, partes[1], usuario);
-  if (partes[0] === 'factions' && partes.length === 1) return crearFaccionRuta(request, usuario);
-  if (partes[0] === 'factions' && partes[1] && partes[2] === 'image') return subirEmblema(request, partes[1], usuario);
-  return noDisponible(`ruta del mantenedor no soportada en producción: ${partes.join('/')}`);
+  if (partes[0] === "solicitudes" && partes[1] && partes[2] === "resolver")
+    return resolverSolicitudRuta(request, partes[1], usuario);
+  if (partes[0] === "factions" && partes.length === 1)
+    return crearFaccionRuta(request, usuario);
+  if (partes[0] === "factions" && partes[1] && partes[2] === "image")
+    return subirEmblema(request, partes[1], usuario);
+  return noDisponible(
+    `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
+  );
 }
 
 export async function DELETE(request, context) {
-  if (ADMIN_UPSTREAM) return reenviar(request, context, 'DELETE');
+  if (ADMIN_UPSTREAM) return reenviar(request, context, "DELETE");
   if (!tursoConfigurado()) return sinBackend();
   const [usuario, negado] = await exigirSesion(request);
   if (negado) return negado;
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
-  if (partes[0] === 'vtubers' && partes[1] && partes[2] === 'image' && partes[3]) {
+  if (
+    partes[0] === "vtubers" &&
+    partes[1] &&
+    partes[2] === "image" &&
+    partes[3]
+  ) {
     return borrarImagen(partes[1], partes[3]);
   }
-  if (partes[0] === 'factions' && partes[1]) return eliminarFaccionRuta(request, partes[1], usuario);
-  return noDisponible(`ruta del mantenedor no soportada en producción: ${partes.join('/')}`);
+  if (partes[0] === "factions" && partes[1])
+    return eliminarFaccionRuta(request, partes[1], usuario);
+  return noDisponible(
+    `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
+  );
 }

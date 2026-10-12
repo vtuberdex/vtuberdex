@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * ¿El catálogo va en modo de UNA hoja (celular)?
  *
@@ -11,19 +11,21 @@
  * Se lee por `matchMedia` en un efecto: el servidor no tiene viewport, así que el
  * primer render (y el HTML) asumen el libro entero y el cliente corrige al montar.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
-import { BINDER } from '@/components/card3d-config';
+import { BINDER } from "@/components/card3d-config";
 
 export function useSingleSheet(): boolean {
   const [single, setSingle] = useState(false);
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const query = window.matchMedia(`(max-width: ${BINDER.singleMaxWidth - 1}px)`);
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const query = window.matchMedia(
+      `(max-width: ${BINDER.singleMaxWidth - 1}px)`,
+    );
     const update = () => setSingle(query.matches);
     update();
-    query.addEventListener?.('change', update);
-    return () => query.removeEventListener?.('change', update);
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
   }, []);
   return single;
 }

@@ -17,9 +17,15 @@
  * Ninguna abre su propia transacción salvo `aplicarOperacion`: así el llamador decide el alcance
  * (el Express añade la auditoría dentro de la misma; el reproductor de producción una por operación).
  */
-import { TODOS_LOS_GRADOS, esGradoPremium, esGradoValido, hoy, mesesCalendario } from './premium.mjs';
-import { normalizeText, slugify } from './text.mjs';
-import { valorEquilibrado } from './equilibrio.mjs';
+import {
+  TODOS_LOS_GRADOS,
+  esGradoPremium,
+  esGradoValido,
+  hoy,
+  mesesCalendario,
+} from "./premium.mjs";
+import { normalizeText, slugify } from "./text.mjs";
+import { valorEquilibrado } from "./equilibrio.mjs";
 
 /**
  * Transacción local. NO se importa la de `db/index.mjs` a propósito: ese módulo importa éste
@@ -27,13 +33,13 @@ import { valorEquilibrado } from './equilibrio.mjs';
  * una de las dos mitades `undefined` según quién se cargue primero.
  */
 function transaction(db, fn) {
-  db.exec('BEGIN');
+  db.exec("BEGIN");
   try {
     const resultado = fn();
-    db.exec('COMMIT');
+    db.exec("COMMIT");
     return resultado;
   } catch (error) {
-    db.exec('ROLLBACK');
+    db.exec("ROLLBACK");
     throw error;
   }
 }
@@ -50,10 +56,10 @@ export const MAX_FACCIONES = 2;
  * tabla, así que re-scrapear no vuelve a abrir los duplicados.
  */
 export const FACCION_ALIAS = {
-  netherbane2: 'Netherbane',
-  'chaos-ascedant': 'Chaos Ascendant',
-  'mythical-legacy3': 'Mythical Legacy',
-  'mythical-lecagy': 'Mythical Legacy',
+  netherbane2: "Netherbane",
+  "chaos-ascedant": "Chaos Ascendant",
+  "mythical-legacy3": "Mythical Legacy",
+  "mythical-lecagy": "Mythical Legacy",
 };
 
 /** Primer id que se reserva a las cartas creadas desde el mantenedor en producción. */
@@ -70,7 +76,7 @@ export class MutationError extends Error {
    */
   constructor(status, code, detail) {
     super(detail ?? code);
-    this.name = 'MutationError';
+    this.name = "MutationError";
     this.status = status;
     this.code = code;
     this.detail = detail ?? code;
@@ -79,9 +85,16 @@ export class MutationError extends Error {
 
 /** Mismo puntaje que usa el seed para el orden por "poder" (ver `seed.mjs`). */
 /** Nivel y EXP son progreso (salen de `experiencia.mjs`), no poder de combate. */
-const FUERA_DEL_PODER = new Set(['level', 'exp']);
+const FUERA_DEL_PODER = new Set(["level", "exp"]);
 
-const POWERS = { attack: 1.2, magicAttack: 1.3, speed: 1.1, defense: 0.8, magicDefense: 0.9, critic: 0.6 };
+const POWERS = {
+  attack: 1.2,
+  magicAttack: 1.3,
+  speed: 1.1,
+  defense: 0.8,
+  magicDefense: 0.9,
+  critic: 0.6,
+};
 
 /**
  * Puntaje de poder de una lista de stats `{slug, value}`. Copia deliberada de la fórmula del
@@ -90,35 +103,39 @@ const POWERS = { attack: 1.2, magicAttack: 1.3, speed: 1.1, defense: 0.8, magicD
  */
 export function calcularPoder(stats) {
   if (!stats || stats.length === 0) return 0;
-  const porSlug = new Map(stats.map((stat) => [stat.slug, Number(stat.value) || 0]));
+  const porSlug = new Map(
+    stats.map((stat) => [stat.slug, Number(stat.value) || 0]),
+  );
   let total = 0;
-  for (const [slug, peso] of Object.entries(POWERS)) total += valorEquilibrado(slug, porSlug.get(slug) ?? 0) * peso;
+  for (const [slug, peso] of Object.entries(POWERS))
+    total += valorEquilibrado(slug, porSlug.get(slug) ?? 0) * peso;
   for (const stat of stats) {
-    if (!(stat.slug in POWERS) && !FUERA_DEL_PODER.has(stat.slug)) total += valorEquilibrado(stat.slug, stat.value) * 0.3;
+    if (!(stat.slug in POWERS) && !FUERA_DEL_PODER.has(stat.slug))
+      total += valorEquilibrado(stat.slug, stat.value) * 0.3;
   }
   return Math.round(total);
 }
 
 /** Slugs conocidos de los atributos del juego; el resto se deriva del nombre. */
 const STAT_SLUGS = {
-  nivel: 'level',
-  exp: 'exp',
-  hp: 'hp',
-  mp: 'mp',
-  ataque: 'attack',
-  defensa: 'defense',
-  'ataque magico': 'magicAttack',
-  'defensa magica': 'magicDefense',
-  velocidad: 'speed',
-  evasion: 'evasion',
-  presicion: 'accuracy',
-  precision: 'accuracy',
-  critico: 'critic',
-  suerte: 'luck',
+  nivel: "level",
+  exp: "exp",
+  hp: "hp",
+  mp: "mp",
+  ataque: "attack",
+  defensa: "defense",
+  "ataque magico": "magicAttack",
+  "defensa magica": "magicDefense",
+  velocidad: "speed",
+  evasion: "evasion",
+  presicion: "accuracy",
+  precision: "accuracy",
+  critico: "critic",
+  suerte: "luck",
 };
 
 export function slugDeStat(label) {
-  return STAT_SLUGS[normalizeText(label)] ?? slugOCodigo(label, 'stat');
+  return STAT_SLUGS[normalizeText(label)] ?? slugOCodigo(label, "stat");
 }
 
 /** Recalcula los contadores desnormalizados de las facetas. */
@@ -148,14 +165,13 @@ export function refreshSearchIndex(db, vtuberId) {
     )
     .get(vtuberId);
   if (!row) return;
-  const tags = [row.tagText, row.countryText, row.factionText].filter(Boolean).join(' ');
-  db.prepare('DELETE FROM vtuber_fts WHERE rowid = ?').run(vtuberId);
-  db.prepare('INSERT INTO vtuber_fts (rowid, name, phrase, tags) VALUES (?, ?, ?, ?)').run(
-    vtuberId,
-    row.name,
-    row.phrase ?? '',
-    tags,
-  );
+  const tags = [row.tagText, row.countryText, row.factionText]
+    .filter(Boolean)
+    .join(" ");
+  db.prepare("DELETE FROM vtuber_fts WHERE rowid = ?").run(vtuberId);
+  db.prepare(
+    "INSERT INTO vtuber_fts (rowid, name, phrase, tags) VALUES (?, ?, ?, ?)",
+  ).run(vtuberId, row.name, row.phrase ?? "", tags);
 }
 
 /**
@@ -164,19 +180,24 @@ export function refreshSearchIndex(db, vtuberId) {
  * Cae a `<prefijo>-<puntos de código en hex>`: determinista, así que el mismo texto da el mismo slug.
  */
 export function slugOCodigo(valor, prefijo) {
-  const slug = slugify(valor).slice(0, 80).replace(/-+$/, '');
+  const slug = slugify(valor).slice(0, 80).replace(/-+$/, "");
   if (slug) return slug;
-  const codigo = [...String(valor ?? '').trim()].map((c) => c.codePointAt(0).toString(16)).join('').slice(0, 40);
-  return `${prefijo}-${codigo || 'x'}`;
+  const codigo = [...String(valor ?? "").trim()]
+    .map((c) => c.codePointAt(0).toString(16))
+    .join("")
+    .slice(0, 40);
+  return `${prefijo}-${codigo || "x"}`;
 }
 
 function upsertTag(db, kind, label) {
-  const slug = slugOCodigo(label, 'etiqueta');
+  const slug = slugOCodigo(label, "etiqueta");
   db.prepare(
     `INSERT INTO tag (kind, slug, label, vtuber_count) VALUES (?, ?, ?, 0)
      ON CONFLICT (kind, slug) DO UPDATE SET label = excluded.label`,
   ).run(kind, slug, label);
-  return db.prepare('SELECT id FROM tag WHERE kind = ? AND slug = ?').get(kind, slug).id;
+  return db
+    .prepare("SELECT id FROM tag WHERE kind = ? AND slug = ?")
+    .get(kind, slug).id;
 }
 
 /**
@@ -185,11 +206,17 @@ function upsertTag(db, kind, label) {
  * "Mythical Lecagy" y "Netherbane2" acabaron siendo facciones distintas de las reales.
  */
 export function buscarFaccion(db, valor) {
-  const clave = String(valor ?? '').trim();
+  const clave = String(valor ?? "").trim();
   if (!clave) return null;
   return (
-    db.prepare('SELECT id, slug, label FROM faction WHERE slug = ? OR lower(label) = lower(?)').get(clave, clave) ??
-    db.prepare('SELECT id, slug, label FROM faction WHERE slug = ?').get(slugify(clave)) ??
+    db
+      .prepare(
+        "SELECT id, slug, label FROM faction WHERE slug = ? OR lower(label) = lower(?)",
+      )
+      .get(clave, clave) ??
+    db
+      .prepare("SELECT id, slug, label FROM faction WHERE slug = ?")
+      .get(slugify(clave)) ??
     null
   );
 }
@@ -197,57 +224,97 @@ export function buscarFaccion(db, valor) {
 /** Reemplaza las relaciones multivaluadas de una carta. */
 export function replaceRelations(db, vtuberId, patch) {
   if (patch.countries) {
-    db.prepare('DELETE FROM vtuber_country WHERE vtuber_id = ?').run(vtuberId);
-    const insert = db.prepare('INSERT OR IGNORE INTO vtuber_country (vtuber_id, country_id, position) VALUES (?, ?, ?)');
+    db.prepare("DELETE FROM vtuber_country WHERE vtuber_id = ?").run(vtuberId);
+    const insert = db.prepare(
+      "INSERT OR IGNORE INTO vtuber_country (vtuber_id, country_id, position) VALUES (?, ?, ?)",
+    );
     patch.countries.forEach((slug, index) => {
-      const country = db.prepare('SELECT id FROM country WHERE slug = ?').get(slug);
-      if (!country) throw new MutationError(422, 'pais_desconocido', `país desconocido: ${slug}`);
+      const country = db
+        .prepare("SELECT id FROM country WHERE slug = ?")
+        .get(slug);
+      if (!country)
+        throw new MutationError(
+          422,
+          "pais_desconocido",
+          `país desconocido: ${slug}`,
+        );
       insert.run(vtuberId, country.id, index);
     });
   }
   if (patch.languages) {
-    db.prepare('DELETE FROM vtuber_language WHERE vtuber_id = ?').run(vtuberId);
-    const insert = db.prepare('INSERT OR IGNORE INTO vtuber_language (vtuber_id, code) VALUES (?, ?)');
+    db.prepare("DELETE FROM vtuber_language WHERE vtuber_id = ?").run(vtuberId);
+    const insert = db.prepare(
+      "INSERT OR IGNORE INTO vtuber_language (vtuber_id, code) VALUES (?, ?)",
+    );
     patch.languages.forEach((code) => insert.run(vtuberId, code));
   }
   if (patch.groups) {
-    db.prepare(`DELETE FROM vtuber_tag WHERE vtuber_id = ? AND tag_id IN (SELECT id FROM tag WHERE kind = 'group')`).run(vtuberId);
-    const insert = db.prepare('INSERT OR IGNORE INTO vtuber_tag (vtuber_id, tag_id, position) VALUES (?, ?, ?)');
-    patch.groups.forEach((label, index) => insert.run(vtuberId, upsertTag(db, 'group', label), index));
+    db.prepare(
+      `DELETE FROM vtuber_tag WHERE vtuber_id = ? AND tag_id IN (SELECT id FROM tag WHERE kind = 'group')`,
+    ).run(vtuberId);
+    const insert = db.prepare(
+      "INSERT OR IGNORE INTO vtuber_tag (vtuber_id, tag_id, position) VALUES (?, ?, ?)",
+    );
+    patch.groups.forEach((label, index) =>
+      insert.run(vtuberId, upsertTag(db, "group", label), index),
+    );
   }
   if (patch.artists) {
-    db.prepare(`DELETE FROM vtuber_tag WHERE vtuber_id = ? AND tag_id IN (SELECT id FROM tag WHERE kind = 'artist')`).run(vtuberId);
-    const insert = db.prepare('INSERT OR IGNORE INTO vtuber_tag (vtuber_id, tag_id, position) VALUES (?, ?, ?)');
-    patch.artists.forEach((label, index) => insert.run(vtuberId, upsertTag(db, 'artist', label), index));
+    db.prepare(
+      `DELETE FROM vtuber_tag WHERE vtuber_id = ? AND tag_id IN (SELECT id FROM tag WHERE kind = 'artist')`,
+    ).run(vtuberId);
+    const insert = db.prepare(
+      "INSERT OR IGNORE INTO vtuber_tag (vtuber_id, tag_id, position) VALUES (?, ?, ?)",
+    );
+    patch.artists.forEach((label, index) =>
+      insert.run(vtuberId, upsertTag(db, "artist", label), index),
+    );
   }
   if (patch.factions) {
     // Se resuelve TODO antes de tocar nada: un valor desconocido no puede dejar a la carta sin facciones.
     const resueltas = [];
     for (const valor of patch.factions) {
       const faccion = buscarFaccion(db, valor);
-      if (!faccion) throw new MutationError(422, 'faccion_desconocida', `facción desconocida: ${valor}`);
+      if (!faccion)
+        throw new MutationError(
+          422,
+          "faccion_desconocida",
+          `facción desconocida: ${valor}`,
+        );
       if (!resueltas.some((f) => f.id === faccion.id)) resueltas.push(faccion);
     }
     if (resueltas.length > MAX_FACCIONES) {
-      throw new MutationError(400, 'demasiadas_facciones', `máximo ${MAX_FACCIONES} facciones por VTuber`);
+      throw new MutationError(
+        400,
+        "demasiadas_facciones",
+        `máximo ${MAX_FACCIONES} facciones por VTuber`,
+      );
     }
-    db.prepare('DELETE FROM vtuber_faction WHERE vtuber_id = ?').run(vtuberId);
-    const insert = db.prepare('INSERT OR IGNORE INTO vtuber_faction (vtuber_id, faction_id, position) VALUES (?, ?, ?)');
-    resueltas.forEach((faccion, index) => insert.run(vtuberId, faccion.id, index));
+    db.prepare("DELETE FROM vtuber_faction WHERE vtuber_id = ?").run(vtuberId);
+    const insert = db.prepare(
+      "INSERT OR IGNORE INTO vtuber_faction (vtuber_id, faction_id, position) VALUES (?, ?, ?)",
+    );
+    resueltas.forEach((faccion, index) =>
+      insert.run(vtuberId, faccion.id, index),
+    );
   }
 }
 
 /** Reemplaza las filas hijas editables (perfil, stats, skills, redes). */
 export function replaceChildren(db, vtuberId, patch) {
   if (patch.profile) {
-    db.prepare('DELETE FROM profile_field WHERE vtuber_id = ?').run(vtuberId);
-    const insert = db.prepare('INSERT INTO profile_field (vtuber_id, label, value, position) VALUES (?, ?, ?, ?)');
-    patch.profile.forEach((field, index) => insert.run(vtuberId, field.label, field.value, index));
+    db.prepare("DELETE FROM profile_field WHERE vtuber_id = ?").run(vtuberId);
+    const insert = db.prepare(
+      "INSERT INTO profile_field (vtuber_id, label, value, position) VALUES (?, ?, ?, ?)",
+    );
+    patch.profile.forEach((field, index) =>
+      insert.run(vtuberId, field.label, field.value, index),
+    );
   }
   if (patch.stats) {
-    db.prepare('DELETE FROM stat WHERE vtuber_id = ?').run(vtuberId);
+    db.prepare("DELETE FROM stat WHERE vtuber_id = ?").run(vtuberId);
     const insert = db.prepare(
-      'INSERT INTO stat (vtuber_id, label, slug, value, value_text, max, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      "INSERT INTO stat (vtuber_id, label, slug, value, value_text, max, position) VALUES (?, ?, ?, ?, ?, ?, ?)",
     );
     const normalizadas = patch.stats.map((stat) => ({
       label: stat.label,
@@ -257,18 +324,33 @@ export function replaceChildren(db, vtuberId, patch) {
       max: stat.max ?? null,
     }));
     normalizadas.forEach((stat, index) =>
-      insert.run(vtuberId, stat.label, stat.slug, stat.value, stat.valueText, stat.max, index),
+      insert.run(
+        vtuberId,
+        stat.label,
+        stat.slug,
+        stat.value,
+        stat.valueText,
+        stat.max,
+        index,
+      ),
     );
     // Las columnas desnormalizadas (poder, hp, mp) salen de las filas: editar un atributo tiene
     // que mover también el orden por "poder", que es lo que ordena el catálogo.
-    const hp = normalizadas.find((stat) => stat.slug === 'hp');
-    const mp = normalizadas.find((stat) => stat.slug === 'mp');
+    const hp = normalizadas.find((stat) => stat.slug === "hp");
+    const mp = normalizadas.find((stat) => stat.slug === "mp");
     db.prepare(
-      'UPDATE vtuber SET power_score = ?, hp_current = ?, hp_max = ?, mp_current = ?, mp_max = ? WHERE id = ?',
-    ).run(calcularPoder(normalizadas), hp?.value ?? null, hp?.max ?? null, mp?.value ?? null, mp?.max ?? null, vtuberId);
+      "UPDATE vtuber SET power_score = ?, hp_current = ?, hp_max = ?, mp_current = ?, mp_max = ? WHERE id = ?",
+    ).run(
+      calcularPoder(normalizadas),
+      hp?.value ?? null,
+      hp?.max ?? null,
+      mp?.value ?? null,
+      mp?.max ?? null,
+      vtuberId,
+    );
   }
   if (patch.skills) {
-    db.prepare('DELETE FROM skill WHERE vtuber_id = ?').run(vtuberId);
+    db.prepare("DELETE FROM skill WHERE vtuber_id = ?").run(vtuberId);
     const insert = db.prepare(
       `INSERT INTO skill (vtuber_id, category, section, type, name, effect, effect_html, factions, position)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -276,7 +358,7 @@ export function replaceChildren(db, vtuberId, patch) {
     patch.skills.forEach((skill, index) =>
       insert.run(
         vtuberId,
-        skill.category ?? 'other',
+        skill.category ?? "other",
         skill.section ?? null,
         skill.type ?? null,
         skill.name ?? null,
@@ -294,17 +376,28 @@ export function replaceChildren(db, vtuberId, patch) {
     );
   }
   if (patch.socials) {
-    db.prepare('DELETE FROM social WHERE vtuber_id = ?').run(vtuberId);
-    const insert = db.prepare('INSERT INTO social (vtuber_id, platform, label, url, icon, position) VALUES (?, ?, ?, ?, ?, ?)');
+    db.prepare("DELETE FROM social WHERE vtuber_id = ?").run(vtuberId);
+    const insert = db.prepare(
+      "INSERT INTO social (vtuber_id, platform, label, url, icon, position) VALUES (?, ?, ?, ?, ?, ?)",
+    );
     patch.socials.forEach((social, index) =>
-      insert.run(vtuberId, social.platform, social.label ?? null, social.url, social.icon ?? null, index),
+      insert.run(
+        vtuberId,
+        social.platform,
+        social.label ?? null,
+        social.url,
+        social.icon ?? null,
+        index,
+      ),
     );
   }
 }
 
 /** Mayor número de dex en uso, o 0. */
 export function ultimoDex(db) {
-  return db.prepare('SELECT COALESCE(MAX(dex_number), 0) AS n FROM vtuber').get().n;
+  return db
+    .prepare("SELECT COALESCE(MAX(dex_number), 0) AS n FROM vtuber")
+    .get().n;
 }
 
 /**
@@ -313,14 +406,24 @@ export function ultimoDex(db) {
  * avisar cambiaría su URL de referencia (`#777`) por un efecto colateral que nadie pidió.
  */
 export function resolverDex(db, pedido, { excluirId = null } = {}) {
-  if (pedido === 'end') return ultimoDex(db) + 1;
+  if (pedido === "end") return ultimoDex(db) + 1;
   const numero = Number(pedido);
   if (!Number.isInteger(numero) || numero < 1) {
-    throw new MutationError(400, 'dex_invalido', 'el número debe ser un entero positivo');
+    throw new MutationError(
+      400,
+      "dex_invalido",
+      "el número debe ser un entero positivo",
+    );
   }
-  const dueño = db.prepare('SELECT id, name FROM vtuber WHERE dex_number = ?').get(numero);
+  const dueño = db
+    .prepare("SELECT id, name FROM vtuber WHERE dex_number = ?")
+    .get(numero);
   if (dueño && dueño.id !== excluirId) {
-    throw new MutationError(409, 'dex_ocupado', `el #${numero} ya lo tiene ${dueño.name}`);
+    throw new MutationError(
+      409,
+      "dex_ocupado",
+      `el #${numero} ya lo tiene ${dueño.name}`,
+    );
   }
   return numero;
 }
@@ -331,14 +434,24 @@ export function resolverDex(db, pedido, { excluirId = null } = {}) {
  * posible duplicado y el mantenedor lo decide.
  */
 function slugDesdeNombre(nombre, dex) {
-  return slugify(nombre).slice(0, 80).replace(/-+$/, '') || `vtuber-${dex}`;
+  return slugify(nombre).slice(0, 80).replace(/-+$/, "") || `vtuber-${dex}`;
 }
 
 /** Valida y normaliza un slug explícito. */
 function slugValido(valor) {
   const slug = slugify(valor);
-  if (!slug) throw new MutationError(400, 'slug_invalido', 'la URL no puede quedar vacía');
-  if (slug.length > 80) throw new MutationError(400, 'slug_invalido', 'la URL admite como máximo 80 caracteres');
+  if (!slug)
+    throw new MutationError(
+      400,
+      "slug_invalido",
+      "la URL no puede quedar vacía",
+    );
+  if (slug.length > 80)
+    throw new MutationError(
+      400,
+      "slug_invalido",
+      "la URL admite como máximo 80 caracteres",
+    );
   return slug;
 }
 
@@ -351,12 +464,16 @@ function slugValido(valor) {
 function cambiarSlug(db, id, actual, nuevo) {
   const slug = slugValido(nuevo);
   if (slug === actual) return;
-  const choque = db.prepare('SELECT id FROM vtuber WHERE slug = ? AND id != ?').get(slug, id);
-  if (choque) throw new MutationError(409, 'slug_duplicado', slug);
+  const choque = db
+    .prepare("SELECT id FROM vtuber WHERE slug = ? AND id != ?")
+    .get(slug, id);
+  if (choque) throw new MutationError(409, "slug_duplicado", slug);
   // Un alias de OTRA carta con ese nombre pierde frente a un slug real; el de ESTA ya no hace falta.
-  db.prepare('DELETE FROM slug_alias WHERE slug = ?').run(slug);
-  db.prepare('INSERT OR REPLACE INTO slug_alias (slug, vtuber_id) VALUES (?, ?)').run(actual, id);
-  db.prepare('UPDATE vtuber SET slug = ? WHERE id = ?').run(slug, id);
+  db.prepare("DELETE FROM slug_alias WHERE slug = ?").run(slug);
+  db.prepare(
+    "INSERT OR REPLACE INTO slug_alias (slug, vtuber_id) VALUES (?, ?)",
+  ).run(actual, id);
+  db.prepare("UPDATE vtuber SET slug = ? WHERE id = ?").run(slug, id);
 }
 
 // ------------------------------------------------------------------ premium
@@ -375,7 +492,10 @@ function cambiarSlug(db, id, actual, nuevo) {
  */
 export function sellarPremium(patch, ahora = hoy()) {
   if (!patch || !patch.premium) return patch;
-  return { ...patch, premium: { ...patch.premium, ahora: patch.premium.ahora ?? ahora } };
+  return {
+    ...patch,
+    premium: { ...patch.premium, ahora: patch.premium.ahora ?? ahora },
+  };
 }
 
 /**
@@ -392,22 +512,27 @@ export function sellarPremium(patch, ahora = hoy()) {
  */
 function aplicarPremium(db, vtuberId, premium) {
   if (premium === null) {
-    db.prepare('DELETE FROM premium WHERE vtuber_id = ?').run(vtuberId);
+    db.prepare("DELETE FROM premium WHERE vtuber_id = ?").run(vtuberId);
     return;
   }
   if (!esGradoValido(premium.grade)) {
-    throw new MutationError(400, 'grado_invalido', `el grado debe ser uno de ${TODOS_LOS_GRADOS.join(', ')}`);
+    throw new MutationError(
+      400,
+      "grado_invalido",
+      `el grado debe ser uno de ${TODOS_LOS_GRADOS.join(", ")}`,
+    );
   }
   const ahora = premium.ahora ?? hoy();
-  const actual = db.prepare('SELECT grade, since, graded_at AS gradedAt FROM premium WHERE vtuber_id = ?').get(vtuberId);
+  const actual = db
+    .prepare(
+      "SELECT grade, since, graded_at AS gradedAt FROM premium WHERE vtuber_id = ?",
+    )
+    .get(vtuberId);
   if (!actual) {
     const alta = premium.since ?? ahora;
-    db.prepare('INSERT INTO premium (vtuber_id, grade, since, graded_at) VALUES (?, ?, ?, ?)').run(
-      vtuberId,
-      premium.grade,
-      alta,
-      premium.gradedAt ?? alta,
-    );
+    db.prepare(
+      "INSERT INTO premium (vtuber_id, grade, since, graded_at) VALUES (?, ?, ?, ?)",
+    ).run(vtuberId, premium.grade, alta, premium.gradedAt ?? alta);
     return;
   }
   const cambioGrado = actual.grade !== premium.grade;
@@ -416,26 +541,30 @@ function aplicarPremium(db, vtuberId, premium) {
     esGradoPremium(actual.grade) &&
     esGradoPremium(premium.grade) &&
     mesesCalendario(actual.gradedAt, premium.gradedAt ?? ahora) > 1;
-  db.prepare('UPDATE premium SET grade = ?, since = ?, graded_at = ? WHERE vtuber_id = ?').run(
+  db.prepare(
+    "UPDATE premium SET grade = ?, since = ?, graded_at = ? WHERE vtuber_id = ?",
+  ).run(
     premium.grade,
     premium.since ?? (rachaRota ? (premium.gradedAt ?? ahora) : actual.since),
-    cambioGrado ? (premium.gradedAt ?? ahora) : (premium.gradedAt ?? actual.gradedAt),
+    cambioGrado
+      ? (premium.gradedAt ?? ahora)
+      : (premium.gradedAt ?? actual.gradedAt),
     vtuberId,
   );
 }
 
 const COLUMNAS = {
-  name: 'name',
-  phrase: 'phrase',
-  cardText: 'card_text',
-  themeColor: 'theme_color',
-  secondaryColor: 'secondary_color',
-  birthday: 'birthday',
-  height: 'height',
-  hashtag: 'hashtag',
-  favoriteColor: 'favorite_color',
-  status: 'status',
-  level: 'level',
+  name: "name",
+  phrase: "phrase",
+  cardText: "card_text",
+  themeColor: "theme_color",
+  secondaryColor: "secondary_color",
+  birthday: "birthday",
+  height: "height",
+  hashtag: "hashtag",
+  favoriteColor: "favorite_color",
+  status: "status",
+  level: "level",
 };
 
 /**
@@ -443,8 +572,11 @@ const COLUMNAS = {
  * Devuelve el slug resultante (puede haber cambiado).
  */
 export function aplicarParche(db, id, patch) {
-  const actual = db.prepare('SELECT id, slug, dex_number AS dex FROM vtuber WHERE id = ?').get(id);
-  if (!actual) throw new MutationError(404, 'no_encontrado', `no existe la ficha ${id}`);
+  const actual = db
+    .prepare("SELECT id, slug, dex_number AS dex FROM vtuber WHERE id = ?")
+    .get(id);
+  if (!actual)
+    throw new MutationError(404, "no_encontrado", `no existe la ficha ${id}`);
 
   const sets = [];
   const args = [];
@@ -456,29 +588,31 @@ export function aplicarParche(db, id, patch) {
   if (patch.cardText !== undefined) {
     // Un texto escrito o corregido a mano ya no es una lectura OCR: dejar el «OCR 77 %» de la
     // lectura original sobre un texto corregido mentiría sobre su fiabilidad.
-    sets.push('card_text_confidence = NULL');
+    sets.push("card_text_confidence = NULL");
   }
   if (patch.name !== undefined) {
     // El slug NO sigue al nombre: la URL es una decisión propia (campo `slug`). Antes cada cambio
     // de nombre reescribía la URL y rompía los enlaces compartidos sin que nadie lo pidiera.
-    sets.push('search_name = ?');
+    sets.push("search_name = ?");
     args.push(normalizeText(patch.name));
   }
   if (patch.dexNumber !== undefined) {
-    sets.push('dex_number = ?');
+    sets.push("dex_number = ?");
     args.push(resolverDex(db, patch.dexNumber, { excluirId: id }));
   }
   // Cambiar el slug antes del UPDATE general: puede lanzar y la transacción lo deshace todo.
   if (patch.slug !== undefined) cambiarSlug(db, id, actual.slug, patch.slug);
   if (sets.length > 0) {
-    db.prepare(`UPDATE vtuber SET ${sets.join(', ')}, updated_at = datetime('now') WHERE id = ?`).run(...args, id);
+    db.prepare(
+      `UPDATE vtuber SET ${sets.join(", ")}, updated_at = datetime('now') WHERE id = ?`,
+    ).run(...args, id);
   }
   replaceRelations(db, id, patch);
   replaceChildren(db, id, patch);
   if (patch.premium !== undefined) aplicarPremium(db, id, patch.premium);
   refreshSearchIndex(db, id);
   refreshFacetCounters(db);
-  return db.prepare('SELECT slug FROM vtuber WHERE id = ?').get(id).slug;
+  return db.prepare("SELECT slug FROM vtuber WHERE id = ?").get(id).slug;
 }
 
 /**
@@ -492,23 +626,44 @@ export function aplicarParche(db, id, patch) {
  *   cada instancia cree la carta con el MISMO id.
  */
 export function crearFicha(db, datos, { id = null } = {}) {
-  const nombre = String(datos.name ?? '').trim();
-  if (!nombre) throw new MutationError(400, 'nombre_requerido', 'falta el nombre');
-  const dex = resolverDex(db, datos.dexNumber ?? 'end');
+  const nombre = String(datos.name ?? "").trim();
+  if (!nombre)
+    throw new MutationError(400, "nombre_requerido", "falta el nombre");
+  const dex = resolverDex(db, datos.dexNumber ?? "end");
   // Un slug EXPLÍCITO se valida y no se toca. El que sale del NOMBRE se slugifica sin quejarse: los
   // VTubers escriben «ミク», «★Luna★» o nombres de 100 letras, y rechazarlos por la URL dejaba la
   // inscripción sin poder aprobarse (`slug_invalido`) por algo que la persona no controla.
-  const slug = datos.slug != null ? slugValido(datos.slug) : slugDesdeNombre(nombre, dex);
-  if (db.prepare('SELECT 1 FROM vtuber WHERE slug = ?').get(slug)) throw new MutationError(409, 'slug_duplicado', slug);
+  const slug =
+    datos.slug != null ? slugValido(datos.slug) : slugDesdeNombre(nombre, dex);
+  if (db.prepare("SELECT 1 FROM vtuber WHERE slug = ?").get(slug))
+    throw new MutationError(409, "slug_duplicado", slug);
 
-  const columnas = ['dex_number', 'slug', 'name', 'search_name', 'status', 'has_detail'];
-  const valores = [dex, slug, nombre, normalizeText(nombre), datos.status ?? 'draft', 1];
+  const columnas = [
+    "dex_number",
+    "slug",
+    "name",
+    "search_name",
+    "status",
+    "has_detail",
+  ];
+  const valores = [
+    dex,
+    slug,
+    nombre,
+    normalizeText(nombre),
+    datos.status ?? "draft",
+    1,
+  ];
   if (id !== null) {
-    columnas.unshift('id');
+    columnas.unshift("id");
     valores.unshift(id);
   }
-  db.prepare(`INSERT INTO vtuber (${columnas.join(', ')}) VALUES (${columnas.map(() => '?').join(', ')})`).run(...valores);
-  const nuevoId = db.prepare('SELECT id FROM vtuber WHERE slug = ?').get(slug).id;
+  db.prepare(
+    `INSERT INTO vtuber (${columnas.join(", ")}) VALUES (${columnas.map(() => "?").join(", ")})`,
+  ).run(...valores);
+  const nuevoId = db
+    .prepare("SELECT id FROM vtuber WHERE slug = ?")
+    .get(slug).id;
 
   // El resto de campos entra por el mismo camino que una edición.
   const { name: _nombre, slug: _slug, dexNumber: _dex, ...resto } = datos;
@@ -529,14 +684,22 @@ export function consolidarFacciones(db) {
   const resultado = { fusionadas: 0, recortadas: 0 };
   transaction(db, () => {
     for (const [slugVariante, etiqueta] of Object.entries(FACCION_ALIAS)) {
-      const variante = db.prepare('SELECT id FROM faction WHERE slug = ?').get(slugVariante);
+      const variante = db
+        .prepare("SELECT id FROM faction WHERE slug = ?")
+        .get(slugVariante);
       if (!variante) continue;
-      const canonica = db.prepare('SELECT id FROM faction WHERE lower(label) = lower(?)').get(etiqueta);
+      const canonica = db
+        .prepare("SELECT id FROM faction WHERE lower(label) = lower(?)")
+        .get(etiqueta);
       if (canonica) {
-        db.prepare('UPDATE OR IGNORE vtuber_faction SET faction_id = ? WHERE faction_id = ?').run(canonica.id, variante.id);
+        db.prepare(
+          "UPDATE OR IGNORE vtuber_faction SET faction_id = ? WHERE faction_id = ?",
+        ).run(canonica.id, variante.id);
       }
-      db.prepare('DELETE FROM vtuber_faction WHERE faction_id = ?').run(variante.id);
-      db.prepare('DELETE FROM faction WHERE id = ?').run(variante.id);
+      db.prepare("DELETE FROM vtuber_faction WHERE faction_id = ?").run(
+        variante.id,
+      );
+      db.prepare("DELETE FROM faction WHERE id = ?").run(variante.id);
       resultado.fusionadas += 1;
     }
     const sobrantes = db
@@ -551,8 +714,14 @@ export function consolidarFacciones(db) {
       .run(MAX_FACCIONES);
     resultado.recortadas = Number(sobrantes.changes);
     // Las posiciones quedan 0..n-1 sin huecos.
-    const filas = db.prepare('SELECT vtuber_id AS v, faction_id AS f FROM vtuber_faction ORDER BY vtuber_id, position, faction_id').all();
-    const mover = db.prepare('UPDATE vtuber_faction SET position = ? WHERE vtuber_id = ? AND faction_id = ?');
+    const filas = db
+      .prepare(
+        "SELECT vtuber_id AS v, faction_id AS f FROM vtuber_faction ORDER BY vtuber_id, position, faction_id",
+      )
+      .all();
+    const mover = db.prepare(
+      "UPDATE vtuber_faction SET position = ? WHERE vtuber_id = ? AND faction_id = ?",
+    );
     let actual = null;
     let indice = 0;
     for (const { v, f } of filas) {
@@ -560,7 +729,9 @@ export function consolidarFacciones(db) {
       actual = v;
       mover.run(indice, v, f);
     }
-    db.prepare('SELECT id FROM vtuber').all().forEach((fila) => refreshSearchIndex(db, fila.id));
+    db.prepare("SELECT id FROM vtuber")
+      .all()
+      .forEach((fila) => refreshSearchIndex(db, fila.id));
     refreshFacetCounters(db);
   });
   return resultado;
@@ -582,35 +753,78 @@ export function listarFacciones(db) {
 
 /** Crea una facción. Debe correr dentro de una transacción. */
 export function crearFaccion(db, { label, icon = null }, { id = null } = {}) {
-  const etiqueta = String(label ?? '').trim();
-  if (!etiqueta) throw new MutationError(400, 'nombre_requerido', 'falta el nombre de la facción');
-  const slug = slugOCodigo(etiqueta, 'faccion');
-  if (db.prepare('SELECT 1 FROM faction WHERE slug = ? OR lower(label) = lower(?)').get(slug, etiqueta)) {
-    throw new MutationError(409, 'faccion_duplicada', `ya existe la facción ${etiqueta}`);
+  const etiqueta = String(label ?? "").trim();
+  if (!etiqueta)
+    throw new MutationError(
+      400,
+      "nombre_requerido",
+      "falta el nombre de la facción",
+    );
+  const slug = slugOCodigo(etiqueta, "faccion");
+  if (
+    db
+      .prepare(
+        "SELECT 1 FROM faction WHERE slug = ? OR lower(label) = lower(?)",
+      )
+      .get(slug, etiqueta)
+  ) {
+    throw new MutationError(
+      409,
+      "faccion_duplicada",
+      `ya existe la facción ${etiqueta}`,
+    );
   }
   if (id !== null) {
-    db.prepare('INSERT INTO faction (id, slug, label, icon, vtuber_count) VALUES (?, ?, ?, ?, 0)').run(id, slug, etiqueta, icon);
+    db.prepare(
+      "INSERT INTO faction (id, slug, label, icon, vtuber_count) VALUES (?, ?, ?, ?, 0)",
+    ).run(id, slug, etiqueta, icon);
   } else {
-    db.prepare('INSERT INTO faction (slug, label, icon, vtuber_count) VALUES (?, ?, ?, 0)').run(slug, etiqueta, icon);
+    db.prepare(
+      "INSERT INTO faction (slug, label, icon, vtuber_count) VALUES (?, ?, ?, 0)",
+    ).run(slug, etiqueta, icon);
   }
-  return db.prepare('SELECT id, slug, label, icon FROM faction WHERE slug = ?').get(slug);
+  return db
+    .prepare("SELECT id, slug, label, icon FROM faction WHERE slug = ?")
+    .get(slug);
 }
 
 /** Renombra o cambia el emblema de una facción. El slug se conserva: es el que va en las URLs de filtro. */
 export function editarFaccion(db, id, { label, icon }) {
-  const actual = db.prepare('SELECT id, label FROM faction WHERE id = ?').get(id);
-  if (!actual) throw new MutationError(404, 'no_encontrado', `no existe la facción ${id}`);
+  const actual = db
+    .prepare("SELECT id, label FROM faction WHERE id = ?")
+    .get(id);
+  if (!actual)
+    throw new MutationError(404, "no_encontrado", `no existe la facción ${id}`);
   if (label !== undefined) {
     const etiqueta = String(label).trim();
-    if (!etiqueta) throw new MutationError(400, 'nombre_requerido', 'falta el nombre de la facción');
-    const choque = db.prepare('SELECT id FROM faction WHERE lower(label) = lower(?) AND id != ?').get(etiqueta, id);
-    if (choque) throw new MutationError(409, 'faccion_duplicada', `ya existe la facción ${etiqueta}`);
-    db.prepare('UPDATE faction SET label = ? WHERE id = ?').run(etiqueta, id);
+    if (!etiqueta)
+      throw new MutationError(
+        400,
+        "nombre_requerido",
+        "falta el nombre de la facción",
+      );
+    const choque = db
+      .prepare(
+        "SELECT id FROM faction WHERE lower(label) = lower(?) AND id != ?",
+      )
+      .get(etiqueta, id);
+    if (choque)
+      throw new MutationError(
+        409,
+        "faccion_duplicada",
+        `ya existe la facción ${etiqueta}`,
+      );
+    db.prepare("UPDATE faction SET label = ? WHERE id = ?").run(etiqueta, id);
   }
-  if (icon !== undefined) db.prepare('UPDATE faction SET icon = ? WHERE id = ?').run(icon, id);
-  const ids = db.prepare('SELECT vtuber_id AS id FROM vtuber_faction WHERE faction_id = ?').all(id);
+  if (icon !== undefined)
+    db.prepare("UPDATE faction SET icon = ? WHERE id = ?").run(icon, id);
+  const ids = db
+    .prepare("SELECT vtuber_id AS id FROM vtuber_faction WHERE faction_id = ?")
+    .all(id);
   ids.forEach((fila) => refreshSearchIndex(db, fila.id));
-  return db.prepare('SELECT id, slug, label, icon FROM faction WHERE id = ?').get(id);
+  return db
+    .prepare("SELECT id, slug, label, icon FROM faction WHERE id = ?")
+    .get(id);
 }
 
 /**
@@ -619,24 +833,49 @@ export function editarFaccion(db, id, { label, icon }) {
  * tiene dos facciones y una es la destino, la fusión no añade una tercera.
  */
 export function eliminarFaccion(db, id, { fusionarEn = null } = {}) {
-  const faccion = db.prepare('SELECT id FROM faction WHERE id = ?').get(id);
-  if (!faccion) throw new MutationError(404, 'no_encontrado', `no existe la facción ${id}`);
+  const faccion = db.prepare("SELECT id FROM faction WHERE id = ?").get(id);
+  if (!faccion)
+    throw new MutationError(404, "no_encontrado", `no existe la facción ${id}`);
   if (fusionarEn !== null) {
-    if (fusionarEn === id) throw new MutationError(400, 'fusion_invalida', 'no se puede fusionar una facción consigo misma');
-    const destino = db.prepare('SELECT id FROM faction WHERE id = ?').get(fusionarEn);
-    if (!destino) throw new MutationError(404, 'no_encontrado', `no existe la facción destino ${fusionarEn}`);
-    const afectadas = db.prepare('SELECT vtuber_id AS id, position FROM vtuber_faction WHERE faction_id = ?').all(id);
+    if (fusionarEn === id)
+      throw new MutationError(
+        400,
+        "fusion_invalida",
+        "no se puede fusionar una facción consigo misma",
+      );
+    const destino = db
+      .prepare("SELECT id FROM faction WHERE id = ?")
+      .get(fusionarEn);
+    if (!destino)
+      throw new MutationError(
+        404,
+        "no_encontrado",
+        `no existe la facción destino ${fusionarEn}`,
+      );
+    const afectadas = db
+      .prepare(
+        "SELECT vtuber_id AS id, position FROM vtuber_faction WHERE faction_id = ?",
+      )
+      .all(id);
     for (const { id: vtuberId, position } of afectadas) {
-      const yaLaTiene = db.prepare('SELECT 1 FROM vtuber_faction WHERE vtuber_id = ? AND faction_id = ?').get(vtuberId, fusionarEn);
+      const yaLaTiene = db
+        .prepare(
+          "SELECT 1 FROM vtuber_faction WHERE vtuber_id = ? AND faction_id = ?",
+        )
+        .get(vtuberId, fusionarEn);
       if (!yaLaTiene) {
-        db.prepare('UPDATE vtuber_faction SET faction_id = ? WHERE vtuber_id = ? AND faction_id = ?').run(fusionarEn, vtuberId, id);
-        db.prepare('UPDATE vtuber_faction SET position = ? WHERE vtuber_id = ? AND faction_id = ?').run(position, vtuberId, fusionarEn);
+        db.prepare(
+          "UPDATE vtuber_faction SET faction_id = ? WHERE vtuber_id = ? AND faction_id = ?",
+        ).run(fusionarEn, vtuberId, id);
+        db.prepare(
+          "UPDATE vtuber_faction SET position = ? WHERE vtuber_id = ? AND faction_id = ?",
+        ).run(position, vtuberId, fusionarEn);
       }
     }
   }
-  db.prepare('DELETE FROM vtuber_faction WHERE faction_id = ?').run(id);
-  db.prepare('DELETE FROM faction WHERE id = ?').run(id);
-  const todas = db.prepare('SELECT id FROM vtuber').all();
+  db.prepare("DELETE FROM vtuber_faction WHERE faction_id = ?").run(id);
+  db.prepare("DELETE FROM faction WHERE id = ?").run(id);
+  const todas = db.prepare("SELECT id FROM vtuber").all();
   todas.forEach((fila) => refreshSearchIndex(db, fila.id));
   refreshFacetCounters(db);
 }
@@ -653,30 +892,38 @@ export function eliminarFaccion(db, id, { fusionarEn = null } = {}) {
 export function aplicarOperacion(db, operacion) {
   return transaction(db, () => {
     switch (operacion.tipo) {
-      case 'vtuber.editar': {
+      case "vtuber.editar": {
         const slug = aplicarParche(db, operacion.id, operacion.patch);
         return { id: operacion.id, slug };
       }
-      case 'vtuber.crear': {
+      case "vtuber.crear": {
         const creada = crearFicha(db, operacion.datos, { id: operacion.id });
         refreshFacetCounters(db);
         return creada;
       }
-      case 'vtuber.estado': {
-        const update = db.prepare(`UPDATE vtuber SET status = ?, updated_at = datetime('now') WHERE id = ?`);
+      case "vtuber.estado": {
+        const update = db.prepare(
+          `UPDATE vtuber SET status = ?, updated_at = datetime('now') WHERE id = ?`,
+        );
         operacion.ids.forEach((id) => update.run(operacion.status, id));
         refreshFacetCounters(db);
         return { ids: operacion.ids };
       }
-      case 'faccion.crear':
+      case "faccion.crear":
         return crearFaccion(db, operacion.datos, { id: operacion.id });
-      case 'faccion.editar':
+      case "faccion.editar":
         return editarFaccion(db, operacion.id, operacion.patch);
-      case 'faccion.eliminar':
-        eliminarFaccion(db, operacion.id, { fusionarEn: operacion.fusionarEn ?? null });
+      case "faccion.eliminar":
+        eliminarFaccion(db, operacion.id, {
+          fusionarEn: operacion.fusionarEn ?? null,
+        });
         return { id: operacion.id };
       default:
-        throw new MutationError(400, 'operacion_desconocida', String(operacion.tipo));
+        throw new MutationError(
+          400,
+          "operacion_desconocida",
+          String(operacion.tipo),
+        );
     }
   });
 }

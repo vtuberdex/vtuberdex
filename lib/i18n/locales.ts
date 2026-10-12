@@ -13,21 +13,27 @@
  * hidratar. Por eso no se lee `Accept-Language` en el servidor: obligaría a que la home deje
  * de ser estática.
  */
-export const LOCALES = ['es', 'en', 'ja'] as const;
+export const LOCALES = ["es", "en", "ja"] as const;
 export type Locale = (typeof LOCALES)[number];
-export const LOCALE_POR_DEFECTO: Locale = 'es';
+export const LOCALE_POR_DEFECTO: Locale = "es";
 
 /** Clave de `localStorage` con la elección explícita del visitante. */
-export const CLAVE_IDIOMA = 'vtuberdex:idioma';
+export const CLAVE_IDIOMA = "vtuberdex:idioma";
 
 /** Cómo se llama cada idioma EN SÍ MISMO: quien lo busca no lee el idioma actual. */
-export const NOMBRE_PROPIO: Record<Locale, string> = { es: 'Español', en: 'English', ja: '日本語' };
+export const NOMBRE_PROPIO: Record<Locale, string> = {
+  es: "Español",
+  en: "English",
+  ja: "日本語",
+};
 
 /** Código BCP 47 para `Intl` y para `<html lang>`. */
-export const BCP47: Record<Locale, string> = { es: 'es', en: 'en', ja: 'ja' };
+export const BCP47: Record<Locale, string> = { es: "es", en: "en", ja: "ja" };
 
 export function esLocale(valor: unknown): valor is Locale {
-  return typeof valor === 'string' && (LOCALES as readonly string[]).includes(valor);
+  return (
+    typeof valor === "string" && (LOCALES as readonly string[]).includes(valor)
+  );
 }
 
 /** `en-GB` → `en`; `ja_JP` → `ja`; lo que no es un idioma soportado → `null`. */
@@ -37,7 +43,10 @@ export function localeDeEtiqueta(etiqueta: string): Locale | null {
 }
 
 /** Aplica las tres reglas de arriba. Pura: recibe lo guardado y las preferencias del navegador. */
-export function elegirLocale(guardado: string | null | undefined, preferidos: readonly string[] = []): Locale {
+export function elegirLocale(
+  guardado: string | null | undefined,
+  preferidos: readonly string[] = [],
+): Locale {
   if (esLocale(guardado)) return guardado;
   for (const etiqueta of preferidos) {
     const locale = localeDeEtiqueta(etiqueta);

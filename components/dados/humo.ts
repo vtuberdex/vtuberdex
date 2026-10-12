@@ -9,7 +9,7 @@
  * El color de la luz puntual que tiñe la mesa sale de la MISMA fórmula (`matizDelHumo`), para que el
  * reflejo en el tapete coincida con el humo.
  */
-import { AdditiveBlending, Color, ShaderMaterial } from 'three';
+import { AdditiveBlending, Color, ShaderMaterial } from "three";
 
 export const HUMO = {
   /** Lo que tarda el color en dar la vuelta al espectro, en segundos. */
@@ -27,7 +27,11 @@ export function matizDelHumo(semilla: number, t: number): number {
   return (((semilla * 0.618034 + t / HUMO.periodoMatiz) % 1) + 1) % 1;
 }
 
-export function colorDelHumo(semilla: number, t: number, destino = new Color()): Color {
+export function colorDelHumo(
+  semilla: number,
+  t: number,
+  destino = new Color(),
+): Color {
   return destino.setHSL(matizDelHumo(semilla, t), HUMO.saturacion, 0.6);
 }
 
@@ -98,7 +102,10 @@ const FRAGMENT = /* glsl */ `
   }
 `;
 
-export function crearMaterialDeHumo(semilla: number, radio: number): ShaderMaterial {
+export function crearMaterialDeHumo(
+  semilla: number,
+  radio: number,
+): ShaderMaterial {
   return new ShaderMaterial({
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,

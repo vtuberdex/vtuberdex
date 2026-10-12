@@ -13,10 +13,10 @@
 const nextConfig = {
   // Build autocontenido para servir con `node server.js` detrás de nginx
   // (scripts/release.sh). Es opt-in: Vercel empaqueta por su cuenta y no lo necesita.
-  ...(process.env.VTUBERDEX_STANDALONE ? { output: 'standalone' } : {}),
+  ...(process.env.VTUBERDEX_STANDALONE ? { output: "standalone" } : {}),
   outputFileTracingIncludes: {
-    '/api/**': ['./deploy/data/**'],
-    '/images/**': ['./deploy/data/**'],
+    "/api/**": ["./deploy/data/**"],
+    "/images/**": ["./deploy/data/**"],
   },
   // El front habla con su propia API por rutas relativas; no hay dominio externo.
   images: { unoptimized: true },
@@ -35,10 +35,10 @@ const nextConfig = {
    * No tiene efecto en producción: los assets de dev no existen en un build.
    */
   allowedDevOrigins: [
-    '192.168.100.90',   // IP LAN de esta máquina (fuchikoma)
-    'fuchikoma',        // el hostname, para entrar por nombre
-    '*.local',          // mDNS de la LAN doméstica
-    '100.98.52.34',     // IP de Tailscale
+    "192.168.100.90", // IP LAN de esta máquina (fuchikoma)
+    "fuchikoma", // el hostname, para entrar por nombre
+    "*.local", // mDNS de la LAN doméstica
+    "100.98.52.34", // IP de Tailscale
   ],
   // `agentRules` se deja en su valor por defecto (true) a propósito.
   //

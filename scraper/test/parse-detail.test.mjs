@@ -3,10 +3,10 @@
  * Los fixtures reproducen la plantilla real (terminal + 3 paneles), incluida la
  * variante sin facciones y la que trae el avatar en base64.
  */
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { test } from "node:test";
+import assert from "node:assert/strict";
 
-import { parseDetail } from '../src/parse-detail.mjs';
+import { parseDetail } from "../src/parse-detail.mjs";
 
 const DETAIL_FIXTURE = `
 <body>
@@ -139,72 +139,88 @@ const MINIMAL_FIXTURE = `
 </body>
 `;
 
-test('parseDetail extrae tema, logo, frase y redes', () => {
+test("parseDetail extrae tema, logo, frase y redes", () => {
   const detail = parseDetail(DETAIL_FIXTURE);
-  assert.equal(detail.theme, '#616161');
-  assert.equal(detail.logo, 'logos/gkuromonochrome.png');
-  assert.equal(detail.phrase, 'Hola causas, soy GKuro\npixelartista');
+  assert.equal(detail.theme, "#616161");
+  assert.equal(detail.logo, "logos/gkuromonochrome.png");
+  assert.equal(detail.phrase, "Hola causas, soy GKuro\npixelartista");
   assert.equal(detail.socials.length, 2);
   assert.deepEqual(detail.socials[0], {
-    platform: 'x',
-    label: 'X',
-    url: 'https://twitter.com/GKuroMonochrome',
-    icon: 'icons/x.png',
+    platform: "x",
+    label: "X",
+    url: "https://twitter.com/GKuroMonochrome",
+    icon: "icons/x.png",
   });
-  assert.equal(detail.socials[1].platform, 'twitch');
+  assert.equal(detail.socials[1].platform, "twitch");
 });
 
-test('parseDetail lee la ficha personal y deriva campos clave', () => {
+test("parseDetail lee la ficha personal y deriva campos clave", () => {
   const detail = parseDetail(DETAIL_FIXTURE);
   assert.equal(detail.profile.length, 5);
-  assert.equal(detail.profile[0].label, 'País');
-  assert.equal(detail.profile[0].value, 'Chile');
-  assert.equal(detail.birthday, '23 de Mayo');
-  assert.equal(detail.height, '1.72 m');
-  assert.equal(detail.favoriteColor, 'Blanco/Negro');
-  assert.equal(detail.hashtag, '(no tengo)');
+  assert.equal(detail.profile[0].label, "País");
+  assert.equal(detail.profile[0].value, "Chile");
+  assert.equal(detail.birthday, "23 de Mayo");
+  assert.equal(detail.height, "1.72 m");
+  assert.equal(detail.favoriteColor, "Blanco/Negro");
+  assert.equal(detail.hashtag, "(no tengo)");
 });
 
-test('parseDetail separa stats numéricos, barras y EXP', () => {
+test("parseDetail separa stats numéricos, barras y EXP", () => {
   const detail = parseDetail(DETAIL_FIXTURE);
   assert.deepEqual(detail.stats.Ataque, 142);
-  assert.deepEqual(detail.stats['Defensa Mágica'], 172);
+  assert.deepEqual(detail.stats["Defensa Mágica"], 172);
   assert.deepEqual(detail.stats.HP, { current: 1710, max: 1710 });
   assert.deepEqual(detail.stats.MP, { current: 1200, max: 1200 });
   assert.equal(detail.level, 3);
   assert.deepEqual(detail.experience, { current: 65, max: 500 });
 });
 
-test('parseDetail recoge facciones sin nombres de archivo', () => {
+test("parseDetail recoge facciones sin nombres de archivo", () => {
   const detail = parseDetail(DETAIL_FIXTURE);
-  assert.deepEqual(detail.factions, ['Mythical Legacy', 'Netherbane', 'Primal Monarch']);
-  assert.ok(!detail.factions.some((name) => name.includes('%')));
+  assert.deepEqual(detail.factions, [
+    "Mythical Legacy",
+    "Netherbane",
+    "Primal Monarch",
+  ]);
+  assert.ok(!detail.factions.some((name) => name.includes("%")));
 });
 
-test('parseDetail clasifica skills por sección y conserva el HTML del efecto', () => {
+test("parseDetail clasifica skills por sección y conserva el HTML del efecto", () => {
   const detail = parseDetail(DETAIL_FIXTURE);
   assert.equal(detail.skills.length, 2);
-  assert.equal(detail.skills[0].category, 'active');
-  assert.equal(detail.skills[0].name, 'Monochrome Resolve');
-  assert.equal(detail.skills[0].type, 'Ofensivo');
-  assert.equal(detail.skills[0].factions[0].name, 'Mythical Legacy');
-  assert.equal(detail.skills[1].category, 'passive');
+  assert.equal(detail.skills[0].category, "active");
+  assert.equal(detail.skills[0].name, "Monochrome Resolve");
+  assert.equal(detail.skills[0].type, "Ofensivo");
+  assert.equal(detail.skills[0].factions[0].name, "Mythical Legacy");
+  assert.equal(detail.skills[1].category, "passive");
   assert.match(detail.skills[0].effect, /Ataque Mágico Base \+30\.\n/);
   assert.match(detail.skills[0].effectHtml, /<br>/);
-  assert.equal(detail.radar, 'diagrama/gkuromonochrome.png');
+  assert.equal(detail.radar, "diagrama/gkuromonochrome.png");
   assert.equal(detail.hasSkills, true);
-  assert.deepEqual(detail.sections, ['Perfil / Presentación', 'Stats / Facciones / Radar', 'Skills']);
-});
-
-test('parseDetail lee la galería declarada en JS', () => {
-  const detail = parseDetail(DETAIL_FIXTURE);
-  assert.deepEqual(detail.gallery, [
-    { src: 'Avatares/gkuromonochrome.png', caption: 'Principal', isInline: false },
-    { src: 'vtubercompleto/gkuromonochrome.png', caption: 'Modelo 3D', isInline: false },
+  assert.deepEqual(detail.sections, [
+    "Perfil / Presentación",
+    "Stats / Facciones / Radar",
+    "Skills",
   ]);
 });
 
-test('parseDetail tolera una ficha mínima con avatar embebido', () => {
+test("parseDetail lee la galería declarada en JS", () => {
+  const detail = parseDetail(DETAIL_FIXTURE);
+  assert.deepEqual(detail.gallery, [
+    {
+      src: "Avatares/gkuromonochrome.png",
+      caption: "Principal",
+      isInline: false,
+    },
+    {
+      src: "vtubercompleto/gkuromonochrome.png",
+      caption: "Modelo 3D",
+      isInline: false,
+    },
+  ]);
+});
+
+test("parseDetail tolera una ficha mínima con avatar embebido", () => {
   const detail = parseDetail(MINIMAL_FIXTURE);
   assert.equal(detail.theme, null);
   assert.equal(detail.socials.length, 0);
@@ -216,8 +232,8 @@ test('parseDetail tolera una ficha mínima con avatar embebido', () => {
   assert.equal(detail.inlineThumbCount, 2);
 });
 
-test('parseDetail nunca lanza con HTML vacío', () => {
-  const detail = parseDetail('');
+test("parseDetail nunca lanza con HTML vacío", () => {
+  const detail = parseDetail("");
   assert.equal(detail.theme, null);
   assert.deepEqual(detail.profile, []);
   assert.deepEqual(detail.skills, []);

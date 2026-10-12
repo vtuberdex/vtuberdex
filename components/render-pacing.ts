@@ -2,7 +2,7 @@
  * Lógica PURA del ritmo de render (sin three ni DOM), para poder probarla: el componente que
  * la usa (`render-governor.tsx`) solo la cablea al bucle de R3F, y ese bucle no corre en jsdom.
  */
-import { RENDER } from '@/components/card3d-config';
+import { RENDER } from "@/components/card3d-config";
 
 export interface PacingConfig {
   activeFps: number;
@@ -38,7 +38,12 @@ function fpsFor(active: boolean, cfg: PacingConfig): number {
  * (24 en 60 Hz = 33/50 ms alternados) y no se acumula deriva. Si se quedó atrás más de un paso
  * (pestaña pausada, hipo del hilo) se reancla a `now` en vez de una ráfaga para ponerse al día.
  */
-export function nextSchedule(now: number, scheduledAt: number, active: boolean, cfg: PacingConfig = RENDER): number {
+export function nextSchedule(
+  now: number,
+  scheduledAt: number,
+  active: boolean,
+  cfg: PacingConfig = RENDER,
+): number {
   const fps = fpsFor(active, cfg);
   if (fps <= 0) return now;
   const paso = 1000 / fps;

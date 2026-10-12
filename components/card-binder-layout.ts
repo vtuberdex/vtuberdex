@@ -11,11 +11,11 @@
  *   · Los HUECOS (slots) van en orden de lectura: 0..3 la hoja izquierda (fila a fila),
  *     4..7 la derecha. `items[i]` del catálogo cae en el slot `i`.
  */
-import { Matrix4, Vector3 } from 'three';
+import { Matrix4, Vector3 } from "three";
 
-import { BINDER, GEOMETRY, RENDER } from '@/components/card3d-config';
+import { BINDER, GEOMETRY, RENDER } from "@/components/card3d-config";
 
-export type Side = 'left' | 'right';
+export type Side = "left" | "right";
 /** Sentido del paso de página: +1 avanza (la hoja derecha gira a la izquierda), -1 retrocede. */
 export type FlipDir = 1 | -1;
 
@@ -35,7 +35,10 @@ export interface BookDimensions {
 
 export function bookDimensions(): BookDimensions {
   const rows = BINDER.cardsPerPage / BINDER.columns;
-  const pageW = BINDER.columns * CARD_W + (BINDER.columns - 1) * BINDER.gap + 2 * BINDER.padding;
+  const pageW =
+    BINDER.columns * CARD_W +
+    (BINDER.columns - 1) * BINDER.gap +
+    2 * BINDER.padding;
   const pageH = rows * CARD_H + (rows - 1) * BINDER.gap + 2 * BINDER.padding;
   return {
     pageW,
@@ -52,7 +55,7 @@ export interface SlotPosition {
 
 /** Lado al que pertenece un slot (0..3 izquierda, 4..7 derecha). */
 export function slotSide(slot: number): Side {
-  return slot < BINDER.cardsPerPage ? 'left' : 'right';
+  return slot < BINDER.cardsPerPage ? "left" : "right";
 }
 
 /**
@@ -70,16 +73,19 @@ export function slotPosition(slot: number): SlotPosition {
   const row = Math.floor(local / BINDER.columns);
   const rows = BINDER.cardsPerPage / BINDER.columns;
   // Columna medida desde el borde izquierdo de la hoja, centrada en la funda.
-  const xInPage = -pageW / 2 + BINDER.padding + CARD_W / 2 + col * (CARD_W + BINDER.gap);
-  const yTop = (rows - 1) * (CARD_H + BINDER.gap) / 2;
+  const xInPage =
+    -pageW / 2 + BINDER.padding + CARD_W / 2 + col * (CARD_W + BINDER.gap);
+  const yTop = ((rows - 1) * (CARD_H + BINDER.gap)) / 2;
   const y = yTop - row * (CARD_H + BINDER.gap);
-  const centerX = slotSide(slot) === 'left' ? -pageCenterX : pageCenterX;
+  const centerX = slotSide(slot) === "left" ? -pageCenterX : pageCenterX;
   return { x: centerX + xInPage, y };
 }
 
 /** Las 8 posiciones, en orden de slot. */
 export function allSlotPositions(): SlotPosition[] {
-  return Array.from({ length: CARDS_PER_SPREAD }, (_, slot) => slotPosition(slot));
+  return Array.from({ length: CARDS_PER_SPREAD }, (_, slot) =>
+    slotPosition(slot),
+  );
 }
 
 /**
@@ -126,12 +132,12 @@ const _pos = new Vector3();
  */
 export function sheetCardLocalMatrix(
   position: SlotPosition,
-  face: 'front' | 'back',
+  face: "front" | "back",
   target = new Matrix4(),
 ): Matrix4 {
   const z = BINDER.sheetZ + BINDER.cardLift;
   target.makeTranslation(position.x, position.y, z);
-  if (face === 'back') {
+  if (face === "back") {
     const flip = new Matrix4().makeRotationY(Math.PI);
     target.premultiply(flip);
   }
@@ -139,12 +145,20 @@ export function sheetCardLocalMatrix(
 }
 
 /** Matriz de una carta fija en su funda (no participa del giro). */
-export function staticCardMatrix(position: SlotPosition, lift = 0, target = new Matrix4()): Matrix4 {
+export function staticCardMatrix(
+  position: SlotPosition,
+  lift = 0,
+  target = new Matrix4(),
+): Matrix4 {
   return target.makeTranslation(position.x, position.y, BINDER.cardLift + lift);
 }
 
 /** Posición mundial que resulta de una matriz (para los tests y el ocultamiento). */
-export function worldPosition(matrix: Matrix4): { x: number; y: number; z: number } {
+export function worldPosition(matrix: Matrix4): {
+  x: number;
+  y: number;
+  z: number;
+} {
   _pos.setFromMatrixPosition(matrix);
   return { x: _pos.x, y: _pos.y, z: _pos.z };
 }
@@ -159,12 +173,12 @@ export function worldPosition(matrix: Matrix4): { x: number; y: number; z: numbe
  *
  * Sin esto la cara (~0.16 sobre la hoja) atravesaría una hoja casi plana cerca del lomo.
  */
-export type RevealRule = 'none' | 'uncover' | 'cover';
+export type RevealRule = "none" | "uncover" | "cover";
 
 export function isStaticCardVisible(rule: RevealRule, theta: number): boolean {
   const turned = Math.abs(theta);
-  if (rule === 'uncover') return turned > BINDER.revealAngle;
-  if (rule === 'cover') return Math.PI - turned > BINDER.revealAngle;
+  if (rule === "uncover") return turned > BINDER.revealAngle;
+  if (rule === "cover") return Math.PI - turned > BINDER.revealAngle;
   return true;
 }
 
@@ -173,7 +187,11 @@ export function isStaticCardVisible(rule: RevealRule, theta: number): boolean {
  * proporción dada (contain): se calcula la distancia que exige el alto y la que exige
  * el ancho y gana la mayor.
  */
-export function fitCameraZ(aspect: number, fovDeg = GEOMETRY.cameraFov, fill = BINDER.cameraFill): number {
+export function fitCameraZ(
+  aspect: number,
+  fovDeg = GEOMETRY.cameraFov,
+  fill = BINDER.cameraFill,
+): number {
   const { spreadW, pageH } = bookDimensions();
   const halfFov = (fovDeg * Math.PI) / 180 / 2;
   const tan = Math.tan(halfFov);
@@ -189,9 +207,14 @@ export function fitCameraZ(aspect: number, fovDeg = GEOMETRY.cameraFov, fill = B
  * lleguen los datos sigue desde ahí, sin salto, porque el progreso se integra por
  * tiempo transcurrido y no por marca de inicio.
  */
-export function advanceFlip(progress: number, deltaSeconds: number, ready: boolean): number {
+export function advanceFlip(
+  progress: number,
+  deltaSeconds: number,
+  ready: boolean,
+): number {
   // El delta se recorta: tras un frame de reposo (50 ms) o un hipo del hilo la hoja no debe saltar.
-  const next = progress + Math.min(deltaSeconds * 1000, RENDER.maxDeltaMs) / BINDER.flipMs;
+  const next =
+    progress + Math.min(deltaSeconds * 1000, RENDER.maxDeltaMs) / BINDER.flipMs;
   const ceiling = ready ? 1 : BINDER.holdProgress;
   return Math.min(ceiling, next);
 }
@@ -200,7 +223,7 @@ export function advanceFlip(progress: number, deltaSeconds: number, ready: boole
  * Reparto de cartas entre hojas durante el giro.
  * ------------------------------------------------------------------------- */
 
-export type CardRole = 'static' | 'sheet-front' | 'sheet-back';
+export type CardRole = "static" | "sheet-front" | "sheet-back";
 
 export interface Placement<T> {
   card: T;
@@ -243,41 +266,62 @@ export function planPlacements<T extends Identified>(
 ): Placement<T>[] {
   const half = BINDER.cardsPerPage;
   const single = options.singleSheet === true;
-  const splitLeft = (cards: readonly T[]) => (single ? [] : cards.slice(0, half));
-  const splitRight = (cards: readonly T[]) => (single ? cards.slice(0, half) : cards.slice(half, CARDS_PER_SPREAD));
+  const splitLeft = (cards: readonly T[]) =>
+    single ? [] : cards.slice(0, half);
+  const splitRight = (cards: readonly T[]) =>
+    single ? cards.slice(0, half) : cards.slice(half, CARDS_PER_SPREAD);
   const incomingLeft = splitLeft(incoming);
   const incomingRight = splitRight(incoming);
   if (!flip) {
     return [
-      ...incomingLeft.map((card, i) => ({ card, slot: i, role: 'static' as const, reveal: 'none' as const })),
-      ...incomingRight.map((card, i) => ({ card, slot: half + i, role: 'static' as const, reveal: 'none' as const })),
+      ...incomingLeft.map((card, i) => ({
+        card,
+        slot: i,
+        role: "static" as const,
+        reveal: "none" as const,
+      })),
+      ...incomingRight.map((card, i) => ({
+        card,
+        slot: half + i,
+        role: "static" as const,
+        reveal: "none" as const,
+      })),
     ];
   }
   const incomingIds = new Set(incoming.map((card) => card.id));
   const outgoing = flip.outgoing.filter((card) => !incomingIds.has(card.id));
-  const outgoingLeft = splitLeft(flip.outgoing).filter((card) => outgoing.includes(card));
-  const outgoingRight = splitRight(flip.outgoing).filter((card) => outgoing.includes(card));
+  const outgoingLeft = splitLeft(flip.outgoing).filter((card) =>
+    outgoing.includes(card),
+  );
+  const outgoingRight = splitRight(flip.outgoing).filter((card) =>
+    outgoing.includes(card),
+  );
 
-  const place = <U,>(cards: readonly U[], firstSlot: number, role: CardRole, reveal: RevealRule): Placement<U>[] =>
+  const place = <U>(
+    cards: readonly U[],
+    firstSlot: number,
+    role: CardRole,
+    reveal: RevealRule,
+  ): Placement<U>[] =>
     cards.map((card, i) => ({ card, slot: firstSlot + i, role, reveal }));
 
   if (flip.dir === 1) {
     return [
-      ...place(outgoingLeft, 0, 'static', 'cover'),
-      ...place(outgoingRight, half, 'sheet-front', 'none'),
-      ...place(incomingLeft, 0, 'sheet-back', 'none'),
-      ...place(incomingRight, half, 'static', 'uncover'),
+      ...place(outgoingLeft, 0, "static", "cover"),
+      ...place(outgoingRight, half, "sheet-front", "none"),
+      ...place(incomingLeft, 0, "sheet-back", "none"),
+      ...place(incomingRight, half, "static", "uncover"),
     ];
   }
   return [
-    ...place(outgoingRight, half, 'static', 'cover'),
-    ...place(outgoingLeft, 0, 'sheet-front', 'none'),
-    ...place(incomingRight, half, 'sheet-back', 'none'),
-    ...place(incomingLeft, 0, 'static', 'uncover'),
+    ...place(outgoingRight, half, "static", "cover"),
+    ...place(outgoingLeft, 0, "sheet-front", "none"),
+    ...place(incomingRight, half, "sheet-back", "none"),
+    ...place(incomingLeft, 0, "static", "uncover"),
   ];
 }
 
 /** Lado de la hoja que gira para un sentido: avanzar levanta la derecha. */
 export function turningSide(dir: FlipDir): Side {
-  return dir === 1 ? 'right' : 'left';
+  return dir === 1 ? "right" : "left";
 }

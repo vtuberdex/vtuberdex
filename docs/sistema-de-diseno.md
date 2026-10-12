@@ -7,19 +7,19 @@ las superficies que no leen ese CSS (el correo) usan la copia de `lib/diseno.mjs
 
 ## Colores
 
-| Token | Valor | Uso |
-|---|---|---|
-| `void` | `#05060a` | Fondo de página; fondo de la cabecera del correo y de las cajas de código |
-| `panel` | `#0d1017` | Tarjetas y paneles |
-| `panelSoft` | `#141924` | Cajas internas, pie del correo |
-| `line` | `#232a38` | Bordes y divisores |
-| `ink` | `#e8ecf5` | Texto principal |
-| `muted` | `#8b96ad` | Texto secundario, notas, etiquetas |
-| `accent` | `#5eead4` | Acento de marca: enlaces, botón principal, códigos |
-| `violeta` | `#a855f7` | Segundo tono de marca (resplandor del fondo, degradado de la franja) |
-| `peligro` | `#f87171` | Solo estados: acciones irreversibles (baja) |
-| `aviso` | `#fbbf24` | Solo estados: acceso del mantenedor |
-| `exito` | `#34d399` | Solo estados: bienvenida y confirmaciones |
+| Token       | Valor     | Uso                                                                       |
+| ----------- | --------- | ------------------------------------------------------------------------- |
+| `void`      | `#05060a` | Fondo de página; fondo de la cabecera del correo y de las cajas de código |
+| `panel`     | `#0d1017` | Tarjetas y paneles                                                        |
+| `panelSoft` | `#141924` | Cajas internas, pie del correo                                            |
+| `line`      | `#232a38` | Bordes y divisores                                                        |
+| `ink`       | `#e8ecf5` | Texto principal                                                           |
+| `muted`     | `#8b96ad` | Texto secundario, notas, etiquetas                                        |
+| `accent`    | `#5eead4` | Acento de marca: enlaces, botón principal, códigos                        |
+| `violeta`   | `#a855f7` | Segundo tono de marca (resplandor del fondo, degradado de la franja)      |
+| `peligro`   | `#f87171` | Solo estados: acciones irreversibles (baja)                               |
+| `aviso`     | `#fbbf24` | Solo estados: acceso del mantenedor                                       |
+| `exito`     | `#34d399` | Solo estados: bienvenida y confirmaciones                                 |
 
 Los tres últimos son **semánticos**: indican qué tipo de mensaje es, no se usan como decoración.
 Texto sobre un color de acento siempre es `void` (contraste alto con los cinco).

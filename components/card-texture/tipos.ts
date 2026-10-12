@@ -1,7 +1,7 @@
 /**
  * Contrato de datos: lo que entra a dibujar y las 7 capas que salen.
  */
-import type { VtuberCard } from '@/lib/types';
+import type { VtuberCard } from "@/lib/types";
 
 /** Datos de la tarjeta que el shader necesita para posicionar capas. */
 export interface CardDrawInfo {
@@ -17,7 +17,7 @@ export interface CardDrawInfo {
    * `fabrica.ts`): la etapa rápida pinta superficie, personaje y título para mostrar la
    * carta cuanto antes, y la completa no debe volver a pagarlas.
    */
-  reutilizar?: Partial<Pick<CardLayers, 'background' | 'character' | 'title'>>;
+  reutilizar?: Partial<Pick<CardLayers, "background" | "character" | "title">>;
 }
 
 /** Las 7 capas que se generan. */

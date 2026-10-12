@@ -10,12 +10,12 @@
  * Si esa variable no está, la página carga pero cada llamada da 404 — el mismo
  * comportamiento de producción, que es lo que el verificador del deploy comprueba.
  */
-import type { Metadata } from 'next';
+import type { Metadata } from "next";
 
-import { AdminPage } from '@/components/admin-page';
+import { AdminPage } from "@/components/admin-page";
 
 export const metadata: Metadata = {
-  title: 'Mantenedor · VTuberDex',
+  title: "Mantenedor · VTuberDex",
   robots: { index: false, follow: false },
 };
 

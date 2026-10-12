@@ -8,16 +8,16 @@
  *   · orden configurable (dex, A-Z, poder),
  *   · conteos de facetas calculados en la base, no recorriendo 785 divs.
  */
-import { valorEquilibrado } from './equilibrio.mjs';
-import { GRADOS, GRADO_DE_BAJA, numeroDeCertificado } from './premium.mjs';
-import { ocultarFichaDeteriorada } from './ficha-deteriorada.mjs';
-import { normalizeText } from './text.mjs';
+import { valorEquilibrado } from "./equilibrio.mjs";
+import { GRADOS, GRADO_DE_BAJA, numeroDeCertificado } from "./premium.mjs";
+import { ocultarFichaDeteriorada } from "./ficha-deteriorada.mjs";
+import { normalizeText } from "./text.mjs";
 
 const SORT_SQL = {
-  dex: 'v.dex_number ASC',
-  'dex-desc': 'v.dex_number DESC',
-  name: 'v.search_name ASC',
-  power: 'v.power_score DESC NULLS LAST, v.dex_number ASC',
+  dex: "v.dex_number ASC",
+  "dex-desc": "v.dex_number DESC",
+  name: "v.search_name ASC",
+  power: "v.power_score DESC NULLS LAST, v.dex_number ASC",
 };
 
 /**
@@ -37,7 +37,13 @@ const SIN_PREMIUM_COLUMNAS = `, NULL AS premiumGrade, NULL AS premiumSince, NULL
 const conPremium = new WeakSet();
 export function tienePremium(db) {
   if (conPremium.has(db)) return true;
-  const hay = Boolean(db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'premium'`).get());
+  const hay = Boolean(
+    db
+      .prepare(
+        `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'premium'`,
+      )
+      .get(),
+  );
   if (hay) conPremium.add(db);
   return hay;
 }
@@ -87,13 +93,14 @@ const armarSelect = (premium) => `
   LEFT JOIN asset a_character ON a_character.vtuber_id = v.id AND a_character.kind = 'character'
   LEFT JOIN asset a_background ON a_background.vtuber_id = v.id AND a_background.kind = 'background'
   LEFT JOIN asset a_radar  ON a_radar.vtuber_id = v.id AND a_radar.kind = 'radar'
-  ${premium ? PREMIUM_UNION : ''}
+  ${premium ? PREMIUM_UNION : ""}
 `;
 
 // Se arman UNA vez: el texto no depende de la consulta, solo de si la base conoce el premium.
 const SELECT_CON_PREMIUM = armarSelect(true);
 const SELECT_SIN_PREMIUM = armarSelect(false);
-const cardSelect = (db) => (tienePremium(db) ? SELECT_CON_PREMIUM : SELECT_SIN_PREMIUM);
+const cardSelect = (db) =>
+  tienePremium(db) ? SELECT_CON_PREMIUM : SELECT_SIN_PREMIUM;
 
 const parseJsonArray = (value) => {
   if (!value) return [];
@@ -116,7 +123,10 @@ const plain = (row) => (row ? { ...row } : row);
  * Las rutas de assets se sirven desde la raíz del sitio (`/images/...`): una
  * ruta relativa se rompería en rutas anidadas del SPA (`/v/:slug/images/...`).
  */
-const toPublicPath = (value) => (value && !value.startsWith('/') && !/^https?:/.test(value) ? `/${value}` : value);
+const toPublicPath = (value) =>
+  value && !value.startsWith("/") && !/^https?:/.test(value)
+    ? `/${value}`
+    : value;
 
 /** Fila SQL -> objeto JSON que consume la app. */
 export function mapCard(row) {
@@ -149,12 +159,16 @@ export function mapCard(row) {
     factions: parseJsonArray(row.factionsJson),
     /** Facciones con emblema, para superponerlo como holograma en la carta. */
     factionIcons: parseJsonArray(row.factionIconsJson)
-      .map((f) => ({ label: f?.label ?? null, slug: f?.slug ?? null, icon: f?.icon ? toPublicPath(f.icon) : null }))
+      .map((f) => ({
+        label: f?.label ?? null,
+        slug: f?.slug ?? null,
+        icon: f?.icon ? toPublicPath(f.icon) : null,
+      }))
       .filter((f) => f.label),
     languages: parseJsonArray(row.languagesJson),
     // Sin nivel/EXP y con cada valor limitado por el equilibrio: la barra de la carta no la domina una ficha inflada.
     statsPreview: parseJsonArray(row.statsPreviewJson)
-      .filter((s) => typeof s?.value === 'number')
+      .filter((s) => typeof s?.value === "number")
       .map((s) => valorEquilibrado(s.slug, s.value)),
     socialCount: row.socialCount ?? 0,
     /**
@@ -201,13 +215,13 @@ export function buildFtsQuery(term) {
     .filter((token) => token.length > 0)
     .slice(0, 8);
   if (tokens.length === 0) return null;
-  return tokens.map((token) => `"${token}"*`).join(' AND ');
+  return tokens.map((token) => `"${token}"*`).join(" AND ");
 }
 
 /** Normaliza la lista de países pedida (acepta slug o nombre). */
 function normalizeCountryFilters(values) {
   return values
-    .flatMap((value) => String(value).split(','))
+    .flatMap((value) => String(value).split(","))
     .map((value) => value.trim())
     .filter(Boolean)
     .map((value) => value.toLowerCase());
@@ -220,13 +234,13 @@ function normalizeCountryFilters(values) {
  */
 export function searchVtubers(db, params = {}) {
   const {
-    q = '',
+    q = "",
     countries = [],
     languages = [],
     groups = [],
     artists = [],
     factions = [],
-    sort = 'dex',
+    sort = "dex",
     page = 1,
     perPage = 24,
     includeHidden = false,
@@ -246,24 +260,27 @@ export function searchVtubers(db, params = {}) {
 
   if (!includeHidden) where.push(`v.status = 'published'`);
   else if (status) {
-    where.push('v.status = ?');
+    where.push("v.status = ?");
     args.push(status);
   }
   if (premium) {
     // Sin la tabla no hay ninguna premium: el filtro devuelve vacío en vez de fallar.
-    if (!tienePremium(db)) where.push('0');
-    else if (premium === 'todas') where.push('EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id)');
+    if (!tienePremium(db)) where.push("0");
+    else if (premium === "todas")
+      where.push("EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id)");
     else {
-      where.push(`EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id AND p.grade IN (${GRADOS.map(() => '?').join(',')}))`);
+      where.push(
+        `EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id AND p.grade IN (${GRADOS.map(() => "?").join(",")}))`,
+      );
       args.push(...GRADOS);
     }
   }
   if (theme) {
-    where.push('v.theme_color = ?');
+    where.push("v.theme_color = ?");
     args.push(theme);
   }
   if (minPower !== null) {
-    where.push('v.power_score >= ?');
+    where.push("v.power_score >= ?");
     args.push(minPower);
   }
 
@@ -280,12 +297,16 @@ export function searchVtubers(db, params = {}) {
       )`);
       args.push(ftsQuery, like, like, Number(term) || -1);
     } else {
-      where.push('(v.search_name LIKE ? OR v.card_text LIKE ? OR v.dex_number = ?)');
+      where.push(
+        "(v.search_name LIKE ? OR v.card_text LIKE ? OR v.dex_number = ?)",
+      );
       args.push(like, like, Number(term) || -1);
     }
     // Buscar por texto no puede revelar a quien se dio de baja: una ficha deteriorada no sale por su nombre.
     if (!includeHidden && tienePremium(db)) {
-      where.push('NOT EXISTS (SELECT 1 FROM premium pb WHERE pb.vtuber_id = v.id AND pb.grade = ?)');
+      where.push(
+        "NOT EXISTS (SELECT 1 FROM premium pb WHERE pb.vtuber_id = v.id AND pb.grade = ?)",
+      );
       args.push(GRADO_DE_BAJA);
     }
   }
@@ -294,61 +315,76 @@ export function searchVtubers(db, params = {}) {
   if (countryList.length > 0) {
     where.push(`EXISTS (
       SELECT 1 FROM vtuber_country vc JOIN country c ON c.id = vc.country_id
-      WHERE vc.vtuber_id = v.id AND (c.slug IN (${countryList.map(() => '?').join(',')})
-        OR lower(c.name) IN (${countryList.map(() => '?').join(',')}))
+      WHERE vc.vtuber_id = v.id AND (c.slug IN (${countryList.map(() => "?").join(",")})
+        OR lower(c.name) IN (${countryList.map(() => "?").join(",")}))
     )`);
     args.push(...countryList, ...countryList);
   }
 
   if (languages.length > 0) {
-    const langList = languages.flatMap((value) => String(value).split(',')).map((v) => v.trim()).filter(Boolean);
+    const langList = languages
+      .flatMap((value) => String(value).split(","))
+      .map((v) => v.trim())
+      .filter(Boolean);
     if (langList.length > 0) {
       where.push(`EXISTS (
         SELECT 1 FROM vtuber_language vl
-        WHERE vl.vtuber_id = v.id AND vl.code IN (${langList.map(() => '?').join(',')})
+        WHERE vl.vtuber_id = v.id AND vl.code IN (${langList.map(() => "?").join(",")})
       )`);
       args.push(...langList);
     }
   }
 
   const tagFilter = (kind, values) => {
-    const list = values.flatMap((value) => String(value).split(',')).map((v) => v.trim().toLowerCase()).filter(Boolean);
+    const list = values
+      .flatMap((value) => String(value).split(","))
+      .map((v) => v.trim().toLowerCase())
+      .filter(Boolean);
     if (list.length === 0) return;
     where.push(`EXISTS (
       SELECT 1 FROM vtuber_tag vt JOIN tag t ON t.id = vt.tag_id
       WHERE vt.vtuber_id = v.id AND t.kind = ?
-        AND (t.slug IN (${list.map(() => '?').join(',')}) OR lower(t.label) IN (${list.map(() => '?').join(',')}))
+        AND (t.slug IN (${list.map(() => "?").join(",")}) OR lower(t.label) IN (${list.map(() => "?").join(",")}))
     )`);
     args.push(kind, ...list, ...list);
   };
-  tagFilter('group', groups);
-  tagFilter('artist', artists);
+  tagFilter("group", groups);
+  tagFilter("artist", artists);
 
   if (factions.length > 0) {
-    const list = factions.flatMap((value) => String(value).split(',')).map((v) => v.trim().toLowerCase()).filter(Boolean);
+    const list = factions
+      .flatMap((value) => String(value).split(","))
+      .map((v) => v.trim().toLowerCase())
+      .filter(Boolean);
     if (list.length > 0) {
       where.push(`EXISTS (
         SELECT 1 FROM vtuber_faction vf JOIN faction f ON f.id = vf.faction_id
-        WHERE vf.vtuber_id = v.id AND (f.slug IN (${list.map(() => '?').join(',')}) OR lower(f.label) IN (${list.map(() => '?').join(',')}))
+        WHERE vf.vtuber_id = v.id AND (f.slug IN (${list.map(() => "?").join(",")}) OR lower(f.label) IN (${list.map(() => "?").join(",")}))
       )`);
       args.push(...list, ...list);
     }
   }
 
-  const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+  const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
   const orderSql = SORT_SQL[sort] ?? SORT_SQL.dex;
   const safePerPage = Math.min(Math.max(Number(perPage) || 24, 1), 100);
   const safePage = Math.max(Number(page) || 1, 1);
   const offset = (safePage - 1) * safePerPage;
 
-  const total = db.prepare(`SELECT COUNT(*) AS total FROM vtuber v ${whereSql}`).get(...args).total;
+  const total = db
+    .prepare(`SELECT COUNT(*) AS total FROM vtuber v ${whereSql}`)
+    .get(...args).total;
   const rows = db
-    .prepare(`${cardSelect(db)} ${whereSql} ORDER BY ${orderSql} LIMIT ? OFFSET ?`)
+    .prepare(
+      `${cardSelect(db)} ${whereSql} ORDER BY ${orderSql} LIMIT ? OFFSET ?`,
+    )
     .all(...args, safePerPage, offset);
 
   return {
     // El público no ve los datos de una ficha deteriorada; el mantenedor (`includeHidden`) sí.
-    items: includeHidden ? rows.map(mapCard) : rows.map((row) => ocultarFichaDeteriorada(mapCard(row))),
+    items: includeHidden
+      ? rows.map(mapCard)
+      : rows.map((row) => ocultarFichaDeteriorada(mapCard(row))),
     total,
     page: safePage,
     perPage: safePerPage,
@@ -361,12 +397,14 @@ export function searchVtubers(db, params = {}) {
  * seleccionado (así solo se ofrecen países que existen en ese idioma).
  */
 export function facetCounts(db, params = {}) {
-  const { language = null, q = '', includeHidden = false } = params;
+  const { language = null, q = "", includeHidden = false } = params;
   const baseArgs = [];
   const baseWhere = [];
   if (!includeHidden) baseWhere.push(`v.status = 'published'`);
   if (language) {
-    baseWhere.push(`EXISTS (SELECT 1 FROM vtuber_language vl WHERE vl.vtuber_id = v.id AND vl.code = ?)`);
+    baseWhere.push(
+      `EXISTS (SELECT 1 FROM vtuber_language vl WHERE vl.vtuber_id = v.id AND vl.code = ?)`,
+    );
     baseArgs.push(language);
   }
   const term = String(q).trim();
@@ -374,14 +412,16 @@ export function facetCounts(db, params = {}) {
     const ftsQuery = buildFtsQuery(term);
     const like = `%${normalizeText(term)}%`;
     if (ftsQuery) {
-      baseWhere.push(`(v.id IN (SELECT rowid FROM vtuber_fts WHERE vtuber_fts MATCH ?) OR v.search_name LIKE ?)`);
+      baseWhere.push(
+        `(v.id IN (SELECT rowid FROM vtuber_fts WHERE vtuber_fts MATCH ?) OR v.search_name LIKE ?)`,
+      );
       baseArgs.push(ftsQuery, like);
     } else {
-      baseWhere.push('v.search_name LIKE ?');
+      baseWhere.push("v.search_name LIKE ?");
       baseArgs.push(like);
     }
   }
-  const baseSql = baseWhere.length ? `WHERE ${baseWhere.join(' AND ')}` : '';
+  const baseSql = baseWhere.length ? `WHERE ${baseWhere.join(" AND ")}` : "";
 
   const countries = db
     .prepare(
@@ -435,10 +475,12 @@ export function facetCounts(db, params = {}) {
     .all(...baseArgs);
 
   const totals = db
-    .prepare(`SELECT COUNT(*) AS total,
+    .prepare(
+      `SELECT COUNT(*) AS total,
                      SUM(CASE WHEN v.has_detail = 1 THEN 1 ELSE 0 END) AS withDetail,
                      COUNT(DISTINCT v.theme_color) AS themes
-                FROM vtuber v ${baseSql}`)
+                FROM vtuber v ${baseSql}`,
+    )
     .get(...baseArgs);
 
   return { countries, languages, groups, artists, factions, totals };
@@ -452,7 +494,11 @@ export function facetCounts(db, params = {}) {
  */
 function buscarAlias(db, slug) {
   try {
-    return db.prepare('SELECT vtuber_id AS id FROM slug_alias WHERE slug = ?').get(slug)?.id ?? null;
+    return (
+      db
+        .prepare("SELECT vtuber_id AS id FROM slug_alias WHERE slug = ?")
+        .get(slug)?.id ?? null
+    );
   } catch {
     return null;
   }
@@ -460,16 +506,15 @@ function buscarAlias(db, slug) {
 
 /** Detalle completo de una carta (perfil, stats, skills, socials, assets). */
 export function getVtuberBySlug(db, slug, { includeHidden = false } = {}) {
-  const where = includeHidden ? '' : `AND v.status = 'published'`;
-  let row = db
-    .prepare(`${cardSelect(db)} WHERE v.slug = ? ${where}`)
-    .get(slug);
+  const where = includeHidden ? "" : `AND v.status = 'published'`;
+  let row = db.prepare(`${cardSelect(db)} WHERE v.slug = ? ${where}`).get(slug);
   if (!row) {
     // Un slug que la ficha ya no usa (se le cambió la URL) sigue resolviendo: el detalle devuelve
     // la ficha con su slug ACTUAL y el cliente redirige. Sin esto, renombrar una página rompería
     // todos los enlaces compartidos.
     const alias = buscarAlias(db, slug);
-    if (alias) row = db.prepare(`${cardSelect(db)} WHERE v.id = ? ${where}`).get(alias);
+    if (alias)
+      row = db.prepare(`${cardSelect(db)} WHERE v.id = ? ${where}`).get(alias);
   }
   if (!row) return null;
   // Una ficha deteriorada (baja) no tiene página pública: es un 404, igual que un borrador. Así ni el
@@ -478,20 +523,33 @@ export function getVtuberBySlug(db, slug, { includeHidden = false } = {}) {
   const card = mapCard(row);
 
   card.profile = db
-    .prepare('SELECT label, value FROM profile_field WHERE vtuber_id = ? ORDER BY position')
+    .prepare(
+      "SELECT label, value FROM profile_field WHERE vtuber_id = ? ORDER BY position",
+    )
     .all(row.id);
   card.stats = db
-    .prepare('SELECT label, slug, value, value_text AS valueText, max, position FROM stat WHERE vtuber_id = ? ORDER BY position')
+    .prepare(
+      "SELECT label, slug, value, value_text AS valueText, max, position FROM stat WHERE vtuber_id = ? ORDER BY position",
+    )
     .all(row.id);
   card.skills = db
-    .prepare('SELECT category, section, type, name, effect, effect_html AS effectHtml, factions AS factionsJson, position FROM skill WHERE vtuber_id = ? ORDER BY position')
+    .prepare(
+      "SELECT category, section, type, name, effect, effect_html AS effectHtml, factions AS factionsJson, position FROM skill WHERE vtuber_id = ? ORDER BY position",
+    )
     .all(row.id)
-    .map((skill) => ({ ...skill, factions: parseJsonArray(skill.factionsJson) }));
+    .map((skill) => ({
+      ...skill,
+      factions: parseJsonArray(skill.factionsJson),
+    }));
   card.socials = db
-    .prepare('SELECT platform, label, url, icon FROM social WHERE vtuber_id = ? ORDER BY position')
+    .prepare(
+      "SELECT platform, label, url, icon FROM social WHERE vtuber_id = ? ORDER BY position",
+    )
     .all(row.id);
   card.assets = db
-    .prepare('SELECT kind, path, source_url AS sourceUrl, width, height, bytes FROM asset WHERE vtuber_id = ?')
+    .prepare(
+      "SELECT kind, path, source_url AS sourceUrl, width, height, bytes FROM asset WHERE vtuber_id = ?",
+    )
     .all(row.id)
     .map((asset) => ({ ...asset, path: toPublicPath(asset.path) }));
   card.experience =
@@ -506,12 +564,16 @@ export function getNeighbors(db, dexNumber) {
   // Los vecinos son enlaces a fichas: una deteriorada no tiene página, así que se salta.
   const sinBajas = tienePremium(db)
     ? `AND NOT EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = vtuber.id AND p.grade = '${GRADO_DE_BAJA}')`
-    : '';
+    : "";
   const prev = db
-    .prepare(`SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number < ? AND status = 'published' ${sinBajas} ORDER BY dex_number DESC LIMIT 1`)
+    .prepare(
+      `SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number < ? AND status = 'published' ${sinBajas} ORDER BY dex_number DESC LIMIT 1`,
+    )
     .get(dexNumber);
   const next = db
-    .prepare(`SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number > ? AND status = 'published' ${sinBajas} ORDER BY dex_number ASC LIMIT 1`)
+    .prepare(
+      `SELECT dex_number AS dexNumber, slug, name FROM vtuber WHERE dex_number > ? AND status = 'published' ${sinBajas} ORDER BY dex_number ASC LIMIT 1`,
+    )
     .get(dexNumber);
   return { prev: plain(prev ?? null), next: plain(next ?? null) };
 }

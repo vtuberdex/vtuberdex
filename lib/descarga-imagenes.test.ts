@@ -22,17 +22,17 @@
  *      viaje, porque es lo que versiona la URL.
  *   4. La constante de origen coincide con la del camino de lectura.
  */
-import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import path from "node:path";
+import { describe, expect, it } from "vitest";
 
-import { ORIGEN_MANTENEDOR } from '../lib/ediciones.mjs';
+import { ORIGEN_MANTENEDOR } from "../lib/ediciones.mjs";
 import {
   CARPETA_TEMPORAL,
   ORIGEN_QUE_SE_BAJA,
   indiceDeReemplazos,
   motivoDestinoInseguro,
   planDeDescarga,
-} from '../scripts/descargar-imagenes.mjs';
+} from "../scripts/descargar-imagenes.mjs";
 
 /** Un `stat` de mentira: mapa de rutas a tamaño; lo que no esté, no existe. */
 const statFalso =
@@ -40,47 +40,57 @@ const statFalso =
   (abs: string): number | null =>
     archivos[abs] ?? null;
 
-const RAIZ = '/tmp/dex-mantenedor';
-const ROOT = path.resolve(__dirname, '..');
+const RAIZ = "/tmp/dex-mantenedor";
+const ROOT = path.resolve(__dirname, "..");
 
-describe('motivoDestinoInseguro', () => {
-  it('rechaza data/images, que es la fuente del manifiesto', () => {
-    expect(motivoDestinoInseguro(path.join(ROOT, 'data', 'images'))).toMatch(/data\/images/);
+describe("motivoDestinoInseguro", () => {
+  it("rechaza data/images, que es la fuente del manifiesto", () => {
+    expect(motivoDestinoInseguro(path.join(ROOT, "data", "images"))).toMatch(
+      /data\/images/,
+    );
   });
 
-  it('rechaza un subdirectorio de data/images', () => {
+  it("rechaza un subdirectorio de data/images", () => {
     // Es la forma en que el fallo se cuela sin querer: apuntar a una carpeta concreta.
-    expect(motivoDestinoInseguro(path.join(ROOT, 'data', 'images', 'character'))).toMatch(/data\/images/);
+    expect(
+      motivoDestinoInseguro(path.join(ROOT, "data", "images", "character")),
+    ).toMatch(/data\/images/);
   });
 
-  it('rechaza deploy/, que es el artefacto versionado', () => {
-    expect(motivoDestinoInseguro(path.join(ROOT, 'deploy'))).toMatch(/deploy/);
-    expect(motivoDestinoInseguro(path.join(ROOT, 'deploy', 'data'))).toMatch(/deploy/);
+  it("rechaza deploy/, que es el artefacto versionado", () => {
+    expect(motivoDestinoInseguro(path.join(ROOT, "deploy"))).toMatch(/deploy/);
+    expect(motivoDestinoInseguro(path.join(ROOT, "deploy", "data"))).toMatch(
+      /deploy/,
+    );
   });
 
-  it('no se deja engañar por un prefijo de texto', () => {
+  it("no se deja engañar por un prefijo de texto", () => {
     // `data/images-otra` EMPIEZA por `data/images` pero es otra carpeta: comparar por texto daría
     // un falso positivo y bloquearía un destino legítimo.
-    expect(motivoDestinoInseguro(path.join(ROOT, 'data', 'images-otra'))).toBeNull();
+    expect(
+      motivoDestinoInseguro(path.join(ROOT, "data", "images-otra")),
+    ).toBeNull();
   });
 
-  it('acepta la carpeta temporal, que es el destino por defecto', () => {
+  it("acepta la carpeta temporal, que es el destino por defecto", () => {
     expect(motivoDestinoInseguro(path.join(ROOT, CARPETA_TEMPORAL))).toBeNull();
   });
 
-  it('la carpeta temporal no está bajo data/images', () => {
+  it("la carpeta temporal no está bajo data/images", () => {
     // La propiedad que hace IMPOSIBLE la contaminación, comprobada como propiedad y no como
     // valor: si alguien mueve la constante, este test avisa.
-    expect(CARPETA_TEMPORAL.startsWith(path.join('data', 'images'))).toBe(false);
+    expect(CARPETA_TEMPORAL.startsWith(path.join("data", "images"))).toBe(
+      false,
+    );
   });
 });
 
-describe('planDeDescarga', () => {
-  it('baja lo que falta y lo que discrepa en tamaño, y respeta lo que ya está igual', () => {
+describe("planDeDescarga", () => {
+  it("baja lo que falta y lo que discrepa en tamaño, y respeta lo que ya está igual", () => {
     const filas = [
-      { slug: 'stella', kind: 'character', size: 129924 },
-      { slug: 'nueva', kind: 'background', size: 1000 },
-      { slug: 'vieja', kind: 'logo', size: 2000 },
+      { slug: "stella", kind: "character", size: 129924 },
+      { slug: "nueva", kind: "background", size: 1000 },
+      { slug: "vieja", kind: "logo", size: 2000 },
     ];
     const stat = statFalso({
       [`${RAIZ}/character/stella.webp`]: 129924,
@@ -90,51 +100,81 @@ describe('planDeDescarga', () => {
     const plan = planDeDescarga(filas, { stat, raiz: RAIZ });
 
     expect(plan.map((p) => [p.slug, p.motivo])).toEqual([
-      ['nueva', 'falta'],
-      ['vieja', 'distinto'],
+      ["nueva", "falta"],
+      ["vieja", "distinto"],
     ]);
   });
 
-  it('escribe en la raíz que recibe, no en un árbol fijo', () => {
+  it("escribe en la raíz que recibe, no en un árbol fijo", () => {
     // Bajar a `data/images/` fue el fallo original: el destino tiene que venir de fuera para que
     // no pueda volver a colarse una ruta fija en el código.
-    const plan = planDeDescarga([{ slug: 'stella', kind: 'character', size: 1 }], {
-      stat: () => null,
-      raiz: RAIZ,
-    });
+    const plan = planDeDescarga(
+      [{ slug: "stella", kind: "character", size: 1 }],
+      {
+        stat: () => null,
+        raiz: RAIZ,
+      },
+    );
     expect(plan[0].abs.startsWith(RAIZ)).toBe(true);
-    expect(plan[0].abs.includes(path.join('data', 'images'))).toBe(false);
+    expect(plan[0].abs.includes(path.join("data", "images"))).toBe(false);
   });
 
-  it('usa la extensión de la carpeta y no asume `.webp`', () => {
+  it("usa la extensión de la carpeta y no asume `.webp`", () => {
     // Los emblemas de facción son PNG: suponer `.webp` los dejaría siempre "faltando".
-    const plan = planDeDescarga([{ slug: 'abyssal', kind: 'faction', size: 10 }], {
-      stat: () => null,
-      raiz: RAIZ,
-    });
+    const plan = planDeDescarga(
+      [{ slug: "abyssal", kind: "faction", size: 10 }],
+      {
+        stat: () => null,
+        raiz: RAIZ,
+      },
+    );
     expect(plan[0].abs).toBe(`${RAIZ}/faction/abyssal.png`);
   });
 
-  it('con `forzar` repite todo aunque el tamaño ya coincida', () => {
+  it("con `forzar` repite todo aunque el tamaño ya coincida", () => {
     const stat = statFalso({ [`${RAIZ}/character/stella.webp`]: 129924 });
-    const plan = planDeDescarga([{ slug: 'stella', kind: 'character', size: 129924 }], {
-      stat,
-      raiz: RAIZ,
-      forzar: true,
-    });
+    const plan = planDeDescarga(
+      [{ slug: "stella", kind: "character", size: 129924 }],
+      {
+        stat,
+        raiz: RAIZ,
+        forzar: true,
+      },
+    );
     expect(plan).toHaveLength(1);
-    expect(plan[0].motivo).toBe('forzado');
+    expect(plan[0].motivo).toBe("forzado");
   });
 });
 
-describe('indiceDeReemplazos', () => {
+describe("indiceDeReemplazos", () => {
   const filas = [
-    { slug: 'stella', kind: 'logo', size: 135240, width: 2400, height: 1200, actualizado: '2026-09-24T00:35:28.076Z' },
-    { slug: 'stella', kind: 'character', size: 129924, width: 720, height: 1008, actualizado: '2026-09-24T00:35:23.269Z' },
-    { slug: 'detectibear', kind: 'character', size: 65764, width: 720, height: 1008, actualizado: '2026-09-24T00:29:48.791Z' },
+    {
+      slug: "stella",
+      kind: "logo",
+      size: 135240,
+      width: 2400,
+      height: 1200,
+      actualizado: "2026-09-24T00:35:28.076Z",
+    },
+    {
+      slug: "stella",
+      kind: "character",
+      size: 129924,
+      width: 720,
+      height: 1008,
+      actualizado: "2026-09-24T00:35:23.269Z",
+    },
+    {
+      slug: "detectibear",
+      kind: "character",
+      size: 65764,
+      width: 720,
+      height: 1008,
+      actualizado: "2026-09-24T00:29:48.791Z",
+    },
   ];
 
-  it('conserva la marca de la subida, que es lo que versiona la URL local', () => {
+  it("conserva la marca de la subida, que es lo que versiona la URL local", () => {
     // Sin `actualizado`, reemplazar una imagen dejaría la copia vieja en el navegador: el fallo
     // que ya se pagó en producción y que `marcaDeVersion` resuelve en el camino de Turso.
     for (const entrada of indiceDeReemplazos(filas)) {
@@ -142,30 +182,34 @@ describe('indiceDeReemplazos', () => {
     }
   });
 
-  it('ordena de forma estable por kind y slug', () => {
-    expect(indiceDeReemplazos(filas).map((e: { kind: string; slug: string }) => `${e.kind}/${e.slug}`)).toEqual([
-      'character/detectibear',
-      'character/stella',
-      'logo/stella',
-    ]);
+  it("ordena de forma estable por kind y slug", () => {
+    expect(
+      indiceDeReemplazos(filas).map(
+        (e: { kind: string; slug: string }) => `${e.kind}/${e.slug}`,
+      ),
+    ).toEqual(["character/detectibear", "character/stella", "logo/stella"]);
   });
 
-  it('normaliza medidas ausentes a null en vez de undefined', () => {
+  it("normaliza medidas ausentes a null en vez de undefined", () => {
     // Va directo a un JSON que lee la ruta de imágenes: `undefined` desaparece al serializar y
     // la propiedad quedaría ausente en vez de nula.
-    const [entrada] = indiceDeReemplazos([{ slug: 'x', kind: 'background', size: 1 }]);
+    const [entrada] = indiceDeReemplazos([
+      { slug: "x", kind: "background", size: 1 },
+    ]);
     expect(entrada.width).toBeNull();
     expect(entrada.height).toBeNull();
     expect(entrada.actualizado).toBeNull();
   });
 
-  it('el tamaño va como número, que es contra lo que se verifica el disco', () => {
-    expect(indiceDeReemplazos([{ slug: 'x', kind: 'logo', size: '2000' }])[0].size).toBe(2000);
+  it("el tamaño va como número, que es contra lo que se verifica el disco", () => {
+    expect(
+      indiceDeReemplazos([{ slug: "x", kind: "logo", size: "2000" }])[0].size,
+    ).toBe(2000);
   });
 });
 
-describe('el origen que se baja es el que gana en el camino de lectura', () => {
-  it('coincide con `ORIGEN_MANTENEDOR` de lib/ediciones.mjs', () => {
+describe("el origen que se baja es el que gana en el camino de lectura", () => {
+  it("coincide con `ORIGEN_MANTENEDOR` de lib/ediciones.mjs", () => {
     // Es la comprobación que impide que este script y la app se contradigan: si uno cambia la
     // precedencia, el directorio temporal dejaría de ser lo que se sirve por encima del catálogo.
     expect(ORIGEN_QUE_SE_BAJA).toBe(ORIGEN_MANTENEDOR);

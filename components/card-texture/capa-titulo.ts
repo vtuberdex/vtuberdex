@@ -1,16 +1,29 @@
 /**
  * CAPA 3 — cabecera: número de dex, nombre, país.
  */
-import type { VtuberCard } from '@/lib/types';
-import { cardPalette, rgba } from '@/lib/color';
-import { TEXT_FINISH } from '../card3d-config';
-import { FACTION_SOCKET, FONT, HEADER } from './dimensiones';
-import { anchoDeEngarces, iconosDeFaccion } from './facciones';
-import { createLayer } from './lienzo';
-import { roundRect, fitText, metalFill, metalSheen, metalBevel, drawEngrave } from './pintura';
+import type { VtuberCard } from "@/lib/types";
+import { cardPalette, rgba } from "@/lib/color";
+import { TEXT_FINISH } from "../card3d-config";
+import { FACTION_SOCKET, FONT, HEADER } from "./dimensiones";
+import { anchoDeEngarces, iconosDeFaccion } from "./facciones";
+import { createLayer } from "./lienzo";
+import {
+  roundRect,
+  fitText,
+  metalFill,
+  metalSheen,
+  metalBevel,
+  drawEngrave,
+} from "./pintura";
 
 /** Capa 3: título — cabecera, número de dex, nombre y país. TEXTO PLANO. */
-export function drawTitleLayer({ card, width }: { card: VtuberCard; width: number }): HTMLCanvasElement {
+export function drawTitleLayer({
+  card,
+  width,
+}: {
+  card: VtuberCard;
+  width: number;
+}): HTMLCanvasElement {
   const { canvas, ctx, W } = createLayer(width);
   if (!ctx) return canvas;
   const { pad, top: headerTop, height: headerH } = HEADER;
@@ -26,7 +39,16 @@ export function drawTitleLayer({ card, width }: { card: VtuberCard; width: numbe
    * va teñido del color de marca (por encima de ~0.5 de tinte deja de leerse como acero).
    */
   const { accent } = cardPalette(card.themeColor, card.secondaryColor);
-  ctx.fillStyle = metalFill(ctx, pad, headerTop, headerW, headerH, TEXT_FINISH.metalStops, accent, TEXT_FINISH.brandTint);
+  ctx.fillStyle = metalFill(
+    ctx,
+    pad,
+    headerTop,
+    headerW,
+    headerH,
+    TEXT_FINISH.metalStops,
+    accent,
+    TEXT_FINISH.brandTint,
+  );
   roundRect(ctx, pad, headerTop, headerW, headerH, headerRadius);
   ctx.fill();
   metalSheen(ctx, pad, headerTop, headerW, headerH);
@@ -34,13 +56,22 @@ export function drawTitleLayer({ card, width }: { card: VtuberCard; width: numbe
 
   // Número de dex: placa propia, de acero más oscuro, para que el `#002` se lea como una
   // pieza distinta y no como parte del mismo bloque.
-  const badge = `#${String(card.dexNumber).padStart(3, '0')}`;
+  const badge = `#${String(card.dexNumber).padStart(3, "0")}`;
   const badgeX = pad + 16;
   const badgeY = headerTop + 21;
   const badgeW = 168;
   const badgeH = 74;
   const badgeRadius = 16;
-  ctx.fillStyle = metalFill(ctx, badgeX, badgeY, badgeW, badgeH, TEXT_FINISH.badgeStops, accent, TEXT_FINISH.brandTint);
+  ctx.fillStyle = metalFill(
+    ctx,
+    badgeX,
+    badgeY,
+    badgeW,
+    badgeH,
+    TEXT_FINISH.badgeStops,
+    accent,
+    TEXT_FINISH.brandTint,
+  );
   roundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeRadius);
   ctx.fill();
   metalSheen(ctx, badgeX, badgeY, badgeW, badgeH);
@@ -57,12 +88,15 @@ export function drawTitleLayer({ card, width }: { card: VtuberCard; width: numbe
    * sobre una placa clara: el mismo problema que resolvió `fillShadowedText` en el resto de
    * la carta.
    */
-  drawEngrave(ctx, badge, pad + 100, headerTop + 59, badgeFont, 'center');
+  drawEngrave(ctx, badge, pad + 100, headerTop + 59, badgeFont, "center");
   ctx.font = badgeFont;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
   ctx.lineWidth = TEXT_FINISH.badgeOutlineWidth;
-  ctx.strokeStyle = rgba(TEXT_FINISH.badgeOutlineColor, TEXT_FINISH.badgeOutlineAlpha);
+  ctx.strokeStyle = rgba(
+    TEXT_FINISH.badgeOutlineColor,
+    TEXT_FINISH.badgeOutlineAlpha,
+  );
   ctx.strokeText(badge, pad + 100, headerTop + 59);
   ctx.fillStyle = TEXT_FINISH.badgeColor;
   ctx.fillText(badge, pad + 100, headerTop + 59);
@@ -83,14 +117,45 @@ export function drawTitleLayer({ card, width }: { card: VtuberCard; width: numbe
   const socketRight = W - pad - FACTION_SOCKET.inset;
   for (let i = 0; i < emblemas; i += 1) {
     // El último engarce va pegado a la derecha; los anteriores, a su izquierda.
-    const socketX = socketRight - FACTION_SOCKET.size - (emblemas - 1 - i) * (FACTION_SOCKET.size + FACTION_SOCKET.gap);
-    ctx.fillStyle = metalFill(ctx, socketX, socketY, FACTION_SOCKET.size, FACTION_SOCKET.size, TEXT_FINISH.emblemSocketStops, accent, TEXT_FINISH.brandTint * 0.4);
-    roundRect(ctx, socketX, socketY, FACTION_SOCKET.size, FACTION_SOCKET.size, 18);
+    const socketX =
+      socketRight -
+      FACTION_SOCKET.size -
+      (emblemas - 1 - i) * (FACTION_SOCKET.size + FACTION_SOCKET.gap);
+    ctx.fillStyle = metalFill(
+      ctx,
+      socketX,
+      socketY,
+      FACTION_SOCKET.size,
+      FACTION_SOCKET.size,
+      TEXT_FINISH.emblemSocketStops,
+      accent,
+      TEXT_FINISH.brandTint * 0.4,
+    );
+    roundRect(
+      ctx,
+      socketX,
+      socketY,
+      FACTION_SOCKET.size,
+      FACTION_SOCKET.size,
+      18,
+    );
     ctx.fill();
-    metalBevel(ctx, socketX, socketY, FACTION_SOCKET.size, FACTION_SOCKET.size, 18);
+    metalBevel(
+      ctx,
+      socketX,
+      socketY,
+      FACTION_SOCKET.size,
+      FACTION_SOCKET.size,
+      18,
+    );
   }
   // Ancho que ocupan los engarces, con el hueco que los separa del país/nombre.
-  const emblemsWidth = anchoDeEngarces(emblemas, FACTION_SOCKET.size, FACTION_SOCKET.gap, FACTION_SOCKET.inset + 12);
+  const emblemsWidth = anchoDeEngarces(
+    emblemas,
+    FACTION_SOCKET.size,
+    FACTION_SOCKET.gap,
+    FACTION_SOCKET.inset + 12,
+  );
 
   // Nombre: reserva el ancho del país Y de los engarces para que nunca se solapen.
   const primary = card.countries[0];
@@ -101,28 +166,37 @@ export function drawTitleLayer({ card, width }: { card: VtuberCard; width: numbe
    */
   const countryLabel = primary
     ? emblemas > 0
-      ? (primary.flag ?? '').trim()
-      : `${primary.flag ?? ''} ${primary.name}`.trim()
-    : '';
+      ? (primary.flag ?? "").trim()
+      : `${primary.flag ?? ""} ${primary.name}`.trim()
+    : "";
   ctx.font = `600 34px ${FONT}`;
-  const countryWidth = countryLabel ? ctx.measureText(countryLabel).width + 28 : 0;
+  const countryWidth = countryLabel
+    ? ctx.measureText(countryLabel).width + 28
+    : 0;
   const nameMax = W - pad * 2 - 232 - countryWidth - emblemsWidth;
-  ctx.textAlign = 'left';
-  const nameSize = fitText(ctx, card.name.toUpperCase(), nameMax, 58, '800');
+  ctx.textAlign = "left";
+  const nameSize = fitText(ctx, card.name.toUpperCase(), nameMax, 58, "800");
   const nameFont = `800 ${nameSize}px ${FONT}`;
   // Grabado: el nombre va hundido en el metal, no impreso encima.
-  drawEngrave(ctx, card.name.toUpperCase(), pad + 212, headerTop + 59, nameFont, 'left');
+  drawEngrave(
+    ctx,
+    card.name.toUpperCase(),
+    pad + 212,
+    headerTop + 59,
+    nameFont,
+    "left",
+  );
   ctx.font = nameFont;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#0a0c11';
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#0a0c11";
   ctx.fillText(card.name.toUpperCase(), pad + 212, headerTop + 59);
 
   // País.
   if (primary) {
-    ctx.textAlign = 'right';
+    ctx.textAlign = "right";
     ctx.font = `600 34px ${FONT}`;
-    ctx.fillStyle = rgba('#05060a', 0.78);
+    ctx.fillStyle = rgba("#05060a", 0.78);
     // El país se corre a la izquierda de los engarces, no debajo de ellos.
     ctx.fillText(countryLabel, W - pad - 18 - emblemsWidth, headerTop + 59);
   }

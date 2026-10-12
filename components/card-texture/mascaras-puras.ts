@@ -13,7 +13,10 @@
  * Máscara de TINTA y PIEL del arte: lineart oscuro a 1, piel a `skinWeight`, el resto 0.
  * El alfa de salida es el del arte, así que la máscara no existe fuera de la silueta.
  */
-export function mascaraTintaYPiel(a: Uint8ClampedArray, o: Uint8ClampedArray): void {
+export function mascaraTintaYPiel(
+  a: Uint8ClampedArray,
+  o: Uint8ClampedArray,
+): void {
   for (let i = 0; i < a.length; i += 4) {
     const alpha = a[i + 3];
     if (alpha < 8) continue;
@@ -43,7 +46,10 @@ export function mascaraTintaYPiel(a: Uint8ClampedArray, o: Uint8ClampedArray): v
 }
 
 /** Máscara de COBERTURA: blanco opaco donde el alfa de origen supera el umbral, negro opaco si no. */
-export function mascaraCobertura(a: Uint8ClampedArray, o: Uint8ClampedArray): void {
+export function mascaraCobertura(
+  a: Uint8ClampedArray,
+  o: Uint8ClampedArray,
+): void {
   for (let i = 0; i < a.length; i += 4) {
     const cubierto = a[i + 3] > 24 ? 255 : 0;
     o[i] = cubierto;
@@ -53,9 +59,13 @@ export function mascaraCobertura(a: Uint8ClampedArray, o: Uint8ClampedArray): vo
   }
 }
 
-export type TipoMascara = 'tinta' | 'cobertura';
+export type TipoMascara = "tinta" | "cobertura";
 
-export function calcularMascara(tipo: TipoMascara, a: Uint8ClampedArray, o: Uint8ClampedArray): void {
-  if (tipo === 'tinta') mascaraTintaYPiel(a, o);
+export function calcularMascara(
+  tipo: TipoMascara,
+  a: Uint8ClampedArray,
+  o: Uint8ClampedArray,
+): void {
+  if (tipo === "tinta") mascaraTintaYPiel(a, o);
   else mascaraCobertura(a, o);
 }

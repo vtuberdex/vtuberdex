@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Cabecera de la app: marca y nada más.
  *
@@ -12,9 +12,9 @@
  * en placa de acrílico. Es el catálogo con un filtro, no una página aparte, así que comparte
  * libro, buscador y enlaces compartibles.
  */
-import Link from 'next/link';
+import Link from "next/link";
 
-import { LanguageSwitcher } from '@/components/language-switcher';
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 export function AppHeader() {
   return (
@@ -22,9 +22,14 @@ export function AppHeader() {
       <div className="mx-auto flex h-14 w-full max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-dex-accent/60 bg-dex-accent/10">
-            <span className="h-2.5 w-2.5 rounded-full bg-dex-accent" style={{ boxShadow: '0 0 12px var(--color-dex-accent)' }} />
+            <span
+              className="h-2.5 w-2.5 rounded-full bg-dex-accent"
+              style={{ boxShadow: "0 0 12px var(--color-dex-accent)" }}
+            />
           </span>
-          <span className="font-heading text-base uppercase tracking-[0.2em] text-dex-ink">VTuberDex</span>
+          <span className="font-heading text-base uppercase tracking-[0.2em] text-dex-ink">
+            VTuberDex
+          </span>
         </Link>
         <LanguageSwitcher />
       </div>

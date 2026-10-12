@@ -2,16 +2,16 @@
  * `/baja` — formulario público para darse de baja. Acepta los mismos términos que la inscripción.
  * La baja no borra la ficha (cláusula de salida): queda como solicitud en espera.
  */
-import type { Metadata } from 'next';
+import type { Metadata } from "next";
 
-import { Encabezado } from '@/components/solicitudes/campos';
-import { BajaForm } from '@/components/solicitudes/baja-form';
-import { NOMBRE_SITIO } from '@/lib/seo';
+import { Encabezado } from "@/components/solicitudes/campos";
+import { BajaForm } from "@/components/solicitudes/baja-form";
+import { NOMBRE_SITIO } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: `Darme de baja · ${NOMBRE_SITIO}`,
-  description: 'Formulario para solicitar la baja de una ficha del catálogo.',
-  alternates: { canonical: '/baja' },
+  description: "Formulario para solicitar la baja de una ficha del catálogo.",
+  alternates: { canonical: "/baja" },
 };
 
 export default function BajaRoute() {

@@ -7,11 +7,19 @@
  *
  * Se lanza desde la raíz: node scripts/sweep-dead-code.mjs
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 
 const RAIZ = process.cwd();
-const IGNORAR = new Set(['node_modules', '.next', '.git', '.verify-stage', 'dist', 'out', 'cache']);
+const IGNORAR = new Set([
+  "node_modules",
+  ".next",
+  ".git",
+  ".verify-stage",
+  "dist",
+  "out",
+  "cache",
+]);
 
 /** Todos los archivos de código del repo, sin los directorios ignorados. */
 function archivos(dir, acc = []) {
@@ -29,7 +37,7 @@ const ARCHIVOS = archivos(RAIZ);
 const FUENTES = ARCHIVOS.filter((f) => !/\.test\.(ts|tsx|mjs|js)$/.test(f));
 const TESTS = ARCHIVOS.filter((f) => /\.test\.(ts|tsx|mjs|js)$/.test(f));
 
-const leer = (f) => readFileSync(f, 'utf8');
+const leer = (f) => readFileSync(f, "utf8");
 const rel = (f) => relative(RAIZ, f);
 
 /** Exports con nombre de un archivo: nombre -> línea. */
@@ -47,8 +55,12 @@ function exportsDe(fuente) {
   }
   // `export { a, b }` y `export { DB_PATH, MANIFEST_PATH }`.
   for (const m of fuente.matchAll(/^export\s*\{([^}]+)\}/gm)) {
-    for (const trozo of m[1].split(',')) {
-      const nombre = trozo.trim().split(/\s+as\s+/).pop()?.trim();
+    for (const trozo of m[1].split(",")) {
+      const nombre = trozo
+        .trim()
+        .split(/\s+as\s+/)
+        .pop()
+        ?.trim();
       if (nombre) salida.push(nombre);
     }
   }
@@ -63,7 +75,9 @@ function exportsDe(fuente) {
 function consumidores(nombre, propio) {
   const usos = { fuente: [], test: [] };
   // Se escapan TODOS los metacaracteres (no solo `$`): un nombre con `\` o `.` rompía o ensanchaba el patrón.
-  const patron = new RegExp(`\\b${nombre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+  const patron = new RegExp(
+    `\\b${nombre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
+  );
   for (const f of ARCHIVOS) {
     if (f === propio) continue;
     const contenido = leer(f);
@@ -73,7 +87,7 @@ function consumidores(nombre, propio) {
   return usos;
 }
 
-console.log('=== EXPORTS SIN CONSUMIDORES FUERA DE SU ARCHIVO ===\n');
+console.log("=== EXPORTS SIN CONSUMIDORES FUERA DE SU ARCHIVO ===\n");
 const muertos = [];
 for (const f of FUENTES) {
   const fuente = leer(f);
@@ -82,7 +96,7 @@ for (const f of FUENTES) {
     const total = usos.fuente.length + usos.test.length;
     if (total === 0) {
       // ¿se usa DENTRO de su propio archivo? Entonces el export sobra, no la función.
-      const interno = new RegExp(`\\b${nombre}\\b`, 'g');
+      const interno = new RegExp(`\\b${nombre}\\b`, "g");
       const dentro = (fuente.match(interno) ?? []).length;
       muertos.push({ archivo: rel(f), nombre, interno: dentro > 1, usos });
     }
@@ -91,9 +105,11 @@ for (const f of FUENTES) {
 
 for (const m of muertos) {
   const nota = m.interno
-    ? 'usado DENTRO del módulo -> solo sobra el `export`'
-    : 'sin ningún uso -> candidato a borrar entero';
-  console.log(`${rel(join(RAIZ, m.archivo)).padEnd(42)} ${m.nombre.padEnd(24)} ${nota}`);
+    ? "usado DENTRO del módulo -> solo sobra el `export`"
+    : "sin ningún uso -> candidato a borrar entero";
+  console.log(
+    `${rel(join(RAIZ, m.archivo)).padEnd(42)} ${m.nombre.padEnd(24)} ${nota}`,
+  );
 }
 console.log(`\ntotal: ${muertos.length} exports sin consumidores externos`);
 

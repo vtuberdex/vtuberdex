@@ -72,7 +72,7 @@ jobs:
         with:
           # Node 22: el mismo que corre en la VPS de producción (v22.x). El `node:sqlite` que
           # usa `server/src/db/index.mjs` exige >= 22; se prueba en la versión que se despliega.
-          node-version: '22'
+          node-version: "22"
           cache: npm
           # Tres paquetes, tres lockfiles: sin declararlos la caché solo cubriría
           # el de la raíz.

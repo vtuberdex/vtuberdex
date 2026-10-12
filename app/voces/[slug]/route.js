@@ -10,37 +10,40 @@
  * El slug se valida contra una lista blanca de caracteres: es lo único que llega de la URL y
  * compone una ruta de archivo.
  */
-import { open } from 'node:fs/promises';
-import path from 'node:path';
+import { open } from "node:fs/promises";
+import path from "node:path";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 const SLUG_VALIDO = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function carpeta() {
-  return process.env.VTUBERDEX_VOCES_DIR || path.join(process.cwd(), 'data', 'voces');
+  return (
+    process.env.VTUBERDEX_VOCES_DIR || path.join(process.cwd(), "data", "voces")
+  );
 }
 
 /** `bytes=a-b` → { inicio, fin } acotado al archivo, o null si no es un rango válido. */
 function parsearRango(cabecera, tamano) {
-  const m = /^bytes=(\d*)-(\d*)$/.exec(cabecera ?? '');
-  if (!m || (m[1] === '' && m[2] === '')) return null;
+  const m = /^bytes=(\d*)-(\d*)$/.exec(cabecera ?? "");
+  if (!m || (m[1] === "" && m[2] === "")) return null;
   let inicio;
   let fin;
-  if (m[1] === '') {
+  if (m[1] === "") {
     inicio = Math.max(0, tamano - Number(m[2]));
     fin = tamano - 1;
   } else {
     inicio = Number(m[1]);
-    fin = m[2] === '' ? tamano - 1 : Math.min(Number(m[2]), tamano - 1);
+    fin = m[2] === "" ? tamano - 1 : Math.min(Number(m[2]), tamano - 1);
   }
   return inicio <= fin && inicio < tamano ? { inicio, fin } : null;
 }
 
 export async function GET(request, { params }) {
   const { slug: crudo } = await params;
-  const slug = String(crudo).replace(/\.mp3$/, '');
-  if (!SLUG_VALIDO.test(slug)) return Response.json({ error: 'no_encontrado' }, { status: 404 });
+  const slug = String(crudo).replace(/\.mp3$/, "");
+  if (!SLUG_VALIDO.test(slug))
+    return Response.json({ error: "no_encontrado" }, { status: 404 });
 
   const archivo = path.join(carpeta(), `${slug}.mp3`);
   // Un solo descriptor para la fecha y el contenido: sin carrera entre `stat` y la lectura.
@@ -48,31 +51,41 @@ export async function GET(request, { params }) {
   let cuerpo;
   let manejador;
   try {
-    manejador = await open(archivo, 'r');
+    manejador = await open(archivo, "r");
     info = await manejador.stat();
     cuerpo = await manejador.readFile();
   } catch {
-    return Response.json({ error: 'sin_voz' }, { status: 404 });
+    return Response.json({ error: "sin_voz" }, { status: 404 });
   } finally {
     await manejador?.close();
   }
   const base = {
-    'content-type': 'audio/mpeg',
-    'accept-ranges': 'bytes',
+    "content-type": "audio/mpeg",
+    "accept-ranges": "bytes",
     // Se puede regenerar al editar la ficha: la caché es corta.
-    'cache-control': 'public, max-age=300, s-maxage=300',
-    'last-modified': info.mtime.toUTCString(),
+    "cache-control": "public, max-age=300, s-maxage=300",
+    "last-modified": info.mtime.toUTCString(),
   };
 
-  const cabeceraRango = request.headers.get('range');
+  const cabeceraRango = request.headers.get("range");
   if (cabeceraRango) {
     const rango = parsearRango(cabeceraRango, cuerpo.length);
-    if (!rango) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${cuerpo.length}` } });
+    if (!rango)
+      return new Response(null, {
+        status: 416,
+        headers: { "content-range": `bytes */${cuerpo.length}` },
+      });
     const trozo = cuerpo.subarray(rango.inicio, rango.fin + 1);
     return new Response(trozo, {
       status: 206,
-      headers: { ...base, 'content-range': `bytes ${rango.inicio}-${rango.fin}/${cuerpo.length}`, 'content-length': String(trozo.length) },
+      headers: {
+        ...base,
+        "content-range": `bytes ${rango.inicio}-${rango.fin}/${cuerpo.length}`,
+        "content-length": String(trozo.length),
+      },
     });
   }
-  return new Response(cuerpo, { headers: { ...base, 'content-length': String(cuerpo.length) } });
+  return new Response(cuerpo, {
+    headers: { ...base, "content-length": String(cuerpo.length) },
+  });
 }

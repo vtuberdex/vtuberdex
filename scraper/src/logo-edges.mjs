@@ -17,7 +17,7 @@
  * fuera sin necesidad de umbrales de color.
  */
 
-import { BAND, BADGE } from './logo-bands.mjs';
+import { BAND, BADGE } from "./logo-bands.mjs";
 
 /** Celdas de NxN px como unidad de agregación. */
 const CELL = 4;
@@ -65,8 +65,13 @@ export function buildEdgeGrid(data, width, height, channels, options = {}) {
       // Vecino derecho, abajo y diagonal: suma de diferencias absolutas.
       const ir = i + channels;
       const ib = i + width * channels;
-      const d = Math.abs(r - data[ir]) + Math.abs(g - data[ir + 1]) + Math.abs(b - data[ir + 2])
-        + Math.abs(r - data[ib]) + Math.abs(g - data[ib + 1]) + Math.abs(b - data[ib + 2]);
+      const d =
+        Math.abs(r - data[ir]) +
+        Math.abs(g - data[ir + 1]) +
+        Math.abs(b - data[ir + 2]) +
+        Math.abs(r - data[ib]) +
+        Math.abs(g - data[ib + 1]) +
+        Math.abs(b - data[ib + 2]);
       if (d > edgeMin) counts[cell] += 1;
     }
   }
@@ -87,7 +92,13 @@ export function buildEdgeGrid(data, width, height, channels, options = {}) {
  * @returns {{box:{left:number,top:number,width:number,height:number}, cells:number, blobs:number}|null}
  */
 export function findLogoBox(data, width, height, channels, options = {}) {
-  const { on, cols, rows } = buildEdgeGrid(data, width, height, channels, options);
+  const { on, cols, rows } = buildEdgeGrid(
+    data,
+    width,
+    height,
+    channels,
+    options,
+  );
   const minCells = options.minCells ?? 30;
   const ratio = options.ratio ?? 0.25;
 
@@ -153,7 +164,8 @@ export function findLogoBox(data, width, height, channels, options = {}) {
   const w = (maxX - minX + 1) * CELL;
   const h = (maxY - minY + 1) * CELL;
   if (w < 24 || h < 20) return null;
-  if (w > width * (options.maxWidthRatio ?? 0.9) && h > height * 0.6) return null;
+  if (w > width * (options.maxWidthRatio ?? 0.9) && h > height * 0.6)
+    return null;
 
   return {
     box: {

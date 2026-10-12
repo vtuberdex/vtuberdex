@@ -25,10 +25,10 @@
  * La contraseña se pide por TTY (oculta) y, sin TTY, por stdin —igual que `admin-hash.mjs`—:
  * nunca aparece en el historial, en la pantalla ni en un archivo.
  */
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from "node:child_process";
 
-import { hashPassword, verifyPassword } from '../server/src/auth.mjs';
-import { ejecutable, pedirCredencial } from './lib/terminal.mjs';
+import { hashPassword, verifyPassword } from "../server/src/auth.mjs";
+import { ejecutable, pedirCredencial } from "./lib/terminal.mjs";
 
 const args = process.argv.slice(2);
 const tiene = (nombre) => args.includes(`--${nombre}`);
@@ -37,40 +37,40 @@ const opcion = (nombre, porDefecto) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : porDefecto;
 };
 
-const NOMBRE = opcion('env-name', 'VTUBERDEX_ADMIN_PASSWORD_HASH');
-const URL = opcion('url', 'https://vtuberdex.com').replace(/\/$/, '');
-const USUARIO = opcion('user', process.env.VTUBERDEX_ADMIN_USER || 'admin');
-const SIN_REDEPLOY = tiene('sin-redeploy');
-const SIN_VERIFICAR = tiene('sin-verificar');
-const COMO_SECRETO = tiene('sensitive');
+const NOMBRE = opcion("env-name", "VTUBERDEX_ADMIN_PASSWORD_HASH");
+const URL = opcion("url", "https://vtuberdex.com").replace(/\/$/, "");
+const USUARIO = opcion("user", process.env.VTUBERDEX_ADMIN_USER || "admin");
+const SIN_REDEPLOY = tiene("sin-redeploy");
+const SIN_VERIFICAR = tiene("sin-verificar");
+const COMO_SECRETO = tiene("sensitive");
 
 const pasos = [];
-const paso = (nombre, ok, detalle = '') => {
+const paso = (nombre, ok, detalle = "") => {
   pasos.push(ok);
-  console.log(`${ok ? '✔' : '✖'} ${nombre}${detalle ? ` — ${detalle}` : ''}`);
+  console.log(`${ok ? "✔" : "✖"} ${nombre}${detalle ? ` — ${detalle}` : ""}`);
 };
 
 /** Ejecuta el CLI de Vercel sin heredar la salida (puede contener el valor). */
 function vercel(argumentos, entrada) {
-  return spawnSync(ejecutable('vercel'), argumentos, {
+  return spawnSync(ejecutable("vercel"), argumentos, {
     input: entrada,
-    encoding: 'utf8',
-    stdio: [entrada === undefined ? 'inherit' : 'pipe', 'pipe', 'pipe'],
+    encoding: "utf8",
+    stdio: [entrada === undefined ? "inherit" : "pipe", "pipe", "pipe"],
   });
 }
 
 /** El deployment que está sirviendo producción, para redeployarlo. */
 function ultimoDeploymentDeProduccion() {
-  const salida = vercel(['ls', '--json']);
+  const salida = vercel(["ls", "--json"]);
   let datos;
   try {
-    datos = JSON.parse(salida.stdout || '{}');
+    datos = JSON.parse(salida.stdout || "{}");
   } catch {
     return null;
   }
   const lista = Array.isArray(datos.deployments) ? datos.deployments : [];
   const produccion = lista
-    .filter((d) => d.target === 'production' && d.state === 'READY')
+    .filter((d) => d.target === "production" && d.state === "READY")
     .sort((a, b) => b.createdAt - a.createdAt);
   return produccion[0]?.url ? `https://${produccion[0].url}` : null;
 }
@@ -78,7 +78,7 @@ function ultimoDeploymentDeProduccion() {
 async function pedir(ruta, init = {}) {
   const respuesta = await fetch(`${URL}${ruta}`, {
     ...init,
-    headers: { 'content-type': 'application/json', ...(init.headers ?? {}) },
+    headers: { "content-type": "application/json", ...(init.headers ?? {}) },
   });
   const texto = await respuesta.text();
   let cuerpo = null;
@@ -93,14 +93,16 @@ async function pedir(ruta, init = {}) {
 // --- 1. la contraseña ------------------------------------------------------
 const password = await pedirCredencial(`Contraseña nueva para ${USUARIO}: `);
 if (!password || password.length < 8) {
-  console.error('✖ la contraseña debe tener al menos 8 caracteres.');
+  console.error("✖ la contraseña debe tener al menos 8 caracteres.");
   process.exit(1);
 }
 
 const hash = hashPassword(password);
 // Ida y vuelta antes de subir nada: un hash que no valida dejaría el mantenedor inaccesible.
 if (!verifyPassword(password, hash)) {
-  console.error('✖ el hash generado no valida la contraseña (no se sube nada).');
+  console.error(
+    "✖ el hash generado no valida la contraseña (no se sube nada).",
+  );
   process.exit(1);
 }
 console.log(`\nPublicando el mantenedor de ${URL}\n`);
@@ -117,71 +119,124 @@ console.log(`\nPublicando el mantenedor de ${URL}\n`);
  * `--sensitive` se conserva el comportamiento antiguo, pero entonces el diagnóstico del 401
  * (que solo describe la FORMA) pasa a ser la única herramienta de depuración.
  */
-const TIPO = COMO_SECRETO ? '--sensitive' : '--no-sensitive';
-const subida = vercel(['env', 'update', NOMBRE, 'production', TIPO, '--value', hash, '-y']);
+const TIPO = COMO_SECRETO ? "--sensitive" : "--no-sensitive";
+const subida = vercel([
+  "env",
+  "update",
+  NOMBRE,
+  "production",
+  TIPO,
+  "--value",
+  hash,
+  "-y",
+]);
 if (subida.status !== 0) {
   // No existía: se crea.
-  const creada = vercel(['env', 'add', NOMBRE, 'production', TIPO, '-y', '--force'], hash);
+  const creada = vercel(
+    ["env", "add", NOMBRE, "production", TIPO, "-y", "--force"],
+    hash,
+  );
   paso(
-    `la variable queda guardada en producción (${COMO_SECRETO ? 'secreta, ilegible' : 'legible'})`,
+    `la variable queda guardada en producción (${COMO_SECRETO ? "secreta, ilegible" : "legible"})`,
     creada.status === 0,
-    creada.status === 0 ? NOMBRE : (creada.stderr || '').trim().slice(0, 200),
+    creada.status === 0 ? NOMBRE : (creada.stderr || "").trim().slice(0, 200),
   );
 } else {
-  paso(`la variable queda guardada en producción (${COMO_SECRETO ? 'secreta, ilegible' : 'legible'})`, true, NOMBRE);
+  paso(
+    `la variable queda guardada en producción (${COMO_SECRETO ? "secreta, ilegible" : "legible"})`,
+    true,
+    NOMBRE,
+  );
 }
 
 // --- 3. redeploy: SIN esto el cambio no llega a la función ----------------
 if (SIN_REDEPLOY) {
-  console.log('· redeploy omitido (--sin-redeploy): el despliegue que sirve conserva el hash anterior');
+  console.log(
+    "· redeploy omitido (--sin-redeploy): el despliegue que sirve conserva el hash anterior",
+  );
 } else {
   const objetivo = ultimoDeploymentDeProduccion();
   if (!objetivo) {
-    paso('se localiza el despliegue de producción a redeployar', false, 'no se pudo leer `vercel ls --json`');
+    paso(
+      "se localiza el despliegue de producción a redeployar",
+      false,
+      "no se pudo leer `vercel ls --json`",
+    );
   } else {
-    console.log(`· redeployando ${objetivo} (Vercel hornea las variables por despliegue)`);
-    const salida = vercel(['redeploy', objetivo, '--target', 'production']);
-    const salidaTexto = `${salida.stdout ?? ''}${salida.stderr ?? ''}`;
-    paso('el despliegue se recrea y queda sirviendo el alias', salida.status === 0 && /Aliased|Ready/.test(salidaTexto), salida.status === 0 ? 'hecho' : salidaTexto.trim().slice(-200));
+    console.log(
+      `· redeployando ${objetivo} (Vercel hornea las variables por despliegue)`,
+    );
+    const salida = vercel(["redeploy", objetivo, "--target", "production"]);
+    const salidaTexto = `${salida.stdout ?? ""}${salida.stderr ?? ""}`;
+    paso(
+      "el despliegue se recrea y queda sirviendo el alias",
+      salida.status === 0 && /Aliased|Ready/.test(salidaTexto),
+      salida.status === 0 ? "hecho" : salidaTexto.trim().slice(-200),
+    );
   }
 }
 
 // --- 4. comprobar el resultado, no la intención ---------------------------
 if (SIN_VERIFICAR) {
-  console.log('· verificación omitida (--sin-verificar)');
+  console.log("· verificación omitida (--sin-verificar)");
 } else {
-  const login = await pedir('/api/admin/login', {
-    method: 'POST',
+  const login = await pedir("/api/admin/login", {
+    method: "POST",
     body: JSON.stringify({ username: USUARIO, password }),
   });
   const ok = login.status === 200 && Boolean(login.cuerpo?.token);
-  paso('el login de producción entra con la credencial nueva', ok, `status=${login.status}`);
+  paso(
+    "el login de producción entra con la credencial nueva",
+    ok,
+    `status=${login.status}`,
+  );
 
   if (ok) {
     const token = login.cuerpo.token;
-    const stats = await pedir('/api/admin/stats', { headers: { authorization: `Bearer ${token}` } });
-    paso('la sesión vale en otra petición (Turso la comparte entre instancias)', stats.status === 200, `status=${stats.status}`);
-    await pedir('/api/admin/logout', { method: 'POST', headers: { authorization: `Bearer ${token}` } });
-    paso('la sesión de prueba queda cerrada', true);
+    const stats = await pedir("/api/admin/stats", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    paso(
+      "la sesión vale en otra petición (Turso la comparte entre instancias)",
+      stats.status === 200,
+      `status=${stats.status}`,
+    );
+    await pedir("/api/admin/logout", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    paso("la sesión de prueba queda cerrada", true);
   } else {
-    console.log('');
+    console.log("");
     const d = login.cuerpo ?? {};
-    if (typeof d.usuarioOk === 'boolean') {
+    if (typeof d.usuarioOk === "boolean") {
       if (!d.usuarioOk) {
-        console.log(`  El USUARIO no es el esperado: el campo pide "${d.usuarioEsperado}".`);
+        console.log(
+          `  El USUARIO no es el esperado: el campo pide "${d.usuarioEsperado}".`,
+        );
       }
       if (!d.claveOk) {
-        console.log('  La CONTRASEÑA no corresponde al hash que quedó en producción.');
+        console.log(
+          "  La CONTRASEÑA no corresponde al hash que quedó en producción.",
+        );
         if (d.hash?.valido) {
-          console.log('  El hash está bien formado, así que el despliegue que sirve todavía no');
-          console.log('  tiene el valor nuevo. Vuelve a correr sin `--sin-redeploy`.');
+          console.log(
+            "  El hash está bien formado, así que el despliegue que sirve todavía no",
+          );
+          console.log(
+            "  tiene el valor nuevo. Vuelve a correr sin `--sin-redeploy`.",
+          );
         } else {
           for (const p of d.hash?.problemas ?? []) console.log(`    · ${p}`);
         }
       }
     } else {
-      console.log('  El despliegue que sirve producción es anterior al diagnóstico: vuelve a');
-      console.log('  desplegar (vercel deploy --prod) antes de sacar conclusiones.');
+      console.log(
+        "  El despliegue que sirve producción es anterior al diagnóstico: vuelve a",
+      );
+      console.log(
+        "  desplegar (vercel deploy --prod) antes de sacar conclusiones.",
+      );
     }
   }
 }

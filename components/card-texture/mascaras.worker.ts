@@ -7,7 +7,7 @@
  * está en todos los navegadores que soportan WebGL. Los búferes viajan TRANSFERIDOS (no
  * copiados) en los dos sentidos.
  */
-import { calcularMascara, type TipoMascara } from './mascaras-puras';
+import { calcularMascara, type TipoMascara } from "./mascaras-puras";
 
 interface Pedido {
   id: number;

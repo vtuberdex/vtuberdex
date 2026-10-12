@@ -1,22 +1,27 @@
-'use client';
+"use client";
 /** Habilidades agrupadas por categoría (activas, pasivas, ultimate). */
-import { useState } from 'react';
+import { useState } from "react";
 
-import { useI18n } from '@/lib/i18n';
-import type { Clave } from '@/lib/i18n/mensajes';
-import { tipoDeHabilidad } from '@/lib/i18n/nombres';
-import type { SkillRow } from '@/lib/types';
-import { RANGO_MAXIMO } from '@/server/src/experiencia.mjs';
-import { htmlDeEfecto } from '@/server/src/habilidades.mjs';
+import { useI18n } from "@/lib/i18n";
+import type { Clave } from "@/lib/i18n/mensajes";
+import { tipoDeHabilidad } from "@/lib/i18n/nombres";
+import type { SkillRow } from "@/lib/types";
+import { RANGO_MAXIMO } from "@/server/src/experiencia.mjs";
+import { htmlDeEfecto } from "@/server/src/habilidades.mjs";
 
-const CATEGORY_LABEL: Record<SkillRow['category'], Clave> = {
-  active: 'habilidades.activas',
-  passive: 'habilidades.pasivas',
-  ultimate: 'habilidades.ultimate',
-  other: 'habilidades.otras',
+const CATEGORY_LABEL: Record<SkillRow["category"], Clave> = {
+  active: "habilidades.activas",
+  passive: "habilidades.pasivas",
+  ultimate: "habilidades.ultimate",
+  other: "habilidades.otras",
 };
 
-const ORDER: Array<SkillRow['category']> = ['active', 'passive', 'ultimate', 'other'];
+const ORDER: Array<SkillRow["category"]> = [
+  "active",
+  "passive",
+  "ultimate",
+  "other",
+];
 
 export interface SkillListProps {
   skills: SkillRow[];
@@ -30,8 +35,10 @@ export function SkillList({ skills, palette }: SkillListProps) {
   if (skills.length === 0) {
     return (
       <section className="rounded-2xl border border-dex-line bg-dex-panel/60 p-5">
-        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">{t('habilidades.titulo')}</h2>
-        <p className="mt-3 text-sm text-dex-muted">{t('habilidades.vacio')}</p>
+        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">
+          {t("habilidades.titulo")}
+        </h2>
+        <p className="mt-3 text-sm text-dex-muted">{t("habilidades.vacio")}</p>
       </section>
     );
   }
@@ -44,8 +51,14 @@ export function SkillList({ skills, palette }: SkillListProps) {
   return (
     <section className="space-y-5" data-testid="skill-list">
       {grouped.map((group) => (
-        <div key={group.category} className="rounded-2xl border border-dex-line bg-dex-panel/60 p-5">
-          <h2 className="text-sm font-bold uppercase tracking-[0.16em]" style={{ color: palette.accent }}>
+        <div
+          key={group.category}
+          className="rounded-2xl border border-dex-line bg-dex-panel/60 p-5"
+        >
+          <h2
+            className="text-sm font-bold uppercase tracking-[0.16em]"
+            style={{ color: palette.accent }}
+          >
             {t(CATEGORY_LABEL[group.category])}
           </h2>
           <ul className="mt-3 space-y-2">
@@ -53,7 +66,10 @@ export function SkillList({ skills, palette }: SkillListProps) {
               const key = `${group.category}-${skill.name}-${skill.position}`;
               const expanded = open === key;
               return (
-                <li key={key} className="rounded-xl border border-dex-line/80 bg-black/25">
+                <li
+                  key={key}
+                  className="rounded-xl border border-dex-line/80 bg-black/25"
+                >
                   <button
                     type="button"
                     onClick={() => setOpen(expanded ? null : key)}
@@ -61,7 +77,9 @@ export function SkillList({ skills, palette }: SkillListProps) {
                     className="flex w-full items-center gap-3 px-4 py-3 text-left"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold text-dex-ink">{skill.name ?? t('habilidades.sinNombre')}</span>
+                      <span className="block truncate text-sm font-bold text-dex-ink">
+                        {skill.name ?? t("habilidades.sinNombre")}
+                      </span>
                       {skill.type && (
                         <span className="mt-0.5 block text-[11px] uppercase tracking-[0.12em] text-dex-muted">
                           {tipoDeHabilidad(locale, skill.type)}
@@ -71,10 +89,16 @@ export function SkillList({ skills, palette }: SkillListProps) {
                     {skill.rank ? (
                       <span
                         className="shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em]"
-                        style={{ borderColor: palette.accent, color: palette.accent }}
+                        style={{
+                          borderColor: palette.accent,
+                          color: palette.accent,
+                        }}
                         data-testid="skill-rank"
                       >
-                        {t('habilidades.rango', { n: skill.rank, max: RANGO_MAXIMO })}
+                        {t("habilidades.rango", {
+                          n: skill.rank,
+                          max: RANGO_MAXIMO,
+                        })}
                       </span>
                     ) : null}
                     <span
@@ -83,19 +107,28 @@ export function SkillList({ skills, palette }: SkillListProps) {
                       aria-hidden
                     />
                     <svg
-                      className={`h-4 w-4 shrink-0 text-dex-muted transition-transform ${expanded ? 'rotate-180' : ''}`}
+                      className={`h-4 w-4 shrink-0 text-dex-muted transition-transform ${expanded ? "rotate-180" : ""}`}
                       viewBox="0 0 24 24"
                       fill="none"
                       aria-hidden
                     >
-                      <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path
+                        d="m6 9 6 6 6-6"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
                     </svg>
                   </button>
                   {expanded && skill.effect && (
                     <div className="border-t border-dex-line/70 px-4 py-3 text-sm leading-relaxed text-dex-ink/85">
                       {/* El efecto viene con <span style="color:…"> del origen: se conserva el color
                           de cada estado alterado porque es información semántica del juego. */}
-                      <div dangerouslySetInnerHTML={{ __html: htmlDeEfecto(skill) }} />
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: htmlDeEfecto(skill),
+                        }}
+                      />
                     </div>
                   )}
                 </li>

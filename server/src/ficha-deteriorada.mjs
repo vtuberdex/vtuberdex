@@ -16,14 +16,15 @@
  * JS puro (sin Node ni DOM), como `premium.mjs`: lo importan el buscador y, para saber de qué grado
  * se trata, también la interfaz.
  */
-import { GRADO_DE_BAJA } from './premium.mjs';
+import { GRADO_DE_BAJA } from "./premium.mjs";
 
 /** Símbolos con los que se sustituyen las letras: ASCII, para que cualquier fuente los tenga. */
-const SIMBOLOS = '#%&@*?/\\~=+<>';
+const SIMBOLOS = "#%&@*?/\\~=+<>";
 
 /** ¿Es una ficha en el grado de las bajas? Sirve para una tarjeta ya mapeada o para un grado suelto. */
 export function esFichaDeteriorada(cartaOGrado) {
-  const grado = typeof cartaOGrado === 'string' ? cartaOGrado : cartaOGrado?.premium?.grade;
+  const grado =
+    typeof cartaOGrado === "string" ? cartaOGrado : cartaOGrado?.premium?.grade;
   return grado === GRADO_DE_BAJA;
 }
 
@@ -33,11 +34,11 @@ export function esFichaDeteriorada(cartaOGrado) {
  */
 export function nombreDeteriorado(nombre, id) {
   let estado = (Number(id) || 0) + 0x9e3779b9;
-  return Array.from(String(nombre ?? ''), (c) => {
+  return Array.from(String(nombre ?? ""), (c) => {
     if (/[\s\d#]/.test(c)) return c;
     estado = (Math.imul(estado, 1103515245) + 12345) >>> 0;
     return SIMBOLOS[estado % SIMBOLOS.length];
-  }).join('');
+  }).join("");
 }
 
 /**

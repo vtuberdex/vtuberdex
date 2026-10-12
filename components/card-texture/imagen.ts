@@ -30,8 +30,8 @@ export function loadImage(src: string): Promise<HTMLImageElement | null> {
   }
   const promesa = new Promise<HTMLImageElement | null>((resolve) => {
     const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.decoding = 'async';
+    image.crossOrigin = "anonymous";
+    image.decoding = "async";
     image.onload = () => resolve(image);
     image.onerror = () => {
       memoria.delete(src);

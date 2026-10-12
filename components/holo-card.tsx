@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Carta holográfica 3D del VTuber (react-three-fiber + shaders propios).
  *
@@ -18,22 +18,25 @@
  * suelta: su cámara, su inclinación hacia el puntero y su flotación. Los efectos se
  * activan desde `card3d-config.ts` y `card-texture.ts` sin ensuciar el shader.
  */
-import { Component, useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import * as THREE from 'three';
+import { Component, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import * as THREE from "three";
 
-import type { VtuberCard } from '@/lib/types';
-import { cardPalette } from '@/lib/color';
-import * as CFG from '@/components/card3d-config';
-import { RenderGovernor } from '@/components/render-governor';
-import { useWebGLRecovery } from '@/components/webgl-recovery';
+import type { VtuberCard } from "@/lib/types";
+import { cardPalette } from "@/lib/color";
+import * as CFG from "@/components/card3d-config";
+import { RenderGovernor } from "@/components/render-governor";
+import { useWebGLRecovery } from "@/components/webgl-recovery";
 import {
   CARD_TEXTURE_HEIGHT,
   CARD_TEXTURE_WIDTH,
   CARD_TEXTURE_FULL_WIDTH,
-} from '@/components/card-texture';
-import { useCardMaterials, type CardMaterials } from '@/components/card-material';
-import { PremiumSlab } from '@/components/premium-slab';
+} from "@/components/card-texture";
+import {
+  useCardMaterials,
+  type CardMaterials,
+} from "@/components/card-material";
+import { PremiumSlab } from "@/components/premium-slab";
 
 /** Proporción real de una carta coleccionable (5x7 pulgadas -> 1.4). */
 const ASPECT = CARD_TEXTURE_HEIGHT / CARD_TEXTURE_WIDTH;
@@ -41,15 +44,20 @@ const CARD_W = CFG.GEOMETRY.cardWidth;
 const CARD_H = CARD_W * ASPECT;
 
 export const CARD_CAMERA_Z =
-  (CARD_H / CFG.GEOMETRY.cameraFill / 2) / Math.tan((CFG.GEOMETRY.cameraFov * Math.PI) / 180 / 2);
+  CARD_H /
+  CFG.GEOMETRY.cameraFill /
+  2 /
+  Math.tan((CFG.GEOMETRY.cameraFov * Math.PI) / 180 / 2);
 
 /**
  * Distancia de cámara para una carta concreta. Una carta PREMIUM va dentro de una placa más alta
  * que ella (la de la funda del libro: carta + 2 x `pocketPad`), así que la cámara se aleja en la
  * misma proporción para que la placa entera entre en el mismo encuadre que una carta normal.
  */
-export function cameraZFor(card: Pick<VtuberCard, 'premium'>): number {
-  return card.premium ? CARD_CAMERA_Z * ((CARD_H + 2 * CFG.BINDER.pocketPad) / CARD_H) : CARD_CAMERA_Z;
+export function cameraZFor(card: Pick<VtuberCard, "premium">): number {
+  return card.premium
+    ? CARD_CAMERA_Z * ((CARD_H + 2 * CFG.BINDER.pocketPad) / CARD_H)
+    : CARD_CAMERA_Z;
 }
 
 interface HoloCardSceneProps {
@@ -74,7 +82,10 @@ const ZERO_TILT = { x: 0, y: 0 };
  * catálogo lo reutiliza con valores menores: un objeto grande no puede inclinarse
  * tanto como una carta suelta sin salirse del encuadre.
  */
-export function usePointerTilt(ref: React.RefObject<THREE.Group | null>, amounts: PointerTiltAmounts = CFG.MOTION) {
+export function usePointerTilt(
+  ref: React.RefObject<THREE.Group | null>,
+  amounts: PointerTiltAmounts = CFG.MOTION,
+) {
   const target = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -88,11 +99,11 @@ export function usePointerTilt(ref: React.RefObject<THREE.Group | null>, amounts
     const onLeave = () => {
       target.current = { x: 0, y: 0 };
     };
-    window.addEventListener('pointermove', onMove, { passive: true });
-    window.addEventListener('pointerleave', onLeave);
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerleave", onLeave);
     return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerleave', onLeave);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerleave", onLeave);
     };
   }, []);
 
@@ -100,9 +111,12 @@ export function usePointerTilt(ref: React.RefObject<THREE.Group | null>, amounts
     const group = ref.current;
     if (!group) return;
     const damp = 1 - Math.pow(amounts.dampingBase, delta);
-    group.rotation.y += (target.current.x * amounts.tiltY - group.rotation.y) * damp;
-    group.rotation.x += (-target.current.y * amounts.tiltX - group.rotation.x) * damp;
-    group.position.x += (target.current.x * amounts.driftX - group.position.x) * damp;
+    group.rotation.y +=
+      (target.current.x * amounts.tiltY - group.rotation.y) * damp;
+    group.rotation.x +=
+      (-target.current.y * amounts.tiltX - group.rotation.x) * damp;
+    group.position.x +=
+      (target.current.x * amounts.driftX - group.position.x) * damp;
   });
 
   return target;
@@ -121,16 +135,32 @@ export function usePointerTilt(ref: React.RefObject<THREE.Group | null>, amounts
  * pintaría sobre la etiqueta y el marco. Se le pasa a la placa, que lo dibuja detrás de TODA ella
  * con el tamaño de la placa, así que el halo rodea el acrílico como rodea a una carta normal.
  */
-export function CardMeshes({ mats, card }: { mats: CardMaterials; card?: VtuberCard }) {
+export function CardMeshes({
+  mats,
+  card,
+}: {
+  mats: CardMaterials;
+  card?: VtuberCard;
+}) {
   const premium = card?.premium ?? null;
   const mallas = (
     <>
       {!premium && (
-        <mesh position={[0, 0, CFG.GEOMETRY.glowZ]} material={mats.glowMaterial}>
-          <planeGeometry args={[mats.cardWidth * CFG.GEOMETRY.glowSpread, mats.cardHeight * CFG.GEOMETRY.glowSpread]} />
+        <mesh
+          position={[0, 0, CFG.GEOMETRY.glowZ]}
+          material={mats.glowMaterial}
+        >
+          <planeGeometry
+            args={[
+              mats.cardWidth * CFG.GEOMETRY.glowSpread,
+              mats.cardHeight * CFG.GEOMETRY.glowSpread,
+            ]}
+          />
         </mesh>
       )}
-      <mesh position={[0, 0, CFG.GEOMETRY.cardDepth / 2 + CFG.GEOMETRY.faceZGap]}>
+      <mesh
+        position={[0, 0, CFG.GEOMETRY.cardDepth / 2 + CFG.GEOMETRY.faceZGap]}
+      >
         <planeGeometry args={[mats.cardWidth, mats.cardHeight]} />
         <primitive object={mats.frontMaterial} attach="material" />
       </mesh>
@@ -160,15 +190,25 @@ function CardMesh({
   const group = useRef<THREE.Group>(null);
   const pointer = usePointerTilt(group);
   const { camera } = useThree();
-  const mats = useCardMaterials(card, { holo, gloss, textureWidth: textureWidth ?? CARD_TEXTURE_FULL_WIDTH });
+  const mats = useCardMaterials(card, {
+    holo,
+    gloss,
+    textureWidth: textureWidth ?? CARD_TEXTURE_FULL_WIDTH,
+  });
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
     const group3d = group.current;
-    mats.tick(t, pointer.current, group3d ? { x: group3d.rotation.x, y: group3d.rotation.y } : ZERO_TILT);
+    mats.tick(
+      t,
+      pointer.current,
+      group3d ? { x: group3d.rotation.x, y: group3d.rotation.y } : ZERO_TILT,
+    );
     if (group3d) {
-      group3d.position.y = Math.sin(t * CFG.MOTION.floatSpeed) * CFG.MOTION.floatAmplitude;
-      group3d.rotation.z = Math.sin(t * CFG.MOTION.rollSpeed) * CFG.MOTION.rollAmplitude;
+      group3d.position.y =
+        Math.sin(t * CFG.MOTION.floatSpeed) * CFG.MOTION.floatAmplitude;
+      group3d.rotation.z =
+        Math.sin(t * CFG.MOTION.rollSpeed) * CFG.MOTION.rollAmplitude;
     }
   });
 
@@ -190,12 +230,21 @@ function CardMesh({
  * se afinaron para la cámara de la carta suelta, y el libro del catálogo pone la cámara
  * dos veces más lejos; sin corregirla, el canto metálico de las 8 cartas salía gris.
  */
-export function Rig({ accent, cameraZ = CARD_CAMERA_Z }: { accent: string; cameraZ?: number }) {
+export function Rig({
+  accent,
+  cameraZ = CARD_CAMERA_Z,
+}: {
+  accent: string;
+  cameraZ?: number;
+}) {
   const shift = cameraZ - CARD_CAMERA_Z;
   return (
     <>
       <ambientLight intensity={CFG.LIGHTS.ambient} />
-      <directionalLight position={CFG.LIGHTS.key.position} intensity={CFG.LIGHTS.key.intensity} />
+      <directionalLight
+        position={CFG.LIGHTS.key.position}
+        intensity={CFG.LIGHTS.key.intensity}
+      />
       <directionalLight
         position={CFG.LIGHTS.fillLeft.position}
         intensity={CFG.LIGHTS.fillLeft.intensity}
@@ -218,7 +267,10 @@ export function Rig({ accent, cameraZ = CARD_CAMERA_Z }: { accent: string; camer
         color={CFG.LIGHTS.top.color}
         distance={CFG.LIGHTS.top.distance}
       />
-      <fog attach="fog" args={[CFG.FOG.color, CFG.FOG.near + shift, CFG.FOG.far + shift]} />
+      <fog
+        attach="fog"
+        args={[CFG.FOG.color, CFG.FOG.near + shift, CFG.FOG.far + shift]}
+      />
     </>
   );
 }
@@ -227,13 +279,16 @@ export interface HoloCardProps extends HoloCardSceneProps {
   className?: string;
 }
 
-export class WebGLBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+export class WebGLBoundary extends Component<
+  { fallback: ReactNode; children: ReactNode },
+  { failed: boolean }
+> {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
   }
   componentDidCatch(error: unknown) {
-    console.warn('[holo-card] fallo al dibujar la escena 3D', error);
+    console.warn("[holo-card] fallo al dibujar la escena 3D", error);
   }
   render() {
     return this.state.failed ? this.props.fallback : this.props.children;
@@ -254,7 +309,10 @@ export function HoloCard({
   );
   // Calidad FIJA, sin medición: el detalle es UNA carta a tamaño grande. `dpr={[1, dprMax]}` es el rango estándar de
   // R3F (el DPR del dispositivo, acotado); textura de ancho completo.
-  const plan = { dpr: [1, CFG.RENDER.dprMax] as [number, number], textureWidth: textureWidth ?? CARD_TEXTURE_FULL_WIDTH };
+  const plan = {
+    dpr: [1, CFG.RENDER.dprMax] as [number, number],
+    textureWidth: textureWidth ?? CARD_TEXTURE_FULL_WIDTH,
+  };
 
   /**
    * `relative` en la raíz y el canvas dentro de una caja POSICIONADA.
@@ -285,7 +343,10 @@ export function HoloCard({
    * caja siga existiendo.
    */
   return (
-    <div className={className ? `relative ${className}` : 'relative'} data-testid="holo-card">
+    <div
+      className={className ? `relative ${className}` : "relative"}
+      data-testid="holo-card"
+    >
       <WebGLBoundary fallback={null}>
         {recovery.canRender && (
           <div className="absolute inset-0">
@@ -293,13 +354,25 @@ export function HoloCard({
               key={recovery.canvasKey}
               frameloop="demand"
               dpr={plan.dpr}
-              gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-              camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, cameraZFor(card)] }}
+              gl={{
+                antialias: true,
+                alpha: true,
+                powerPreference: "high-performance",
+              }}
+              camera={{
+                fov: CFG.GEOMETRY.cameraFov,
+                position: [0, 0, cameraZFor(card)],
+              }}
               onCreated={({ gl }) => recovery.attach(gl.domElement)}
             >
               <RenderGovernor wake={card} idleFps={CFG.RENDER.idleFpsDetail} />
               <Rig accent={palette.accent} cameraZ={cameraZFor(card)} />
-              <CardMesh card={card} holo={holo} gloss={gloss} textureWidth={plan.textureWidth} />
+              <CardMesh
+                card={card}
+                holo={holo}
+                gloss={gloss}
+                textureWidth={plan.textureWidth}
+              />
             </Canvas>
           </div>
         )}

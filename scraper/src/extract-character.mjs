@@ -11,20 +11,20 @@
  * con transparencia para que no aparezca en la carta ni en el listado.
  */
 
-import { promises as fsP } from 'node:fs';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import sharp from 'sharp';
+import { promises as fsP } from "node:fs";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, '..', '..');
-const OUTDIR = path.join(ROOT, 'data', 'images', 'character');
+const ROOT = path.resolve(HERE, "..", "..");
+const OUTDIR = path.join(ROOT, "data", "images", "character");
 /** Lienzo de carta coleccionable (proporción 1.4 de alto/ancho). */
 const CARD_W = 720;
 const CARD_H = 1008;
-const DATASET = path.join(HERE, '..', 'out', 'dataset.json');
-const REPORT = path.join(HERE, '..', 'out', 'character-extraction.json');
+const DATASET = path.join(HERE, "..", "out", "dataset.json");
+const REPORT = path.join(HERE, "..", "out", "character-extraction.json");
 
 /**
  * Panel del personaje, en fracciones de la carta. Se toma un poco de margen a
@@ -96,7 +96,11 @@ export function detectPanelRight(data, width, height, channels) {
   }
   // Primer tramo sostenido de oscuridad (8 columnas por debajo del umbral) que
   // empieza después del 28% del ancho.
-  for (let x = Math.round(width * 0.28); x < Math.round(width * 0.72) - 8; x += 1) {
+  for (
+    let x = Math.round(width * 0.28);
+    x < Math.round(width * 0.72) - 8;
+    x += 1
+  ) {
     let oscuro = true;
     for (let k = 0; k < 8; k += 1) {
       if (columna[x + k] > 14) {
@@ -116,19 +120,31 @@ export function detectPanelRight(data, width, height, channels) {
  * @returns {Promise<{buffer:Buffer, box:object, flag:boolean}|null>}
  */
 export async function extractCharacterFromCard(file) {
-  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = await sharp(file)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
 
   // El ancho del panel se mide en ESTA ficha en vez de asumir uno fijo.
-  const panelRight = Math.min(0.9, Math.max(0.3, detectPanelRight(data, width, height, channels)));
+  const panelRight = Math.min(
+    0.9,
+    Math.max(0.3, detectPanelRight(data, width, height, channels)),
+  );
   const crop = {
     left: Math.max(0, Math.round(width * PANEL.x0)),
     top: Math.max(0, Math.round(height * PANEL.y0)),
     width: 0,
     height: 0,
   };
-  crop.width = Math.min(width - crop.left, Math.round(width * (panelRight - PANEL.x0)));
-  crop.height = Math.min(height - crop.top, Math.round(height * (PANEL.y1 - PANEL.y0)));
+  crop.width = Math.min(
+    width - crop.left,
+    Math.round(width * (panelRight - PANEL.x0)),
+  );
+  crop.height = Math.min(
+    height - crop.top,
+    Math.round(height * (PANEL.y1 - PANEL.y0)),
+  );
   if (crop.width < 40 || crop.height < 40) return null;
 
   // NOTA sobre la bandera del país: se superpone al arte del personaje en la
@@ -140,7 +156,11 @@ export async function extractCharacterFromCard(file) {
   // relleno es contenido INVENTADO. Se conservan los píxeles originales: es más
   // fiel al origen que un parche falso. Eliminarla de verdad requeriría un
   // inpaint real (modelo), no un promedio de bordes.
-  const raw = await sharp(file).extract(crop).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const raw = await sharp(file)
+    .extract(crop)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   const out = raw.data;
   /**
    * Se normaliza SIEMPRE al lienzo de carta (720x1008, proporción 1.4) con
@@ -164,8 +184,19 @@ export async function extractCharacterFromCard(file) {
    *   - El resultado es SIEMPRE 720x1008 (proporción 1.4), de modo que todos los
    *     personajes encajan igual en el mismo marco.
    */
-  const escalada = await sharp(out, { raw: { width: raw.info.width, height: raw.info.height, channels: raw.info.channels } })
-    .resize({ width: CARD_W, height: CARD_H, fit: 'inside', withoutEnlargement: false })
+  const escalada = await sharp(out, {
+    raw: {
+      width: raw.info.width,
+      height: raw.info.height,
+      channels: raw.info.channels,
+    },
+  })
+    .resize({
+      width: CARD_W,
+      height: CARD_H,
+      fit: "inside",
+      withoutEnlargement: false,
+    })
     .ensureAlpha()
     .png()
     .toBuffer();
@@ -187,13 +218,21 @@ export async function extractCharacterFromCard(file) {
     .png()
     .toBuffer();
 
-  const webp = await sharp(lienzo).webp({ quality: 88, alphaQuality: 100, effort: 6 }).toBuffer();
-  return { buffer: webp, box: crop, flag: hasFlag(data, width, height, channels) };
+  const webp = await sharp(lienzo)
+    .webp({ quality: 88, alphaQuality: 100, effort: 6 })
+    .toBuffer();
+  return {
+    buffer: webp,
+    box: crop,
+    flag: hasFlag(data, width, height, channels),
+  };
 }
 
 async function main() {
-  const sample = Number(process.argv.find((a) => a.startsWith('--sample'))?.split('=')[1] ?? 0);
-  const dataset = JSON.parse(fs.readFileSync(DATASET, 'utf8'));
+  const sample = Number(
+    process.argv.find((a) => a.startsWith("--sample"))?.split("=")[1] ?? 0,
+  );
+  const dataset = JSON.parse(fs.readFileSync(DATASET, "utf8"));
   let targets = dataset.vtubers.filter((v) => v.assets?.card);
   if (sample) {
     const step = Math.max(1, Math.floor(targets.length / sample));
@@ -205,35 +244,51 @@ async function main() {
   let extraidos = 0;
   let conBandera = 0;
   for (const v of targets) {
-    const cardPath = path.join(ROOT, 'data', v.assets.card);
+    const cardPath = path.join(ROOT, "data", v.assets.card);
     if (!fs.existsSync(cardPath)) {
-      results.push({ slug: v.slug, status: 'sin-carta' });
+      results.push({ slug: v.slug, status: "sin-carta" });
       continue;
     }
     try {
       const r = await extractCharacterFromCard(cardPath);
       if (!r) {
-        results.push({ slug: v.slug, status: 'no-detectado' });
+        results.push({ slug: v.slug, status: "no-detectado" });
         continue;
       }
       await fsP.writeFile(path.join(OUTDIR, `${v.slug}.webp`), r.buffer);
       extraidos += 1;
       if (r.flag) conBandera += 1;
-      results.push({ slug: v.slug, status: 'extraido', box: r.box, flag: r.flag });
+      results.push({
+        slug: v.slug,
+        status: "extraido",
+        box: r.box,
+        flag: r.flag,
+      });
     } catch (error) {
-      results.push({ slug: v.slug, status: 'error', detail: String(error.message).slice(0, 120) });
+      results.push({
+        slug: v.slug,
+        status: "error",
+        detail: String(error.message).slice(0, 120),
+      });
     }
   }
 
   const resumen = { total: targets.length, extraidos, conBandera };
-  fs.writeFileSync(REPORT, JSON.stringify({ generatedAt: new Date().toISOString(), resumen, results }, null, 1));
+  fs.writeFileSync(
+    REPORT,
+    JSON.stringify(
+      { generatedAt: new Date().toISOString(), resumen, results },
+      null,
+      1,
+    ),
+  );
   console.log(`[character] ${JSON.stringify(resumen)}`);
   console.log(`[character] informe: out/character-extraction.json`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
-    console.error('[character] ERROR', error);
+    console.error("[character] ERROR", error);
     process.exit(1);
   });
 }

@@ -1,19 +1,19 @@
-'use client';
+"use client";
 /**
  * Zona para elegir un archivo de emblema: arrastrar y soltar, o botón. Solo entrega el
  * `File`; la conversión a PNG y la subida son de quien la usa, porque aquí no se sabe si
  * el archivo se sube ya (tarjeta existente) o se guarda para después (asistente).
  */
-import { useRef, useState } from 'react';
+import { useRef, useState } from "react";
 
-import { ghostButton } from '@/components/admin/ui';
+import { ghostButton } from "@/components/admin/ui";
 
 export function EmblemDropzone({
   onFile,
   busy = false,
-  label = 'Arrastra aquí tu emblema',
-  buttonLabel = 'Elegir archivo',
-  inputLabel = 'Archivo del emblema',
+  label = "Arrastra aquí tu emblema",
+  buttonLabel = "Elegir archivo",
+  inputLabel = "Archivo del emblema",
 }: {
   onFile: (file: File) => void;
   busy?: boolean;
@@ -38,7 +38,9 @@ export function EmblemDropzone({
         if (file && !busy) onFile(file);
       }}
       className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center text-xs transition ${
-        over ? 'border-dex-accent bg-dex-accent/10 text-dex-ink' : 'border-dex-line text-dex-muted'
+        over
+          ? "border-dex-accent bg-dex-accent/10 text-dex-ink"
+          : "border-dex-line text-dex-muted"
       }`}
     >
       <p>{label}</p>
@@ -51,12 +53,17 @@ export function EmblemDropzone({
         data-testid="emblem-input"
         onChange={(event) => {
           const file = event.target.files?.[0];
-          event.target.value = '';
+          event.target.value = "";
           if (file) onFile(file);
         }}
       />
-      <button type="button" className={ghostButton} disabled={busy} onClick={() => input.current?.click()}>
-        {busy ? 'Subiendo…' : buttonLabel}
+      <button
+        type="button"
+        className={ghostButton}
+        disabled={busy}
+        onClick={() => input.current?.click()}
+      >
+        {busy ? "Subiendo…" : buttonLabel}
       </button>
     </div>
   );
@@ -69,8 +76,13 @@ export function useObjectUrl(file: Blob | null): string | null {
   // Se deriva durante el render (patrón de React para estado dependiente de props) y no en un efecto.
   if (file !== lastFile) {
     setLastFile(file);
-    if (url && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(url);
-    setUrl(file && typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : null);
+    if (url && typeof URL.revokeObjectURL === "function")
+      URL.revokeObjectURL(url);
+    setUrl(
+      file && typeof URL.createObjectURL === "function"
+        ? URL.createObjectURL(file)
+        : null,
+    );
   }
   return url;
 }

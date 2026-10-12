@@ -8,8 +8,8 @@
  * los mismos sitios, en el libro, en el detalle y en cada recarga. Con `Math.random` la carta
  * «bailaría» al volver de otra página.
  */
-import { DESGASTE_LEVE, DETERIORO } from '@/components/card3d-config';
-import { desgasteLeveDeGrado, severidadDeGrado } from '@/lib/premium';
+import { DESGASTE_LEVE, DETERIORO } from "@/components/card3d-config";
+import { desgasteLeveDeGrado, severidadDeGrado } from "@/lib/premium";
 
 /** Generador pseudoaleatorio con semilla (mulberry32): mismo número de entrada, misma secuencia. */
 export function crearAzar(semilla: number): () => number {
@@ -30,9 +30,10 @@ export function semillaDeCarta(id: number, grado: string): number {
   return h >>> 0;
 }
 
-const interpolar = (rango: readonly [number, number], s: number) => rango[0] + (rango[1] - rango[0]) * s;
+const interpolar = (rango: readonly [number, number], s: number) =>
+  rango[0] + (rango[1] - rango[0]) * s;
 
-export type Lado = 'arriba' | 'abajo' | 'izquierda' | 'derecha';
+export type Lado = "arriba" | "abajo" | "izquierda" | "derecha";
 
 /** Un trozo que falta: un polígono irregular pegado a un borde, en coordenadas del lienzo (1008x1411). */
 export interface Mordida {
@@ -70,8 +71,16 @@ export interface PlanDeDeterioro {
  * Una mordida en un borde: una franja irregular cuyo borde interior es una línea quebrada.
  * `centro` es la posición a lo largo del lado (0..1), `ancho` su extensión y `profundidad` hasta dónde entra.
  */
-export function mordidaEnLado(lado: Lado, centro: number, ancho: number, profundidad: number, azar: () => number, W: number, H: number): Mordida {
-  const horizontal = lado === 'arriba' || lado === 'abajo';
+export function mordidaEnLado(
+  lado: Lado,
+  centro: number,
+  ancho: number,
+  profundidad: number,
+  azar: () => number,
+  W: number,
+  H: number,
+): Mordida {
+  const horizontal = lado === "arriba" || lado === "abajo";
   const largo = horizontal ? W : H;
   const pasos = 6 + Math.floor(azar() * 5);
   const inicio = Math.max(0, centro * largo - ancho / 2);
@@ -87,16 +96,22 @@ export function mordidaEnLado(lado: Lado, centro: number, ancho: number, profund
   const puntos: Array<[number, number]> = [[inicio, 0], ...interior, [fin, 0]];
   return {
     puntos: puntos.map(([a, d]) => {
-      if (lado === 'arriba') return [a, d] as [number, number];
-      if (lado === 'abajo') return [a, H - d] as [number, number];
-      if (lado === 'izquierda') return [d, a] as [number, number];
+      if (lado === "arriba") return [a, d] as [number, number];
+      if (lado === "abajo") return [a, H - d] as [number, number];
+      if (lado === "izquierda") return [d, a] as [number, number];
       return [W - d, a] as [number, number];
     }),
   };
 }
 
 /** Un mordisco en la esquina: un triángulo irregular. */
-function mordidaEnEsquina(esquina: number, tamano: number, azar: () => number, W: number, H: number): Mordida {
+function mordidaEnEsquina(
+  esquina: number,
+  tamano: number,
+  azar: () => number,
+  W: number,
+  H: number,
+): Mordida {
   const x0 = esquina % 2 === 0 ? 0 : W;
   const y0 = esquina < 2 ? 0 : H;
   const sx = esquina % 2 === 0 ? 1 : -1;
@@ -115,10 +130,16 @@ function mordidaEnEsquina(esquina: number, tamano: number, azar: () => number, W
 }
 
 /** Un rayón: una trayectoria que se desvía poco, de un lado de la carta hacia el interior. */
-function rayonAleatorio(s: number, azar: () => number, W: number, H: number): Rayon {
+function rayonAleatorio(
+  s: number,
+  azar: () => number,
+  W: number,
+  H: number,
+): Rayon {
   const { length, alpha, darkFrom } = DETERIORO.scratches;
   const largo = Math.hypot(W, H) * interpolar(length, azar());
-  const angulo = (azar() - 0.5) * Math.PI * 1.2 + (azar() < 0.5 ? 0 : Math.PI / 2);
+  const angulo =
+    (azar() - 0.5) * Math.PI * 1.2 + (azar() < 0.5 ? 0 : Math.PI / 2);
   let x = azar() * W;
   let y = azar() * H;
   const puntos: Array<[number, number]> = [[x, y]];
@@ -138,9 +159,25 @@ function rayonAleatorio(s: number, azar: () => number, W: number, H: number): Ra
 }
 
 /** Todo lo que se le hace a la carta con este grado. Severidad 0 (grado premium) = sin daño. */
-export function planDeDeterioro(grado: string | null | undefined, cartaId: number, W: number, H: number): PlanDeDeterioro {
+export function planDeDeterioro(
+  grado: string | null | undefined,
+  cartaId: number,
+  W: number,
+  H: number,
+): PlanDeDeterioro {
   const s = severidadDeGrado(grado);
-  const vacio: PlanDeDeterioro = { severidad: 0, semilla: 0, mordidas: [], rayones: [], bloque: 1, pixelar: false, ruido: 0, gris: 0, oscuridad: 0, canto: 0 };
+  const vacio: PlanDeDeterioro = {
+    severidad: 0,
+    semilla: 0,
+    mordidas: [],
+    rayones: [],
+    bloque: 1,
+    pixelar: false,
+    ruido: 0,
+    gris: 0,
+    oscuridad: 0,
+    canto: 0,
+  };
   if (s <= 0 || !grado) return vacio;
 
   const semilla = semillaDeCarta(cartaId, grado);
@@ -150,23 +187,36 @@ export function planDeDeterioro(grado: string | null | undefined, cartaId: numbe
   const mordidas: Mordida[] = [];
   if (s >= chips.minSeverity) {
     const cuantas = Math.round(interpolar(chips.count, s));
-    const lados: Lado[] = ['arriba', 'abajo', 'izquierda', 'derecha'];
+    const lados: Lado[] = ["arriba", "abajo", "izquierda", "derecha"];
     for (let i = 0; i < cuantas; i += 1) {
       const profundidad = W * chips.depth * s * (0.25 + 0.75 * azar());
-      if (i < 4 && s > 0.3) mordidas.push(mordidaEnEsquina(i, profundidad * 1.4, azar, W, H));
+      if (i < 4 && s > 0.3)
+        mordidas.push(mordidaEnEsquina(i, profundidad * 1.4, azar, W, H));
       else {
         const lado = lados[Math.floor(azar() * lados.length)];
-        const ancho = (lado === 'arriba' || lado === 'abajo' ? W : H) * (0.05 + 0.18 * azar() * (0.4 + s));
-        mordidas.push(mordidaEnLado(lado, azar(), ancho, profundidad, azar, W, H));
+        const ancho =
+          (lado === "arriba" || lado === "abajo" ? W : H) *
+          (0.05 + 0.18 * azar() * (0.4 + s));
+        mordidas.push(
+          mordidaEnLado(lado, azar(), ancho, profundidad, azar, W, H),
+        );
       }
     }
   }
 
   const rayones: Rayon[] = [];
   const cuantosRayones = Math.round(interpolar(scratches.count, s));
-  for (let i = 0; i < cuantosRayones; i += 1) rayones.push(rayonAleatorio(s, azar, W, H));
+  for (let i = 0; i < cuantosRayones; i += 1)
+    rayones.push(rayonAleatorio(s, azar, W, H));
 
-  const bloque = s < blur.minSeverity ? 1 : Math.round(1 + (blur.maxBlock - 1) * ((s - blur.minSeverity) / (1 - blur.minSeverity)) ** 1.6);
+  const bloque =
+    s < blur.minSeverity
+      ? 1
+      : Math.round(
+          1 +
+            (blur.maxBlock - 1) *
+              ((s - blur.minSeverity) / (1 - blur.minSeverity)) ** 1.6,
+        );
 
   return {
     severidad: s,
@@ -188,17 +238,27 @@ export function planDeDeterioro(grado: string | null | undefined, cartaId: numbe
  * tocar el texto (`severidad` baja a propósito: ningún umbral de `DETERIORO` se activa). Devuelve
  * `null` si no hay nada que pintar (del 8 hacia arriba).
  */
-export function planDeDesgasteLeve(grado: string | null | undefined, cartaId: number, W: number, H: number): PlanDeDeterioro | null {
+export function planDeDesgasteLeve(
+  grado: string | null | undefined,
+  cartaId: number,
+  W: number,
+  H: number,
+): PlanDeDeterioro | null {
   const factor = desgasteLeveDeGrado(grado);
   if (factor <= 0) return null;
   const s = DESGASTE_LEVE.severidad * factor;
-  const semilla = semillaDeCarta(cartaId, grado || 'suelta');
+  const semilla = semillaDeCarta(cartaId, grado || "suelta");
   const azar = crearAzar(semilla);
   const rayones: Rayon[] = [];
   const cuantos = Math.round(DESGASTE_LEVE.rayones * factor);
   for (let i = 0; i < cuantos; i += 1) {
     const r = rayonAleatorio(s, azar, W, H);
-    rayones.push({ ...r, grosor: 1, alfa: interpolar(DESGASTE_LEVE.rayonAlfa, azar()), oscuro: false });
+    rayones.push({
+      ...r,
+      grosor: 1,
+      alfa: interpolar(DESGASTE_LEVE.rayonAlfa, azar()),
+      oscuro: false,
+    });
   }
   return {
     severidad: s,
@@ -220,14 +280,21 @@ export function planDeDesgasteLeve(grado: string | null | undefined, cartaId: nu
  * único que sigue entendiéndose en el grado 1, y los espacios conservan la silueta de las palabras.
  * Determinista (misma carta y grado, mismo texto roto).
  */
-export function corromperTexto(texto: string, severidad: number, semilla: number): string {
+export function corromperTexto(
+  texto: string,
+  severidad: number,
+  semilla: number,
+): string {
   if (severidad <= 0) return texto;
   const { from, gain, unreadableFrom, glyphs } = DETERIORO.text;
-  const prob = severidad >= unreadableFrom ? 1 : Math.min(1, Math.max(0, (severidad - from) * gain));
+  const prob =
+    severidad >= unreadableFrom
+      ? 1
+      : Math.min(1, Math.max(0, (severidad - from) * gain));
   if (prob <= 0) return texto;
   const azar = crearAzar(semilla);
   return Array.from(texto, (c) => {
     if (/[\s\d#]/.test(c)) return c;
     return azar() < prob ? glyphs[Math.floor(azar() * glyphs.length)] : c;
-  }).join('');
+  }).join("");
 }

@@ -1,11 +1,18 @@
 /**
  * Primitivas de dibujo compartidas por las capas (texto, metal, relieve).
  */
-import { mixHex, rgba } from '@/lib/color';
-import { TEXT_FINISH } from '../card3d-config';
-import { FONT } from './dimensiones';
+import { mixHex, rgba } from "@/lib/color";
+import { TEXT_FINISH } from "../card3d-config";
+import { FONT } from "./dimensiones";
 
-export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number): void {
+export function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): void {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
   ctx.arcTo(x + width, y, x + width, y + height, radius);
@@ -15,7 +22,13 @@ export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w
   ctx.closePath();
 }
 
-export function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, startSize: number, weight = '700'): number {
+export function fitText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  startSize: number,
+  weight = "700",
+): number {
   let size = startSize;
   do {
     ctx.font = `${weight} ${size}px ${FONT}`;
@@ -51,7 +64,8 @@ export function metalFill(
   brandTint: number,
 ): CanvasGradient {
   const g = ctx.createLinearGradient(x, y, x + w * 0.25, y + h);
-  for (const s of stops) g.addColorStop(s.at, mixHex(s.color, brand, brandTint));
+  for (const s of stops)
+    g.addColorStop(s.at, mixHex(s.color, brand, brandTint));
   return g;
 }
 
@@ -61,20 +75,34 @@ export function metalFill(
  * Se recorta al área ANTES de pintar porque el gradiente es del ancho del área y
  * cualquier trazo se saldría por las esquinas redondeadas de la placa.
  */
-export function metalSheen(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+export function metalSheen(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(x, y, w, h);
   ctx.clip();
   const g = ctx.createLinearGradient(x, y, x + w * 0.55, y + h);
-  for (const s of TEXT_FINISH.sheen) g.addColorStop(s.at, `rgba(255, 255, 255, ${s.alpha})`);
+  for (const s of TEXT_FINISH.sheen)
+    g.addColorStop(s.at, `rgba(255, 255, 255, ${s.alpha})`);
   ctx.fillStyle = g;
   ctx.fillRect(x, y, w, h);
   ctx.restore();
 }
 
 /** Bisel: filo claro arriba y línea oscura abajo, dentro del área redondeada. */
-export function metalBevel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, radius: number): void {
+export function metalBevel(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radius: number,
+): void {
   const { bevel } = TEXT_FINISH;
   ctx.save();
   ctx.beginPath();
@@ -112,7 +140,7 @@ export function drawEngrave(
   ctx.save();
   ctx.font = font;
   ctx.textAlign = align;
-  ctx.textBaseline = 'middle';
+  ctx.textBaseline = "middle";
   ctx.filter = `blur(${engrave.blur}px)`;
   ctx.fillStyle = rgba(engrave.color, engrave.alpha);
   ctx.fillText(text, x, y + engrave.offsetY);
@@ -177,15 +205,16 @@ export function drawMetalWordmark(
   const { wordmark } = TEXT_FINISH;
   ctx.save();
   ctx.font = font;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = rgba('#05060a', wordmark.bevelDarkAlpha);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = rgba("#05060a", wordmark.bevelDarkAlpha);
   ctx.fillText(text, left, y + wordmark.bevelDarkOffset);
-  ctx.fillStyle = rgba('#ffffff', wordmark.bevelLightAlpha);
+  ctx.fillStyle = rgba("#ffffff", wordmark.bevelLightAlpha);
   ctx.fillText(text, left, y + wordmark.bevelLightOffset);
   const width = ctx.measureText(text).width;
   const g = ctx.createLinearGradient(left, y - 16, left + width, y + 16);
-  for (const s of wordmark.stops) g.addColorStop(s.at, mixHex(s.color, brand, wordmark.brandTint));
+  for (const s of wordmark.stops)
+    g.addColorStop(s.at, mixHex(s.color, brand, wordmark.brandTint));
   ctx.fillStyle = g;
   ctx.fillText(text, left, y);
   ctx.restore();

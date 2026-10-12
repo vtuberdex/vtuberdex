@@ -1,17 +1,35 @@
 /**
  * Ensambla las 7 capas y publica la info de layout medida.
  */
-import { CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT, FONT, HEADER } from './dimensiones';
-import type { CardDrawInfo, CardLayers } from './tipos';
-import { createLayer, emptyLayer } from './lienzo';
-import { drawSurfaceLayer } from './capa-superficie';
-import { drawCharacterLayer } from './capa-personaje';
-import { drawTitleLayer } from './capa-titulo';
-import { drawWordmarkLayer } from './capa-wordmark';
-import { deteriorarArte, deteriorarCabecera, deteriorarCanto, planDeCarta, tarjetaParaTitulo } from './deterioro';
+import {
+  CARD_TEXTURE_WIDTH,
+  CARD_TEXTURE_HEIGHT,
+  FONT,
+  HEADER,
+} from "./dimensiones";
+import type { CardDrawInfo, CardLayers } from "./tipos";
+import { createLayer, emptyLayer } from "./lienzo";
+import { drawSurfaceLayer } from "./capa-superficie";
+import { drawCharacterLayer } from "./capa-personaje";
+import { drawTitleLayer } from "./capa-titulo";
+import { drawWordmarkLayer } from "./capa-wordmark";
+import {
+  deteriorarArte,
+  deteriorarCabecera,
+  deteriorarCanto,
+  planDeCarta,
+  tarjetaParaTitulo,
+} from "./deterioro";
 
 /** Genera todas las capas y la información de layout medida. */
-export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTURE_WIDTH, reutilizar }: CardDrawInfo): CardLayers {
+export function drawCardLayers({
+  card,
+  art,
+  logo,
+  background,
+  width = CARD_TEXTURE_WIDTH,
+  reutilizar,
+}: CardDrawInfo): CardLayers {
   const W = CARD_TEXTURE_WIDTH;
   const H = CARD_TEXTURE_HEIGHT;
   const { pad, top: headerTop, height: headerH } = HEADER;
@@ -30,15 +48,20 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
   const typesList = [...card.factions, ...card.groups].slice(0, 4);
   const chipFont = `700 24px ${FONT}`;
   const chipRows: string[][] = [];
-  if (typeof document !== 'undefined') {
-    const probe = document.createElement('canvas').getContext('2d');
+  if (typeof document !== "undefined") {
+    const probe = document.createElement("canvas").getContext("2d");
     if (probe) {
       probe.font = chipFont;
       for (const type of typesList) {
         const label = type.toUpperCase().slice(0, 22);
         const tw = probe.measureText(label).width + 32;
         const row = chipRows[chipRows.length - 1];
-        const used = row ? row.reduce((sum, item) => sum + probe.measureText(item).width + 32 + 12, 0) : 0;
+        const used = row
+          ? row.reduce(
+              (sum, item) => sum + probe.measureText(item).width + 32 + 12,
+              0,
+            )
+          : 0;
         if (row && used + tw <= W - pad * 2) row.push(label);
         else chipRows.push([label]);
       }
@@ -64,11 +87,11 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
   const stateChips = [
     card.level !== null ? `NIV ${card.level}` : null,
     card.powerScore ? `PODER ${card.powerScore}` : null,
-    card.hasDetail ? 'FICHA COMPLETA' : 'SOLO FICHA BÁSICA',
+    card.hasDetail ? "FICHA COMPLETA" : "SOLO FICHA BÁSICA",
   ].filter(Boolean) as string[];
   let stateX = pad;
-  if (typeof document !== 'undefined' && stateChips.length > 0) {
-    const probe = document.createElement('canvas').getContext('2d');
+  if (typeof document !== "undefined" && stateChips.length > 0) {
+    const probe = document.createElement("canvas").getContext("2d");
     if (probe) {
       probe.font = `700 24px ${FONT}`;
       for (const chip of stateChips) {
@@ -79,7 +102,7 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
     }
   }
 
-  const info: CardLayers['info'] = {
+  const info: CardLayers["info"] = {
     W,
     H,
     headerTop,
@@ -100,9 +123,12 @@ export function drawCardLayers({ card, art, logo, background, width = CARD_TEXTU
    * duplicaría el daño. El wordmark es la capa de arriba y lleva el canto roto y los rayones.
    */
   const plan = planDeCarta(card);
-  const fondo = reutilizar?.background ?? drawSurfaceLayer({ card, background, width });
+  const fondo =
+    reutilizar?.background ?? drawSurfaceLayer({ card, background, width });
   const personaje = reutilizar?.character ?? drawCharacterLayer({ art, width });
-  const titulo = reutilizar?.title ?? drawTitleLayer({ card: tarjetaParaTitulo(card), width });
+  const titulo =
+    reutilizar?.title ??
+    drawTitleLayer({ card: tarjetaParaTitulo(card), width });
   const marca = drawWordmarkLayer({ card, width });
   if (plan) {
     if (!reutilizar?.background) deteriorarArte(fondo, plan);

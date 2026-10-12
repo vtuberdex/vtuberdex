@@ -11,17 +11,17 @@
  * correrlo con el entorno del servicio (`TURSO_DATABASE_URL=file:...`) o informará sobre la base
  * empaquetada, sin las ediciones del mantenedor.
  */
-import { dbConDiario } from '../lib/diario.mjs';
-import { CODIGOS, validarKit } from '../server/src/habilidades.mjs';
+import { dbConDiario } from "../lib/diario.mjs";
+import { CODIGOS, validarKit } from "../server/src/habilidades.mjs";
 
 const args = process.argv.slice(2);
 const valor = (flag) => {
   const i = args.indexOf(flag);
   return i >= 0 ? args[i + 1] : null;
 };
-const soloSlug = valor('--slug');
-const soloCodigo = valor('--codigo');
-const comoJson = args.includes('--json');
+const soloSlug = valor("--slug");
+const soloCodigo = valor("--codigo");
+const comoJson = args.includes("--json");
 
 const db = await dbConDiario();
 const fichas = db
@@ -48,10 +48,18 @@ for (const f of fichas) {
   const habilidades = leerHabilidades.all(f.id);
   const facciones = leerFacciones.all(f.id).map((r) => r.slug);
   // Una ficha sin facciones no dice nada de la exclusividad: no se acusa a ciegas.
-  let problemas = validarKit({ habilidades, facciones: facciones.length ? facciones : null });
+  let problemas = validarKit({
+    habilidades,
+    facciones: facciones.length ? facciones : null,
+  });
   if (soloCodigo) problemas = problemas.filter((p) => p.codigo === soloCodigo);
-  const ultimate = habilidades.find((h) => h.category === 'ultimate');
-  informe.push({ ...f, facciones, ultimateConDado: /1d6/i.test(ultimate?.effectHtml ?? ''), problemas });
+  const ultimate = habilidades.find((h) => h.category === "ultimate");
+  informe.push({
+    ...f,
+    facciones,
+    ultimateConDado: /1d6/i.test(ultimate?.effectHtml ?? ""),
+    problemas,
+  });
 }
 
 if (comoJson) {
@@ -59,7 +67,7 @@ if (comoJson) {
   process.exit(0);
 }
 
-const dex = (n) => `#${String(n).padStart(3, '0')}`;
+const dex = (n) => `#${String(n).padStart(3, "0")}`;
 
 if (soloSlug) {
   const f = informe[0];
@@ -67,9 +75,13 @@ if (soloSlug) {
     console.error(`No hay ninguna ficha con kit y slug «${soloSlug}».`);
     process.exit(1);
   }
-  console.log(`${dex(f.dex)} ${f.name} (${f.facciones.join(', ') || 'sin facciones'})`);
-  if (!f.problemas.length) console.log('  Cumple todas las reglas que se pueden comprobar.');
-  for (const p of f.problemas) console.log(`  [${p.gravedad}] ${p.pieza}: ${p.detalle}  (${p.codigo})`);
+  console.log(
+    `${dex(f.dex)} ${f.name} (${f.facciones.join(", ") || "sin facciones"})`,
+  );
+  if (!f.problemas.length)
+    console.log("  Cumple todas las reglas que se pueden comprobar.");
+  for (const p of f.problemas)
+    console.log(`  [${p.gravedad}] ${p.pieza}: ${p.detalle}  (${p.codigo})`);
   process.exit(0);
 }
 
@@ -79,25 +91,43 @@ for (const f of informe) {
     porCodigo.set(codigo, (porCodigo.get(codigo) ?? 0) + 1);
   }
 }
-const conErrores = informe.filter((f) => f.problemas.some((p) => p.gravedad === 'error'));
+const conErrores = informe.filter((f) =>
+  f.problemas.some((p) => p.gravedad === "error"),
+);
 const limpias = informe.filter((f) => !f.problemas.length);
 
 console.log(`Fichas con kit: ${informe.length}`);
 console.log(`  sin ningún problema: ${limpias.length}`);
 console.log(`  con al menos un error: ${conErrores.length}`);
-console.log(`  Ultimates con 1d6: ${informe.filter((f) => f.ultimateConDado).length} (el prompt pide no usarlo siempre)`);
-console.log('\nFichas afectadas por regla:');
+console.log(
+  `  Ultimates con 1d6: ${informe.filter((f) => f.ultimateConDado).length} (el prompt pide no usarlo siempre)`,
+);
+console.log("\nFichas afectadas por regla:");
 for (const [codigo, descripcion] of Object.entries(CODIGOS)) {
   const n = porCodigo.get(codigo) ?? 0;
   if (n) console.log(`  ${String(n).padStart(4)}  ${descripcion}  (${codigo})`);
 }
 
 const peores = [...conErrores]
-  .sort((a, b) => b.problemas.filter((p) => p.gravedad === 'error').length - a.problemas.filter((p) => p.gravedad === 'error').length)
+  .sort(
+    (a, b) =>
+      b.problemas.filter((p) => p.gravedad === "error").length -
+      a.problemas.filter((p) => p.gravedad === "error").length,
+  )
   .slice(0, soloCodigo ? Infinity : 15);
-console.log(soloCodigo ? `\nFichas con «${soloCodigo}»:` : '\nLas 15 fichas con más errores:');
-for (const f of soloCodigo ? informe.filter((x) => x.problemas.length) : peores) {
-  const errores = f.problemas.filter((p) => p.gravedad === 'error').length;
-  console.log(`  ${dex(f.dex)} ${f.name} (${f.slug}): ${errores} errores, ${f.problemas.length - errores} avisos`);
+console.log(
+  soloCodigo
+    ? `\nFichas con «${soloCodigo}»:`
+    : "\nLas 15 fichas con más errores:",
+);
+for (const f of soloCodigo
+  ? informe.filter((x) => x.problemas.length)
+  : peores) {
+  const errores = f.problemas.filter((p) => p.gravedad === "error").length;
+  console.log(
+    `  ${dex(f.dex)} ${f.name} (${f.slug}): ${errores} errores, ${f.problemas.length - errores} avisos`,
+  );
 }
-console.log('\nDetalle de una ficha: npm run informe:habilidades -- --slug <slug>');
+console.log(
+  "\nDetalle de una ficha: npm run informe:habilidades -- --slug <slug>",
+);

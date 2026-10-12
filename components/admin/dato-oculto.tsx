@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Datos personales OCULTOS por defecto en el mantenedor (correos, nombre civil).
  *
@@ -10,30 +10,52 @@
  * La máscara tiene SIEMPRE el mismo largo: una máscara que copiara la longitud (o la primera letra, o
  * el dominio) ya daría pistas de quién es.
  */
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from "react";
 
-import { ghostButton, inputClass } from '@/components/admin/ui';
+import { ghostButton, inputClass } from "@/components/admin/ui";
 
-export const MASCARA_CORREO = '••••••@••••';
-const MASCARA_TEXTO = '••••••••';
+export const MASCARA_CORREO = "••••••@••••";
+const MASCARA_TEXTO = "••••••••";
 
-const botonChico = 'ml-1.5 rounded border border-dex-line px-1.5 py-0 text-[10px] uppercase tracking-[0.08em] text-dex-muted hover:text-dex-ink';
+const botonChico =
+  "ml-1.5 rounded border border-dex-line px-1.5 py-0 text-[10px] uppercase tracking-[0.08em] text-dex-muted hover:text-dex-ink";
 
 /** ¿Parece un correo? Lo que no lo parece (un usuario «admin») se muestra tal cual. */
-export const pareceCorreo = (texto: string | null | undefined) => /\S+@\S+/.test(texto ?? '');
+export const pareceCorreo = (texto: string | null | undefined) =>
+  /\S+@\S+/.test(texto ?? "");
 
 /**
  * Un dato que se ve como máscara hasta pulsar «Mostrar». `children` permite revelar algo con formato
  * (un enlace `mailto:`) en vez del texto plano.
  */
-export function DatoOculto({ valor, etiqueta = 'correo', children }: { valor: string; etiqueta?: string; children?: ReactNode }) {
+export function DatoOculto({
+  valor,
+  etiqueta = "correo",
+  children,
+}: {
+  valor: string;
+  etiqueta?: string;
+  children?: ReactNode;
+}) {
   const [visible, setVisible] = useState(false);
   return (
     <span className="inline-flex items-baseline" data-testid="dato-oculto">
-      {visible ? (children ?? <span className="break-all">{valor}</span>) : <span aria-label={`${etiqueta} oculto`}>{pareceCorreo(valor) ? MASCARA_CORREO : MASCARA_TEXTO}</span>}
+      {visible ? (
+        (children ?? <span className="break-all">{valor}</span>)
+      ) : (
+        <span aria-label={`${etiqueta} oculto`}>
+          {pareceCorreo(valor) ? MASCARA_CORREO : MASCARA_TEXTO}
+        </span>
+      )}
       {/* aria-label explícito: dentro de un <label> el botón heredaría como nombre todo el texto de la etiqueta. */}
-      <button type="button" className={botonChico} aria-pressed={visible} aria-label={`${visible ? 'Ocultar' : 'Mostrar'} ${etiqueta}`} onClick={() => setVisible(!visible)}>
-        {visible ? 'Ocultar' : 'Mostrar'}
+      <button
+        type="button"
+        className={botonChico}
+        aria-pressed={visible}
+        aria-label={`${visible ? "Ocultar" : "Mostrar"} ${etiqueta}`}
+        onClick={() => setVisible(!visible)}
+      >
+        {visible ? "Ocultar" : "Mostrar"}
       </button>
     </span>
   );
@@ -64,12 +86,23 @@ export function CampoCorreoOculto({
   const [visible, setVisible] = useState(() => !valor);
   if (valor && !visible) {
     return (
-      <span className="flex w-full items-center gap-2" data-testid="correo-oculto">
-        <span className={`${inputClass} mt-0! flex-1 text-dex-muted`} aria-label={`${etiqueta} oculto`}>
+      <span
+        className="flex w-full items-center gap-2"
+        data-testid="correo-oculto"
+      >
+        <span
+          className={`${inputClass} mt-0! flex-1 text-dex-muted`}
+          aria-label={`${etiqueta} oculto`}
+        >
           {MASCARA_CORREO}
         </span>
         {/* aria-label explícito: el campo va dentro de un <label> (Field) que, si no, le daría su texto como nombre. */}
-        <button type="button" className={ghostButton} aria-label={`Mostrar y editar ${etiqueta.toLowerCase()}`} onClick={() => setVisible(true)}>
+        <button
+          type="button"
+          className={ghostButton}
+          aria-label={`Mostrar y editar ${etiqueta.toLowerCase()}`}
+          onClick={() => setVisible(true)}
+        >
           Mostrar y editar
         </button>
       </span>
@@ -87,7 +120,12 @@ export function CampoCorreoOculto({
         placeholder={placeholder}
       />
       {valor && (
-        <button type="button" className={ghostButton} aria-label={`Ocultar ${etiqueta.toLowerCase()}`} onClick={() => setVisible(false)}>
+        <button
+          type="button"
+          className={ghostButton}
+          aria-label={`Ocultar ${etiqueta.toLowerCase()}`}
+          onClick={() => setVisible(false)}
+        >
           Ocultar
         </button>
       )}

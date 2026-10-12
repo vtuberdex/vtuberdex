@@ -9,9 +9,9 @@
  * va la donación. Por eso la ficha muestra un código de referencia (`codigoDeReferencia`) que
  * el donante escribe en la nota del pago, y el mantenedor sabe buscar una ficha por ese código.
  */
-import { numeroDeCertificado } from '@/lib/premium';
+import { numeroDeCertificado } from "@/lib/premium";
 
-export const PAYPAL_PAYMENT_ID = 'TQ6SU2TZL6ZEU';
+export const PAYPAL_PAYMENT_ID = "TQ6SU2TZL6ZEU";
 
 export const PAYPAL_DONATE_URL = `https://www.paypal.com/ncp/payment/${PAYPAL_PAYMENT_ID}`;
 
@@ -26,21 +26,24 @@ export const PAYPAL_DONATE_URL = `https://www.paypal.com/ncp/payment/${PAYPAL_PA
  * No es un secreto (queda en la URL de cada donación) pero sí una decisión de la cuenta, por eso
  * está aquí y no inventado.
  */
-export const PAYPAL_MERCHANT_ID = '';
+export const PAYPAL_MERCHANT_ID = "";
 
 /**
  * Enlace de donación de una ficha. Con ID de comerciante, lleva el código de la carta como
  * `item_number` y en el nombre del concepto; sin él, el enlace fijo de siempre.
  */
-export function urlDeDonacion(card?: { dexNumber: number; name: string } | null, merchantId: string = PAYPAL_MERCHANT_ID): string {
+export function urlDeDonacion(
+  card?: { dexNumber: number; name: string } | null,
+  merchantId: string = PAYPAL_MERCHANT_ID,
+): string {
   if (!card || !merchantId) return PAYPAL_DONATE_URL;
   const codigo = codigoDeReferencia(card.dexNumber);
   const consulta = new URLSearchParams({
     business: merchantId,
-    no_recurring: '0',
+    no_recurring: "0",
     item_name: `VTuberDex ${codigo} · ${card.name}`,
     item_number: codigo,
-    currency_code: 'USD',
+    currency_code: "USD",
   });
   return `https://www.paypal.com/donate?${consulta.toString()}`;
 }

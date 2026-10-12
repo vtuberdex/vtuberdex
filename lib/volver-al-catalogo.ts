@@ -7,7 +7,7 @@
  * cae en `/`. Solo se guarda y se reconstruye el QUERYSTRING; el destino siempre es `/?…` del propio
  * sitio, así que un valor manipulado en el almacenamiento no puede mandar al visitante a otro dominio.
  */
-export const CLAVE_CATALOGO = 'vtuberdex:catalogo';
+export const CLAVE_CATALOGO = "vtuberdex:catalogo";
 
 export function guardarCatalogo(queryString: string): void {
   try {
@@ -20,10 +20,12 @@ export function guardarCatalogo(queryString: string): void {
 /** Ruta del catálogo tal como se dejó: `/` o `/?page=3&…`. */
 export function rutaDelCatalogo(): string {
   try {
-    const guardado = window.sessionStorage.getItem(CLAVE_CATALOGO) ?? '';
+    const guardado = window.sessionStorage.getItem(CLAVE_CATALOGO) ?? "";
     // Solo un querystring plausible: sin saltos, sin esquema ni "//" que cambiarían el destino.
-    return guardado && /^[\w%.,=&+~\-:*@!$'()]*$/.test(guardado) ? `/?${guardado}` : '/';
+    return guardado && /^[\w%.,=&+~\-:*@!$'()]*$/.test(guardado)
+      ? `/?${guardado}`
+      : "/";
   } catch {
-    return '/';
+    return "/";
   }
 }

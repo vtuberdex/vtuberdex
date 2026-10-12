@@ -9,14 +9,14 @@
  * Corre con el entorno de producción (Turso: likes, XP de juego, premium y ediciones) o informará con la
  * base empaquetada y sin likes. El nivel «antes» es el que traía la ficha o el mantenedor.
  */
-import { dbConDiario } from '../lib/diario.mjs';
-import { contarLikes, experienciaDe } from '../lib/likes.mjs';
-import { xpJuegoDe } from '../lib/minecraft.mjs';
-import { searchVtubers } from '../server/src/search.mjs';
+import { dbConDiario } from "../lib/diario.mjs";
+import { contarLikes, experienciaDe } from "../lib/likes.mjs";
+import { xpJuegoDe } from "../lib/minecraft.mjs";
+import { searchVtubers } from "../server/src/search.mjs";
 
 const args = process.argv.slice(2);
-const slug = args.includes('--slug') ? args[args.indexOf('--slug') + 1] : null;
-const comoJson = args.includes('--json');
+const slug = args.includes("--slug") ? args[args.indexOf("--slug") + 1] : null;
+const comoJson = args.includes("--json");
 
 const db = await dbConDiario();
 // `searchVtubers` pagina (100 como máximo): se recorre hasta agotar las páginas.
@@ -29,9 +29,20 @@ for (let page = 1, paginas = 1; page <= paginas; page += 1) {
 const filas = [];
 for (const card of cartas) {
   if (slug && card.slug !== slug) continue;
-  const [likes, xpJuego] = await Promise.all([contarLikes(card.id), xpJuegoDe(card.id)]);
+  const [likes, xpJuego] = await Promise.all([
+    contarLikes(card.id),
+    xpJuegoDe(card.id),
+  ]);
   const exp = experienciaDe(card, likes, xpJuego);
-  filas.push({ dex: card.dexNumber, slug: card.slug, antes: card.level ?? null, despues: exp.level, likes, premium: card.premium?.grade ?? null, ...exp.desglose });
+  filas.push({
+    dex: card.dexNumber,
+    slug: card.slug,
+    antes: card.level ?? null,
+    despues: exp.level,
+    likes,
+    premium: card.premium?.grade ?? null,
+    ...exp.desglose,
+  });
 }
 
 if (comoJson) {
@@ -40,10 +51,18 @@ if (comoJson) {
   console.table(filas);
 } else {
   const niveles = filas.map((f) => f.despues).sort((a, b) => a - b);
-  const q = (p) => niveles[Math.min(niveles.length - 1, Math.floor(niveles.length * p))];
-  console.log(`${filas.length} fichas · nivel después: min ${niveles[0]} · p50 ${q(0.5)} · p90 ${q(0.9)} · max ${niveles.at(-1)}`);
-  console.log('Top 15:');
+  const q = (p) =>
+    niveles[Math.min(niveles.length - 1, Math.floor(niveles.length * p))];
+  console.log(
+    `${filas.length} fichas · nivel después: min ${niveles[0]} · p50 ${q(0.5)} · p90 ${q(0.9)} · max ${niveles.at(-1)}`,
+  );
+  console.log("Top 15:");
   console.table([...filas].sort((a, b) => b.total - a.total).slice(0, 15));
-  console.log('Fichas que más bajan de nivel:');
-  console.table(filas.filter((f) => f.antes !== null && f.despues < f.antes).sort((a, b) => b.antes - b.despues - (a.antes - a.despues)).slice(0, 15));
+  console.log("Fichas que más bajan de nivel:");
+  console.table(
+    filas
+      .filter((f) => f.antes !== null && f.despues < f.antes)
+      .sort((a, b) => b.antes - b.despues - (a.antes - a.despues))
+      .slice(0, 15),
+  );
 }

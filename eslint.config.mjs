@@ -33,11 +33,11 @@
  *
  * Uso: `npm run lint` (falla el proceso si hay cualquier error).
  */
-import js from '@eslint/js';
-import { defineConfig, globalIgnores } from 'eslint/config';
-import nextVitals from 'eslint-config-next/core-web-vitals';
-import nextTs from 'eslint-config-next/typescript';
-import globals from 'globals';
+import js from "@eslint/js";
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+import globals from "globals";
 
 export default defineConfig([
   /**
@@ -51,17 +51,17 @@ export default defineConfig([
    * `scraper/cache/` son datos crudos del scrape (HTML y dataset), no código.
    */
   globalIgnores([
-    '.next/**',
-    'out/**',
-    'build/**',
-    'next-env.d.ts',
-    'deploy/**',
-    'data/**',
-    'public/**',
-    '.verify-stage/**',
-    'scraper/out/**',
-    'scraper/cache/**',
-    'tsconfig.tsbuildinfo',
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "deploy/**",
+    "data/**",
+    "public/**",
+    ".verify-stage/**",
+    "scraper/out/**",
+    "scraper/cache/**",
+    "tsconfig.tsbuildinfo",
   ]),
 
   // --- front (Next 16 + React 19) -------------------------------------------
@@ -102,7 +102,11 @@ export default defineConfig([
    *     comportamiento es el esperado.
    */
   {
-    files: ['app/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}', 'lib/**/*.{ts,tsx}'],
+    files: [
+      "app/**/*.{ts,tsx}",
+      "components/**/*.{ts,tsx}",
+      "lib/**/*.{ts,tsx}",
+    ],
     rules: {
       /**
        * La versión de TypeScript de `no-unused-vars` que trae el preset NO hereda
@@ -112,13 +116,17 @@ export default defineConfig([
        * propósito — el preset de Next ya lo deja así y no es motivo para no
        * desplegar —, pero con el mismo criterio que en el resto del repo.
        */
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' },
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrors: "none",
+        },
       ],
-      'react-hooks/immutability': 'off',
-      'react-hooks/refs': 'off',
-      'react-hooks/set-state-in-effect': 'off',
+      "react-hooks/immutability": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
       /**
        * `<img>` en vez de `next/image`: decisión del repo, no descuido. La
        * optimización de imágenes está DESACTIVADA en `next.config.mjs`
@@ -129,18 +137,18 @@ export default defineConfig([
        * envoltorio sobre `<img>`: no aporta LCP ni ancho de banda, y sí añade
        * un componente cliente donde no hace falta.
        */
-      '@next/next/no-img-element': 'off',
+      "@next/next/no-img-element": "off",
     },
   },
 
   // --- JavaScript de Node (scripts, configs, server y scraper) --------------
   {
     files: [
-      'scripts/**/*.mjs',
-      '*.config.mjs',
-      '*.config.mts',
-      'server/**/*.mjs',
-      'scraper/**/*.mjs',
+      "scripts/**/*.mjs",
+      "*.config.mjs",
+      "*.config.mts",
+      "server/**/*.mjs",
+      "scraper/**/*.mjs",
       // `lib/**/*.mjs` es el huérfano que dejaba pasar el fallo más caro del mantenedor.
       //
       // Son la capa de datos que importan las rutas de Next (`ediciones.mjs`, `db.mjs`,
@@ -151,12 +159,12 @@ export default defineConfig([
       // Medido: un `EXTENSION_DE_CARPETA is not defined` por un import que faltaba pasó
       // `typecheck`, `test` y `build` en verde y solo apareció como un 500 en la ruta del
       // mantenedor de producción. Con `no-undef` activo, el linter lo señala en el acto.
-      'lib/**/*.mjs',
+      "lib/**/*.mjs",
     ],
     extends: [js.configs.recommended],
     languageOptions: {
       ecmaVersion: 2023,
-      sourceType: 'module',
+      sourceType: "module",
       /**
        * `globals.node` y no `globals['node/builtin']`: en este repo el código de
        * Node usa `process`, `console`, `Buffer` y también temporizadores
@@ -173,34 +181,36 @@ export default defineConfig([
        * Sin esta regla el linter obliga a inventar nombres o a borrar parámetros
        * que la firma necesita.
        */
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }],
+      "no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrors: "none",
+        },
+      ],
       /**
        * El preset de TypeScript ya activa su propia versión de `no-unused-vars`
        * como AVISO, y estos archivos (`.mjs`) también pasan por él. Se apaga esa
        * para no reportar el mismo hallazgo dos veces: en este bloque manda la
        * regla de arriba, que falla en vez de avisar.
        */
-      '@typescript-eslint/no-unused-vars': 'off',
+      "@typescript-eslint/no-unused-vars": "off",
       /**
        * `no-empty` se relaja solo para bloques con comentario dentro: el repo
        * documenta mucho el POR QUÉ, y los `catch {}` que explican que el error
        * es esperable (ver `unstage()` en `verify-vercel-bundle.mjs`) no son
        * código muerto.
        */
-      'no-empty': ['error', { allowEmptyCatch: true }],
+      "no-empty": ["error", { allowEmptyCatch: true }],
       // Los scripts usan `console` para informar; es su salida, no un descuido.
-      'no-console': 'off',
+      "no-console": "off",
     },
   },
 
   // --- tests (vitest en la raíz, `node --test` en server y scraper) ---------
   {
-    files: [
-      '**/*.test.ts',
-      '**/*.test.tsx',
-      '**/*.test.mjs',
-      'test/**',
-    ],
+    files: ["**/*.test.ts", "**/*.test.tsx", "**/*.test.mjs", "test/**"],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -209,15 +219,15 @@ export default defineConfig([
          * usan `describe`/`it`/`expect` sin importarlos. Sin declararlos aquí,
          * el linter marcaría cada test como `no-undef`.
          */
-        describe: 'readonly',
-        it: 'readonly',
-        test: 'readonly',
-        expect: 'readonly',
-        vi: 'readonly',
-        beforeEach: 'readonly',
-        afterEach: 'readonly',
-        beforeAll: 'readonly',
-        afterAll: 'readonly',
+        describe: "readonly",
+        it: "readonly",
+        test: "readonly",
+        expect: "readonly",
+        vi: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly",
+        beforeAll: "readonly",
+        afterAll: "readonly",
       },
     },
   },

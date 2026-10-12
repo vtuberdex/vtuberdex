@@ -11,18 +11,29 @@
  * (`?q=`, `?page=`…) y son vistas del mismo catálogo; dejarlas indexables multiplicaría
  * páginas casi idénticas. Las fichas se descubren por el sitemap y por el JSON-LD.
  */
-import type { Metadata } from 'next';
-import { Suspense } from 'react';
+import type { Metadata } from "next";
+import { Suspense } from "react";
 
-import { CatalogPage } from '@/components/catalog-page';
-import { fichasPublicadas } from '@/lib/seo-datos.mjs';
-import { DESCRIPCION_SITIO, NOMBRE_SITIO, jsonLdDelIndice, serializarJsonLd } from '@/lib/seo';
+import { CatalogPage } from "@/components/catalog-page";
+import { fichasPublicadas } from "@/lib/seo-datos.mjs";
+import {
+  DESCRIPCION_SITIO,
+  NOMBRE_SITIO,
+  jsonLdDelIndice,
+  serializarJsonLd,
+} from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: { absolute: `${NOMBRE_SITIO} · catálogo de VTubers hispanohablantes con cartas 3D` },
+  title: {
+    absolute: `${NOMBRE_SITIO} · catálogo de VTubers hispanohablantes con cartas 3D`,
+  },
   description: DESCRIPCION_SITIO,
-  alternates: { canonical: '/' },
-  openGraph: { title: `${NOMBRE_SITIO} · catálogo de VTubers`, description: DESCRIPCION_SITIO, url: '/' },
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: `${NOMBRE_SITIO} · catálogo de VTubers`,
+    description: DESCRIPCION_SITIO,
+    url: "/",
+  },
 };
 
 /** Cuántas fichas se listan en el JSON-LD: una muestra, el resto sale del sitemap. */
@@ -38,12 +49,16 @@ function Fallback() {
 
 export default async function CatalogRoute() {
   // Si la base falla el catálogo sigue funcionando: solo se pierde el JSON-LD de la lista.
-  const fichas = await fichasPublicadas({ limit: FICHAS_EN_JSON_LD }).catch(() => []);
+  const fichas = await fichasPublicadas({ limit: FICHAS_EN_JSON_LD }).catch(
+    () => [],
+  );
   return (
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializarJsonLd(jsonLdDelIndice(fichas)) }}
+        dangerouslySetInnerHTML={{
+          __html: serializarJsonLd(jsonLdDelIndice(fichas)),
+        }}
       />
       <Suspense fallback={<Fallback />}>
         <CatalogPage />

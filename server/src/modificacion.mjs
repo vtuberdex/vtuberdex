@@ -14,9 +14,9 @@
  *   · Avatar y logo llegan como ENLACE y NO se aplican solos: el mantenedor descarga y sube la imagen
  *     por el gestor, igual que con una inscripción. Se devuelven aparte (`imagenes`) para que lo vea.
  */
-import { SolicitudError, camposDeFicha } from './solicitudes.mjs';
-import { getVtuberBySlug } from './search.mjs';
-import { normalizeText, slugify } from './text.mjs';
+import { SolicitudError, camposDeFicha } from "./solicitudes.mjs";
+import { getVtuberBySlug } from "./search.mjs";
+import { normalizeText, slugify } from "./text.mjs";
 
 /**
  * Busca la ficha que pidió la solicitud: por `/v/<slug>` (o una URL completa), por slug, por nombre
@@ -30,47 +30,73 @@ import { normalizeText, slugify } from './text.mjs';
  * nunca manda sobre un nombre que sí coincide con otra ficha.
  */
 export function fichaDeLaSolicitud(db, referencia) {
-  const texto = String(referencia ?? '').trim();
+  const texto = String(referencia ?? "").trim();
   const delEnlace = texto.match(/\/v\/([^/?#\s]+)/i)?.[1];
   const marcaDex = /(?:^|\s)#\s*(\d{1,4})(?=\s|$|[.,;:\-–—)])/;
   const dex = delEnlace ? null : texto.match(marcaDex)?.[1];
-  const sinDex = delEnlace ? texto : texto.replace(marcaDex, ' ').replace(/\s+/g, ' ').trim();
+  const sinDex = delEnlace
+    ? texto
+    : texto.replace(marcaDex, " ").replace(/\s+/g, " ").trim();
 
   const nombre = normalizeText(sinDex);
 
   // Nombre Y número a la vez: la ficha que cumple las dos cosas gana a cualquier otra con el mismo
   // slug o nombre (con dos fichas llamadas igual, «#77 GKuro» no puede caer en la primera por slug).
   if (dex !== null && dex !== undefined && nombre) {
-    const exactas = db.prepare('SELECT slug FROM vtuber WHERE dex_number = ? AND search_name = ?').all(Number(dex), nombre);
-    if (exactas.length === 1) return getVtuberBySlug(db, exactas[0].slug, { includeHidden: true });
+    const exactas = db
+      .prepare(
+        "SELECT slug FROM vtuber WHERE dex_number = ? AND search_name = ?",
+      )
+      .all(Number(dex), nombre);
+    if (exactas.length === 1)
+      return getVtuberBySlug(db, exactas[0].slug, { includeHidden: true });
   }
 
-  const candidatos = [delEnlace, slugify(sinDex), slugify(texto)].filter(Boolean);
+  const candidatos = [delEnlace, slugify(sinDex), slugify(texto)].filter(
+    Boolean,
+  );
   for (const slug of new Set(candidatos)) {
     let ficha = null;
     try {
-      ficha = getVtuberBySlug(db, decodeURIComponent(slug), { includeHidden: true });
+      ficha = getVtuberBySlug(db, decodeURIComponent(slug), {
+        includeHidden: true,
+      });
     } catch {
       /* un %xx mal formado en el enlace no debe tumbar la resolución */
     }
     if (ficha) return ficha;
   }
 
-  const porNombre = nombre ? db.prepare('SELECT slug FROM vtuber WHERE search_name = ?').all(nombre) : [];
-  if (porNombre.length === 1) return getVtuberBySlug(db, porNombre[0].slug, { includeHidden: true });
+  const porNombre = nombre
+    ? db.prepare("SELECT slug FROM vtuber WHERE search_name = ?").all(nombre)
+    : [];
+  if (porNombre.length === 1)
+    return getVtuberBySlug(db, porNombre[0].slug, { includeHidden: true });
 
   if (dex !== null && dex !== undefined) {
-    const porDex = db.prepare('SELECT slug FROM vtuber WHERE dex_number = ?').all(Number(dex));
+    const porDex = db
+      .prepare("SELECT slug FROM vtuber WHERE dex_number = ?")
+      .all(Number(dex));
     // Varias con el mismo nombre: el número decide cuál. Sin nombre escrito: el número es todo lo que hay.
-    const pool = porNombre.length > 1 ? porNombre.filter((n) => porDex.some((d) => d.slug === n.slug)) : nombre ? [] : porDex;
-    if (pool.length === 1) return getVtuberBySlug(db, pool[0].slug, { includeHidden: true });
+    const pool =
+      porNombre.length > 1
+        ? porNombre.filter((n) => porDex.some((d) => d.slug === n.slug))
+        : nombre
+          ? []
+          : porDex;
+    if (pool.length === 1)
+      return getVtuberBySlug(db, pool[0].slug, { includeHidden: true });
   }
 
-  const detalle = porNombre.length > 1 ? 'hay varias fichas con ese nombre: pídele su dirección /v/…' : 'no se encontró esa ficha';
-  throw new SolicitudError(404, 'ficha_no_encontrada', detalle);
+  const detalle =
+    porNombre.length > 1
+      ? "hay varias fichas con ese nombre: pídele su dirección /v/…"
+      : "no se encontró esa ficha";
+  throw new SolicitudError(404, "ficha_no_encontrada", detalle);
 }
 
-const igual = (a, b) => normalizeText(String(a ?? '')) === normalizeText(String(b ?? ''));
+const igual = (a, b) =>
+  normalizeText(String(a ?? "")) === normalizeText(String(b ?? ""));
 
 /**
  * @param {import('node:sqlite').DatabaseSync} db
@@ -88,12 +114,18 @@ export function prepararModificacion(db, solicitud, { ficha = null } = {}) {
   if (d.country) patch.countries = [d.country];
   if (d.languages?.length) patch.languages = d.languages;
 
-  if (modeler && !(actual.artists ?? []).some((nombre) => igual(nombre, modeler))) {
+  if (
+    modeler &&
+    !(actual.artists ?? []).some((nombre) => igual(nombre, modeler))
+  ) {
     patch.artists = [modeler, ...(actual.artists ?? [])];
   }
 
   if (perfil.length) {
-    const filas = (actual.profile ?? []).map(({ label, value }) => ({ label, value }));
+    const filas = (actual.profile ?? []).map(({ label, value }) => ({
+      label,
+      value,
+    }));
     for (const nueva of perfil) {
       const indice = filas.findIndex((fila) => igual(fila.label, nueva.label));
       if (indice >= 0) filas[indice] = nueva;
@@ -105,10 +137,16 @@ export function prepararModificacion(db, solicitud, { ficha = null } = {}) {
   if (d.socials?.length) {
     // Se conservan label e icon de la red existente; las nulas se descartan para pasar el esquema.
     const redes = (actual.socials ?? []).map((red) =>
-      Object.fromEntries(Object.entries(red).filter(([, valor]) => valor !== null && valor !== undefined)),
+      Object.fromEntries(
+        Object.entries(red).filter(
+          ([, valor]) => valor !== null && valor !== undefined,
+        ),
+      ),
     );
     for (const nueva of d.socials) {
-      const indice = redes.findIndex((red) => igual(red.platform, nueva.platform));
+      const indice = redes.findIndex((red) =>
+        igual(red.platform, nueva.platform),
+      );
       if (indice >= 0) redes[indice] = { ...redes[indice], url: nueva.url };
       else redes.push({ platform: nueva.platform, url: nueva.url });
     }

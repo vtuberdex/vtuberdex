@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Gestión de las imágenes de un VTuber desde el mantenedor.
  *
@@ -24,12 +24,12 @@
  * formulario. El padre recibe el detalle nuevo, el gestor actualiza su propio
  * timestamp de caché y la imagen se redibuja sin salir de la ficha.
  */
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useRef, useState, type ChangeEvent } from "react";
 
-import { api } from '@/lib/api';
-import { canvasABlob, cargarBitmap } from '@/lib/imagen-cliente';
-import type { UploadKind, VtuberDetail } from '@/lib/types';
-import { ToastContainer, useToasts } from '@/components/toast';
+import { api } from "@/lib/api";
+import { canvasABlob, cargarBitmap } from "@/lib/imagen-cliente";
+import type { UploadKind, VtuberDetail } from "@/lib/types";
+import { ToastContainer, useToasts } from "@/components/toast";
 
 /**
  * Imágenes que el mantenedor puede gestionar.
@@ -55,13 +55,21 @@ import { ToastContainer, useToasts } from '@/components/toast';
  *               nunca. Se retiró con su carpeta para no publicar 33 MB inútiles.
  */
 const KINDS: Array<{ kind: ManagedKind; label: string; hint: string }> = [
-  { kind: 'character', label: 'Personaje', hint: 'El personaje recortado, en proporción de carta (si viene más ancho, se recorta)' },
   {
-    kind: 'background',
-    label: 'Fondo',
-    hint: 'Capa que va POR DETRÁS del personaje, con su propio holograma más intenso. En las fichas cuyo personaje es un rectángulo opaco solo se ve por los bordes',
+    kind: "character",
+    label: "Personaje",
+    hint: "El personaje recortado, en proporción de carta (si viene más ancho, se recorta)",
   },
-  { kind: 'logo', label: 'Logo', hint: 'Logotipo rectangular; se recorta el margen transparente' },
+  {
+    kind: "background",
+    label: "Fondo",
+    hint: "Capa que va POR DETRÁS del personaje, con su propio holograma más intenso. En las fichas cuyo personaje es un rectángulo opaco solo se ve por los bordes",
+  },
+  {
+    kind: "logo",
+    label: "Logo",
+    hint: "Logotipo rectangular; se recorta el margen transparente",
+  },
 ];
 
 /**
@@ -72,19 +80,22 @@ const KINDS: Array<{ kind: ManagedKind; label: string; hint: string }> = [
  *   - carta → apaisada en la previsualización (0.56)
  */
 const KIND_SHAPE: Record<ManagedKind, { ratio: number; note: string }> = {
-  character: { ratio: 1.4, note: 'proporción de carta' },
-  background: { ratio: 1.4, note: 'proporción de carta' },
-  logo: { ratio: 0, note: 'rectangular (natural)' },
-  card: { ratio: 0.56, note: 'apaisada (legacy)' },
+  character: { ratio: 1.4, note: "proporción de carta" },
+  background: { ratio: 1.4, note: "proporción de carta" },
+  logo: { ratio: 0, note: "rectangular (natural)" },
+  card: { ratio: 0.56, note: "apaisada (legacy)" },
 };
 
-const ACCEPT = 'image/*,.png,.jpg,.jpeg,.webp,.gif,.avif,.tif,.tiff,.svg';
+const ACCEPT = "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif,.tif,.tiff,.svg";
 
 /**
  * Tipos gestionables desde el mantenedor: un subconjunto de `UploadKind`
  * (la API acepta más tipos de los que aquí se administran).
  */
-type ManagedKind = Extract<UploadKind, 'character' | 'background' | 'logo' | 'card'>;
+type ManagedKind = Extract<
+  UploadKind,
+  "character" | "background" | "logo" | "card"
+>;
 
 /**
  * Lienzo de normalización por tipo, en píxeles. `null` = no se toca el encuadre.
@@ -113,8 +124,8 @@ const TARGET: Partial<Record<ManagedKind, { w: number; h: number }>> = {
  */
 async function preparar(file: File, kind: ManagedKind): Promise<Blob> {
   const target = TARGET[kind];
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
   if (!ctx) return file;
   /**
    * `createImageBitmap` no existe en navegadores antiguos. Se comprueba ANTES de
@@ -141,7 +152,7 @@ async function preparar(file: File, kind: ManagedKind): Promise<Blob> {
   }
   bitmap.close?.();
 
-  return (await canvasABlob(canvas, 'image/webp', 0.92)) ?? file;
+  return (await canvasABlob(canvas, "image/webp", 0.92)) ?? file;
 }
 
 interface Props {
@@ -152,7 +163,7 @@ interface Props {
 
 /** Formatea bytes para mostrarlos en la ficha. */
 function human(bytes: number | undefined): string {
-  if (!bytes) return '—';
+  if (!bytes) return "—";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
@@ -168,9 +179,9 @@ function human(bytes: number | undefined): string {
  * que acaba de recibir los bytes— es la que manda.
  */
 function conVersion(path: string, version: number | undefined): string {
-  const [base, query = ''] = path.split('?');
+  const [base, query = ""] = path.split("?");
   const parametros = new URLSearchParams(query);
-  parametros.set('v', String(version ?? 0));
+  parametros.set("v", String(version ?? 0));
   return `${base}?${parametros.toString()}`;
 }
 
@@ -178,8 +189,12 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
   const [busy, setBusy] = useState<ManagedKind | null>(null);
   const [dragging, setDragging] = useState<ManagedKind | null>(null);
   /** Marca de tiempo por tipo para forzar la recarga de la vista previa. */
-  const [versions, setVersions] = useState<Partial<Record<ManagedKind, number>>>({});
-  const inputs = useRef<Partial<Record<ManagedKind, HTMLInputElement | null>>>({});
+  const [versions, setVersions] = useState<
+    Partial<Record<ManagedKind, number>>
+  >({});
+  const inputs = useRef<Partial<Record<ManagedKind, HTMLInputElement | null>>>(
+    {},
+  );
   const { toasts, add: addToast, remove: removeToast } = useToasts();
 
   /**
@@ -188,7 +203,14 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
    * imagen en disco sin fila de asset (p. ej. el radar solo existe en 211 fichas),
    * y decir "sin imagen" cuando sí la hay confundiría al mantenedor.
    */
-  const infoFor = (kind: ManagedKind): { path: string | null; width: number | null; height: number | null; bytes: number | null } => {
+  const infoFor = (
+    kind: ManagedKind,
+  ): {
+    path: string | null;
+    width: number | null;
+    height: number | null;
+    bytes: number | null;
+  } => {
     const fromAssets = detail.assets?.find((a) => a.kind === kind);
     if (fromAssets) {
       return {
@@ -198,13 +220,23 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
         bytes: fromAssets.bytes ?? null,
       };
     }
-    return { path: detail.images[kind], width: null, height: null, bytes: null };
+    return {
+      path: detail.images[kind],
+      width: null,
+      height: null,
+      bytes: null,
+    };
   };
 
   const upload = async (kind: ManagedKind, file: File) => {
     setBusy(kind);
     try {
-      const result = await api.uploadImage(token, detail.id, kind, await preparar(file, kind));
+      const result = await api.uploadImage(
+        token,
+        detail.id,
+        kind,
+        await preparar(file, kind),
+      );
       /**
        * `onUpdated` solo se llama si la respuesta trae el detalle.
        *
@@ -215,16 +247,25 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
        * diagnosticar en vez de parecer que el dato desapareció.
        */
       if (!result?.vtuber) {
-        addToast('error', `${kind}: el servidor no devolvió la ficha actualizada (respuesta incompleta). Recarga la página.`);
+        addToast(
+          "error",
+          `${kind}: el servidor no devolvió la ficha actualizada (respuesta incompleta). Recarga la página.`,
+        );
         return;
       }
       onUpdated(result.vtuber);
       setVersions((v) => ({ ...v, [kind]: Date.now() }));
       const a = result.asset;
-      const aviso = a?.alphaLost ? ' (el original no tenía transparencia)' : '';
-      addToast('ok', `${kind}: reemplazado por un WebP de ${a?.width ?? '?'}×${a?.height ?? '?'} — ${human(a?.bytes)}${aviso}`);
+      const aviso = a?.alphaLost ? " (el original no tenía transparencia)" : "";
+      addToast(
+        "ok",
+        `${kind}: reemplazado por un WebP de ${a?.width ?? "?"}×${a?.height ?? "?"} — ${human(a?.bytes)}${aviso}`,
+      );
     } catch (error) {
-      addToast('error', `${kind}: ${error instanceof Error ? error.message : 'error al subir'}`);
+      addToast(
+        "error",
+        `${kind}: ${error instanceof Error ? error.message : "error al subir"}`,
+      );
     } finally {
       setBusy(null);
     }
@@ -235,33 +276,46 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
     try {
       const result = await api.deleteImage(token, detail.id, kind);
       if (!result?.vtuber) {
-        addToast('error', `${kind}: el servidor no devolvió la ficha actualizada (respuesta incompleta). Recarga la página.`);
+        addToast(
+          "error",
+          `${kind}: el servidor no devolvió la ficha actualizada (respuesta incompleta). Recarga la página.`,
+        );
         return;
       }
       onUpdated(result.vtuber);
       setVersions((v) => ({ ...v, [kind]: Date.now() }));
-      addToast('ok', `${kind}: imagen eliminada`);
+      addToast("ok", `${kind}: imagen eliminada`);
     } catch (error) {
-      addToast('error', `${kind}: ${error instanceof Error ? error.message : 'error al borrar'}`);
+      addToast(
+        "error",
+        `${kind}: ${error instanceof Error ? error.message : "error al borrar"}`,
+      );
     } finally {
       setBusy(null);
     }
   };
 
-  const onPick = (kind: ManagedKind) => (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    // Se limpia el input para poder volver a elegir el MISMO archivo después.
-    event.target.value = '';
-    if (file) void upload(kind, file);
-  };
+  const onPick =
+    (kind: ManagedKind) => (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      // Se limpia el input para poder volver a elegir el MISMO archivo después.
+      event.target.value = "";
+      if (file) void upload(kind, file);
+    };
 
   return (
-    <section className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/60 p-5" data-testid="admin-images">
+    <section
+      className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/60 p-5"
+      data-testid="admin-images"
+    >
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-bold uppercase tracking-wide text-dex-text">Imágenes</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wide text-dex-text">
+          Imágenes
+        </h3>
         <p className="text-xs text-dex-muted">
-          Cualquier formato se convierte a WebP optimizado; se conserva la transparencia.
+          Cualquier formato se convierte a WebP optimizado; se conserva la
+          transparencia.
         </p>
       </header>
 
@@ -275,14 +329,18 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
             <li
               key={kind}
               className={`space-y-2 rounded-xl border p-3 transition ${
-                dragging === kind ? 'border-dex-accent bg-dex-accent/10' : 'border-dex-line/70 bg-black/20'
+                dragging === kind
+                  ? "border-dex-accent bg-dex-accent/10"
+                  : "border-dex-line/70 bg-black/20"
               }`}
               // Arrastrar y soltar: es lo más natural para quien sube su primera imagen.
               onDragOver={(event) => {
                 event.preventDefault();
                 setDragging(kind);
               }}
-              onDragLeave={() => setDragging((current) => (current === kind ? null : current))}
+              onDragLeave={() =>
+                setDragging((current) => (current === kind ? null : current))
+              }
               onDrop={(event) => {
                 event.preventDefault();
                 setDragging(null);
@@ -291,13 +349,18 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
               }}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-bold uppercase tracking-wide text-dex-text">{label}</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-dex-text">
+                  {label}
+                </span>
                 {info.width ? (
                   <span className="font-mono text-[10px] text-dex-muted">
-                    {info.width}×{info.height} · {human(info.bytes ?? undefined)}
+                    {info.width}×{info.height} ·{" "}
+                    {human(info.bytes ?? undefined)}
                   </span>
                 ) : (
-                  <span className="font-mono text-[10px] text-amber-300/80">sin imagen</span>
+                  <span className="font-mono text-[10px] text-amber-300/80">
+                    sin imagen
+                  </span>
                 )}
               </div>
 
@@ -310,13 +373,14 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
                   className="flex items-center justify-center overflow-hidden rounded-lg border border-dex-line/60"
                   style={{
                     backgroundImage:
-                      'linear-gradient(45deg, #2a2a32 25%, transparent 25%), linear-gradient(-45deg, #2a2a32 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a32 75%), linear-gradient(-45deg, transparent 75%, #2a2a32 75%)',
-                    backgroundSize: '12px 12px',
-                    backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0',
-                    height: '112px',
+                      "linear-gradient(45deg, #2a2a32 25%, transparent 25%), linear-gradient(-45deg, #2a2a32 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a32 75%), linear-gradient(-45deg, transparent 75%, #2a2a32 75%)",
+                    backgroundSize: "12px 12px",
+                    backgroundPosition: "0 0, 0 6px, 6px -6px, -6px 0",
+                    height: "112px",
                     // ratio 0 = proporción natural (logos, muy variables).
-                    aspectRatio: shape.ratio > 0 ? `1 / ${shape.ratio}` : undefined,
-                    width: shape.ratio > 0 ? undefined : '100%',
+                    aspectRatio:
+                      shape.ratio > 0 ? `1 / ${shape.ratio}` : undefined,
+                    width: shape.ratio > 0 ? undefined : "100%",
                   }}
                 >
                   {info.path ? (
@@ -333,7 +397,9 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
               </div>
 
               <p className="text-[11px] leading-snug text-dex-muted">{hint}</p>
-              <p className="text-[11px] text-dex-muted/80">Arrastra una imagen sobre esta tarjeta o usa el botón.</p>
+              <p className="text-[11px] text-dex-muted/80">
+                Arrastra una imagen sobre esta tarjeta o usa el botón.
+              </p>
 
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -352,7 +418,7 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
                   onClick={() => inputs.current[kind]?.click()}
                   className="rounded-lg bg-teal-500/20 px-3 py-1.5 text-xs font-semibold text-teal-100 transition hover:bg-teal-500/30 disabled:opacity-50"
                 >
-                  {working ? 'Subiendo…' : info.path ? 'Reemplazar' : 'Subir'}
+                  {working ? "Subiendo…" : info.path ? "Reemplazar" : "Subir"}
                 </button>
                 {info.path && (
                   <button

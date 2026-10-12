@@ -38,16 +38,16 @@ vtuberdex.com  ──scraper──▶  dataset.json ──seed──▶  SQLite 
 
 ## Datos extraídos (evidencia real del scrape)
 
-| Métrica | Valor |
-| --- | --- |
-| Cartas del index | **785** |
-| Fichas de detalle encontradas | **211** |
+| Métrica                        | Valor                              |
+| ------------------------------ | ---------------------------------- |
+| Cartas del index               | **785**                            |
+| Fichas de detalle encontradas  | **211**                            |
 | Cartas solo con datos de index | 574 (no tienen ficha en el origen) |
-| Imágenes de carta + miniatura | 785 + 785 |
-| Logos / avatares / radares | 154 / 155 / 153 |
-| Países distintos | 31 |
-| Habilidades | 1055 |
-| Filas de assets | 2203 |
+| Imágenes de carta + miniatura  | 785 + 785                          |
+| Logos / avatares / radares     | 154 / 155 / 153                    |
+| Países distintos               | 31                                 |
+| Habilidades                    | 1055                               |
+| Filas de assets                | 2203                               |
 
 Notas del origen que el scraper resuelve:
 
@@ -124,24 +124,24 @@ El navegador de la otra máquina habla **solo con Next** (`:3000`); sus rutas
 `/api` y `/images` las sirve la propia app, así que funciona desde cualquier IP
 sin tocar CORS.
 
-| Acceso | URL |
-| --- | --- |
-| Front | `http://192.168.100.90:3000/` |
+| Acceso     | URL                                |
+| ---------- | ---------------------------------- |
+| Front      | `http://192.168.100.90:3000/`      |
 | Mantenedor | `http://192.168.100.90:3000/admin` |
 
 Si la IP del host cambia, el script la detecta solo (contenedor en `--network host`).
 
 ## API
 
-| Método | Ruta | Descripción |
-| --- | --- | --- |
-| GET | `/api/health` | Estado y conteos publicados |
-| GET | `/api/vtubers` | Búsqueda paginada (`q`, `countries`, `languages`, `groups`, `artists`, `factions`, `sort`, `premium=1`, `page`, `perPage`, `facet`) |
-| GET | `/api/vtubers/:slug` | Detalle + vecinos de dex |
-| POST | `/api/admin/login` | Sesión del mantenedor |
-| PATCH | `/api/admin/vtubers/:id` | Edición (nombre, color, visibilidad, relaciones, `premium: { grade } \| null`) |
-| POST | `/api/admin/vtubers/bulk-status` | Visibilidad en lote |
-| GET | `/api/admin/stats`, `/api/admin/audit` | Métricas y auditoría |
+| Método | Ruta                                   | Descripción                                                                                                                         |
+| ------ | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/health`                          | Estado y conteos publicados                                                                                                         |
+| GET    | `/api/vtubers`                         | Búsqueda paginada (`q`, `countries`, `languages`, `groups`, `artists`, `factions`, `sort`, `premium=1`, `page`, `perPage`, `facet`) |
+| GET    | `/api/vtubers/:slug`                   | Detalle + vecinos de dex                                                                                                            |
+| POST   | `/api/admin/login`                     | Sesión del mantenedor                                                                                                               |
+| PATCH  | `/api/admin/vtubers/:id`               | Edición (nombre, color, visibilidad, relaciones, `premium: { grade } \| null`)                                                      |
+| POST   | `/api/admin/vtubers/bulk-status`       | Visibilidad en lote                                                                                                                 |
+| GET    | `/api/admin/stats`, `/api/admin/audit` | Métricas y auditoría                                                                                                                |
 
 ## Tests y lint
 

@@ -1,6 +1,6 @@
-import { AbriendoDetalle } from '@/components/abriendo-detalle';
-import { AppFooter } from '@/components/app-footer';
-import { AppHeader } from '@/components/app-header';
+import { AbriendoDetalle } from "@/components/abriendo-detalle";
+import { AppFooter } from "@/components/app-footer";
+import { AppHeader } from "@/components/app-header";
 
 /**
  * Layout compartido por las páginas con el catálogo (inicio y detalle).
@@ -9,7 +9,11 @@ import { AppHeader } from '@/components/app-header';
  * rejilla) pero SIN router propio: el enrutado lo hace el App Router de Next a
  * partir de las carpetas, así que aquí solo queda el marco visual.
  */
-export default function CatalogLayout({ children }: { children: React.ReactNode }) {
+export default function CatalogLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div className="dex-grid relative min-h-screen">
       <div className="relative z-10">

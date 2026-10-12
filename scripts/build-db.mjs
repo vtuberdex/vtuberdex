@@ -17,23 +17,25 @@
  *
  * Uso: node scripts/build-db.mjs [--from data/vtuberdex.db] [--out deploy/data]
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
-import { fileURLToPath } from 'node:url';
+import fs from "node:fs";
+import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { fileURLToPath } from "node:url";
 
-import { CARPETAS_PUBLICADAS } from '../lib/carpetas.mjs';
-import { leerOpciones } from './lib/terminal.mjs';
+import { CARPETAS_PUBLICADAS } from "../lib/carpetas.mjs";
+import { leerOpciones } from "./lib/terminal.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, '..');
+const ROOT = path.resolve(HERE, "..");
 
-const { tiene: has, opcion: value } = leerOpciones(process.argv.slice(2), { conIgual: true });
+const { tiene: has, opcion: value } = leerOpciones(process.argv.slice(2), {
+  conIgual: true,
+});
 
-const SRC_DB = path.resolve(ROOT, value('from', 'data/vtuberdex.db'));
-const OUT_DIR = path.resolve(ROOT, value('out', 'deploy/data'));
-const OUT_DB = path.join(OUT_DIR, 'vtuberdex.db');
-const OUT_MANIFEST = path.join(OUT_DIR, 'images.json');
+const SRC_DB = path.resolve(ROOT, value("from", "data/vtuberdex.db"));
+const OUT_DIR = path.resolve(ROOT, value("out", "deploy/data"));
+const OUT_DB = path.join(OUT_DIR, "vtuberdex.db");
+const OUT_MANIFEST = path.join(OUT_DIR, "images.json");
 
 /**
  * `--if-missing` salta el trabajo si los artefactos ya están.
@@ -43,14 +45,14 @@ const OUT_MANIFEST = path.join(OUT_DIR, 'images.json');
  * esta bandera el build usa el artefacto ya versionado en `deploy/` y solo lo
  * regenera quien tiene los datos locales (el scraper y el seed).
  */
-const IF_MISSING = has('if-missing');
+const IF_MISSING = has("if-missing");
 
 /**
  * Tablas que NO deben viajar a producción: identifican al mantenedor y
  * registran su actividad. En Vercel no hay sesiones, así que vaciarlas no quita
  * ninguna función y sí evita publicar un artefacto de autenticación.
  */
-const CREDENTIAL_TABLES = ['admin_user', 'audit_log'];
+const CREDENTIAL_TABLES = ["admin_user", "audit_log"];
 
 /**
  * Carpetas de imagen que el front realmente pide.
@@ -98,7 +100,7 @@ function stripCredentials(db) {
  * quiso eliminar.
  */
 function vacuumAwayDeletedRows(db) {
-  db.exec('VACUUM');
+  db.exec("VACUUM");
 }
 
 /**
@@ -125,15 +127,24 @@ function assetPaths(db) {
     ...db.prepare(`SELECT icon AS p FROM faction WHERE icon IS NOT NULL`).all(),
   ];
   const unique = new Set(
-    rows.map((row) => `images/${String(row.p).replace(/^\/?images\//, '').split('?')[0]}`),
+    rows.map(
+      (row) =>
+        `images/${
+          String(row.p)
+            .replace(/^\/?images\//, "")
+            .split("?")[0]
+        }`,
+    ),
   );
-  unique.delete('images/');
+  unique.delete("images/");
   return [...unique];
 }
 
 function buildDatabase() {
   if (!fs.existsSync(SRC_DB)) {
-    console.error(`✖ falta la base de origen: ${SRC_DB} (corre: cd server && npm run seed)`);
+    console.error(
+      `✖ falta la base de origen: ${SRC_DB} (corre: cd server && npm run seed)`,
+    );
     process.exit(1);
   }
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -146,14 +157,14 @@ function buildDatabase() {
   src.exec(`VACUUM INTO '${OUT_DB.replace(/'/g, "''")}'`);
   const paths = assetPaths(src);
   const counts = {
-    vtubers: src.prepare('SELECT COUNT(*) AS n FROM vtuber').get().n,
-    assets: src.prepare('SELECT COUNT(*) AS n FROM asset').get().n,
+    vtubers: src.prepare("SELECT COUNT(*) AS n FROM vtuber").get().n,
+    assets: src.prepare("SELECT COUNT(*) AS n FROM asset").get().n,
   };
   src.close();
 
   // El saneado se hace sobre la COPIA ya materializada.
   const out = new DatabaseSync(OUT_DB);
-  out.exec('PRAGMA journal_mode = DELETE');
+  out.exec("PRAGMA journal_mode = DELETE");
   const removed = stripCredentials(out);
   // `DELETE` deja los bytes en las páginas liberadas: sin este VACUUM, el hash
   // de la contraseña del mantenedor seguía siendo recuperable del archivo que se
@@ -163,13 +174,16 @@ function buildDatabase() {
   // Se deja constancia en `meta` de que el artefacto está saneado: así el
   // propio deploy puede demostrarlo sin inspeccionar tablas.
   out
-    .prepare(`INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`)
-    .run('build_sanitized_at', new Date().toISOString());
+    .prepare(
+      `INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+    )
+    .run("build_sanitized_at", new Date().toISOString());
   let integrity = null;
   try {
-    integrity = out.prepare('PRAGMA integrity_check').get()?.integrity_check ?? null;
+    integrity =
+      out.prepare("PRAGMA integrity_check").get()?.integrity_check ?? null;
   } catch {
-    integrity = 'no_comprobado';
+    integrity = "no_comprobado";
   }
   out.close();
 
@@ -182,8 +196,10 @@ function buildDatabase() {
   // NOT NULL ...)`), que sí viaja porque el esquema es inofensivo. Buscar la
   // palabra daba un falso positivo permanente.
   const bytes = fs.readFileSync(OUT_DB);
-  if (/scrypt\$[0-9a-f]{16,}\$[0-9a-f]{32,}/.test(bytes.toString('latin1'))) {
-    console.error('✖ la base saneada TODAVÍA contiene el hash de una credencial');
+  if (/scrypt\$[0-9a-f]{16,}\$[0-9a-f]{32,}/.test(bytes.toString("latin1"))) {
+    console.error(
+      "✖ la base saneada TODAVÍA contiene el hash de una credencial",
+    );
     process.exit(1);
   }
 
@@ -213,9 +229,9 @@ function buildManifest(paths, blobBase) {
   const included = [];
   for (const rel of paths) {
     // `images/<carpeta>/<archivo>.webp` -> carpeta y ruta en disco bajo data/.
-    const folder = rel.split('/')[1];
+    const folder = rel.split("/")[1];
     if (!USED_FOLDERS.includes(folder)) continue;
-    const abs = path.join(ROOT, 'data', rel);
+    const abs = path.join(ROOT, "data", rel);
     if (!fs.existsSync(abs)) {
       missing.push(rel);
       continue;
@@ -233,7 +249,7 @@ function buildManifest(paths, blobBase) {
   return {
     manifest: {
       generatedAt: new Date().toISOString(),
-      blobBase: blobBase.replace(/\/$/, ''),
+      blobBase: blobBase.replace(/\/$/, ""),
       folders: byFolder,
       count: included.length,
       totalBytes: included.reduce((total, item) => total + item.bytes, 0),
@@ -252,19 +268,29 @@ function buildManifest(paths, blobBase) {
  * siempre, que es lo que quieren el scraper y el seed tras cambiar el dataset.
  */
 if (IF_MISSING && fs.existsSync(OUT_DB) && fs.existsSync(OUT_MANIFEST)) {
-  console.log(`[build-db] ya existen los artefactos en ${path.relative(ROOT, OUT_DIR)}; se reutilizan`);
+  console.log(
+    `[build-db] ya existen los artefactos en ${path.relative(ROOT, OUT_DIR)}; se reutilizan`,
+  );
   process.exit(0);
 }
 
-const BLOB_BASE = value('blob-base', process.env.VTUBERDEX_BLOB_BASE ?? '');
+const BLOB_BASE = value("blob-base", process.env.VTUBERDEX_BLOB_BASE ?? "");
 const { counts, removed, paths, integrity, bytes } = buildDatabase();
 const { manifest, missing } = buildManifest(paths, BLOB_BASE);
 fs.writeFileSync(OUT_MANIFEST, JSON.stringify(manifest, null, 1));
 
-console.log(`[build-db] base -> ${path.relative(ROOT, OUT_DB)} (${(bytes / 1024 / 1024).toFixed(1)} MB)`);
-console.log(`[build-db] integridad: ${integrity} | vtubers: ${counts.vtubers} | assets: ${counts.assets}`);
+console.log(
+  `[build-db] base -> ${path.relative(ROOT, OUT_DB)} (${(bytes / 1024 / 1024).toFixed(1)} MB)`,
+);
+console.log(
+  `[build-db] integridad: ${integrity} | vtubers: ${counts.vtubers} | assets: ${counts.assets}`,
+);
 console.log(`[build-db] credenciales eliminadas: ${JSON.stringify(removed)}`);
-console.log(`[build-db] imágenes publicables: ${manifest.count} (${(manifest.totalBytes / 1024 / 1024).toFixed(1)} MB) ${JSON.stringify(manifest.folders)}`);
+console.log(
+  `[build-db] imágenes publicables: ${manifest.count} (${(manifest.totalBytes / 1024 / 1024).toFixed(1)} MB) ${JSON.stringify(manifest.folders)}`,
+);
 if (missing.length > 0) {
-  console.log(`[build-db] ⚠ ${missing.length} rutas de asset referenciadas pero ausentes en disco (muestra): ${missing.slice(0, 5).join(', ')}`);
+  console.log(
+    `[build-db] ⚠ ${missing.length} rutas de asset referenciadas pero ausentes en disco (muestra): ${missing.slice(0, 5).join(", ")}`,
+  );
 }

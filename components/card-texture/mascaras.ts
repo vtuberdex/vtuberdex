@@ -9,8 +9,8 @@
  * al cálculo síncrono: el resultado es idéntico porque la matemática es la misma función
  * (`mascaras-puras.ts`).
  */
-import { CARD_TEXTURE_WIDTH } from './dimensiones';
-import { calcularMascara, type TipoMascara } from './mascaras-puras';
+import { CARD_TEXTURE_WIDTH } from "./dimensiones";
+import { calcularMascara, type TipoMascara } from "./mascaras-puras";
 
 /*
  * NOTA: aquí vivía `characterAlphaMask()`, que calculaba en CPU la silueta del
@@ -34,12 +34,14 @@ const pendientes = new Map<number, (out: Uint8ClampedArray) => void>();
 function obtenerWorker(): Worker | null {
   if (worker !== undefined) return worker;
   try {
-    if (typeof Worker === 'undefined') {
+    if (typeof Worker === "undefined") {
       worker = null;
       return null;
     }
-    worker = new Worker(new URL('./mascaras.worker.ts', import.meta.url));
-    worker.onmessage = (event: MessageEvent<{ id: number; out: Uint8ClampedArray }>) => {
+    worker = new Worker(new URL("./mascaras.worker.ts", import.meta.url));
+    worker.onmessage = (
+      event: MessageEvent<{ id: number; out: Uint8ClampedArray }>,
+    ) => {
       const resolver = pendientes.get(event.data.id);
       if (!resolver) return;
       pendientes.delete(event.data.id);
@@ -70,7 +72,10 @@ export function precalentarMascaras(): void {
 }
 
 /** Calcula la máscara en el worker si existe; si no (o si falla), en este hilo. */
-async function mascaraAsync(tipo: TipoMascara, src: ImageData): Promise<Uint8ClampedArray> {
+async function mascaraAsync(
+  tipo: TipoMascara,
+  src: ImageData,
+): Promise<Uint8ClampedArray> {
   const w = obtenerWorker();
   if (w) {
     const id = siguienteId++;
@@ -99,11 +104,15 @@ interface Preparada {
   y: number;
 }
 
-function prepararTinta(art: CanvasImageSource, width: number, height: number): Preparada | HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
+function prepararTinta(
+  art: CanvasImageSource,
+  width: number,
+  height: number,
+): Preparada | HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
   /**
    * Si el origen ya es un canvas del tamaño exacto (lo es: `flat` en `completar`), se leen sus
@@ -112,24 +121,45 @@ function prepararTinta(art: CanvasImageSource, width: number, height: number): P
    * resultado era idéntico: el canvas intermedio no escalaba nada.
    */
   const directo =
-    typeof HTMLCanvasElement !== 'undefined' && art instanceof HTMLCanvasElement && art.width === width && art.height === height
-      ? art.getContext('2d')
+    typeof HTMLCanvasElement !== "undefined" &&
+    art instanceof HTMLCanvasElement &&
+    art.width === width &&
+    art.height === height
+      ? art.getContext("2d")
       : null;
-  if (directo) return { canvas, ctx, src: directo.getImageData(0, 0, width, height), x: 0, y: 0 };
-  const artCanvas = document.createElement('canvas');
+  if (directo)
+    return {
+      canvas,
+      ctx,
+      src: directo.getImageData(0, 0, width, height),
+      x: 0,
+      y: 0,
+    };
+  const artCanvas = document.createElement("canvas");
   artCanvas.width = width;
   artCanvas.height = height;
-  const artCtx = artCanvas.getContext('2d');
+  const artCtx = artCanvas.getContext("2d");
   if (!artCtx) return canvas;
   artCtx.drawImage(art, 0, 0, width, height);
-  return { canvas, ctx, src: artCtx.getImageData(0, 0, width, height), x: 0, y: 0 };
+  return {
+    canvas,
+    ctx,
+    src: artCtx.getImageData(0, 0, width, height),
+    x: 0,
+    y: 0,
+  };
 }
 
-function prepararCobertura(logo: CanvasImageSource, box: Caja, width: number, height: number): Preparada | HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
+function prepararCobertura(
+  logo: CanvasImageSource,
+  box: Caja,
+  width: number,
+  height: number,
+): Preparada | HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
   const scale = width / CARD_TEXTURE_WIDTH;
   /**
@@ -143,16 +173,22 @@ function prepararCobertura(logo: CanvasImageSource, box: Caja, width: number, he
    * La traslación va ANTES de la escala para que el logo caiga en los mismos subpíxeles que
    * antes: la máscara resultante es idéntica píxel a píxel.
    */
-  ctx.fillStyle = '#000';
+  ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, width, height);
   const x = Math.max(0, Math.floor(box.x * scale) - 1);
   const y = Math.max(0, Math.floor(box.y * scale) - 1);
-  const w = Math.max(1, Math.min(width, Math.ceil((box.x + box.w) * scale) + 1) - x);
-  const h = Math.max(1, Math.min(height, Math.ceil((box.y + box.h) * scale) + 1) - y);
-  const tmp = document.createElement('canvas');
+  const w = Math.max(
+    1,
+    Math.min(width, Math.ceil((box.x + box.w) * scale) + 1) - x,
+  );
+  const h = Math.max(
+    1,
+    Math.min(height, Math.ceil((box.y + box.h) * scale) + 1) - y,
+  );
+  const tmp = document.createElement("canvas");
   tmp.width = w;
   tmp.height = h;
-  const tmpCtx = tmp.getContext('2d', { willReadFrequently: true });
+  const tmpCtx = tmp.getContext("2d", { willReadFrequently: true });
   if (!tmpCtx) return canvas;
   tmpCtx.translate(-x, -y);
   tmpCtx.scale(scale, scale);
@@ -167,45 +203,69 @@ function escribir(p: Preparada, pixeles: Uint8ClampedArray): HTMLCanvasElement {
   return p.canvas;
 }
 
-const esPreparada = (p: Preparada | HTMLCanvasElement): p is Preparada => 'src' in p;
+const esPreparada = (p: Preparada | HTMLCanvasElement): p is Preparada =>
+  "src" in p;
 
 /* ----------------------------------------------------------------------------
  * API.
  * ------------------------------------------------------------------------- */
 
-export function inkAndSkinMask(art: CanvasImageSource, width: number, height: number): HTMLCanvasElement {
+export function inkAndSkinMask(
+  art: CanvasImageSource,
+  width: number,
+  height: number,
+): HTMLCanvasElement {
   const p = prepararTinta(art, width, height);
   if (!esPreparada(p)) return p;
   const out = new Uint8ClampedArray(p.src.data.length);
-  calcularMascara('tinta', p.src.data, out);
+  calcularMascara("tinta", p.src.data, out);
   return escribir(p, out);
 }
 
-export async function inkAndSkinMaskAsync(art: CanvasImageSource, width: number, height: number): Promise<HTMLCanvasElement> {
+export async function inkAndSkinMaskAsync(
+  art: CanvasImageSource,
+  width: number,
+  height: number,
+): Promise<HTMLCanvasElement> {
   const p = prepararTinta(art, width, height);
   if (!esPreparada(p)) return p;
-  return escribir(p, await mascaraAsync('tinta', p.src));
+  return escribir(p, await mascaraAsync("tinta", p.src));
 }
 
-export function logoMask(logo: CanvasImageSource, box: Caja, width: number, height: number): HTMLCanvasElement {
+export function logoMask(
+  logo: CanvasImageSource,
+  box: Caja,
+  width: number,
+  height: number,
+): HTMLCanvasElement {
   const p = prepararCobertura(logo, box, width, height);
   if (!esPreparada(p)) return p;
   const out = new Uint8ClampedArray(p.src.data.length);
-  calcularMascara('cobertura', p.src.data, out);
+  calcularMascara("cobertura", p.src.data, out);
   return escribir(p, out);
 }
 
-export async function logoMaskAsync(logo: CanvasImageSource, box: Caja, width: number, height: number): Promise<HTMLCanvasElement> {
+export async function logoMaskAsync(
+  logo: CanvasImageSource,
+  box: Caja,
+  width: number,
+  height: number,
+): Promise<HTMLCanvasElement> {
   const p = prepararCobertura(logo, box, width, height);
   if (!esPreparada(p)) return p;
-  return escribir(p, await mascaraAsync('cobertura', p.src));
+  return escribir(p, await mascaraAsync("cobertura", p.src));
 }
 
-export function logoSticker(logo: CanvasImageSource, box: Caja, width: number, height: number): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
+export function logoSticker(
+  logo: CanvasImageSource,
+  box: Caja,
+  width: number,
+  height: number,
+): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
   ctx.scale(width / CARD_TEXTURE_WIDTH, width / CARD_TEXTURE_WIDTH);
   ctx.drawImage(logo, box.x, box.y, box.w, box.h);

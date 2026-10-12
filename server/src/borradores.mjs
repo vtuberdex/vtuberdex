@@ -16,8 +16,8 @@
  * sin un trabajo aparte). El correo en un borrador es un dato personal más: ver la cláusula 4 de los
  * términos.
  */
-import { PERFIL_CAMPOS, SolicitudError } from './solicitudes.mjs';
-import { preparadorDeTablas } from './db/tablas.mjs';
+import { PERFIL_CAMPOS, SolicitudError } from "./solicitudes.mjs";
+import { preparadorDeTablas } from "./db/tablas.mjs";
 
 export const VIDA_BORRADOR_MS = 60 * 24 * 60 * 60 * 1000;
 /** Tope del JSON guardado: el formulario completo no llega ni a 20 KB. */
@@ -48,7 +48,8 @@ const TEXTOS = {
   ...Object.fromEntries(PERFIL_CAMPOS.map(([clave, max]) => [clave, max])),
 };
 
-const comoTexto = (valor, max) => (typeof valor === 'string' ? valor.slice(0, max) : '');
+const comoTexto = (valor, max) =>
+  typeof valor === "string" ? valor.slice(0, max) : "";
 
 /**
  * Se queda solo con lo que el formulario conoce, recortado a su máximo. Lo que sobre se ignora (no es
@@ -61,26 +62,43 @@ const comoTexto = (valor, max) => (typeof valor === 'string' ? valor.slice(0, ma
  */
 export function sanearBorrador(entrada) {
   /** @type {Record<string, any>} */
-  const datos = entrada && typeof entrada === 'object' ? entrada : {};
+  const datos = entrada && typeof entrada === "object" ? entrada : {};
   /** @type {Record<string, any>} */
   const limpio = {};
-  for (const [clave, max] of Object.entries(TEXTOS)) limpio[clave] = comoTexto(datos[clave], max);
-  limpio.languages = Array.isArray(datos.languages) ? datos.languages.filter((c) => typeof c === 'string').map((c) => c.slice(0, 8)).slice(0, 12) : [];
+  for (const [clave, max] of Object.entries(TEXTOS))
+    limpio[clave] = comoTexto(datos[clave], max);
+  limpio.languages = Array.isArray(datos.languages)
+    ? datos.languages
+        .filter((c) => typeof c === "string")
+        .map((c) => c.slice(0, 8))
+        .slice(0, 12)
+    : [];
   limpio.socials = Array.isArray(datos.socials)
     ? datos.socials
-        .filter((r) => r && typeof r === 'object')
+        .filter((r) => r && typeof r === "object")
         .slice(0, 10)
-        .map((r) => ({ platform: comoTexto(r.platform, 40), url: comoTexto(r.url, 500) }))
+        .map((r) => ({
+          platform: comoTexto(r.platform, 40),
+          url: comoTexto(r.url, 500),
+        }))
     : [];
   limpio.paso = datos.paso === 5 ? 5 : datos.paso === 4 ? 4 : 3;
   return limpio;
 }
 
 /** Guarda (o reemplaza) el borrador de este correo. Devuelve la marca de tiempo. */
-export async function guardarBorrador(ejecutor, { email, tipo = 'inscripcion', datos, ahora = new Date() }) {
+export async function guardarBorrador(
+  ejecutor,
+  { email, tipo = "inscripcion", datos, ahora = new Date() },
+) {
   const limpio = sanearBorrador(datos);
   const json = JSON.stringify(limpio);
-  if (json.length > MAX_BYTES) throw new SolicitudError(413, 'borrador_demasiado_grande', 'El borrador es demasiado grande para guardarlo.');
+  if (json.length > MAX_BYTES)
+    throw new SolicitudError(
+      413,
+      "borrador_demasiado_grande",
+      "El borrador es demasiado grande para guardarlo.",
+    );
   const e = await conTablas(ejecutor);
   const marca = ahora.toISOString();
   await e.execute(
@@ -88,24 +106,45 @@ export async function guardarBorrador(ejecutor, { email, tipo = 'inscripcion', d
      ON CONFLICT (email, tipo) DO UPDATE SET datos = excluded.datos, actualizado = excluded.actualizado`,
     [email, tipo, json, marca],
   );
-  await e.execute('DELETE FROM borrador WHERE actualizado < ?', [new Date(ahora.getTime() - VIDA_BORRADOR_MS).toISOString()]);
+  await e.execute("DELETE FROM borrador WHERE actualizado < ?", [
+    new Date(ahora.getTime() - VIDA_BORRADOR_MS).toISOString(),
+  ]);
   return marca;
 }
 
 /** El borrador de este correo, o `null` (también si ya venció). */
-export async function leerBorrador(ejecutor, { email, tipo = 'inscripcion', ahora = new Date() }) {
+export async function leerBorrador(
+  ejecutor,
+  { email, tipo = "inscripcion", ahora = new Date() },
+) {
   const e = await conTablas(ejecutor);
-  const { rows } = await e.execute('SELECT datos, actualizado FROM borrador WHERE email = ? AND tipo = ?', [email, tipo]);
+  const { rows } = await e.execute(
+    "SELECT datos, actualizado FROM borrador WHERE email = ? AND tipo = ?",
+    [email, tipo],
+  );
   if (!rows[0]) return null;
-  if (String(rows[0].actualizado) < new Date(ahora.getTime() - VIDA_BORRADOR_MS).toISOString()) return null;
+  if (
+    String(rows[0].actualizado) <
+    new Date(ahora.getTime() - VIDA_BORRADOR_MS).toISOString()
+  )
+    return null;
   try {
-    return { datos: sanearBorrador(JSON.parse(rows[0].datos)), actualizado: rows[0].actualizado };
+    return {
+      datos: sanearBorrador(JSON.parse(rows[0].datos)),
+      actualizado: rows[0].actualizado,
+    };
   } catch {
     return null;
   }
 }
 
-export async function borrarBorrador(ejecutor, { email, tipo = 'inscripcion' }) {
+export async function borrarBorrador(
+  ejecutor,
+  { email, tipo = "inscripcion" },
+) {
   const e = await conTablas(ejecutor);
-  await e.execute('DELETE FROM borrador WHERE email = ? AND tipo = ?', [email, tipo]);
+  await e.execute("DELETE FROM borrador WHERE email = ? AND tipo = ?", [
+    email,
+    tipo,
+  ]);
 }

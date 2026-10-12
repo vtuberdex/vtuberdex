@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Gobierna CUÁNDO el `<Canvas>` dibuja. Va dentro del canvas, que debe llevar `frameloop="demand"`.
  *
@@ -18,10 +18,10 @@
  * primer frame al volver traería un `delta` de minutos y `advanceFlip` (que integra por delta)
  * saltaría el giro entero. Al reanudar se descarta con `clock.getDelta()`.
  */
-import { useEffect, useRef } from 'react';
-import { useThree } from '@react-three/fiber';
-import { RENDER } from '@/components/card3d-config';
-import { nextSchedule, shouldRender } from '@/components/render-pacing';
+import { useEffect, useRef } from "react";
+import { useThree } from "@react-three/fiber";
+import { RENDER } from "@/components/card3d-config";
+import { nextSchedule, shouldRender } from "@/components/render-pacing";
 
 export interface RenderGovernorProps {
   /** ¿Hay una animación en curso que no pasa por el puntero (giro de página, carga)? */
@@ -32,9 +32,19 @@ export interface RenderGovernorProps {
   idleFps?: number;
 }
 
-const SEÑALES = ['pointermove', 'pointerdown', 'wheel', 'keydown', 'touchstart'] as const;
+const SEÑALES = [
+  "pointermove",
+  "pointerdown",
+  "wheel",
+  "keydown",
+  "touchstart",
+] as const;
 
-export function RenderGovernor({ busy, wake, idleFps = RENDER.idleFps }: RenderGovernorProps) {
+export function RenderGovernor({
+  busy,
+  wake,
+  idleFps = RENDER.idleFps,
+}: RenderGovernorProps) {
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const clock = useThree((s) => s.clock);
@@ -78,7 +88,7 @@ export function RenderGovernor({ busy, wake, idleFps = RENDER.idleFps }: RenderG
     despertar.current = alActividad;
 
     const observador =
-      typeof IntersectionObserver === 'undefined'
+      typeof IntersectionObserver === "undefined"
         ? null
         : new IntersectionObserver((entradas) => {
             enPantalla = entradas.some((e) => e.isIntersecting);
@@ -86,14 +96,15 @@ export function RenderGovernor({ busy, wake, idleFps = RENDER.idleFps }: RenderG
             sincronizar();
           });
     observador?.observe(canvas);
-    document.addEventListener('visibilitychange', sincronizar);
-    for (const tipo of SEÑALES) window.addEventListener(tipo, alActividad, { passive: true });
+    document.addEventListener("visibilitychange", sincronizar);
+    for (const tipo of SEÑALES)
+      window.addEventListener(tipo, alActividad, { passive: true });
 
     alActividad();
     return () => {
       parar();
       observador?.disconnect();
-      document.removeEventListener('visibilitychange', sincronizar);
+      document.removeEventListener("visibilitychange", sincronizar);
       for (const tipo of SEÑALES) window.removeEventListener(tipo, alActividad);
     };
   }, [gl, invalidate, clock, idleFps]);

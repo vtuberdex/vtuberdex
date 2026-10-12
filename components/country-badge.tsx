@@ -1,9 +1,15 @@
 /** Chip de país con bandera; tolera países sin bandera en el dataset. */
-import type { CountryRef } from '@/lib/types';
+import type { CountryRef } from "@/lib/types";
 
-const FALLBACK_FLAG = '🏳️';
+const FALLBACK_FLAG = "🏳️";
 
-export function CountryBadge({ country, showName = false }: { country: CountryRef; showName?: boolean }) {
+export function CountryBadge({
+  country,
+  showName = false,
+}: {
+  country: CountryRef;
+  showName?: boolean;
+}) {
   const flag = country.flag?.trim() || FALLBACK_FLAG;
   return (
     <span

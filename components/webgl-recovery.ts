@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Recuperación de un contexto WebGL perdido.
  *
@@ -16,10 +16,10 @@
  * contador se agotaría solo. Por eso solo vale el evento del canvas VIGENTE (`vigente`), y se
  * suelta en cuanto se acepta o se desmonta.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { RENDER } from '@/components/card3d-config';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { RENDER } from "@/components/card3d-config";
 
-type Estado = { key: number; status: 'ok' | 'recovering' | 'failed' };
+type Estado = { key: number; status: "ok" | "recovering" | "failed" };
 
 export interface WebGLRecovery {
   /** `false` mientras se espera el remonte o si se agotaron los intentos: no montar el `<Canvas>`. */
@@ -32,11 +32,16 @@ export interface WebGLRecovery {
   attach: (canvas: HTMLCanvasElement) => void;
 }
 
-export function useWebGLRecovery(cfg: typeof RENDER.recovery = RENDER.recovery): WebGLRecovery {
-  const [estado, setEstado] = useState<Estado>({ key: 0, status: 'ok' });
+export function useWebGLRecovery(
+  cfg: typeof RENDER.recovery = RENDER.recovery,
+): WebGLRecovery {
+  const [estado, setEstado] = useState<Estado>({ key: 0, status: "ok" });
   const vigente = useRef<HTMLCanvasElement | null>(null);
   const intentos = useRef(0);
-  const temporizadores = useRef<{ espera?: ReturnType<typeof setTimeout>; sano?: ReturnType<typeof setTimeout> }>({});
+  const temporizadores = useRef<{
+    espera?: ReturnType<typeof setTimeout>;
+    sano?: ReturnType<typeof setTimeout>;
+  }>({});
 
   const limpiar = useCallback(() => {
     clearTimeout(temporizadores.current.espera);
@@ -46,14 +51,14 @@ export function useWebGLRecovery(cfg: typeof RENDER.recovery = RENDER.recovery):
   const alPerderse = useCallback(() => {
     vigente.current = null;
     limpiar();
-    setEstado((s) => ({ key: s.key, status: 'recovering' }));
+    setEstado((s) => ({ key: s.key, status: "recovering" }));
     temporizadores.current.espera = setTimeout(() => {
       if (intentos.current >= cfg.maxAttempts) {
-        setEstado((s) => ({ key: s.key, status: 'failed' }));
+        setEstado((s) => ({ key: s.key, status: "failed" }));
         return;
       }
       intentos.current += 1;
-      setEstado((s) => ({ key: s.key + 1, status: 'ok' }));
+      setEstado((s) => ({ key: s.key + 1, status: "ok" }));
       temporizadores.current.sano = setTimeout(() => {
         intentos.current = 0;
       }, cfg.healthyMs);
@@ -63,7 +68,7 @@ export function useWebGLRecovery(cfg: typeof RENDER.recovery = RENDER.recovery):
   const attach = useCallback(
     (canvas: HTMLCanvasElement) => {
       vigente.current = canvas;
-      canvas.addEventListener('webglcontextlost', (event) => {
+      canvas.addEventListener("webglcontextlost", (event) => {
         if (vigente.current !== canvas) return;
         event.preventDefault();
         alPerderse();
@@ -80,5 +85,10 @@ export function useWebGLRecovery(cfg: typeof RENDER.recovery = RENDER.recovery):
     [limpiar],
   );
 
-  return { canRender: estado.status === 'ok', failed: estado.status === 'failed', canvasKey: estado.key, attach };
+  return {
+    canRender: estado.status === "ok",
+    failed: estado.status === "failed",
+    canvasKey: estado.key,
+    attach,
+  };
 }

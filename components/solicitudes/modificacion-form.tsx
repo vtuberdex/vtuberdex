@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Formulario PÚBLICO para pedir cambios en una ficha YA registrada.
  *
@@ -18,15 +18,19 @@
  * Las preguntas salen de la misma lista que la inscripción (`campos-ficha.ts`). El avatar y el logo se piden como ENLACE
  * (un formulario público que recibe archivos es una puerta a subir basura).
  */
-import { useState } from 'react';
+import { useState } from "react";
 
-import { useI18n } from '@/lib/i18n';
-import type { Clave } from '@/lib/i18n/mensajes';
+import { useI18n } from "@/lib/i18n";
+import type { Clave } from "@/lib/i18n/mensajes";
 
-import { ApiError, api } from '@/lib/api';
-import { TERMINOS_VERSION } from '@/lib/terminos';
-import { useOpcionesFicha } from '@/components/solicitudes/use-opciones-ficha';
-import { AceptaTerminos, Campo, claseInput } from '@/components/solicitudes/campos';
+import { ApiError, api } from "@/lib/api";
+import { TERMINOS_VERSION } from "@/lib/terminos";
+import { useOpcionesFicha } from "@/components/solicitudes/use-opciones-ficha";
+import {
+  AceptaTerminos,
+  Campo,
+  claseInput,
+} from "@/components/solicitudes/campos";
 import {
   BarraDePasos,
   BotoneraPasos,
@@ -41,7 +45,7 @@ import {
   redesEscritas,
   useCodigoDelEnlace,
   useEnvio,
-} from '@/components/solicitudes/pasos-ficha';
+} from "@/components/solicitudes/pasos-ficha";
 
 const TOTAL_PASOS = 4;
 type Paso = 1 | 2 | 3 | 4;
@@ -50,27 +54,29 @@ export function ModificacionForm() {
   const { t } = useI18n();
   const { paises, idiomas } = useOpcionesFicha();
   const [paso, setPaso] = useState<Paso>(1);
-  const [ficha, setFicha] = useState('');
-  const [email, setEmail] = useState('');
-  const [codigo, setCodigo] = useState('');
+  const [ficha, setFicha] = useState("");
+  const [email, setEmail] = useState("");
+  const [codigo, setCodigo] = useState("");
   /** Lo que canjea el código: autoriza un envío con el correo verificado. Solo vive en memoria. */
-  const [permiso, setPermiso] = useState('');
-  const [fichasDelCorreo, setFichasDelCorreo] = useState<Array<{ slug: string; name: string }>>([]);
+  const [permiso, setPermiso] = useState("");
+  const [fichasDelCorreo, setFichasDelCorreo] = useState<
+    Array<{ slug: string; name: string }>
+  >([]);
   const [perfil, setPerfil] = useState(perfilVacio);
-  const [country, setCountry] = useState('');
-  const [zodiac, setZodiac] = useState('');
+  const [country, setCountry] = useState("");
+  const [zodiac, setZodiac] = useState("");
   const [languages, setLanguages] = useState<string[]>([]);
-  const [phrase, setPhrase] = useState('');
-  const [cardText, setCardText] = useState('');
+  const [phrase, setPhrase] = useState("");
+  const [cardText, setCardText] = useState("");
   // El selector de color siempre tiene un valor: sin la casilla no se podría decir «no lo cambies».
   const [cambiaColor, setCambiaColor] = useState(false);
-  const [themeColor, setThemeColor] = useState('#5eead4');
-  const [imageUrl, setImageUrl] = useState('');
-  const [logoUrl, setLogoUrl] = useState('');
-  const [socials, setSocials] = useState([{ platform: '', url: '' }]);
-  const [nota, setNota] = useState('');
+  const [themeColor, setThemeColor] = useState("#5eead4");
+  const [imageUrl, setImageUrl] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [socials, setSocials] = useState([{ platform: "", url: "" }]);
+  const [nota, setNota] = useState("");
   const [acepta, setAcepta] = useState(false);
-  const [website, setWebsite] = useState('');
+  const [website, setWebsite] = useState("");
   const { enviando, error, setError, intentar } = useEnvio();
   const [enviada, setEnviada] = useState(false);
 
@@ -81,7 +87,15 @@ export function ModificacionForm() {
 
   const redes = redesEscritas(socials);
   const hayCambios =
-    [phrase, cardText, country, zodiac, imageUrl, logoUrl, ...Object.values(perfil)].some((v) => v.trim()) ||
+    [
+      phrase,
+      cardText,
+      country,
+      zodiac,
+      imageUrl,
+      logoUrl,
+      ...Object.values(perfil),
+    ].some((v) => v.trim()) ||
     cambiaColor ||
     languages.length > 0 ||
     redes.length > 0;
@@ -95,7 +109,7 @@ export function ModificacionForm() {
         await api.pedirCodigoDeModificacion(email, website);
         setPaso(2);
         window.scrollTo({ top: 0 });
-      }, 'ficha.errorCodigo');
+      }, "ficha.errorCodigo");
       return;
     }
     if (paso === 2) {
@@ -104,10 +118,10 @@ export function ModificacionForm() {
         setPermiso(canje.permiso);
         setFichasDelCorreo(canje.fichas);
         // Una sola ficha asociada: es esa. Varias: se elige. Ninguna: se escribe.
-        setFicha(canje.fichas.length === 1 ? canje.fichas[0].slug : '');
+        setFicha(canje.fichas.length === 1 ? canje.fichas[0].slug : "");
         setPaso(3);
         window.scrollTo({ top: 0 });
-      }, 'ficha.errorConfirmar');
+      }, "ficha.errorConfirmar");
       return;
     }
     if (paso === 3) {
@@ -116,11 +130,11 @@ export function ModificacionForm() {
       return;
     }
     if (!hayCambios) {
-      setError(t('mod.errorSinCambios'));
+      setError(t("mod.errorSinCambios"));
       return;
     }
     if (!acepta) {
-      setError(t('mod.errorTerminos'));
+      setError(t("mod.errorTerminos"));
       return;
     }
     await intentar(
@@ -134,7 +148,7 @@ export function ModificacionForm() {
           languages,
           phrase,
           cardText,
-          themeColor: cambiaColor ? themeColor : '',
+          themeColor: cambiaColor ? themeColor : "",
           imageUrl,
           logoUrl,
           ...perfil,
@@ -146,12 +160,12 @@ export function ModificacionForm() {
         });
         setEnviada(true);
       },
-      'mod.errorEnviar',
+      "mod.errorEnviar",
       (causa) => {
         if (causa instanceof ApiError && causa.status === 410) {
           // El permiso caducó o ya se usó: hay que demostrar el correo otra vez.
-          setPermiso('');
-          setCodigo('');
+          setPermiso("");
+          setCodigo("");
           setPaso(1);
         }
       },
@@ -159,18 +173,33 @@ export function ModificacionForm() {
   };
 
   if (enviada) {
-    return <FichaRecibida testId="modificacion-enviada" titulo="mod.recibidaTitulo" texto="mod.recibidaTexto" />;
+    return (
+      <FichaRecibida
+        testId="modificacion-enviada"
+        titulo="mod.recibidaTitulo"
+        texto="mod.recibidaTexto"
+      />
+    );
   }
 
   return (
-    <form onSubmit={enviar} className="relative space-y-6" data-testid="modificacion-form">
-      <BarraDePasos testId="modificacion-paso" paso={paso} total={TOTAL_PASOS} titulo={t(`mod.titulo.${paso}` as Clave)} />
+    <form
+      onSubmit={enviar}
+      className="relative space-y-6"
+      data-testid="modificacion-form"
+    >
+      <BarraDePasos
+        testId="modificacion-paso"
+        paso={paso}
+        total={TOTAL_PASOS}
+        titulo={t(`mod.titulo.${paso}` as Clave)}
+      />
 
       {paso === 1 && (
         <PasoCorreo
-          leyenda={t('mod.conQueCorreo')}
-          ayuda={t('mod.correoAyuda')}
-          privacidad={t('mod.privacidad')}
+          leyenda={t("mod.conQueCorreo")}
+          ayuda={t("mod.correoAyuda")}
+          privacidad={t("mod.privacidad")}
           email={email}
           setEmail={setEmail}
           website={website}
@@ -178,21 +207,40 @@ export function ModificacionForm() {
         />
       )}
 
-      {paso === 2 && <PasoCodigo testId="modificacion-codigo" email={email} codigo={codigo} setCodigo={setCodigo} />}
+      {paso === 2 && (
+        <PasoCodigo
+          testId="modificacion-codigo"
+          email={email}
+          codigo={codigo}
+          setCodigo={setCodigo}
+        />
+      )}
 
       {paso === 3 && (
         <>
-          <fieldset className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-5" data-testid="modificacion-ficha">
-            <legend className="px-2 text-sm font-bold text-dex-ink">{t('mod.tuFicha')}</legend>
+          <fieldset
+            className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-5"
+            data-testid="modificacion-ficha"
+          >
+            <legend className="px-2 text-sm font-bold text-dex-ink">
+              {t("mod.tuFicha")}
+            </legend>
             {fichasDelCorreo.length === 1 && (
               <p className="text-sm text-dex-ink">
-                {t('mod.vasActualizarA')}<strong>{fichasDelCorreo[0].name}</strong>{t('mod.vasActualizarB')}
+                {t("mod.vasActualizarA")}
+                <strong>{fichasDelCorreo[0].name}</strong>
+                {t("mod.vasActualizarB")}
               </p>
             )}
             {fichasDelCorreo.length > 1 && (
-              <Campo etiqueta={t('mod.cualFicha')} obligatorio>
-                <select className={claseInput} required value={ficha} onChange={(e) => setFicha(e.target.value)}>
-                  <option value="">{t('mod.eligeUna')}</option>
+              <Campo etiqueta={t("mod.cualFicha")} obligatorio>
+                <select
+                  className={claseInput}
+                  required
+                  value={ficha}
+                  onChange={(e) => setFicha(e.target.value)}
+                >
+                  <option value="">{t("mod.eligeUna")}</option>
                   {fichasDelCorreo.map((f) => (
                     <option key={f.slug} value={f.slug}>
                       {f.name}
@@ -203,17 +251,25 @@ export function ModificacionForm() {
             )}
             {fichasDelCorreo.length === 0 && (
               <Campo
-                etiqueta={t('mod.fichaEtiqueta')}
+                etiqueta={t("mod.fichaEtiqueta")}
                 obligatorio
-                ayuda={t('mod.fichaAyuda')}
+                ayuda={t("mod.fichaAyuda")}
               >
-                <input className={claseInput} required maxLength={300} value={ficha} onChange={(e) => setFicha(e.target.value)} />
+                <input
+                  className={claseInput}
+                  required
+                  maxLength={300}
+                  value={ficha}
+                  onChange={(e) => setFicha(e.target.value)}
+                />
               </Campo>
             )}
           </fieldset>
           <fieldset className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-5">
-            <legend className="px-2 text-sm font-bold text-dex-ink">{t('ficha.tuPersonaje')}</legend>
-            <p className="text-xs text-dex-muted">{t('mod.personajeAyuda')}</p>
+            <legend className="px-2 text-sm font-bold text-dex-ink">
+              {t("ficha.tuPersonaje")}
+            </legend>
+            <p className="text-xs text-dex-muted">{t("mod.personajeAyuda")}</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <CamposDelPaso n={2} perfil={perfil} setPerfil={setPerfil} />
               <CamposPaisYSigno
@@ -222,25 +278,44 @@ export function ModificacionForm() {
                 setCountry={setCountry}
                 zodiac={zodiac}
                 setZodiac={setZodiac}
-                vacio={t('ficha.sinCambios')}
+                vacio={t("ficha.sinCambios")}
               />
             </div>
-            <Campo etiqueta={t('ficha.frase')} ayuda={t('ficha.fraseAyuda')}>
-              <input className={claseInput} maxLength={600} value={phrase} onChange={(e) => setPhrase(e.target.value)} />
+            <Campo etiqueta={t("ficha.frase")} ayuda={t("ficha.fraseAyuda")}>
+              <input
+                className={claseInput}
+                maxLength={600}
+                value={phrase}
+                onChange={(e) => setPhrase(e.target.value)}
+              />
             </Campo>
-            <Campo etiqueta={t('ficha.lore')} ayuda={t('mod.loreAyuda')}>
-              <textarea className={`${claseInput} min-h-28`} maxLength={4000} value={cardText} onChange={(e) => setCardText(e.target.value)} />
+            <Campo etiqueta={t("ficha.lore")} ayuda={t("mod.loreAyuda")}>
+              <textarea
+                className={`${claseInput} min-h-28`}
+                maxLength={4000}
+                value={cardText}
+                onChange={(e) => setCardText(e.target.value)}
+              />
             </Campo>
-            <SelectorIdiomas leyenda={t('mod.idiomas')} idiomas={idiomas} languages={languages} setLanguages={setLanguages} />
+            <SelectorIdiomas
+              leyenda={t("mod.idiomas")}
+              idiomas={idiomas}
+              languages={languages}
+              setLanguages={setLanguages}
+            />
             <div>
               <label className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-dex-muted">
-                <input type="checkbox" checked={cambiaColor} onChange={(e) => setCambiaColor(e.target.checked)} />
-                {t('mod.cambiarColor')}
+                <input
+                  type="checkbox"
+                  checked={cambiaColor}
+                  onChange={(e) => setCambiaColor(e.target.checked)}
+                />
+                {t("mod.cambiarColor")}
               </label>
               {cambiaColor && (
                 <input
                   type="color"
-                  aria-label={t('ficha.colorMarca')}
+                  aria-label={t("ficha.colorMarca")}
                   className="mt-2 h-10 w-full cursor-pointer rounded-lg border border-dex-line bg-dex-void p-1 sm:w-48"
                   value={themeColor}
                   onChange={(e) => setThemeColor(e.target.value)}
@@ -250,20 +325,40 @@ export function ModificacionForm() {
           </fieldset>
 
           <fieldset className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-5">
-            <legend className="px-2 text-sm font-bold text-dex-ink">{t('mod.imagenesRedes')}</legend>
-            <p className="text-xs text-dex-muted">
-              {t('mod.imagenesAyuda')}
-            </p>
+            <legend className="px-2 text-sm font-bold text-dex-ink">
+              {t("mod.imagenesRedes")}
+            </legend>
+            <p className="text-xs text-dex-muted">{t("mod.imagenesAyuda")}</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Campo etiqueta={t('mod.avatarNuevo')}>
-                <input type="url" className={claseInput} maxLength={500} placeholder="https://" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
+              <Campo etiqueta={t("mod.avatarNuevo")}>
+                <input
+                  type="url"
+                  className={claseInput}
+                  maxLength={500}
+                  placeholder="https://"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                />
               </Campo>
-              <Campo etiqueta={t('mod.logoNuevo')}>
-                <input type="url" className={claseInput} maxLength={500} placeholder="https://" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
+              <Campo etiqueta={t("mod.logoNuevo")}>
+                <input
+                  type="url"
+                  className={claseInput}
+                  maxLength={500}
+                  placeholder="https://"
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                />
               </Campo>
             </div>
-            <EditorRedes titulo={t('mod.redesTitulo')} socials={socials} setSocials={setSocials}>
-              <p className="mt-2 text-[11px] text-dex-muted">{t('mod.redesNota')}</p>
+            <EditorRedes
+              titulo={t("mod.redesTitulo")}
+              socials={socials}
+              setSocials={setSocials}
+            >
+              <p className="mt-2 text-[11px] text-dex-muted">
+                {t("mod.redesNota")}
+              </p>
             </EditorRedes>
           </fieldset>
         </>
@@ -272,17 +367,28 @@ export function ModificacionForm() {
       {paso === 4 && (
         <>
           <fieldset className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-5">
-            <legend className="px-2 text-sm font-bold text-dex-ink">{t('ficha.tusGustos')}</legend>
-            <p className="text-xs text-dex-muted">{t('mod.gustosAyuda')}</p>
+            <legend className="px-2 text-sm font-bold text-dex-ink">
+              {t("ficha.tusGustos")}
+            </legend>
+            <p className="text-xs text-dex-muted">{t("mod.gustosAyuda")}</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <CamposDelPaso n={3} perfil={perfil} setPerfil={setPerfil} />
             </div>
-            <Campo etiqueta={t('mod.nota')} ayuda={t('mod.notaAyuda')}>
-              <textarea className={`${claseInput} min-h-20`} maxLength={2000} value={nota} onChange={(e) => setNota(e.target.value)} />
+            <Campo etiqueta={t("mod.nota")} ayuda={t("mod.notaAyuda")}>
+              <textarea
+                className={`${claseInput} min-h-20`}
+                maxLength={2000}
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+              />
             </Campo>
           </fieldset>
 
-          <AceptaTerminos idUnico="acepta-terminos-modificacion" marcada={acepta} alCambiar={setAcepta} />
+          <AceptaTerminos
+            idUnico="acepta-terminos-modificacion"
+            marcada={acepta}
+            alCambiar={setAcepta}
+          />
         </>
       )}
 
@@ -297,7 +403,7 @@ export function ModificacionForm() {
           setError(null);
           setPaso((paso - 1) as Paso);
         }}
-        textoEnviar={t('mod.enviar')}
+        textoEnviar={t("mod.enviar")}
       />
     </form>
   );

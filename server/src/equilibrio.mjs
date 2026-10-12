@@ -14,8 +14,17 @@ export const FACTOR_TOPE = 1.5;
 
 /** Percentil 90 del catálogo por stat (medido). */
 const P90 = Object.freeze({
-  hp: 1860, mp: 1200, attack: 236, defense: 158, magicAttack: 233, magicDefense: 181,
-  speed: 162, evasion: 85, accuracy: 126, critic: 56, luck: 10,
+  hp: 1860,
+  mp: 1200,
+  attack: 236,
+  defense: 158,
+  magicAttack: 233,
+  magicDefense: 181,
+  speed: 162,
+  evasion: 85,
+  accuracy: 126,
+  critic: 56,
+  luck: 10,
 });
 
 /** Tope del stat base, o `null` si no tiene (stats desconocidos pasan tal cual). */
@@ -23,7 +32,7 @@ export function topeDeStatBase(slug) {
   return P90[slug] === undefined ? null : Math.round(P90[slug] * FACTOR_TOPE);
 }
 
-const NO_SON_STATS = new Set(['level', 'exp']);
+const NO_SON_STATS = new Set(["level", "exp"]);
 
 /** La lista de stats sin nivel/EXP y con cada valor base limitado; el máximo de HP/MP baja con él. No muta. */
 export function equilibrarStats(stats) {
@@ -32,9 +41,14 @@ export function equilibrarStats(stats) {
     .filter((s) => !NO_SON_STATS.has(s.slug))
     .map((s) => {
       const tope = topeDeStatBase(s.slug);
-      if (tope === null || typeof s.value !== 'number' || s.value <= tope) return s;
+      if (tope === null || typeof s.value !== "number" || s.value <= tope)
+        return s;
       const baja = s.value - tope;
-      return { ...s, value: tope, max: typeof s.max === 'number' ? Math.max(tope, s.max - baja) : s.max };
+      return {
+        ...s,
+        value: tope,
+        max: typeof s.max === "number" ? Math.max(tope, s.max - baja) : s.max,
+      };
     });
 }
 

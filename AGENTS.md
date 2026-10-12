@@ -138,8 +138,8 @@ se comporta como antes (es lo que hace que local y CI no necesiten cuenta ni red
   con un cliente falso (la suite corre en CI sin credenciales), no la forma de la
   respuesta.
 - **Las credenciales de producción NO se pueden releer para medir.** Marcadas
-  *sensitive* en Vercel devuelven vacío incluso con `decrypt=true` (comprobado con la
-  API; las de *development* sí salen, pero su valor puede ser un JWT y no la URL del
+  _sensitive_ en Vercel devuelven vacío incluso con `decrypt=true` (comprobado con la
+  API; las de _development_ sí salen, pero su valor puede ser un JWT y no la URL del
   servicio). Plan B que sí mide, y es el que usa `npm run bench:ediciones`: un **stub
   del protocolo** —`@libsql/client` habla Hrana v2 en `/v2/pipeline` con JSON—
   respaldado por SQLite, comparando el módulo actual contra `git show HEAD:lib/ediciones.mjs`
@@ -224,8 +224,7 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   paso manual aparte (no está automatizada) y el mantenedor lo avisa.
 - **La inscripción es un formulario de 5 pasos** (`inscripcion-form.tsx`; el estado vive en el padre, así que «Volver» no pierde nada y la
   validación nativa `required` de cada paso corre antes de avanzar): 1) nombre artístico y correo, 2) código del correo, 3) tu ficha
-  (color, idiomas, frase, redes), 4) tu personaje (avatar y logo como ENLACE, modelo, hashtag, estatura, cumpleaños, país, signo, lore),
-  5) gustos + términos. Obligatorios todos salvo país y signo. Los textos cortos
+  (color, idiomas, frase, redes), 4) tu personaje (avatar y logo como ENLACE, modelo, hashtag, estatura, cumpleaños, país, signo, lore), 5) gustos + términos. Obligatorios todos salvo país y signo. Los textos cortos
   salen de `CAMPOS_PERFIL` (cliente) y `perfilObligatorio` (`solicitudes.mjs`): al añadir uno, tócalos a la vez (y `sanearBorrador` los toma de
   `PERFIL_CAMPOS`, así que el borrador los sigue solo). `fichaDesdeInscripcion`
   mapea estatura/cumpleaños/hashtag/color a sus columnas, el modelador a `artists` y el resto a filas de `profile`.
@@ -275,23 +274,23 @@ servidor (así local y CI funcionan sin servidor de correo). Variables: `VTUBERD
 (`mail._domainkey`) y DMARC; sin ellos Gmail marca el correo como spam o lo rechaza.
 
 - **Tokens** (`server/src/verificacion.mjs`, tabla `token_correo` en el MISMO ejecutor que `solicitud`): un solo uso (`UPDATE …
-  WHERE usado = 0 AND expira > ahora` es el cerrojo), 24 h para solicitudes y 15 min para acceso, **solo se guarda el sha256**. El
+WHERE usado = 0 AND expira > ahora` es el cerrojo), 24 h para solicitudes y 15 min para acceso, **solo se guarda el sha256**. El
   enlace lleva el token en el **fragmento** (`/verificar#t=…`, `/admin#entrar=…`): no llega a nginx ni a los logs. Y se gasta con un
   **botón (POST)**, no al abrir el enlace: antivirus y clientes de correo abren los enlaces y lo quemarían. La URL sale de
   `SITE_URL`, nunca de la cabecera `Host`.
 - **Dos formas de demostrar el correo**:
   · **Inscripción y actualización: el correo se demuestra ANTES de rellenar** (`pedirCodigo` / `verificarCodigo` en `lib/solicitudes.mjs`,
-    rutas `/api/inscripciones|modificaciones/codigo|verificar`). Se manda un CÓDIGO (1 h, un uso; el enlace del correo abre el formulario en el
-    paso 2 con el código puesto, `/inscripcion#t=…`) y se canjea por una credencial que vive solo en memoria del navegador: la **`sesion`**
-    de la inscripción (24 h, se puede usar muchas veces, se gasta al enviar) y el **`permiso`** de la actualización (2 h, un solo envío).
-    El envío final lleva la credencial y **el servidor toma el correo de ella, no del cuerpo** (`crearSolicitud(..., { permiso, propositoPermiso })`):
-    la solicitud nace `pendiente` sin segundo correo. La credencial se MIRA (`correoDelToken`) y se gasta (`consumirToken`) al final, con todo lo
-    demás validado: un error de validación no quema un formulario largo. Sin credencial, `recibirSolicitud` responde 400 `falta_verificacion`.
-    Tope de 1 código/min y 4/día por correo (`envioPermitido`); un código no sirve para otro formulario (propósitos distintos).
+  rutas `/api/inscripciones|modificaciones/codigo|verificar`). Se manda un CÓDIGO (1 h, un uso; el enlace del correo abre el formulario en el
+  paso 2 con el código puesto, `/inscripcion#t=…`) y se canjea por una credencial que vive solo en memoria del navegador: la **`sesion`**
+  de la inscripción (24 h, se puede usar muchas veces, se gasta al enviar) y el **`permiso`** de la actualización (2 h, un solo envío).
+  El envío final lleva la credencial y **el servidor toma el correo de ella, no del cuerpo** (`crearSolicitud(..., { permiso, propositoPermiso })`):
+  la solicitud nace `pendiente` sin segundo correo. La credencial se MIRA (`correoDelToken`) y se gasta (`consumirToken`) al final, con todo lo
+  demás validado: un error de validación no quema un formulario largo. Sin credencial, `recibirSolicitud` responde 400 `falta_verificacion`.
+  Tope de 1 código/min y 4/día por correo (`envioPermitido`); un código no sirve para otro formulario (propósitos distintos).
   · **Baja: se envía primero y se confirma después** (la solicitud entra `sin_verificar` y el mantenedor NO la ve; su cola lista `pendiente`).
-    Pasa a `pendiente` al confirmar (`POST /api/verificar`). Reenviar reemplaza la anterior sin confirmar del mismo correo. Tope por correo
-    comprobado **antes** de guardar: crear reemplaza, y un doble clic no puede borrar la solicitud cuyo correo ya va en camino. Si el correo no se
-    puede enviar, la solicitud se descarta (503): nadie podría confirmarla.
+  Pasa a `pendiente` al confirmar (`POST /api/verificar`). Reenviar reemplaza la anterior sin confirmar del mismo correo. Tope por correo
+  comprobado **antes** de guardar: crear reemplaza, y un doble clic no puede borrar la solicitud cuyo correo ya va en camino. Si el correo no se
+  puede enviar, la solicitud se descarta (503): nadie podría confirmarla.
 - **BORRADOR de la inscripción** (`server/src/borradores.mjs`, tabla `borrador (email, tipo)`, `PUT /api/inscripciones/borrador`): desde que se
   valida el código, lo escrito se guarda solo (un instante después de dejar de teclear) atado al correo de la `sesion`. Para retomar: volver a
   `/inscripcion`, escribir el MISMO correo y un código nuevo; `verificarCodigo` devuelve el borrador y el formulario carga todo y sigue en su paso
@@ -369,6 +368,7 @@ La escala premium es `6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10, BL` (`GRADOS` en `serv
 `DONACION_POR_GRADO` (misma archivo) es la tabla de referencia en USD ACUMULADOS (1 USD = 1 mes de racha): 6=1, 6.5=2, 7=3,
 7.5=4, 8=5, 8.5=7, 9=10, 9.5=20, 10=50; la BL no se vende. La muestra la pestaña «Tarifas» del mantenedor (`premium-rates.tsx`),
 solo lectura: el grado lo sigue fijando el mantenedor a mano (no hay aún «cubierto hasta» ni ascenso automático).
+
 - **Racha** (`rachaDe`): meses seguidos, derivada de `since`/`gradedAt`; `aplicarPremium` adelanta `since` si pasó más de un mes sin
   ascenso (el grado no baja). Se ve en la etiqueta de la placa y en `PremiumBadge`.
 - **Desgaste leve** (`DESGASTE_LEVE`, `planDeDesgasteLeve`): la carta SIN premium se pinta con uso mínimo (canto, grano, rayitas) y las
@@ -444,6 +444,7 @@ Un plugin de Paper **26.2** (Java 25, `minecraft/`; `./gradlew build` → `build
 9.8.1 porque Gradle 8 no corre en Java 25; compila contra `paper-api:26.2.build.*-stable` con `api-version: '26.2'`: Paper NO carga un
 plugin con `api-version` más nueva que el servidor) hace del servidor uno **solo para VTubers con ficha**: se juega con los stats de la ficha
 PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verdad**: el plugin no calcula niveles, topes ni dueños.
+
 - **Casa-lobby para quien no está vinculado** (`Lobby.java` + `SalaDeEspera.java`): un MUNDO APARTE vacío (`vtuberdex_lobby`, generador
   sin terreno, pacífico, mediodía fijo, sin mobs) con una casa de 13x13 construida por código en cada arranque (idempotente; paredes,
   techo y barreras arriba y abajo) y carteles ENCERADOS con los pasos (los textos están en `CARTELES`: ~15 caracteres por línea, más se
@@ -521,7 +522,7 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
   es lo que se enseña en el chat); el token está en `/etc/vtuberdex.env` y en `plugins/VTuberDex/config.yml` (600). Actualizar el
   plugin = copiar el jar a `/srv/minecraft/plugins/` (dueño `minecraft`) y `sudo systemctl restart vtuberdex-minecraft`. Compilar:
   JDK 25 y Gradle viven en `~/.local/share/vtuberdex-build/` (NO en /tmp, que es RAM): `GRADLE_USER_HOME=…/gradle-home
-  JAVA_HOME=…/jdk25 ./gradlew build`.
+JAVA_HOME=…/jdk25 ./gradlew build`.
 - **Reparto de recursos de la VPS** (drop-ins `recursos.conf` en `/etc/systemd/system/<servicio>.service.d/`): Minecraft
   `CPUQuota=200%` (2 de 4 núcleos), `CPUWeight=40`, `Nice=5`, `MemoryHigh=2300M`/`MemoryMax=2700M`, `OOMScoreAdjust=300` (el núcleo
   lo mata antes que a la web); `view-distance=6`, `simulation-distance=4`, Paper `worker-threads: 2`/`io-threads: 1` (generar chunks es
@@ -551,6 +552,7 @@ Las reglas MECÁNICAS del «prompt maestro» de habilidades viven en `server/src
 aplica, `ambos` para Hackeo/Hemofagia/Drenaje Arcano/Usurpación/Soul Trader, que las fichas usan de las dos formas), su
 evolución con los efectos OFICIALES y la facción exclusiva (Juramento, Requiem, Soul Trader, Epopeya, Fortificación).
 `spanDeEstado`/`bloqueDeEvolucion` pintan el HTML; `validarKit` dice qué regla se rompe (error) o qué conviene revisar (aviso).
+
 - **Solo valida lo que se lee en el HTML**: si sale del lore, si hay narrativa, si la Habilidad Única es única o si está
   balanceado NO se comprueba (eso lo decide una persona). El MP no está en `effect_html`: no se valida.
 - **El estado se cuenta si lo ENTREGA un verbo** («obtienes/aplicas X [y Y]»); nombrarlo en una condición no cuenta.
@@ -588,6 +590,7 @@ accesible; por eso los botones llevan `aria-label` explícito.
 
 El admin tira los dados de la partida (la X de una Ultimate «Lanza 2d6», o cualquier tirada) en `components/admin/dados-panel.tsx`;
 la escena es `components/dados/` (un canvas, montado solo con la pestaña abierta).
+
 - **El resultado NO sale de la animación**: `tirar` (`dados-geometria.ts`) usa `crypto.getRandomValues` con rechazo (sin sesgo de
   módulo) y el dado rueda hasta `orientacionFinal`, que deja ESA cara arriba (el d4, ese vértice). No hay motor de física: el tumbo
   es un giro que se deshace y rebotes que decrecen. El panel muestra el número al acabar la duración conocida (`DADOS.duracionMs`),
@@ -939,15 +942,15 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
     viejo duraba una hora. El 304 responde sin cuerpo.
   - **Republicar NO reescribe las filas del catálogo**: `publish-images.mjs` solo sube lo
     que cambió de tamaño, así que las URLs versionadas del catálogo no rotan en cada pasada.
-- **`VTUBERDEX_ADMIN_PASSWORD_HASH` no va marcado *sensitive*.** El panel y
+- **`VTUBERDEX_ADMIN_PASSWORD_HASH` no va marcado _sensitive_.** El panel y
   `npx vercel env add` lo ofrecen por defecto, y Vercel guarda esos valores en un
   **formato ilegible para siempre**: ni el CLI, ni `vercel env pull`, ni la API con
   `decrypt=true` dejan volver a leerlos (devuelven un placeholder o un sobre cifrado;
   comprobado). Un hash `scrypt` no es un secreto reutilizable —es irreversible y
-  salado—, así que se guarda como *encrypted*/**Config** (`--no-sensitive`) y se puede
+  salado—, así que se guarda como _encrypted_/**Config** (`--no-sensitive`) y se puede
   releer para comparar. `formatoDeHash` (`lib/admin-auth.mjs`) solo describe la FORMA.
   **Lo mismo vale para `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN`**: hoy están como
-  *sensitive* en producción y por eso `npm run bench:ediciones` mide con un stub en vez
+  _sensitive_ en producción y por eso `npm run bench:ediciones` mide con un stub en vez
   de contra el servicio real.
 - **`scripts/` no tiene subcarpeta de sondas.** `scripts/*.sh` es infraestructura del
   repo (`dev-up.sh`, `dev-docker.sh`, `refresh.sh`) y `scripts/*.mjs` son utilidades
@@ -1102,8 +1105,8 @@ Hay **un solo workflow, `ci.yml`**, que valida sin necesitar ningún secreto. No
 despliegue es `scripts/release.sh` en la VPS (antes existía `deploy.yml` con `vercel deploy --prod`; se eliminó).
 Corre con **Node 22**, el mismo que la VPS.
 
-| Workflow | Cuándo | Qué hace |
-|---|---|---|
+| Workflow | Cuándo                               | Qué hace                                                       |
+| -------- | ------------------------------------ | -------------------------------------------------------------- |
 | `ci.yml` | todo push (cualquier rama) y cada PR | lint, typecheck, check:shaders, las 3 suites, build y `verify` |
 
 ```bash
@@ -1144,17 +1147,17 @@ Publican **cuatro carpetas**: las tres primeras las produce el scraper y viajan
 siempre; `background` es nueva y viaja **vacía** por defecto. La decisión es por
 uso real verificado en el front, no por lo que exista en disco:
 
-| Carpeta | Estado | Por qué |
-|---|---|---|
-| `character` | ✅ publicado | La imagen fuente del VTuber |
-| `logo` | ✅ publicado | Capa superior de la carta |
-| `faction` | ✅ publicado | Emblema que la carta superpone como holograma |
+| Carpeta      | Estado                  | Por qué                                                                                                                                                          |
+| ------------ | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `character`  | ✅ publicado            | La imagen fuente del VTuber                                                                                                                                      |
+| `logo`       | ✅ publicado            | Capa superior de la carta                                                                                                                                        |
+| `faction`    | ✅ publicado            | Emblema que la carta superpone como holograma                                                                                                                    |
 | `background` | ✅ publicado (1 objeto) | Capa POR DETRÁS del personaje, con holograma y paralaje propios. **El scraper NO la produce**: solo se llena si alguien sube una desde el mantenedor (hoy hay 1) |
-| `thumb` | ❌ eliminado | Ninguna vista la pedía (18 MB) |
-| `avatar` | ❌ eliminado | Duplicado legacy de `character` (13 MB) |
-| `ficha` | ❌ eliminado | Respaldo de `character`; hoy los 785 lo tienen (33 MB) |
-| `radar` | ❌ eliminado | Gráfico de atributos **dibujado desde los datos** por `StatBars` en la misma página (8 MB) |
-| `card` | ❌ eliminada | Vacía desde siempre |
+| `thumb`      | ❌ eliminado            | Ninguna vista la pedía (18 MB)                                                                                                                                   |
+| `avatar`     | ❌ eliminado            | Duplicado legacy de `character` (13 MB)                                                                                                                          |
+| `ficha`      | ❌ eliminado            | Respaldo de `character`; hoy los 785 lo tienen (33 MB)                                                                                                           |
+| `radar`      | ❌ eliminado            | Gráfico de atributos **dibujado desde los datos** por `StatBars` en la misma página (8 MB)                                                                       |
+| `card`       | ❌ eliminada            | Vacía desde siempre                                                                                                                                              |
 
 `data/images/` pasó de **143 MB a ~74 MB**; el manifiesto publica **1594** objetos
 (785 `character` + 785 `logo` + 23 `faction` + 1 `background`), y `count` del
@@ -1171,10 +1174,10 @@ añadirla a `USED_FOLDERS` de `scripts/build-db.mjs` y republicar.
 `asset_remoto` es el único sitio donde vive la mitad del contenido del mantenedor, así que
 hay un script por sentido y **tienen reglas que no pueden divergir**:
 
-| Script | Sentido | Qué compara | Fuente de la verdad |
-|---|---|---|---|
-| `npm run publish:images` | disco → Turso (`origen = catalogo`) | tamaño | el MANIFIESTO (`deploy/data/images.json`) |
-| `npm run download:images` | Turso → `data/mantenedor/` | tamaño | Turso |
+| Script                    | Sentido                             | Qué compara | Fuente de la verdad                       |
+| ------------------------- | ----------------------------------- | ----------- | ----------------------------------------- |
+| `npm run publish:images`  | disco → Turso (`origen = catalogo`) | tamaño      | el MANIFIESTO (`deploy/data/images.json`) |
+| `npm run download:images` | Turso → `data/mantenedor/`          | tamaño      | Turso                                     |
 
 - **Los dos comparan TAMAÑO, no presencia**, y por la misma razón: el nombre canónico
   (`<carpeta>/<slug>.<ext>`) no cambia aunque cambie el contenido, así que sin mirar el peso
@@ -1208,7 +1211,7 @@ hay un script por sentido y **tienen reglas que no pueden divergir**:
 - **Credenciales:** acepta `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` del entorno, o `--turso-url`
   / `--turso-token`, o las lee de un `.env` (`--env-file`, por defecto `.env.dev.local`, lo que
   deja `npx vercel env pull --environment=development`). Las de **producción** están marcadas
-  *sensitive* en Vercel y no se pueden releer; las de *development* apuntan a la MISMA base, así
+  _sensitive_ en Vercel y no se pueden releer; las de _development_ apuntan a la MISMA base, así
   que sirven igual.
 
 ## Despliegue en VPS (nginx + base local, sin Turso)
@@ -1350,10 +1353,10 @@ dispositivo. El panel pone los nombres al servir y una ficha retirada sale como 
 
 `./scripts/dev-up.sh` levanta **dos** procesos y los dos hacen falta:
 
-| Puerto | Qué | Por qué |
-|---|---|---|
-| 3000 | la app Next | catálogo, API de lectura, imágenes |
-| 4000 | `server/src/index.mjs` (Express) | el mantenedor: es el ÚNICO que escribe |
+| Puerto | Qué                              | Por qué                                |
+| ------ | -------------------------------- | -------------------------------------- |
+| 3000   | la app Next                      | catálogo, API de lectura, imágenes     |
+| 4000   | `server/src/index.mjs` (Express) | el mantenedor: es el ÚNICO que escribe |
 
 Next reenvía `/api/admin/*` al Express con `VTUBERDEX_ADMIN_URL`. Si esa variable
 no está y tampoco hay Turso, la página `/admin` carga pero cada llamada da **404**
@@ -1417,9 +1420,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->`, al
-   final). Es inofensivo: se **añade** y todo lo escrito fuera de los marcadores
-   se **preserva**. No lo borres de un diff sin querer — `next dev` lo vuelve a
-   crear; commitearlo con el resto deja el árbol limpio.
+
+final). Es inofensivo: se **añade** y todo lo escrito fuera de los marcadores
+se **preserva**. No lo borres de un diff sin querer — `next dev` lo vuelve a
+crear; commitearlo con el resto deja el árbol limpio.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

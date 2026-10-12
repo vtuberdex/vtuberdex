@@ -3,13 +3,13 @@
  * no son contenido que deba indexarse. Los assets de Next (`/_next/`) NO se bloquean: el
  * buscador necesita el JS y el CSS para renderizar la página.
  */
-import type { MetadataRoute } from 'next';
+import type { MetadataRoute } from "next";
 
-import { urlAbsoluta } from '@/lib/seo';
+import { urlAbsoluta } from "@/lib/seo";
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: '*', allow: '/', disallow: ['/api/', '/admin'] }],
-    sitemap: urlAbsoluta('/sitemap.xml'),
+    rules: [{ userAgent: "*", allow: "/", disallow: ["/api/", "/admin"] }],
+    sitemap: urlAbsoluta("/sitemap.xml"),
   };
 }

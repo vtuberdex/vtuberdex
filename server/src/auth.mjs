@@ -5,23 +5,26 @@
  * mano. Aquí hay un login real sobre `admin_user` con hash scrypt (sin
  * dependencias externas) y tokens de sesión en memoria.
  */
-import crypto from 'node:crypto';
+import crypto from "node:crypto";
 
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
 /** Hash `scrypt` con sal aleatoria: `scrypt$<sal>$<derivado>`. */
-export function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
-  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+export function hashPassword(
+  password,
+  salt = crypto.randomBytes(16).toString("hex"),
+) {
+  const derived = crypto.scryptSync(password, salt, 64).toString("hex");
   return `scrypt$${salt}$${derived}`;
 }
 
 /** Comparación en tiempo constante. */
 export function verifyPassword(password, stored) {
-  const [scheme, salt, expected] = String(stored ?? '').split('$');
-  if (scheme !== 'scrypt' || !salt || !expected) return false;
-  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
-  const a = Buffer.from(derived, 'hex');
-  const b = Buffer.from(expected, 'hex');
+  const [scheme, salt, expected] = String(stored ?? "").split("$");
+  if (scheme !== "scrypt" || !salt || !expected) return false;
+  const derived = crypto.scryptSync(password, salt, 64).toString("hex");
+  const a = Buffer.from(derived, "hex");
+  const b = Buffer.from(expected, "hex");
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
@@ -30,7 +33,7 @@ export function createSessionStore({ ttlMs = SESSION_TTL_MS } = {}) {
 
   return {
     issue(user) {
-      const token = crypto.randomBytes(32).toString('base64url');
+      const token = crypto.randomBytes(32).toString("base64url");
       sessions.set(token, { user, expiresAt: Date.now() + ttlMs });
       return token;
     },
