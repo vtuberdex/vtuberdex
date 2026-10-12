@@ -47,12 +47,7 @@ async function exists(target) {
     return false;
   }
 }
-/** Escribe solo dentro de `base`: descarta rutas que, ya resueltas, se salgan de él (p. ej. por un slug con `..`). */
-async function writeInside(base, target, data) {
-  const rel = path.relative(path.resolve(base), path.resolve(target));
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) throw new Error(`ruta fuera de ${base}: ${target}`);
-  await fs.writeFile(target, data);
-}
+import { writeInside } from "./safe-write.mjs";
 async function readCache(target) {
   try {
     return await fs.readFile(target, "utf8");
