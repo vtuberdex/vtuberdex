@@ -43,20 +43,24 @@
  * ---------------------------------
  * `XP_JUEGO_MAX_DIA` por ficha y día. El INSERT lee lo sumado hoy y recorta el lote a lo que cabe en la
  * MISMA sentencia: dos lotes simultáneos no pueden pasarse del tope (misma idea que `subirHabilidad`).
+ * Las ENTREGAS (motivo `entrega`) tienen su tope aparte (`XP_ENTREGA_MAX_DIA`): un lote es de entrega o no lo es
+ * (nunca mezcla), y cada tope suma solo los lotes de su clase.
  * El «día» lo decide quien llama (Chile, `diaDeChile` en `lib/likes.mjs`): este archivo es JS puro.
  *
  * JS puro sobre un EJECUTOR `{ execute, exec }` (Turso/`file:` en producción, SQLite en los tests).
  */
 import crypto from 'node:crypto';
 
-import { XP_JUEGO_MAX_DIA } from './experiencia.mjs';
+import { XP_ENTREGA_MAX_DIA, XP_JUEGO_MAX_DIA } from './experiencia.mjs';
 
 /** Vida del código de vínculo. */
 export const CODIGO_TTL_MS = 10 * 60 * 1000;
 /** XP máxima de un lote. El plugin manda cada ~30 s: más que esto en un lote es un plugin roto o trucado. */
 export const XP_POR_LOTE_MAX = 100;
 /** De dónde sale la XP: lista cerrada (se guarda el desglose para poder ajustar después lo que vale cada cosa). */
-export const MOTIVOS_XP = Object.freeze(['mob', 'jefe', 'logro', 'tiempo', 'evento']);
+export const MOTIVOS_XP = Object.freeze(['mob', 'jefe', 'logro', 'tiempo', 'evento', 'entrega']);
+/** La XP de entregas viaja en lotes propios: tiene su tope diario y mezclarla haría ambiguo a cuál cuenta. */
+export const MOTIVO_ENTREGA = 'entrega';
 /** Sin 0/O, 1/I/L ni U: se dicta y se escribe a mano en el chat del juego. */
 const ALFABETO = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
 const LARGO_CODIGO = 8;
@@ -298,8 +302,11 @@ function desgloseValido(detalle) {
     total += valor;
   }
   if (total < 1) throw new MinecraftError(400, 'payload_invalido', 'El lote no trae XP.');
+  if (MOTIVO_ENTREGA in limpio && Object.keys(limpio).length > 1) {
+    throw new MinecraftError(400, 'entrega_aparte', 'La XP de entrega va en un lote propio, sin mezclar motivos.');
+  }
   if (total > XP_POR_LOTE_MAX) throw new MinecraftError(400, 'lote_excesivo', `Un lote suma como mucho ${XP_POR_LOTE_MAX} XP.`);
-  return { limpio, total };
+  return { limpio, total, entrega: MOTIVO_ENTREGA in limpio };
 }
 
 /**
@@ -310,28 +317,40 @@ function desgloseValido(detalle) {
 export async function sumarXp(ejecutor, { uuid, idLote, detalle, dia, ahora = Date.now() }) {
   if (!uuidValido(idLote)) throw new MinecraftError(400, 'payload_invalido', 'El lote necesita un id (UUID).');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dia))) throw new Error(`día inválido: ${dia}`);
-  const { limpio, total } = desgloseValido(detalle);
+  const { limpio, total, entrega } = desgloseValido(detalle);
+  const tope = entrega ? XP_ENTREGA_MAX_DIA : XP_JUEGO_MAX_DIA;
   const e = await conTablas(ejecutor);
   const vinculo = await vinculoDeJugador(e, uuid);
   if (!vinculo) throw new MinecraftError(404, 'sin_vinculo', 'Esta cuenta no está vinculada a ninguna ficha.');
   const id = idLote.toLowerCase();
   const previo = await e.execute('SELECT cantidad FROM xp_juego WHERE id_lote = ?', [id]);
   if (previo.rows.length) return { vtuberId: vinculo.vtuberId, sumado: Number(previo.rows[0].cantidad), duplicado: true, ...(await deHoy(e, vinculo.vtuberId, dia)) };
+  // «Es de entrega» se lee del desglose guardado: un lote de entrega solo trae ese motivo (ver desgloseValido).
   await e.execute(
     `INSERT INTO xp_juego (id_lote, vtuber_id, uuid, cantidad, detalle, dia, creado)
      SELECT ?, ?, ?, MIN(?, ? - hoy), ?, ?, ?
-       FROM (SELECT COALESCE(SUM(cantidad), 0) AS hoy FROM xp_juego WHERE vtuber_id = ? AND dia = ?)
+       FROM (SELECT COALESCE(SUM(cantidad), 0) AS hoy FROM xp_juego
+              WHERE vtuber_id = ? AND dia = ? AND (json_extract(detalle, '$.entrega') IS NOT NULL) = ?)
       WHERE hoy < ?
      ON CONFLICT (id_lote) DO NOTHING`,
-    [id, vinculo.vtuberId, uuid.toLowerCase(), total, XP_JUEGO_MAX_DIA, JSON.stringify(limpio), dia, new Date(ahora).toISOString(), vinculo.vtuberId, dia, XP_JUEGO_MAX_DIA],
+    [id, vinculo.vtuberId, uuid.toLowerCase(), total, tope, JSON.stringify(limpio), dia, new Date(ahora).toISOString(), vinculo.vtuberId, dia, entrega ? 1 : 0, tope],
   );
   const escrito = await e.execute('SELECT cantidad FROM xp_juego WHERE id_lote = ?', [id]);
   return { vtuberId: vinculo.vtuberId, sumado: Number(escrito.rows[0]?.cantidad ?? 0), duplicado: false, ...(await deHoy(e, vinculo.vtuberId, dia)) };
 }
 
+/**
+ * Lo de hoy, separado por clase de tope: `hoy`/`topeDia` es la XP de juego de siempre (el panel del plugin muestra
+ * «hoy 120/300») y `entregaHoy`/`topeEntrega` la de entregas. Así llegar al tope de uno no apaga el aviso del otro.
+ */
 async function deHoy(e, vtuberId, dia) {
-  const { rows } = await e.execute('SELECT COALESCE(SUM(cantidad), 0) AS n FROM xp_juego WHERE vtuber_id = ? AND dia = ?', [vtuberId, dia]);
-  return { hoy: Number(rows[0]?.n ?? 0), topeDia: XP_JUEGO_MAX_DIA };
+  const { rows } = await e.execute(
+    `SELECT COALESCE(SUM(CASE WHEN json_extract(detalle, '$.entrega') IS NULL THEN cantidad ELSE 0 END), 0) AS n,
+            COALESCE(SUM(CASE WHEN json_extract(detalle, '$.entrega') IS NULL THEN 0 ELSE cantidad END), 0) AS entrega
+       FROM xp_juego WHERE vtuber_id = ? AND dia = ?`,
+    [vtuberId, dia],
+  );
+  return { hoy: Number(rows[0]?.n ?? 0), topeDia: XP_JUEGO_MAX_DIA, entregaHoy: Number(rows[0]?.entrega ?? 0), topeEntrega: XP_ENTREGA_MAX_DIA };
 }
 
 /** XP de juego que la ficha lleva HOY y el tope del día (el panel del juego muestra «hoy 120/300»). */

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 
-import { XP_JUEGO_MAX_DIA, XP_POR_LIKE, experienciaConLikes } from '../src/experiencia.mjs';
+import { XP_ENTREGA_MAX_DIA, XP_JUEGO_MAX_DIA, XP_POR_LIKE, experienciaConLikes } from '../src/experiencia.mjs';
 import {
   CODIGO_TTL_MS,
   ENVIOS,
@@ -118,6 +118,35 @@ test('el tope diario recorta el último lote y deja pasar al día siguiente', as
   assert.equal(topado.hoy, XP_JUEGO_MAX_DIA);
   assert.equal((await sumarXp(e, lote({ mob: 70 }, { dia: '2026-10-08' }))).sumado, 70);
   assert.equal(await xpDeJuego(e, 7), XP_JUEGO_MAX_DIA + 70);
+});
+
+test('la XP de entrega tiene su tope aparte y no resta del de siempre', async () => {
+  const e = nuevo();
+  await vinculado(e);
+  let entrega = 0;
+  while (entrega < XP_ENTREGA_MAX_DIA) entrega += (await sumarXp(e, lote({ entrega: 100 }))).sumado;
+  assert.equal(entrega, XP_ENTREGA_MAX_DIA);
+  assert.equal((await sumarXp(e, lote({ entrega: 100 }))).sumado, 0);
+  // Topada la entrega, el resto de la XP del día sigue entera.
+  const normal = await sumarXp(e, lote({ mob: 70 }));
+  assert.equal(normal.sumado, 70);
+  assert.equal(normal.hoy, 70);
+  assert.equal(normal.entregaHoy, XP_ENTREGA_MAX_DIA);
+  assert.equal(await xpDeJuego(e, 7), XP_ENTREGA_MAX_DIA + 70);
+});
+
+test('el tope de lo de siempre no se come la XP de entrega', async () => {
+  const e = nuevo();
+  await vinculado(e);
+  let sumado = 0;
+  while (sumado < XP_JUEGO_MAX_DIA) sumado += (await sumarXp(e, lote({ mob: 70 }))).sumado;
+  assert.equal((await sumarXp(e, lote({ entrega: 80 }))).sumado, 80);
+});
+
+test('un lote de entrega no se mezcla con otros motivos', async () => {
+  const e = nuevo();
+  await vinculado(e);
+  assert.equal((await error(sumarXp(e, lote({ entrega: 50, mob: 5 })))).code, 'entrega_aparte');
 });
 
 test('lotes concurrentes no pasan del tope', async () => {
