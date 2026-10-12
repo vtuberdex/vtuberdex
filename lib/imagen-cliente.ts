@@ -15,11 +15,15 @@
 export async function cargarBitmap(file: Blob): Promise<ImageBitmap | null> {
   // Se comprueba ANTES de llamarla: en navegadores antiguos invocarla lanzaría un
   // TypeError síncrono y el `.catch()` no llegaría a engancharse.
-  if (typeof createImageBitmap !== 'function') return null;
+  if (typeof createImageBitmap !== "function") return null;
   return createImageBitmap(file).catch(() => null);
 }
 
-export function canvasABlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob | null> {
+export function canvasABlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality?: number,
+): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
@@ -36,9 +40,12 @@ export const EMBLEMA_MAX_LADO = 512;
  * perder parte del trazo, y no se agranda nunca lo que ya es pequeño.
  * Lanza un error legible si el resultado supera el límite del servidor.
  */
-export async function aPngCuadrado(file: Blob, maxLado = EMBLEMA_MAX_LADO): Promise<Blob> {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+export async function aPngCuadrado(
+  file: Blob,
+  maxLado = EMBLEMA_MAX_LADO,
+): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
   if (!ctx) return file;
   const bitmap = await cargarBitmap(file);
   if (!bitmap) return file;
@@ -49,12 +56,20 @@ export async function aPngCuadrado(file: Blob, maxLado = EMBLEMA_MAX_LADO): Prom
   const dh = Math.round(bitmap.height * escala);
   canvas.width = lado;
   canvas.height = lado;
-  ctx.drawImage(bitmap, Math.round((lado - dw) / 2), Math.round((lado - dh) / 2), dw, dh);
+  ctx.drawImage(
+    bitmap,
+    Math.round((lado - dw) / 2),
+    Math.round((lado - dh) / 2),
+    dw,
+    dh,
+  );
   bitmap.close?.();
 
-  const png = (await canvasABlob(canvas, 'image/png')) ?? file;
+  const png = (await canvasABlob(canvas, "image/png")) ?? file;
   if (png.size > EMBLEMA_MAX_BYTES) {
-    throw new Error('El emblema pesa más de 2 MB incluso reducido. Prueba con una imagen más simple.');
+    throw new Error(
+      "El emblema pesa más de 2 MB incluso reducido. Prueba con una imagen más simple.",
+    );
   }
   return png;
 }

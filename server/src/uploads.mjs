@@ -14,9 +14,9 @@
  *     refleje lo que hay en disco.
  */
 
-import fs from 'node:fs';
-import { promises as fsP } from 'node:fs';
-import path from 'node:path';
+import fs from "node:fs";
+import { promises as fsP } from "node:fs";
+import path from "node:path";
 
 /** Tipos de asset que el mantenedor puede reemplazar. */
 export const UPLOADABLE_KINDS = {
@@ -25,7 +25,7 @@ export const UPLOADABLE_KINDS = {
    * muestra cuando el VTuber no tiene personaje. La CARTA en sí no se sube: la
    * compone el visor 3D en el navegador a partir del personaje y el logo.
    */
-  card: { folder: 'ficha', width: 720 },
+  card: { folder: "ficha", width: 720 },
   /**
    * El PERSONAJE normalizado al lienzo de carta (720x1008). Es la imagen que
    * consumen la carta 3D, el listado y la ficha: llega ya recortada y con la
@@ -35,10 +35,10 @@ export const UPLOADABLE_KINDS = {
    * sustitución desde el mantenedor y una regeneración del scraper escriben el
    * MISMO archivo en vez de dos copias que se contradicen.
    */
-  character: { folder: 'character', width: 720, keepAlpha: true, ratio: 1.4 },
-  thumb: { folder: 'thumb', width: 360, keepAlpha: true, ratio: 1.4 },
-  logo: { folder: 'logo', width: 900, keepAlpha: true, trim: true },
-  radar: { folder: 'radar', width: 512 },
+  character: { folder: "character", width: 720, keepAlpha: true, ratio: 1.4 },
+  thumb: { folder: "thumb", width: 360, keepAlpha: true, ratio: 1.4 },
+  logo: { folder: "logo", width: 900, keepAlpha: true, trim: true },
+  radar: { folder: "radar", width: 512 },
   /**
    * El FONDO de la carta 3D: la capa que se pinta POR DETRÁS del personaje.
    *
@@ -47,7 +47,7 @@ export const UPLOADABLE_KINDS = {
    * un desajuste de proporción. Se conserva el alfa porque un fondo puede traerlo
    * (un cielo calado, un degradado con transparencia).
    */
-  background: { folder: 'background', width: 720, keepAlpha: true, ratio: 1.4 },
+  background: { folder: "background", width: 720, keepAlpha: true, ratio: 1.4 },
 };
 
 /** Tamaño máximo aceptado para una imagen subida (12 MB). */
@@ -61,14 +61,31 @@ export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
  * `sharp.format` para que la lista refleje lo que esta instalación realmente
  * puede decodificar, en vez de asumir un juego de formatos.
  */
-export const ACCEPTED_FORMATS = ['png', 'jpeg', 'webp', 'gif', 'avif', 'heif', 'tiff', 'svg'];
+export const ACCEPTED_FORMATS = [
+  "png",
+  "jpeg",
+  "webp",
+  "gif",
+  "avif",
+  "heif",
+  "tiff",
+  "svg",
+];
 
 /**
  * Formatos que SÍ pueden conservar transparencia al convertirlos. El resto (JPEG,
  * TIFF sin alfa) son opacos por definición; se avisa en la respuesta para que el
  * mantenedor no crea que perdió el alfa por un error de la conversión.
  */
-export const FORMATS_WITH_ALPHA = ['png', 'webp', 'gif', 'avif', 'heif', 'svg', 'tiff'];
+export const FORMATS_WITH_ALPHA = [
+  "png",
+  "webp",
+  "gif",
+  "avif",
+  "heif",
+  "svg",
+  "tiff",
+];
 
 /**
  * Recorta el alfa real de un PNG. `trim()` de sharp usa la esquina como
@@ -92,7 +109,12 @@ export function alphaBounds(data, width, height, channels) {
     }
   }
   if (maxX < minX || maxY < minY) return null;
-  return { left: minX, top: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+  return {
+    left: minX,
+    top: minY,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1,
+  };
 }
 
 /**
@@ -105,23 +127,31 @@ export function alphaBounds(data, width, height, channels) {
  * @param {object} args.sharp    instancia de sharp
  * @returns {Promise<{path:string,width:number,height:number,bytes:number}>}
  */
-export async function saveUploadedImage({ buffer, kind, slug, imageRoot, sharp }) {
+export async function saveUploadedImage({
+  buffer,
+  kind,
+  slug,
+  imageRoot,
+  sharp,
+}) {
   const spec = specDeKind(kind);
-  if (!spec) throw new Error('kind_invalido');
-  if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw new Error('archivo_vacio');
-  if (buffer.length > MAX_UPLOAD_BYTES) throw new Error('archivo_demasiado_grande');
+  if (!spec) throw new Error("kind_invalido");
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0)
+    throw new Error("archivo_vacio");
+  if (buffer.length > MAX_UPLOAD_BYTES)
+    throw new Error("archivo_demasiado_grande");
 
   // Validación por CONTENIDO: si sharp no lo decodifica, no es una imagen.
   let meta;
   try {
     meta = await sharp(buffer).metadata();
   } catch {
-    throw new Error('no_es_imagen');
+    throw new Error("no_es_imagen");
   }
   if (!meta.format || !ACCEPTED_FORMATS.includes(meta.format)) {
-    throw new Error(`formato_no_soportado:${meta.format ?? 'desconocido'}`);
+    throw new Error(`formato_no_soportado:${meta.format ?? "desconocido"}`);
   }
-  if (!meta.width || !meta.height) throw new Error('imagen_sin_dimensiones');
+  if (!meta.width || !meta.height) throw new Error("imagen_sin_dimensiones");
 
   const dir = path.join(imageRoot, spec.folder);
   await fsP.mkdir(dir, { recursive: true });
@@ -131,9 +161,20 @@ export async function saveUploadedImage({ buffer, kind, slug, imageRoot, sharp }
   // Los logos traen padding transparente baked; se recorta el alfa real para que
   // no queden diminutos ni con márgenes enormes (mismo criterio que el scraper).
   if (spec.trim) {
-    const raw = await sharp(buffer, { animated: false }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    const bounds = alphaBounds(raw.data, raw.info.width, raw.info.height, raw.info.channels);
-    if (bounds && (bounds.width < raw.info.width || bounds.height < raw.info.height)) {
+    const raw = await sharp(buffer, { animated: false })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const bounds = alphaBounds(
+      raw.data,
+      raw.info.width,
+      raw.info.height,
+      raw.info.channels,
+    );
+    if (
+      bounds &&
+      (bounds.width < raw.info.width || bounds.height < raw.info.height)
+    ) {
       pipeline = sharp(buffer, { animated: false }).extract(bounds);
     }
   }
@@ -162,23 +203,44 @@ export async function saveUploadedImage({ buffer, kind, slug, imageRoot, sharp }
     ? pipeline.resize({
         width: spec.width,
         height: Math.round(spec.width * spec.ratio),
-        fit: 'cover',
-        position: 'top',
+        fit: "cover",
+        position: "top",
       })
-    : pipeline.resize({ width: spec.width, withoutEnlargement: true, fit: 'inside' });
+    : pipeline.resize({
+        width: spec.width,
+        withoutEnlargement: true,
+        fit: "inside",
+      });
 
-  let converted = await (hasAlpha
-    ? resized.webp({ nearLossless: true, quality: 90, alphaQuality: 100, effort: 6, smartSubsample: false })
-    : resized.webp({ quality: 94, effort: 6 })
+  let converted = await (
+    hasAlpha
+      ? resized.webp({
+          nearLossless: true,
+          quality: 90,
+          alphaQuality: 100,
+          effort: 6,
+          smartSubsample: false,
+        })
+      : resized.webp({ quality: 94, effort: 6 })
   ).toBuffer();
 
   // Si el resultado pesa MÁS que el original, se reintenta con pérdida más
   // agresiva. Sin esto, un original ya optimizado (un JPEG pequeño) salía más
   // grande que antes de subirlo, que es justo lo contrario de "optimizar".
   if (converted.length > buffer.length) {
-    const alt = await (fitsCard
-      ? pipeline.resize({ width: spec.width, height: Math.round(spec.width * spec.ratio), fit: 'cover', position: 'top' })
-      : pipeline.resize({ width: spec.width, withoutEnlargement: true, fit: 'inside' })
+    const alt = await (
+      fitsCard
+        ? pipeline.resize({
+            width: spec.width,
+            height: Math.round(spec.width * spec.ratio),
+            fit: "cover",
+            position: "top",
+          })
+        : pipeline.resize({
+            width: spec.width,
+            withoutEnlargement: true,
+            fit: "inside",
+          })
     )
       .webp({ quality: hasAlpha ? 92 : 86, alphaQuality: 100, effort: 6 })
       .toBuffer();
@@ -193,20 +255,23 @@ export async function saveUploadedImage({ buffer, kind, slug, imageRoot, sharp }
     width: out.width ?? spec.width,
     height: out.height ?? 0,
     bytes: converted.length,
-    format: 'webp',
+    format: "webp",
     hasAlpha: Boolean(out.hasAlpha),
     /**
      * Aviso para la UI: JPEG nunca tiene alfa, así que si el original era JPEG el
      * usuario no perdió nada; si era PNG/WebP con alfa y no se conservó, sí.
      */
-    alphaLost: FORMATS_WITH_ALPHA.includes(meta.format) && Boolean(meta.hasAlpha) && !out.hasAlpha,
+    alphaLost:
+      FORMATS_WITH_ALPHA.includes(meta.format) &&
+      Boolean(meta.hasAlpha) &&
+      !out.hasAlpha,
   };
 }
 
 /** Borra la imagen de un asset (deja el VTuber sin esa imagen). */
 export async function removeUploadedImage({ kind, slug, imageRoot }) {
   const spec = specDeKind(kind);
-  if (!spec) throw new Error('kind_invalido');
+  if (!spec) throw new Error("kind_invalido");
   const file = path.join(imageRoot, spec.folder, `${slug}.webp`);
   if (fs.existsSync(file)) await fsP.unlink(file);
   return { path: `images/${spec.folder}/${slug}.webp` };
@@ -217,7 +282,9 @@ export async function removeUploadedImage({ kind, slug, imageRoot }) {
  * con `UPLOADABLE_KINDS[kind]` a secas, `constructor` o `__proto__` pasaban la validación.
  */
 export function specDeKind(kind) {
-  return typeof kind === 'string' && Object.hasOwn(UPLOADABLE_KINDS, kind) ? UPLOADABLE_KINDS[kind] : null;
+  return typeof kind === "string" && Object.hasOwn(UPLOADABLE_KINDS, kind)
+    ? UPLOADABLE_KINDS[kind]
+    : null;
 }
 
 /**
@@ -229,25 +296,37 @@ export function specDeKind(kind) {
  * Turso). Se valida por contenido con `sharp`, igual que el resto de subidas.
  */
 export async function saveFactionEmblem({ buffer, slug, imageRoot, sharp }) {
-  if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw new Error('archivo_vacio');
-  if (buffer.length > MAX_UPLOAD_BYTES) throw new Error('archivo_demasiado_grande');
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0)
+    throw new Error("archivo_vacio");
+  if (buffer.length > MAX_UPLOAD_BYTES)
+    throw new Error("archivo_demasiado_grande");
   let meta;
   try {
     meta = await sharp(buffer).metadata();
   } catch {
-    throw new Error('no_es_imagen');
+    throw new Error("no_es_imagen");
   }
   if (!meta.format || !ACCEPTED_FORMATS.includes(meta.format)) {
-    throw new Error(`formato_no_soportado:${meta.format ?? 'desconocido'}`);
+    throw new Error(`formato_no_soportado:${meta.format ?? "desconocido"}`);
   }
-  const dir = path.join(imageRoot, 'faction');
+  const dir = path.join(imageRoot, "faction");
   await fsP.mkdir(dir, { recursive: true });
   const converted = await sharp(buffer, { animated: false })
-    .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
+    .resize({
+      width: 512,
+      height: 512,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
     .ensureAlpha()
     .png({ compressionLevel: 9 })
     .toBuffer();
   await fsP.writeFile(path.join(dir, `${slug}.png`), converted);
   const out = await sharp(converted).metadata();
-  return { path: `images/faction/${slug}.png`, width: out.width ?? 0, height: out.height ?? 0, bytes: converted.length };
+  return {
+    path: `images/faction/${slug}.png`,
+    width: out.width ?? 0,
+    height: out.height ?? 0,
+    bytes: converted.length,
+  };
 }

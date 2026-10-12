@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Editor genérico de listas ordenadas (perfil, atributos, habilidades, redes).
  *
@@ -8,9 +8,9 @@
  * posición de cada elemento y los arrays REEMPLAZAN la lista completa, por eso el
  * reordenamiento es explícito (botones) y no un arrastre que se pueda soltar mal.
  */
-import type { ReactNode } from 'react';
+import type { ReactNode } from "react";
 
-import { ghostButton } from '@/components/admin/ui';
+import { ghostButton } from "@/components/admin/ui";
 
 export interface ListEditorProps<T> {
   /** Nombre en singular, usado en los `aria-label` de los botones («Quitar habilidad 2»). */
@@ -18,14 +18,27 @@ export interface ListEditorProps<T> {
   items: T[];
   onChange: (items: T[]) => void;
   newItem: () => T;
-  renderItem: (item: T, update: (patch: Partial<T>) => void, index: number) => ReactNode;
+  renderItem: (
+    item: T,
+    update: (patch: Partial<T>) => void,
+    index: number,
+  ) => ReactNode;
   addLabel: string;
   emptyText: string;
   /** Tope de filas: el servidor también lo impone, aquí solo se deshabilita «Agregar». */
   max?: number;
 }
 
-export function ListEditor<T>({ noun, items, onChange, newItem, renderItem, addLabel, emptyText, max }: ListEditorProps<T>) {
+export function ListEditor<T>({
+  noun,
+  items,
+  onChange,
+  newItem,
+  renderItem,
+  addLabel,
+  emptyText,
+  max,
+}: ListEditorProps<T>) {
   const move = (from: number, to: number) => {
     if (to < 0 || to >= items.length) return;
     const next = items.slice();
@@ -36,10 +49,18 @@ export function ListEditor<T>({ noun, items, onChange, newItem, renderItem, addL
 
   return (
     <div className="space-y-3">
-      {items.length === 0 && <p className="rounded-xl border border-dashed border-dex-line px-4 py-6 text-center text-sm text-dex-muted">{emptyText}</p>}
+      {items.length === 0 && (
+        <p className="rounded-xl border border-dashed border-dex-line px-4 py-6 text-center text-sm text-dex-muted">
+          {emptyText}
+        </p>
+      )}
       <ol className="space-y-3">
         {items.map((item, index) => (
-          <li key={index} className="rounded-xl border border-dex-line bg-dex-void/40 p-3" data-testid="list-row">
+          <li
+            key={index}
+            className="rounded-xl border border-dex-line bg-dex-void/40 p-3"
+            data-testid="list-row"
+          >
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className="font-mono text-[11px] text-dex-muted">
                 {noun} {index + 1}
@@ -73,7 +94,16 @@ export function ListEditor<T>({ noun, items, onChange, newItem, renderItem, addL
                 </button>
               </span>
             </div>
-            {renderItem(item, (patch) => onChange(items.map((current, i) => (i === index ? { ...current, ...patch } : current))), index)}
+            {renderItem(
+              item,
+              (patch) =>
+                onChange(
+                  items.map((current, i) =>
+                    i === index ? { ...current, ...patch } : current,
+                  ),
+                ),
+              index,
+            )}
           </li>
         ))}
       </ol>

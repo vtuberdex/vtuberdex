@@ -23,10 +23,10 @@ import {
   hoy,
   numeroDeCertificado,
   rangoDeGrado,
-} from '@/server/src/premium.mjs';
+} from "@/server/src/premium.mjs";
 
-import { esFichaDeteriorada as esFichaDeterioradaServidor } from '@/server/src/ficha-deteriorada.mjs';
-import type { PremiumGrade, PremiumInfo } from '@/lib/types';
+import { esFichaDeteriorada as esFichaDeterioradaServidor } from "@/server/src/ficha-deteriorada.mjs";
+import type { PremiumGrade, PremiumInfo } from "@/lib/types";
 
 export { hoy, numeroDeCertificado, rangoDeGrado };
 
@@ -35,41 +35,53 @@ export const GRADOS = GRADOS_SERVIDOR as readonly PremiumGrade[];
 export const GRADO_INICIAL = GRADO_INICIAL_SERVIDOR as PremiumGrade;
 
 /** Donación en USD por grado premium (`null` = aún sin definir). Referencia del mantenedor. */
-export const DONACION_POR_GRADO = DONACION_POR_GRADO_SERVIDOR as Readonly<Record<string, number | null>>;
+export const DONACION_POR_GRADO = DONACION_POR_GRADO_SERVIDOR as Readonly<
+  Record<string, number | null>
+>;
 /** Grados que no se obtienen donando (Black Label). */
-export const GRADOS_RESERVADOS = GRADOS_RESERVADOS_SERVIDOR as readonly PremiumGrade[];
+export const GRADOS_RESERVADOS =
+  GRADOS_RESERVADOS_SERVIDOR as readonly PremiumGrade[];
 
 /** La escala de deterioro (`7`…`1`), del menos al más dañado. */
-export const GRADOS_DEGRADADOS = GRADOS_DEGRADADOS_SERVIDOR as readonly PremiumGrade[];
+export const GRADOS_DEGRADADOS =
+  GRADOS_DEGRADADOS_SERVIDOR as readonly PremiumGrade[];
 /** Todos los grados que el mantenedor puede fijar, de peor a mejor (`1 … 7 · 8 … BL`). */
-export const TODOS_LOS_GRADOS = TODOS_LOS_GRADOS_SERVIDOR as readonly PremiumGrade[];
+export const TODOS_LOS_GRADOS =
+  TODOS_LOS_GRADOS_SERVIDOR as readonly PremiumGrade[];
 /** El grado de quien se dio de baja. */
 export const GRADO_DE_BAJA = GRADO_DE_BAJA_SERVIDOR as PremiumGrade;
 
-export const esGradoDegradado = (grado: string | null | undefined): boolean => esGradoDegradadoServidor(grado);
+export const esGradoDegradado = (grado: string | null | undefined): boolean =>
+  esGradoDegradadoServidor(grado);
 /** 0 en un grado premium; de 1/7 (grado 7) a 1 (grado 1) en uno degradado. */
-export const severidadDeGrado = (grado: string | null | undefined): number => severidadDeGradoServidor(grado);
+export const severidadDeGrado = (grado: string | null | undefined): number =>
+  severidadDeGradoServidor(grado);
 
 export const gradoSiguiente = (grado: PremiumGrade): PremiumGrade | null =>
   gradoSiguienteServidor(grado) as PremiumGrade | null;
 
-export const esBlackLabel = (grado: PremiumGrade): boolean => esBlackLabelServidor(grado);
+export const esBlackLabel = (grado: PremiumGrade): boolean =>
+  esBlackLabelServidor(grado);
 
 /** Nombre del grado en la etiqueta (`GEM MINT`, `PRISTINE`…). */
 export const nombreDeGrado = (grado: PremiumGrade): string =>
-  (NOMBRE_DE_GRADO as Record<string, string>)[grado] ?? '';
+  (NOMBRE_DE_GRADO as Record<string, string>)[grado] ?? "";
 
 /**
  * Cómo se lee el grado en grande: el `10` sale como `10`, el `8.5` como `8.5` y la Black Label
  * como `10` con su leyenda aparte (la etiqueta CGC de una Black Label lleva el 10 pristino).
  */
-export const notaVisible = (grado: PremiumGrade): string => (esBlackLabel(grado) ? '10' : grado);
+export const notaVisible = (grado: PremiumGrade): string =>
+  esBlackLabel(grado) ? "10" : grado;
 
 /** Leyenda corta para chips: `GEM MINT 10`, `NM/MT 8`, `PRISTINE 10 · BLACK LABEL`. */
-export function leyendaDePremium(premium: Pick<PremiumInfo, 'grade'>): string {
+export function leyendaDePremium(premium: Pick<PremiumInfo, "grade">): string {
   const { grade } = premium;
-  if (esGradoDegradado(grade)) return `${nombreDeGrado(grade)} ${grade} · DETERIORADA`;
-  return esBlackLabel(grade) ? 'PRISTINE 10 · BLACK LABEL' : `${nombreDeGrado(grade)} ${grade}`;
+  if (esGradoDegradado(grade))
+    return `${nombreDeGrado(grade)} ${grade} · DETERIORADA`;
+  return esBlackLabel(grade)
+    ? "PRISTINE 10 · BLACK LABEL"
+    : `${nombreDeGrado(grade)} ${grade}`;
 }
 
 /**
@@ -77,44 +89,56 @@ export function leyendaDePremium(premium: Pick<PremiumInfo, 'grade'>): string {
  * para decir «lleva N meses» y avisar si ya se subió el grado este mes.
  */
 export function mesesEntre(desde: string, hasta: string = hoy()): number {
-  const [ay, am, ad] = desde.split('-').map(Number);
-  const [by, bm, bd] = hasta.split('-').map(Number);
+  const [ay, am, ad] = desde.split("-").map(Number);
+  const [by, bm, bd] = hasta.split("-").map(Number);
   if (![ay, am, ad, by, bm, bd].every(Number.isFinite)) return 0;
   const meses = (by - ay) * 12 + (bm - am) - (bd < ad ? 1 : 0);
   return Math.max(0, meses);
 }
 
 /** ¿Es el mismo mes calendario? (`AAAA-MM`). */
-export const mismoMes = (a: string, b: string = hoy()): boolean => a.slice(0, 7) === b.slice(0, 7);
+export const mismoMes = (a: string, b: string = hoy()): boolean =>
+  a.slice(0, 7) === b.slice(0, 7);
 
 /** ¿Es una ficha deteriorada (grado 1, la de las bajas)? El público no ve sus datos ni su logo. */
-export const esFichaDeteriorada = (cartaOGrado: { premium?: { grade: string } | null } | string | null | undefined): boolean =>
-  esFichaDeterioradaServidor(cartaOGrado);
+export const esFichaDeteriorada = (
+  cartaOGrado:
+    { premium?: { grade: string } | null } | string | null | undefined,
+): boolean => esFichaDeterioradaServidor(cartaOGrado);
 
 /**
  * Grado con que se pinta una ficha sin correo, SIN placa (no es una carta premium). Es el 6 y no el 4: el 4 rompía
  * demasiado la carta. El 6 solo le da el desgaste leve más fuerte de la escala premium; el aviso real es el banner.
  * El refuerzo holográfico NO lo usa (solo mira `card.premium`): sería un premium regalado.
  */
-export const GRADO_SIN_CORREO: PremiumGrade = '6';
+export const GRADO_SIN_CORREO: PremiumGrade = "6";
 
 /**
  * El grado con que se DIBUJA la carta: el premium si lo tiene y, si no, el 4 de las fichas sin correo
  * (`sinCorreo` lo calcula el servidor al leer). Solo afecta al deterioro de la textura; la placa
  * de acrílico sigue colgando de `card.premium`, así que estas fichas se rompen sin marco.
  */
-export const gradoDeDibujo = (card: { premium?: { grade: PremiumGrade } | null; sinCorreo?: boolean }): PremiumGrade | undefined =>
+export const gradoDeDibujo = (card: {
+  premium?: { grade: PremiumGrade } | null;
+  sinCorreo?: boolean;
+}): PremiumGrade | undefined =>
   card.premium?.grade ?? (card.sinCorreo ? GRADO_SIN_CORREO : undefined);
 
 /** Meses seguidos donando (0 = nada que mostrar). Se calcula al pintar: la home es estática y «hoy» cambia. */
-export const rachaDe = (premium: Pick<PremiumInfo, 'grade' | 'since' | 'gradedAt'>, ahora: string = hoy()): number =>
-  rachaDeServidor(premium, ahora);
+export const rachaDe = (
+  premium: Pick<PremiumInfo, "grade" | "since" | "gradedAt">,
+  ahora: string = hoy(),
+): number => rachaDeServidor(premium, ahora);
 
 /** Texto de la racha para etiqueta e insignia: `5 meses seguidos`, o `null` si no hay. */
-export function textoDeRacha(premium: Pick<PremiumInfo, 'grade' | 'since' | 'gradedAt'>, ahora?: string): string | null {
+export function textoDeRacha(
+  premium: Pick<PremiumInfo, "grade" | "since" | "gradedAt">,
+  ahora?: string,
+): string | null {
   const meses = rachaDe(premium, ahora);
   return meses > 0 ? `${meses} meses seguidos` : null;
 }
 
 /** Desgaste leve de 0 a 1 (1 = carta suelta sin gradear; 0 = del 8 en adelante o degradada). */
-export const desgasteLeveDeGrado = (grado: string | null | undefined): number => desgasteLeveDeGradoServidor(grado);
+export const desgasteLeveDeGrado = (grado: string | null | undefined): number =>
+  desgasteLeveDeGradoServidor(grado);

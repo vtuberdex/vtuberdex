@@ -14,7 +14,7 @@
  * blanco o negro: ahí el arcoíris debe quedar completo) o si hay varios colores igual de
  * fuertes (ningún tono representa a la carta).
  */
-import { DOMINANT } from '../card3d-config';
+import { DOMINANT } from "../card3d-config";
 
 export interface ColorPredominante {
   /** Canales 0..1 del color predominante. */
@@ -31,27 +31,40 @@ const suave = (valor: number, desde: number, hasta: number) => {
 };
 
 /** Matiz 0..1 de un color RGB 0..255 (solo se llama con croma > 0). */
-function matiz(r: number, g: number, b: number, max: number, min: number): number {
+function matiz(
+  r: number,
+  g: number,
+  b: number,
+  max: number,
+  min: number,
+): number {
   const d = max - min;
   let h: number;
   if (max === r) h = ((g - b) / d) % 6;
   else if (max === g) h = (b - r) / d + 2;
   else h = (r - g) / d + 4;
-  return ((h / 6) % 1 + 1) % 1;
+  return (((h / 6) % 1) + 1) % 1;
 }
 
-export function colorPredominante(fuente: CanvasImageSource | null): ColorPredominante {
-  if (!fuente || typeof document === 'undefined') return SIN_COLOR;
+export function colorPredominante(
+  fuente: CanvasImageSource | null,
+): ColorPredominante {
+  if (!fuente || typeof document === "undefined") return SIN_COLOR;
   const lado = DOMINANT.grid;
-  const canvas = document.createElement('canvas');
+  const canvas = document.createElement("canvas");
   canvas.width = lado;
   canvas.height = lado;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return SIN_COLOR;
   ctx.drawImage(fuente, 0, 0, lado, lado);
   const datos = ctx.getImageData(0, 0, lado, lado).data;
 
-  const cubos = Array.from({ length: DOMINANT.hueBins }, () => ({ peso: 0, r: 0, g: 0, b: 0 }));
+  const cubos = Array.from({ length: DOMINANT.hueBins }, () => ({
+    peso: 0,
+    r: 0,
+    g: 0,
+    b: 0,
+  }));
   let pesoTotal = 0;
   let pixeles = 0;
   for (let i = 0; i < datos.length; i += 4) {
@@ -64,7 +77,13 @@ export function colorPredominante(fuente: CanvasImageSource | null): ColorPredom
     if (croma < DOMINANT.minChroma) continue;
     // El brillo también pesa: un píxel casi negro con algo de croma no «es» ese color.
     const peso = croma * (max / 255);
-    const cubo = cubos[Math.min(DOMINANT.hueBins - 1, Math.floor(matiz(r, g, b, max, min) * DOMINANT.hueBins))];
+    const cubo =
+      cubos[
+        Math.min(
+          DOMINANT.hueBins - 1,
+          Math.floor(matiz(r, g, b, max, min) * DOMINANT.hueBins),
+        )
+      ];
     cubo.peso += peso;
     cubo.r += r * peso;
     cubo.g += g * peso;
@@ -73,11 +92,25 @@ export function colorPredominante(fuente: CanvasImageSource | null): ColorPredom
   }
   if (pixeles === 0 || pesoTotal === 0) return SIN_COLOR;
 
-  const ganador = cubos.reduce((mejor, cubo) => (cubo.peso > mejor.peso ? cubo : mejor), cubos[0]);
-  const cobertura = Math.min(1, ganador.peso / (pixeles * DOMINANT.coverageFull));
-  const dominancia = suave(ganador.peso / pesoTotal, DOMINANT.dominanceFrom, DOMINANT.dominanceTo);
+  const ganador = cubos.reduce(
+    (mejor, cubo) => (cubo.peso > mejor.peso ? cubo : mejor),
+    cubos[0],
+  );
+  const cobertura = Math.min(
+    1,
+    ganador.peso / (pixeles * DOMINANT.coverageFull),
+  );
+  const dominancia = suave(
+    ganador.peso / pesoTotal,
+    DOMINANT.dominanceFrom,
+    DOMINANT.dominanceTo,
+  );
   return {
-    rgb: [ganador.r / ganador.peso / 255, ganador.g / ganador.peso / 255, ganador.b / ganador.peso / 255],
+    rgb: [
+      ganador.r / ganador.peso / 255,
+      ganador.g / ganador.peso / 255,
+      ganador.b / ganador.peso / 255,
+    ],
     amount: cobertura * dominancia,
   };
 }

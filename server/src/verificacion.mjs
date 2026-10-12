@@ -24,9 +24,9 @@
  * inundar el buzón de un tercero. `envioPermitido` cuenta los tokens ya emitidos a ese correo
  * (el tope por red de las solicitudes no basta: el atacante cambia de red, la víctima no).
  */
-import crypto from 'node:crypto';
+import crypto from "node:crypto";
 
-import { preparadorDeTablas } from './db/tablas.mjs';
+import { preparadorDeTablas } from "./db/tablas.mjs";
 
 /**
  * `solicitud`: confirma una inscripción/baja ya enviada. `admin`: acceso al mantenedor. `modificacion`:
@@ -36,7 +36,15 @@ import { preparadorDeTablas } from './db/tablas.mjs';
  * inscripción. `sesion`: lo que ese código se canjea; a diferencia del `permiso` NO se gasta al guardar el
  * borrador (se puede usar muchas veces mientras se rellena) y solo se gasta al enviar la inscripción.
  */
-export const PROPOSITOS = ['solicitud', 'admin', 'modificacion', 'permiso', 'inscripcion', 'sesion', 'ficha'];
+export const PROPOSITOS = [
+  "solicitud",
+  "admin",
+  "modificacion",
+  "permiso",
+  "inscripcion",
+  "sesion",
+  "ficha",
+];
 // `ficha`: el enlace mágico de «Mi ficha» (subir los puntos de habilidad). A diferencia del resto NO se gasta:
 // se MIRA (`correoDelToken`) cada vez que se usa la página y simplemente caduca.
 
@@ -73,20 +81,28 @@ const DDL = `
 
 const conTablas = preparadorDeTablas(DDL);
 
-const hashDe = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
+const hashDe = (token) =>
+  crypto.createHash("sha256").update(String(token)).digest("hex");
 
 /** ¿Se le puede enviar otro correo a esta dirección ahora? Devuelve `{ ok }` o `{ ok:false, motivo }`. */
 export async function envioPermitido(
   ejecutor,
-  { email, proposito, ahora = Date.now(), maximo = MAX_ENVIOS_POR_CORREO_Y_DIA, espera = ESPERA_ENTRE_ENVIOS_MS },
+  {
+    email,
+    proposito,
+    ahora = Date.now(),
+    maximo = MAX_ENVIOS_POR_CORREO_Y_DIA,
+    espera = ESPERA_ENTRE_ENVIOS_MS,
+  },
 ) {
   const e = await conTablas(ejecutor);
   const { rows } = await e.execute(
-    'SELECT creado FROM token_correo WHERE email = ? AND proposito = ? AND creado >= ? ORDER BY creado DESC',
+    "SELECT creado FROM token_correo WHERE email = ? AND proposito = ? AND creado >= ? ORDER BY creado DESC",
     [email, proposito, ahora - 24 * 60 * 60 * 1000],
   );
-  if (rows.length >= maximo) return { ok: false, motivo: 'tope_diario' };
-  if (rows[0] && ahora - Number(rows[0].creado) < espera) return { ok: false, motivo: 'demasiado_pronto' };
+  if (rows.length >= maximo) return { ok: false, motivo: "tope_diario" };
+  if (rows[0] && ahora - Number(rows[0].creado) < espera)
+    return { ok: false, motivo: "demasiado_pronto" };
   return { ok: true };
 }
 
@@ -95,13 +111,24 @@ export async function envioPermitido(
  * @param {any} ejecutor
  * @param {{ proposito: string, email: string, solicitudId?: number | null, ahora?: number }} datos
  */
-export async function crearToken(ejecutor, { proposito, email, solicitudId = null, ahora = Date.now() }) {
-  if (!PROPOSITOS.includes(proposito)) throw new Error(`propósito de token desconocido: ${proposito}`);
+export async function crearToken(
+  ejecutor,
+  { proposito, email, solicitudId = null, ahora = Date.now() },
+) {
+  if (!PROPOSITOS.includes(proposito))
+    throw new Error(`propósito de token desconocido: ${proposito}`);
   const e = await conTablas(ejecutor);
-  const token = crypto.randomBytes(32).toString('base64url');
+  const token = crypto.randomBytes(32).toString("base64url");
   await e.execute(
-    'INSERT INTO token_correo (hash, proposito, email, solicitud_id, creado, expira) VALUES (?, ?, ?, ?, ?, ?)',
-    [hashDe(token), proposito, email, solicitudId, ahora, ahora + TTL_MS[proposito]],
+    "INSERT INTO token_correo (hash, proposito, email, solicitud_id, creado, expira) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      hashDe(token),
+      proposito,
+      email,
+      solicitudId,
+      ahora,
+      ahora + TTL_MS[proposito],
+    ],
   );
   return token;
 }
@@ -111,11 +138,17 @@ export async function crearToken(ejecutor, { proposito, email, solicitudId = nul
  * verificado y gastar el token solo cuando todo lo demás pasó (un error de validación no lo quema).
  * Devuelve `{ email }` o `null`.
  */
-export async function correoDelToken(ejecutor, token, proposito, ahora = Date.now()) {
-  if (typeof token !== 'string' || token.length < 20 || token.length > 100) return null;
+export async function correoDelToken(
+  ejecutor,
+  token,
+  proposito,
+  ahora = Date.now(),
+) {
+  if (typeof token !== "string" || token.length < 20 || token.length > 100)
+    return null;
   const e = await conTablas(ejecutor);
   const { rows } = await e.execute(
-    'SELECT email FROM token_correo WHERE hash = ? AND proposito = ? AND usado = 0 AND expira > ?',
+    "SELECT email FROM token_correo WHERE hash = ? AND proposito = ? AND usado = 0 AND expira > ?",
     [hashDe(token), proposito, ahora],
   );
   return rows[0] ? { email: rows[0].email } : null;
@@ -125,23 +158,50 @@ export async function correoDelToken(ejecutor, token, proposito, ahora = Date.no
  * Gasta el token si existe, es del propósito pedido, no caducó y no se usó. Devuelve
  * `{ email, solicitudId }` o `null`. Un token que no sirve no dice POR QUÉ no sirve.
  */
-export async function consumirToken(ejecutor, token, proposito, ahora = Date.now()) {
-  if (typeof token !== 'string' || token.length < 20 || token.length > 100) return null;
+export async function consumirToken(
+  ejecutor,
+  token,
+  proposito,
+  ahora = Date.now(),
+) {
+  if (typeof token !== "string" || token.length < 20 || token.length > 100)
+    return null;
   const e = await conTablas(ejecutor);
   const hash = hashDe(token);
   const cambio = await e.execute(
-    'UPDATE token_correo SET usado = 1 WHERE hash = ? AND proposito = ? AND usado = 0 AND expira > ?',
+    "UPDATE token_correo SET usado = 1 WHERE hash = ? AND proposito = ? AND usado = 0 AND expira > ?",
     [hash, proposito, ahora],
   );
   if (cambio.rowsAffected === 0) return null;
-  const { rows } = await e.execute('SELECT email, solicitud_id FROM token_correo WHERE hash = ?', [hash]);
-  return rows[0] ? { email: rows[0].email, solicitudId: rows[0].solicitud_id == null ? null : Number(rows[0].solicitud_id) } : null;
+  const { rows } = await e.execute(
+    "SELECT email, solicitud_id FROM token_correo WHERE hash = ?",
+    [hash],
+  );
+  return rows[0]
+    ? {
+        email: rows[0].email,
+        solicitudId:
+          rows[0].solicitud_id == null ? null : Number(rows[0].solicitud_id),
+      }
+    : null;
 }
 
 /** Borra los tokens de una solicitud (al reemplazarla o descartarla) y los caducados hace más de 2 días. */
-export async function limpiarTokens(ejecutor, { solicitudId = null, ahora = Date.now() } = {}) {
+export async function limpiarTokens(
+  ejecutor,
+  { solicitudId = null, ahora = Date.now() } = {},
+) {
   const e = await conTablas(ejecutor);
-  if (solicitudId != null) await e.execute('DELETE FROM token_correo WHERE solicitud_id = ?', [solicitudId]);
-  await e.execute('DELETE FROM token_correo WHERE expira < ? AND proposito = ?', [ahora - 2 * 24 * 60 * 60 * 1000, 'solicitud']);
-  await e.execute('DELETE FROM token_correo WHERE expira < ? AND proposito = ?', [ahora - 2 * 24 * 60 * 60 * 1000, 'admin']);
+  if (solicitudId != null)
+    await e.execute("DELETE FROM token_correo WHERE solicitud_id = ?", [
+      solicitudId,
+    ]);
+  await e.execute(
+    "DELETE FROM token_correo WHERE expira < ? AND proposito = ?",
+    [ahora - 2 * 24 * 60 * 60 * 1000, "solicitud"],
+  );
+  await e.execute(
+    "DELETE FROM token_correo WHERE expira < ? AND proposito = ?",
+    [ahora - 2 * 24 * 60 * 60 * 1000, "admin"],
+  );
 }

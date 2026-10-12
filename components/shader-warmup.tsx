@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Compila en reposo los programas de shader que, sin esto, nacen en mitad del primer giro.
  *
@@ -25,12 +25,12 @@
  * Si cambias los parámetros del material de `PremiumSlab` (side, alphaTest,
  * transparent, toneMapped, fog, mapa), cámbialos aquí también: con otra clave el calentamiento no sirve.
  */
-import { useEffect, useMemo, useRef } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
-import * as THREE from 'three';
+import { useEffect, useMemo, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import * as THREE from "three";
 
-import { slabLayout } from '@/components/premium-layout';
-import { crearMaterialDeAcrilico } from '@/components/premium-slab';
+import { slabLayout } from "@/components/premium-layout";
+import { crearMaterialDeAcrilico } from "@/components/premium-slab";
 
 /** Detrás del libro (que está en z ≈ 0, con las cartas por delante). */
 const WARMUP_Z = -5;
@@ -44,7 +44,7 @@ function mapaVacio(): THREE.DataTexture {
 
 /** Espera a que el navegador esté ocioso: el calentamiento no debe competir con las texturas. */
 function enReposo(fn: () => void): () => void {
-  if (typeof window.requestIdleCallback === 'function') {
+  if (typeof window.requestIdleCallback === "function") {
     const id = window.requestIdleCallback(fn, { timeout: 2000 });
     return () => window.cancelIdleCallback(id);
   }
@@ -56,11 +56,14 @@ export function ShaderWarmup() {
   const { gl, scene, camera, invalidate } = useThree();
   const grupo = useRef<THREE.Group>(null);
   /** 'espera' → compilando; 'dibujando' → visible 1 frame; 'hecho' → oculto para siempre. */
-  const fase = useRef<'espera' | 'dibujando' | 'hecho'>('espera');
+  const fase = useRef<"espera" | "dibujando" | "hecho">("espera");
   const framesDibujando = useRef(0);
   const mapa = useMemo(() => mapaVacio(), []);
   // Las medidas no cambian la clave del programa (solo los uniforms), así que sirven unas cualquiera.
-  const acrilico = useMemo(() => crearMaterialDeAcrilico(slabLayout(1, 1.4, 0.1)), []);
+  const acrilico = useMemo(
+    () => crearMaterialDeAcrilico(slabLayout(1, 1.4, 0.1)),
+    [],
+  );
   useEffect(
     () => () => {
       mapa.dispose();
@@ -74,8 +77,8 @@ export function ShaderWarmup() {
     const cancelar = enReposo(() => {
       if (!vivo) return;
       const dibujar = () => {
-        if (!vivo || fase.current !== 'espera') return;
-        fase.current = 'dibujando';
+        if (!vivo || fase.current !== "espera") return;
+        fase.current = "dibujando";
         invalidate();
       };
       gl.compileAsync(scene, camera).then(dibujar, dibujar);
@@ -88,15 +91,15 @@ export function ShaderWarmup() {
 
   useFrame(() => {
     const g = grupo.current;
-    if (!g || fase.current === 'espera') return;
-    if (fase.current === 'dibujando') {
+    if (!g || fase.current === "espera") return;
+    if (fase.current === "dibujando") {
       if (framesDibujando.current === 0) {
         // Detrás del libro, centrado donde mira la cámara: la profundidad lo esconde.
         g.position.set(camera.position.x, 0, WARMUP_Z);
         g.visible = true;
       } else {
         g.visible = false;
-        fase.current = 'hecho';
+        fase.current = "hecho";
       }
       framesDibujando.current += 1;
       invalidate();
@@ -107,7 +110,12 @@ export function ShaderWarmup() {
     <group ref={grupo} visible={false} scale={0.01} data-testid="shader-warmup">
       <mesh>
         <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial map={mapa} alphaTest={0.5} toneMapped={false} fog={false} />
+        <meshBasicMaterial
+          map={mapa}
+          alphaTest={0.5}
+          toneMapped={false}
+          fog={false}
+        />
       </mesh>
       <mesh material={acrilico}>
         <planeGeometry args={[1, 1]} />

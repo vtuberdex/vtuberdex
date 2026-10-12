@@ -1,20 +1,22 @@
-import '@testing-library/jest-dom/vitest';
-import { afterEach, vi } from 'vitest';
-import { cleanup } from '@testing-library/react';
-import { createElement } from 'react';
+import "@testing-library/jest-dom/vitest";
+import { afterEach, vi } from "vitest";
+import { cleanup } from "@testing-library/react";
+import { createElement } from "react";
 
 // jsdom no tiene WebGL y el producto ya no tiene vista 2D de respaldo: el libro y la ficha
 // montan SIEMPRE un `<Canvas>`. Aquí es una caja inerte (los hijos son mallas de three, no
 // DOM): los tests fijan lo que el usuario hace sin ver la escena. La escena y el shader los
 // cubren sus propios tests (layout, shaders) y la sonda en navegador.
-vi.mock('@react-three/fiber', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@react-three/fiber')>()),
-  Canvas: () => createElement('div', { 'data-testid': 'r3f-canvas' }),
+vi.mock("@react-three/fiber", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@react-three/fiber")>()),
+  Canvas: () => createElement("div", { "data-testid": "r3f-canvas" }),
 }));
 
 // jsdom no implementa WebGL: los componentes 3D se prueban por su contrato
 // (props/render del contenedor) y el shader se valida como string.
-HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as unknown as HTMLCanvasElement['getContext'];
+HTMLCanvasElement.prototype.getContext = vi.fn(
+  () => null,
+) as unknown as HTMLCanvasElement["getContext"];
 
 if (!window.matchMedia) {
   window.matchMedia = ((query: string) => ({
@@ -44,7 +46,7 @@ if (!window.scrollTo) {
 if (!globalThis.IntersectionObserver) {
   class FakeIntersectionObserver implements IntersectionObserver {
     readonly root: Element | Document | null = null;
-    readonly rootMargin: string = '';
+    readonly rootMargin: string = "";
     readonly thresholds: ReadonlyArray<number> = [];
     constructor(private readonly callback: IntersectionObserverCallback) {}
     observe(): void {
@@ -56,7 +58,8 @@ if (!globalThis.IntersectionObserver) {
       return [];
     }
   }
-  globalThis.IntersectionObserver = FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+  globalThis.IntersectionObserver =
+    FakeIntersectionObserver as unknown as typeof IntersectionObserver;
 }
 
 afterEach(() => {

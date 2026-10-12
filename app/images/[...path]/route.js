@@ -18,23 +18,23 @@
  *   · El **301** de producción es seguro porque la ruta pública es estable: si
  *     cambia el contenido, el scraper reescribe el MISMO archivo canónico por slug.
  */
-import { readFileSync, statSync } from 'node:fs';
-import path from 'node:path';
+import { readFileSync, statSync } from "node:fs";
+import path from "node:path";
 
-import { resolveImageUrl, usesLocalImages } from '../../../lib/db.mjs';
-import { leerAssetRemoto, tursoConfigurado } from '../../../lib/ediciones.mjs';
-import { CARPETAS_PUBLICADAS } from '../../../lib/carpetas.mjs';
+import { resolveImageUrl, usesLocalImages } from "../../../lib/db.mjs";
+import { leerAssetRemoto, tursoConfigurado } from "../../../lib/ediciones.mjs";
+import { CARPETAS_PUBLICADAS } from "../../../lib/carpetas.mjs";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 /** Tipo por extensión. Las carpetas publicadas son `.webp` y `.png` (emblemas). */
 const CONTENT_TYPES = {
-  '.webp': 'image/webp',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
+  ".webp": "image/webp",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
 };
 
 /**
@@ -45,7 +45,7 @@ const CONTENT_TYPES = {
  * sistema de archivos y trace el proyecto ENTERO dentro de cada función (aviso
  * explícito del build).
  */
-const LOCAL_IMAGE_ROOT = path.join(process.cwd(), 'data', 'images');
+const LOCAL_IMAGE_ROOT = path.join(process.cwd(), "data", "images");
 
 /**
  * Raíz de los reemplazos del mantenedor bajados de Turso (`npm run download:images`).
@@ -68,7 +68,7 @@ const LOCAL_IMAGE_ROOT = path.join(process.cwd(), 'data', 'images');
  * Escrita literal por la misma razón que `LOCAL_IMAGE_ROOT`: componerla dinámicamente hace que
  * Turbopack trace el proyecto entero dentro de cada función.
  */
-const REEMPLAZOS_IMAGE_ROOT = path.join(process.cwd(), 'data', 'mantenedor');
+const REEMPLAZOS_IMAGE_ROOT = path.join(process.cwd(), "data", "mantenedor");
 
 /**
  * Comprueba que la ruta resuelta no se escape de su raíz (`../`).
@@ -79,7 +79,7 @@ const REEMPLAZOS_IMAGE_ROOT = path.join(process.cwd(), 'data', 'mantenedor');
  */
 function isInsideRoot(filePath, raiz = LOCAL_IMAGE_ROOT) {
   const rel = path.relative(raiz, filePath);
-  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+  return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
 }
 
 /**
@@ -118,14 +118,16 @@ function etagDeArchivo(absolute, bytes) {
  * respuesta entera, y `Last-Modified` es un extra, no un requisito.
  */
 function fechaDeMarca(marca) {
-  const normalizada = String(marca ?? '').includes('T') ? String(marca) : `${String(marca).replace(' ', 'T')}Z`;
+  const normalizada = String(marca ?? "").includes("T")
+    ? String(marca)
+    : `${String(marca).replace(" ", "T")}Z`;
   const fecha = new Date(normalizada);
   return Number.isNaN(fecha.getTime()) ? null : fecha.toUTCString();
 }
 
 /** Lee la imagen de un árbol local; `null` si no existe o la ruta es sospechosa. */
 function serveLocal(key, etagPedido, raiz = LOCAL_IMAGE_ROOT) {
-  const absolute = path.join(raiz, key.replace(/^images\//, ''));
+  const absolute = path.join(raiz, key.replace(/^images\//, ""));
   if (!isInsideRoot(absolute, raiz)) return null;
 
   let bytes;
@@ -134,7 +136,9 @@ function serveLocal(key, etagPedido, raiz = LOCAL_IMAGE_ROOT) {
   } catch {
     return null;
   }
-  const type = CONTENT_TYPES[path.extname(absolute).toLowerCase()] ?? 'application/octet-stream';
+  const type =
+    CONTENT_TYPES[path.extname(absolute).toLowerCase()] ??
+    "application/octet-stream";
   const etag = etagDeArchivo(absolute, bytes);
   /**
    * El 304 tiene que responder ANTES de mandar los bytes: si el navegador ya tiene esa
@@ -143,13 +147,13 @@ function serveLocal(key, etagPedido, raiz = LOCAL_IMAGE_ROOT) {
   if (etagPedido && etagPedido === etag) {
     return new Response(null, {
       status: 304,
-      headers: { etag, 'cache-control': 'no-cache' },
+      headers: { etag, "cache-control": "no-cache" },
     });
   }
   return new Response(bytes, {
     status: 200,
     headers: {
-      'content-type': type,
+      "content-type": type,
       etag,
       /**
        * `no-cache` NO significa "no guardes": significa "guarda, pero revalida antes de
@@ -158,15 +162,15 @@ function serveLocal(key, etagPedido, raiz = LOCAL_IMAGE_ROOT) {
        * cuerpo. En producción la rama de Turso sigue con caché larga: allí las URLs van
        * versionadas por la subida (ver `aplicarImagenesDelMantenedor`).
        */
-      'cache-control': 'no-cache',
-      'content-length': String(bytes.byteLength),
+      "cache-control": "no-cache",
+      "content-length": String(bytes.byteLength),
     },
   });
 }
 
 export async function GET(request, { params }) {
   const { path: segments } = await params;
-  const key = `images/${Array.isArray(segments) ? segments.join('/') : segments}`;
+  const key = `images/${Array.isArray(segments) ? segments.join("/") : segments}`;
   /**
    * El validador que manda el cliente, si lo manda.
    *
@@ -175,7 +179,7 @@ export async function GET(request, { params }) {
    * preguntar "¿sigue valiendo lo que tengo?". Son dos cosas distintas y la segunda es la
    * que convierte una revalidación en un 304 sin cuerpo.
    */
-  const etagPedido = request.headers.get('if-none-match');
+  const etagPedido = request.headers.get("if-none-match");
 
   /**
    * El manifiesto decide qué se sirve, pero solo para las carpetas PUBLICADAS.
@@ -191,9 +195,12 @@ export async function GET(request, { params }) {
    * carpeta no es una de las publicadas, se corta aquí. Dentro de una carpeta publicada, la
    * fila de Turso manda: es donde el mantenedor escribe.
    */
-  const carpeta = key.split('/')[1];
+  const carpeta = key.split("/")[1];
   if (!CARPETAS_PUBLICADAS.includes(carpeta)) {
-    return Response.json({ error: 'imagen_no_publicada', path: key }, { status: 404 });
+    return Response.json(
+      { error: "imagen_no_publicada", path: key },
+      { status: 404 },
+    );
   }
   const published = Boolean(resolveImageUrl(key));
 
@@ -219,7 +226,9 @@ export async function GET(request, { params }) {
        * tiene, la respuesta correcta es un 304 sin cuerpo — ni la imagen viaja, ni el CDN
        * se llena de copias nuevas solo porque cambió el query.
        */
-      const etag = remoto.actualizado ? `"${String(remoto.actualizado).replace(/[^0-9]/g, '')}"` : null;
+      const etag = remoto.actualizado
+        ? `"${String(remoto.actualizado).replace(/[^0-9]/g, "")}"`
+        : null;
       if (etag && etagPedido === etag) {
         return new Response(null, { status: 304, headers: { etag } });
       }
@@ -230,14 +239,18 @@ export async function GET(request, { params }) {
        * ni en el navegador. Sin versión, o con una versión que ya no es la vigente, se queda la
        * caché corta de abajo (la copia vieja no puede vivir mucho).
        */
-      const versionPedida = new URL(request.url).searchParams.get('v');
-      const marca = remoto.actualizado ? String(remoto.actualizado).replace(/\D/g, '') : '';
+      const versionPedida = new URL(request.url).searchParams.get("v");
+      const marca = remoto.actualizado
+        ? String(remoto.actualizado).replace(/\D/g, "")
+        : "";
       const versionVigente = Boolean(versionPedida) && versionPedida === marca;
       return new Response(remoto.bytes, {
         status: 200,
         headers: {
-          'content-type': remoto.mime,
-          ...(etag ? { etag, 'last-modified': fechaDeMarca(remoto.actualizado) } : {}),
+          "content-type": remoto.mime,
+          ...(etag
+            ? { etag, "last-modified": fechaDeMarca(remoto.actualizado) }
+            : {}),
           /**
            * Caché CORTA a propósito. El mantenedor puede reemplazar esta imagen y, al
            * restaurarla, la copia antigua sigue viva en el CDN de Vercel: con
@@ -246,10 +259,10 @@ export async function GET(request, { params }) {
            * catálogo y sin él la vieja). Cinco minutos de CDN y uno de navegador son
            * suficiente protección de cuota y no dejan una imagen obsoleta a la vista.
            */
-          'cache-control': versionVigente
-            ? 'public, max-age=31536000, s-maxage=31536000, immutable'
-            : 'public, max-age=60, s-maxage=300',
-          'content-length': String(remoto.bytes.byteLength),
+          "cache-control": versionVigente
+            ? "public, max-age=31536000, s-maxage=31536000, immutable"
+            : "public, max-age=60, s-maxage=300",
+          "content-length": String(remoto.bytes.byteLength),
         },
       });
     }
@@ -259,7 +272,10 @@ export async function GET(request, { params }) {
      * quedó **bloqueada** (`403 Your store is blocked`), ese rodeo convertía una imagen
      * que falta en un error ajeno y confuso en vez de decir que no está.
      */
-    return Response.json({ error: 'imagen_no_publicada', path: key }, { status: 404 });
+    return Response.json(
+      { error: "imagen_no_publicada", path: key },
+      { status: 404 },
+    );
   }
 
   if (usesLocalImages()) {
@@ -288,11 +304,17 @@ export async function GET(request, { params }) {
     if (reemplazo) return reemplazo;
     const local = serveLocal(key, etagPedido);
     if (local) return local;
-    return Response.json({ error: 'imagen_no_publicada', path: key }, { status: 404 });
+    return Response.json(
+      { error: "imagen_no_publicada", path: key },
+      { status: 404 },
+    );
   }
 
   if (!published) {
-    return Response.json({ error: 'imagen_no_publicada', path: key }, { status: 404 });
+    return Response.json(
+      { error: "imagen_no_publicada", path: key },
+      { status: 404 },
+    );
   }
 
   return new Response(null, {
@@ -300,7 +322,7 @@ export async function GET(request, { params }) {
     headers: {
       location: resolveImageUrl(key),
       // Cache larga en el borde: el nombre del asset es canónico, no versionado.
-      'cache-control': 'public, max-age=86400, s-maxage=604800, immutable',
+      "cache-control": "public, max-age=86400, s-maxage=604800, immutable",
     },
   });
 }

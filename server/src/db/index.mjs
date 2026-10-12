@@ -4,19 +4,19 @@
  * Se usa `node:sqlite` (incluido en Node 22+) para que el contenedor de datos
  * sea un único archivo, sin dependencias nativas que compilar.
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
-import { fileURLToPath } from 'node:url';
+import fs from "node:fs";
+import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { fileURLToPath } from "node:url";
 
-import { consolidarFacciones } from './../mutations.mjs';
+import { consolidarFacciones } from "./../mutations.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-export const SCHEMA_PATH = path.join(HERE, 'schema.sql');
+export const SCHEMA_PATH = path.join(HERE, "schema.sql");
 export const DEFAULT_DB_PATH = process.env.VTUBERDEX_DB
   ? path.resolve(process.env.VTUBERDEX_DB)
-  : path.resolve(HERE, '..', '..', '..', 'data', 'vtuberdex.db');
+  : path.resolve(HERE, "..", "..", "..", "data", "vtuberdex.db");
 
 /**
  * Migraciones incrementales.
@@ -27,7 +27,7 @@ export const DEFAULT_DB_PATH = process.env.VTUBERDEX_DB
  */
 const MIGRATIONS = [
   {
-    id: '2026-09-add-card-text',
+    id: "2026-09-add-card-text",
     sql: `ALTER TABLE vtuber ADD COLUMN card_text TEXT;
           ALTER TABLE vtuber ADD COLUMN card_text_confidence INTEGER;`,
   },
@@ -42,7 +42,7 @@ const MIGRATIONS = [
      * reconstruye: se copia a una tabla nueva con el CHECK ampliado y se
      * renombra. Los índices y la FK se recrean con ella.
      */
-    id: '2026-09-asset-character-kind',
+    id: "2026-09-asset-character-kind",
     sql: `DROP VIEW IF EXISTS v_vtuber_card;
           CREATE TABLE asset_new (
             id         INTEGER PRIMARY KEY,
@@ -72,7 +72,7 @@ const MIGRATIONS = [
      * `character`, y la ficha apaisada del sitio queda solo como respaldo en
      * disco (nunca como asset).
      */
-    id: '2026-09-unify-character-asset',
+    id: "2026-09-unify-character-asset",
     sql: `UPDATE OR REPLACE asset SET kind = 'character' WHERE kind = 'avatar';`,
   },
   {
@@ -86,7 +86,7 @@ const MIGRATIONS = [
      * ALTER TABLE, igual que en la migración de `character`. La vista se suelta
      * primero: la recrea `VIEWS_SQL` al terminar de aplicar las migraciones.
      */
-    id: '2026-09-asset-background-kind',
+    id: "2026-09-asset-background-kind",
     sql: `DROP VIEW IF EXISTS v_vtuber_card;
           CREATE TABLE asset_new (
             id         INTEGER PRIMARY KEY,
@@ -112,7 +112,7 @@ const MIGRATIONS = [
      * cuando la carta solo tiene dos emblemas. Se fusionan las variantes y se conservan las dos
      * primeras de cada ficha; el resto se reasigna a mano desde el mantenedor.
      */
-    id: '2026-10-facciones-canonicas',
+    id: "2026-10-facciones-canonicas",
     run: (db) => consolidarFacciones(db),
   },
 ];
@@ -160,7 +160,7 @@ FROM vtuber v;
 function applyMigrations(db) {
   for (const migration of MIGRATIONS) {
     const key = `migration:${migration.id}`;
-    const already = db.prepare('SELECT value FROM meta WHERE key = ?').get(key);
+    const already = db.prepare("SELECT value FROM meta WHERE key = ?").get(key);
     if (already) continue;
     try {
       if (migration.run) migration.run(db);
@@ -169,20 +169,24 @@ function applyMigrations(db) {
       // Columna ya presente (base creada con el esquema nuevo): no es un fallo.
       if (!/duplicate column name/i.test(String(error))) throw error;
     }
-    db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value')
-      .run(key, new Date().toISOString());
+    db.prepare(
+      "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    ).run(key, new Date().toISOString());
   }
 }
 
 /** Abre (creando si hace falta) la base y aplica el esquema. */
-export function openDatabase(dbPath = DEFAULT_DB_PATH, { readonly = false } = {}) {
+export function openDatabase(
+  dbPath = DEFAULT_DB_PATH,
+  { readonly = false } = {},
+) {
   if (!readonly) {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   }
   const db = new DatabaseSync(dbPath, { readOnly: readonly });
-  db.exec('PRAGMA foreign_keys = ON;');
+  db.exec("PRAGMA foreign_keys = ON;");
   if (!readonly) {
-    db.exec(fs.readFileSync(SCHEMA_PATH, 'utf8'));
+    db.exec(fs.readFileSync(SCHEMA_PATH, "utf8"));
     applyMigrations(db);
     db.exec(VIEWS_SQL);
   }
@@ -191,26 +195,26 @@ export function openDatabase(dbPath = DEFAULT_DB_PATH, { readonly = false } = {}
 
 /** Ejecuta una función dentro de una transacción. */
 export function transaction(db, fn) {
-  db.exec('BEGIN');
+  db.exec("BEGIN");
   try {
     const result = fn();
-    db.exec('COMMIT');
+    db.exec("COMMIT");
     return result;
   } catch (error) {
-    db.exec('ROLLBACK');
+    db.exec("ROLLBACK");
     throw error;
   }
 }
 
 /** Lee un valor de `meta`. */
 export function getMeta(db, key) {
-  const row = db.prepare('SELECT value FROM meta WHERE key = ?').get(key);
+  const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key);
   return row?.value ?? null;
 }
 
 /** Escribe un valor de `meta`. */
 export function setMeta(db, key, value) {
   db.prepare(
-    'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
+    "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
   ).run(key, String(value));
 }

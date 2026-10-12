@@ -25,7 +25,18 @@
  */
 
 /** La escala PREMIUM, de menor a mayor. La posición es el rango. Es la que sube con las donaciones. */
-export const GRADOS = Object.freeze(['6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', 'BL']);
+export const GRADOS = Object.freeze([
+  "6",
+  "6.5",
+  "7",
+  "7.5",
+  "8",
+  "8.5",
+  "9",
+  "9.5",
+  "10",
+  "BL",
+]);
 
 /**
  * La escala de DETERIORO, del menos al más dañado: `7` apenas desgastada, `1` ilegible. Es la
@@ -33,13 +44,16 @@ export const GRADOS = Object.freeze(['6', '6.5', '7', '7.5', '8', '8.5', '9', '9
  * (cláusula de salida de los términos) y se muestra gradeada igual que una premium, pero rota.
  * El grado `1` es el de las bajas. Los asigna a mano el mantenedor; nada los calcula.
  */
-export const GRADOS_DEGRADADOS = Object.freeze(['5', '4', '3', '2', '1']);
+export const GRADOS_DEGRADADOS = Object.freeze(["5", "4", "3", "2", "1"]);
 
 /** El grado con el que queda la ficha de quien se dio de baja: la carta ya no se entiende. */
-export const GRADO_DE_BAJA = '1';
+export const GRADO_DE_BAJA = "1";
 
 /** Todos los grados que se pueden fijar, de peor a mejor: `1 … 7 · 8 … BL`. */
-export const TODOS_LOS_GRADOS = Object.freeze([...[...GRADOS_DEGRADADOS].reverse(), ...GRADOS]);
+export const TODOS_LOS_GRADOS = Object.freeze([
+  ...[...GRADOS_DEGRADADOS].reverse(),
+  ...GRADOS,
+]);
 
 /** Grado con el que entra una carta nueva: el mínimo de la escala. */
 export const GRADO_INICIAL = GRADOS[0];
@@ -52,23 +66,23 @@ export const GRADO_MAXIMO = GRADOS[GRADOS.length - 1];
  * Black Label: un 10 «pristine» al que se le imprime la etiqueta negra.
  */
 export const NOMBRE_DE_GRADO = Object.freeze({
-  8: 'NM/MT',
-  8.5: 'NM/MT+',
-  9: 'MINT',
-  9.5: 'MINT+',
-  10: 'GEM MINT',
-  BL: 'PRISTINE',
+  8: "NM/MT",
+  8.5: "NM/MT+",
+  9: "MINT",
+  9.5: "MINT+",
+  10: "GEM MINT",
+  BL: "PRISTINE",
   // Entrada de la escala premium: cartas con algo de desgaste (el 6 es la primera donación).
-  6: 'EX/NM',
-  6.5: 'EX/NM+',
-  7: 'NM',
-  7.5: 'NM+',
+  6: "EX/NM",
+  6.5: "EX/NM+",
+  7: "NM",
+  7.5: "NM+",
   // Escala de deterioro, con los nombres de las categorías bajas de las certificadoras.
-  5: 'EX',
-  4: 'VG/EX',
-  3: 'VG',
-  2: 'GD',
-  1: 'POOR',
+  5: "EX",
+  4: "VG/EX",
+  3: "VG",
+  2: "GD",
+  1: "POOR",
 });
 
 /**
@@ -98,26 +112,26 @@ export const DONACION_POR_GRADO = Object.freeze({
  * degradadas (5…1) siguen su propia escala rota (`severidadDeGrado`).
  */
 export function desgasteLeveDeGrado(grado) {
-  if (grado === null || grado === undefined || grado === '') return 1;
-  const rango = ['6', '6.5', '7', '7.5'].indexOf(grado);
+  if (grado === null || grado === undefined || grado === "") return 1;
+  const rango = ["6", "6.5", "7", "7.5"].indexOf(grado);
   return rango < 0 ? 0 : 0.8 - rango * 0.2;
 }
 
 /** Grados que nadie puede obtener donando: los otorga el mantenedor. */
-export const GRADOS_RESERVADOS = Object.freeze(['BL']);
+export const GRADOS_RESERVADOS = Object.freeze(["BL"]);
 
 export function esGradoValido(valor) {
-  return typeof valor === 'string' && TODOS_LOS_GRADOS.includes(valor);
+  return typeof valor === "string" && TODOS_LOS_GRADOS.includes(valor);
 }
 
 /** ¿Es un grado de la escala PREMIUM (`8`…`BL`)? */
 export function esGradoPremium(grado) {
-  return typeof grado === 'string' && GRADOS.includes(grado);
+  return typeof grado === "string" && GRADOS.includes(grado);
 }
 
 /** ¿Es un grado de la escala de deterioro (`7`…`1`)? */
 export function esGradoDegradado(grado) {
-  return typeof grado === 'string' && GRADOS_DEGRADADOS.includes(grado);
+  return typeof grado === "string" && GRADOS_DEGRADADOS.includes(grado);
 }
 
 /**
@@ -163,7 +177,7 @@ export function esBlackLabel(grado) {
  * su código cambia con él.
  */
 export function numeroDeCertificado(dexNumber) {
-  return `VTD-${String(Math.max(0, Number(dexNumber) || 0)).padStart(3, '0')}`;
+  return `VTD-${String(Math.max(0, Number(dexNumber) || 0)).padStart(3, "0")}`;
 }
 
 /** Fecha de hoy (`AAAA-MM-DD`, UTC). Aislada para que los tests y el diario puedan fijarla. */
@@ -173,8 +187,8 @@ export function hoy(ahora = new Date()) {
 
 /** Meses calendario entre dos fechas `AAAA-MM-DD` (por mes, no por día: de enero 31 a febrero 1 hay 1). */
 export function mesesCalendario(desde, hasta) {
-  const [ay, am] = String(desde).split('-').map(Number);
-  const [by, bm] = String(hasta).split('-').map(Number);
+  const [ay, am] = String(desde).split("-").map(Number);
+  const [by, bm] = String(hasta).split("-").map(Number);
   if (![ay, am, by, bm].every(Number.isFinite)) return 0;
   return (by - ay) * 12 + (bm - am);
 }
@@ -194,7 +208,7 @@ export function rachaDe(premium, ahora = hoy()) {
   if (!premium || !GRADOS.includes(premium.grade)) return 0;
   const meses = mesesCalendario(premium.since, premium.gradedAt) + 1;
   if (meses < 2) return 0;
-  const enLoAlto = premium.grade === '10' || premium.grade === GRADO_MAXIMO;
+  const enLoAlto = premium.grade === "10" || premium.grade === GRADO_MAXIMO;
   if (!enLoAlto && mesesCalendario(premium.gradedAt, ahora) > 1) return 0;
   return meses;
 }

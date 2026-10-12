@@ -18,57 +18,69 @@
  * guarda ni se imprime. Un `PATCH` reemplaza las listas completas (perfil, redes, facciones):
  * lo que el archivo no traiga en una lista que SÍ menciona, se pierde.
  */
-import fs from 'node:fs';
-import path from 'node:path';
+import fs from "node:fs";
+import path from "node:path";
 
-import { formatIssues, vtuberUpdateSchema } from '../server/src/validation.mjs';
-import { leerOpciones, pedirCredencial, pedirJson } from './lib/terminal.mjs';
+import { formatIssues, vtuberUpdateSchema } from "../server/src/validation.mjs";
+import { leerOpciones, pedirCredencial, pedirJson } from "./lib/terminal.mjs";
 
 const { tiene, opcion } = leerOpciones();
 
-const URL_BASE = opcion('url', 'https://vtuberdex.com').replace(/\/$/, '');
-const USUARIO = opcion('user', process.env.VTUBERDEX_ADMIN_USER || 'admin');
-const SLUG = opcion('slug', null);
-const ARCHIVO = opcion('file', null);
-const APLICAR = tiene('aplicar');
+const URL_BASE = opcion("url", "https://vtuberdex.com").replace(/\/$/, "");
+const USUARIO = opcion("user", process.env.VTUBERDEX_ADMIN_USER || "admin");
+const SLUG = opcion("slug", null);
+const ARCHIVO = opcion("file", null);
+const APLICAR = tiene("aplicar");
 
 if (!SLUG || !ARCHIVO) {
-  console.error('Uso: npm run ficha:prod -- --slug <slug> --file <parche.json> [--aplicar]');
+  console.error(
+    "Uso: npm run ficha:prod -- --slug <slug> --file <parche.json> [--aplicar]",
+  );
   process.exit(1);
 }
 
 /* --------------------------------------------------------------- el parche */
 let crudo;
 try {
-  crudo = JSON.parse(fs.readFileSync(path.resolve(ARCHIVO), 'utf8'));
+  crudo = JSON.parse(fs.readFileSync(path.resolve(ARCHIVO), "utf8"));
 } catch (error) {
   console.error(`✖ no se pudo leer ${ARCHIVO}: ${error.message}`);
   process.exit(1);
 }
 const validado = vtuberUpdateSchema.safeParse(crudo);
 if (!validado.success) {
-  console.error('✖ el archivo no cumple el esquema del mantenedor:');
-  for (const { path: ruta, message } of formatIssues(validado.error)) console.error(`  · ${ruta}: ${message}`);
+  console.error("✖ el archivo no cumple el esquema del mantenedor:");
+  for (const { path: ruta, message } of formatIssues(validado.error))
+    console.error(`  · ${ruta}: ${message}`);
   process.exit(1);
 }
 const parche = validado.data;
-console.log(`✔ ${ARCHIVO} válido (${Object.keys(parche).length} campos: ${Object.keys(parche).join(', ')})`);
+console.log(
+  `✔ ${ARCHIVO} válido (${Object.keys(parche).length} campos: ${Object.keys(parche).join(", ")})`,
+);
 
 /* ------------------------------------------------------------ credenciales */
 function pedir(ruta, { token, ...init } = {}) {
-  const cabeceras = { 'content-type': 'application/json' };
-  if (token) cabeceras.authorization = ['Bearer', token].join(' ');
+  const cabeceras = { "content-type": "application/json" };
+  if (token) cabeceras.authorization = ["Bearer", token].join(" ");
   return pedirJson(`${URL_BASE}${ruta}`, { ...init, headers: cabeceras });
 }
 
 /* ------------------------------------------------------------ lo que hay hoy */
 const actual = await pedir(`/api/vtubers/${encodeURIComponent(SLUG)}`);
 if (actual.status !== 200) {
-  console.error(`✖ producción no sirve la ficha «${SLUG}» (status ${actual.status}). ¿Está publicada?`);
+  console.error(
+    `✖ producción no sirve la ficha «${SLUG}» (status ${actual.status}). ¿Está publicada?`,
+  );
   process.exit(1);
 }
 const hoy = actual.cuerpo;
-const resumir = (valor) => (valor === null || valor === undefined || (Array.isArray(valor) && valor.length === 0) ? '(vacío)' : JSON.stringify(valor));
+const resumir = (valor) =>
+  valor === null ||
+  valor === undefined ||
+  (Array.isArray(valor) && valor.length === 0)
+    ? "(vacío)"
+    : JSON.stringify(valor);
 const proyeccion = {
   phrase: hoy.phrase,
   birthday: hoy.birthday,
@@ -78,56 +90,103 @@ const proyeccion = {
   languages: hoy.languages,
   factions: hoy.factionIcons?.map((f) => f.slug) ?? [],
   profile: hoy.profile,
-  socials: hoy.socials?.map((s) => ({ platform: s.platform, label: s.label, url: s.url })),
+  socials: hoy.socials?.map((s) => ({
+    platform: s.platform,
+    label: s.label,
+    url: s.url,
+  })),
   stats: hoy.stats,
   skills: hoy.skills,
 };
-console.log(`\nFicha «${hoy.name}» (#${hoy.dexNumber}, id ${hoy.id}) — cambios respecto de producción:`);
+console.log(
+  `\nFicha «${hoy.name}» (#${hoy.dexNumber}, id ${hoy.id}) — cambios respecto de producción:`,
+);
 for (const campo of Object.keys(parche)) {
-  if (campo === 'premium') continue;
-  const igual = JSON.stringify(proyeccion[campo]) === JSON.stringify(parche[campo]);
-  console.log(`  ${igual ? '=' : '~'} ${campo}: ${resumir(proyeccion[campo])}  →  ${resumir(parche[campo])}`.slice(0, 400));
+  if (campo === "premium") continue;
+  const igual =
+    JSON.stringify(proyeccion[campo]) === JSON.stringify(parche[campo]);
+  console.log(
+    `  ${igual ? "=" : "~"} ${campo}: ${resumir(proyeccion[campo])}  →  ${resumir(parche[campo])}`.slice(
+      0,
+      400,
+    ),
+  );
 }
 
 if (!APLICAR) {
-  console.log('\nEnsayo: no se escribió nada. Repite con --aplicar para publicarlo.');
+  console.log(
+    "\nEnsayo: no se escribió nada. Repite con --aplicar para publicarlo.",
+  );
   process.exit(0);
 }
 
 /* ---------------------------------------------------------------- escribir */
-const password = await pedirCredencial(`Contraseña de ${USUARIO} en ${URL_BASE}: `);
+const password = await pedirCredencial(
+  `Contraseña de ${USUARIO} en ${URL_BASE}: `,
+);
 if (!password) {
-  console.error('✖ sin contraseña');
+  console.error("✖ sin contraseña");
   process.exit(1);
 }
-const login = await pedir('/api/admin/login', { method: 'POST', body: JSON.stringify({ username: USUARIO, password }) });
+const login = await pedir("/api/admin/login", {
+  method: "POST",
+  body: JSON.stringify({ username: USUARIO, password }),
+});
 if (login.status !== 200 || !login.cuerpo?.token) {
-  console.error(`✖ el login falló (status ${login.status}): ${JSON.stringify(login.cuerpo)}`);
+  console.error(
+    `✖ el login falló (status ${login.status}): ${JSON.stringify(login.cuerpo)}`,
+  );
   process.exit(1);
 }
 const token = login.cuerpo.token;
 
-const guardado = await pedir(`/api/admin/vtubers/${hoy.id}`, { method: 'PATCH', token, body: JSON.stringify(parche) });
+const guardado = await pedir(`/api/admin/vtubers/${hoy.id}`, {
+  method: "PATCH",
+  token,
+  body: JSON.stringify(parche),
+});
 if (guardado.status !== 200) {
-  console.error(`✖ el servidor rechazó el parche (status ${guardado.status}): ${JSON.stringify(guardado.cuerpo)}`);
+  console.error(
+    `✖ el servidor rechazó el parche (status ${guardado.status}): ${JSON.stringify(guardado.cuerpo)}`,
+  );
   process.exit(1);
 }
-console.log('✔ parche aplicado');
+console.log("✔ parche aplicado");
 
 /* Se comprueba el RESULTADO público, no la intención: la API pública va cacheada en el borde unos segundos. */
 await new Promise((resolve) => setTimeout(resolve, 1500));
-const despues = await pedir(`/api/vtubers/${encodeURIComponent(SLUG)}?verificar=${Date.now()}`);
+const despues = await pedir(
+  `/api/vtubers/${encodeURIComponent(SLUG)}?verificar=${Date.now()}`,
+);
 const publico = despues.cuerpo ?? {};
 const comprobaciones = [
-  ['frase', parche.phrase === undefined || publico.phrase === parche.phrase],
-  ['cumpleaños', parche.birthday === undefined || publico.birthday === parche.birthday],
-  ['altura', parche.height === undefined || publico.height === parche.height],
-  ['perfil', parche.profile === undefined || publico.profile?.length === parche.profile.length],
-  ['redes', parche.socials === undefined || publico.socials?.length === parche.socials.length],
-  ['facciones', parche.factions === undefined || publico.factions?.length === parche.factions.length],
+  ["frase", parche.phrase === undefined || publico.phrase === parche.phrase],
+  [
+    "cumpleaños",
+    parche.birthday === undefined || publico.birthday === parche.birthday,
+  ],
+  ["altura", parche.height === undefined || publico.height === parche.height],
+  [
+    "perfil",
+    parche.profile === undefined ||
+      publico.profile?.length === parche.profile.length,
+  ],
+  [
+    "redes",
+    parche.socials === undefined ||
+      publico.socials?.length === parche.socials.length,
+  ],
+  [
+    "facciones",
+    parche.factions === undefined ||
+      publico.factions?.length === parche.factions.length,
+  ],
 ];
-for (const [nombre, ok] of comprobaciones) console.log(`${ok ? '✔' : '✖'} ${nombre}`);
+for (const [nombre, ok] of comprobaciones)
+  console.log(`${ok ? "✔" : "✖"} ${nombre}`);
 if (comprobaciones.some(([, ok]) => !ok)) {
-  console.log('(si algo sale ✖ espera ~30 s: la ficha pública se cachea en el borde y vuelve a comprobar con el ensayo)');
+  console.log(
+    "(si algo sale ✖ espera ~30 s: la ficha pública se cachea en el borde y vuelve a comprobar con el ensayo)",
+  );
   process.exit(2);
 }

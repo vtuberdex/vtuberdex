@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /* ============================================================================
    Tema del VTuberDex.
@@ -17,7 +17,7 @@
      Knewave para los títulos. Las variables las define `next/font` en <html> (app/layout.tsx). */
   --font-display: var(--font-asul), ui-serif, Georgia, serif;
   --font-mono: var(--font-asul), ui-serif, Georgia, serif;
-  --font-heading: var(--font-knewave), 'Asul', ui-serif, Georgia, serif;
+  --font-heading: var(--font-knewave), "Asul", ui-serif, Georgia, serif;
 }
 
 :root {
@@ -32,8 +32,16 @@ body {
 
 body {
   background:
-    radial-gradient(1200px 700px at 15% -10%, rgb(94 234 212 / 0.08), transparent 60%),
-    radial-gradient(900px 600px at 90% 10%, rgb(168 85 247 / 0.08), transparent 55%),
+    radial-gradient(
+      1200px 700px at 15% -10%,
+      rgb(94 234 212 / 0.08),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 600px at 90% 10%,
+      rgb(168 85 247 / 0.08),
+      transparent 55%
+    ),
     var(--color-dex-void);
   color: var(--color-dex-ink);
   font-family: var(--font-display);
@@ -53,7 +61,7 @@ h6 {
 
 /* Rejilla técnica de fondo, coherente con la estética "terminal" del origen. */
 .dex-grid::before {
-  content: '';
+  content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -75,8 +83,12 @@ h6 {
 }
 
 @keyframes dex-shimmer {
-  0% { background-position: 200% 50%; }
-  100% { background-position: -60% 50%; }
+  0% {
+    background-position: 200% 50%;
+  }
+  100% {
+    background-position: -60% 50%;
+  }
 }
 
 .dex-skeleton {

@@ -21,13 +21,13 @@
  * cobertura ni composición: la capa 0 es el sustrato y el personaje y la UI se imprimen
  * sobre él. Eso es lo que hace que el fondo sea la textura del mesh.
  */
-import { BACKGROUND } from '../card3d-config';
-import { cardPalette, mixHex } from '@/lib/color';
-import type { VtuberCard } from '@/lib/types';
-import { createLayer } from './lienzo';
+import { BACKGROUND } from "../card3d-config";
+import { cardPalette, mixHex } from "@/lib/color";
+import type { VtuberCard } from "@/lib/types";
+import { createLayer } from "./lienzo";
 
 /** Color profundo del degradado de tema; el mismo que usaba el shader. */
-const DEEP = '#080a10';
+const DEEP = "#080a10";
 /** Peso del acento en la mezcla del degradado (el shader usaba 0.55). */
 const ACCENT_MIX = 0.55;
 
@@ -39,11 +39,22 @@ const ACCENT_MIX = 0.55;
  * `mix(secondary, mix(accent, DEEP, vUv.y), 0.55)`, y la mezcla de mezclas es LINEAL en
  * `vUv.y`, así que una interpolación de dos paradas la reproduce exactamente.
  */
-export function drawSurfaceLayer({ card, background, width }: { card: VtuberCard; background: HTMLImageElement | null; width: number }): HTMLCanvasElement {
+export function drawSurfaceLayer({
+  card,
+  background,
+  width,
+}: {
+  card: VtuberCard;
+  background: HTMLImageElement | null;
+  width: number;
+}): HTMLCanvasElement {
   const { canvas, ctx, W, H } = createLayer(width);
   if (!ctx) return canvas;
 
-  const { accent, secondary } = cardPalette(card.themeColor, card.secondaryColor);
+  const { accent, secondary } = cardPalette(
+    card.themeColor,
+    card.secondaryColor,
+  );
   const gradiente = ctx.createLinearGradient(0, 0, 0, H);
   gradiente.addColorStop(0, mixHex(secondary, accent, ACCENT_MIX));
   gradiente.addColorStop(1, mixHex(secondary, DEEP, ACCENT_MIX));
@@ -64,7 +75,10 @@ export function drawSurfaceLayer({ card, background, width }: { card: VtuberCard
      * cualquier hueco dejaría ver el degradado como un borde.
      */
     const cover = BACKGROUND.cover;
-    const s = Math.max((W * cover) / background.width, (H * cover) / background.height);
+    const s = Math.max(
+      (W * cover) / background.width,
+      (H * cover) / background.height,
+    );
     const dw = background.width * s;
     const dh = background.height * s;
     ctx.drawImage(background, (W - dw) / 2, (H - dh) / 2, dw, dh);

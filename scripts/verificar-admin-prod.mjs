@@ -25,37 +25,42 @@
  * `verifyPassword` en local, así que distingue "el hash está mal pegado" de "la contraseña
  * no es la del hash". La contraseña no se imprime nunca, ni se guarda en ningún archivo.
  */
-import { formatoDeHash } from '../lib/admin-auth.mjs';
-import { verifyPassword } from '../server/src/auth.mjs';
-import { leerOpciones, pedirCredencial, pedirJson } from './lib/terminal.mjs';
+import { formatoDeHash } from "../lib/admin-auth.mjs";
+import { verifyPassword } from "../server/src/auth.mjs";
+import { leerOpciones, pedirCredencial, pedirJson } from "./lib/terminal.mjs";
 
 /** Alias de producción del proyecto. Se puede apuntar a otro con `--url`. */
-const URL_POR_DEFECTO = 'https://vtuberdex.com';
+const URL_POR_DEFECTO = "https://vtuberdex.com";
 
 const { opcion } = leerOpciones();
 
-const base = opcion('url', URL_POR_DEFECTO).replace(/\/$/, '');
-const usuario = opcion('user', process.env.VTUBERDEX_ADMIN_USER || 'admin');
-const hashPegado = opcion('hash', null);
+const base = opcion("url", URL_POR_DEFECTO).replace(/\/$/, "");
+const usuario = opcion("user", process.env.VTUBERDEX_ADMIN_USER || "admin");
+const hashPegado = opcion("hash", null);
 
 const resultados = [];
-const comprobar = (nombre, ok, detalle = '') => {
+const comprobar = (nombre, ok, detalle = "") => {
   resultados.push({ nombre, ok });
-  console.log(`${ok ? '✔' : '✖'} ${nombre}${detalle ? ` — ${detalle}` : ''}`);
+  console.log(`${ok ? "✔" : "✖"} ${nombre}${detalle ? ` — ${detalle}` : ""}`);
 };
 
 /** POST/GET contra producción sin lanzar por un status no-2xx: el status es el dato. */
 function pedir(ruta, init = {}) {
   return pedirJson(
     `${base}${ruta}`,
-    { ...init, headers: { 'content-type': 'application/json', ...(init.headers ?? {}) } },
+    {
+      ...init,
+      headers: { "content-type": "application/json", ...(init.headers ?? {}) },
+    },
     (texto) => ({ crudo: texto.slice(0, 200) }),
   );
 }
 
 const password = await pedirCredencial();
 if (!password) {
-  console.error('✖ no llegó ninguna contraseña (¿stdin sin datos? Pásala por argumento no existe a propósito: usa un pipe).');
+  console.error(
+    "✖ no llegó ninguna contraseña (¿stdin sin datos? Pásala por argumento no existe a propósito: usa un pipe).",
+  );
   process.exit(2);
 }
 
@@ -66,74 +71,115 @@ if (hashPegado) {
   const forma = formatoDeHash(hashPegado);
   const valida = verifyPassword(password, hashPegado);
   comprobar(
-    'el hash pegado valida la contraseña localmente',
+    "el hash pegado valida la contraseña localmente",
     valida,
-    valida ? 'el valor está completo y sin adornos' : `revisa el pegado: ${forma.problemas.join('; ') || 'el valor tiene la forma correcta, así que la contraseña no es la que generó este hash'}`,
+    valida
+      ? "el valor está completo y sin adornos"
+      : `revisa el pegado: ${forma.problemas.join("; ") || "el valor tiene la forma correcta, así que la contraseña no es la que generó este hash"}`,
   );
 }
 
 // 2. El login de verdad. Aquí está el fallo que este script existe para cazar: sin
 //    redeploy, la variable nueva no llega a la función y esto da 401.
-const login = await pedir('/api/admin/login', {
-  method: 'POST',
+const login = await pedir("/api/admin/login", {
+  method: "POST",
   body: JSON.stringify({ username: usuario, password }),
 });
 const okLogin = login.status === 200 && Boolean(login.cuerpo?.token);
-comprobar('el login de producción acepta la credencial', okLogin, `status=${login.status}`);
+comprobar(
+  "el login de producción acepta la credencial",
+  okLogin,
+  `status=${login.status}`,
+);
 
 if (!okLogin) {
-  console.log('');
+  console.log("");
   const d = login.cuerpo ?? {};
-  if (typeof d.usuarioOk === 'boolean') {
+  if (typeof d.usuarioOk === "boolean") {
     // El despliegue ya trae el diagnóstico: se dice QUÉ mitad falló, que es lo único que
     // permite arreglarlo sin adivinar (el valor guardado no se puede leer).
     if (!d.usuarioOk) {
-      console.log(`  El USUARIO no es el esperado. El campo de usuario pide "${d.usuarioEsperado}".`);
-      console.log('  Escribe ese usuario exacto (sin espacios) en el formulario del mantenedor.');
+      console.log(
+        `  El USUARIO no es el esperado. El campo de usuario pide "${d.usuarioEsperado}".`,
+      );
+      console.log(
+        "  Escribe ese usuario exacto (sin espacios) en el formulario del mantenedor.",
+      );
     }
     if (!d.claveOk) {
-      console.log('  La CONTRASEÑA no corresponde al hash que hay en producción.');
+      console.log(
+        "  La CONTRASEÑA no corresponde al hash que hay en producción.",
+      );
       if (d.hash?.valido) {
-        console.log('  El hash guardado está bien formado, así que es la contraseña: o el');
-        console.log('  despliegue que sirve es anterior al cambio, o la clave escrita no es la');
-        console.log('  que generó el hash. Vuelve a publicarla: npm run admin:publicar');
+        console.log(
+          "  El hash guardado está bien formado, así que es la contraseña: o el",
+        );
+        console.log(
+          "  despliegue que sirve es anterior al cambio, o la clave escrita no es la",
+        );
+        console.log(
+          "  que generó el hash. Vuelve a publicarla: npm run admin:publicar",
+        );
       } else {
-        for (const p of d.hash?.problemas ?? ['el hash guardado no se pudo leer']) console.log(`    · ${p}`);
+        for (const p of d.hash?.problemas ?? [
+          "el hash guardado no se pudo leer",
+        ])
+          console.log(`    · ${p}`);
       }
     }
   } else {
     // Sin campos de diagnóstico: la función desplegada es anterior a esta versión del código.
     // Es un dato, no un fallo del script.
-    console.log('  La respuesta no trae diagnóstico: el despliegue que sirve producción es');
-    console.log('  ANTERIOR a esta versión del código del mantenedor.');
+    console.log(
+      "  La respuesta no trae diagnóstico: el despliegue que sirve producción es",
+    );
+    console.log("  ANTERIOR a esta versión del código del mantenedor.");
   }
-  console.log('');
-  console.log('  La forma correcta de publicarla (sin copiar/pegar el hash a mano):');
-  console.log('    npm run admin:publicar');
-  console.log('  Ese comando sube el hash por stdin, redeploya —Vercel hornea las variables por');
-  console.log('  despliegue, y el que ya servía conserva el hash anterior— y comprueba el login.');
-  console.log('  Guarda el hash como Config (legible): los valores *sensitive* quedan ilegibles');
-  console.log('  para siempre en Vercel, así que un error de pegado no se puede depurar.');
+  console.log("");
+  console.log(
+    "  La forma correcta de publicarla (sin copiar/pegar el hash a mano):",
+  );
+  console.log("    npm run admin:publicar");
+  console.log(
+    "  Ese comando sube el hash por stdin, redeploya —Vercel hornea las variables por",
+  );
+  console.log(
+    "  despliegue, y el que ya servía conserva el hash anterior— y comprueba el login.",
+  );
+  console.log(
+    "  Guarda el hash como Config (legible): los valores *sensitive* quedan ilegibles",
+  );
+  console.log(
+    "  para siempre en Vercel, así que un error de pegado no se puede depurar.",
+  );
   process.exit(1);
 }
 
 // 3. La sesión tiene que valer en otra petición: si no se guardó en Turso, la instancia
 //    siguiente no la reconocería y el mantenedor echaría al usuario en la petición siguiente.
 const token = login.cuerpo.token;
-const stats = await pedir('/api/admin/stats', { headers: { authorization: `Bearer ${token}` } });
+const stats = await pedir("/api/admin/stats", {
+  headers: { authorization: `Bearer ${token}` },
+});
 comprobar(
-  'la sesión vale para una petición con sesión (y sobrevive en Turso)',
+  "la sesión vale para una petición con sesión (y sobrevive en Turso)",
   stats.status === 200,
   `status=${stats.status}`,
 );
 
 // 4. Cerrar la sesión: no dejar filas vivas en `sesion_admin` por una comprobación.
-const salida = await pedir('/api/admin/logout', {
-  method: 'POST',
+const salida = await pedir("/api/admin/logout", {
+  method: "POST",
   headers: { authorization: `Bearer ${token}` },
 });
-comprobar('la sesión se cierra al terminar la comprobación', salida.status === 200, `status=${salida.status}`);
+comprobar(
+  "la sesión se cierra al terminar la comprobación",
+  salida.status === 200,
+  `status=${salida.status}`,
+);
 
 const fallos = resultados.filter((r) => !r.ok).length;
-console.log(`\n${resultados.length - fallos}/${resultados.length} comprobaciones pasan`);
+console.log(
+  `\n${resultados.length - fallos}/${resultados.length} comprobaciones pasan`,
+);
 if (fallos) process.exitCode = 1;

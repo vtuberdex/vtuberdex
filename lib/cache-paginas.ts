@@ -20,8 +20,8 @@
  * una ficha y volver) y el hook solo la consulta. `__limpiarCachePaginas` es para los
  * tests, que comparten módulo.
  */
-import type { ApiListResponse, SearchParams, VtuberCard } from '@/lib/types';
-import { searchParamsToQuery } from '@/lib/query';
+import type { ApiListResponse, SearchParams, VtuberCard } from "@/lib/types";
+import { searchParamsToQuery } from "@/lib/query";
 
 /** Páginas que se retienen: la actual, sus vecinas y un historial corto de navegación. */
 export const LIMITE_PAGINAS = 24;
@@ -51,7 +51,10 @@ export function leerPagina(params: SearchParams): ApiListResponse | undefined {
   return hit;
 }
 
-export function guardarPagina(params: SearchParams, response: ApiListResponse): void {
+export function guardarPagina(
+  params: SearchParams,
+  response: ApiListResponse,
+): void {
   const clave = clavePagina(params);
   cache.delete(clave);
   cache.set(clave, response);
@@ -63,10 +66,14 @@ export function guardarPagina(params: SearchParams, response: ApiListResponse): 
 }
 
 /** Parámetros de las páginas anterior y siguiente que existen. */
-export function paginasVecinas(params: SearchParams, pageCount: number): SearchParams[] {
+export function paginasVecinas(
+  params: SearchParams,
+  pageCount: number,
+): SearchParams[] {
   const vecinas: SearchParams[] = [];
   for (const page of [params.page - 1, params.page + 1]) {
-    if (page >= 1 && page <= pageCount && page !== params.page) vecinas.push({ ...params, page });
+    if (page >= 1 && page <= pageCount && page !== params.page)
+      vecinas.push({ ...params, page });
   }
   return vecinas;
 }

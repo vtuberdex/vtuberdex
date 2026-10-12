@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * La bandeja de dados en 3D (UN solo canvas, regla 7): tapete, dados de cristal y su tumbo.
  *
@@ -13,8 +13,8 @@
  * deshaciendo hasta la orientación final exacta (`orientacionFinal`), mientras rebota cada vez más
  * bajo. Al terminar, la cara de arriba es la del resultado sin aproximaciones.
  */
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useEffect, useMemo, useRef } from "react";
 import {
   CanvasTexture,
   Color,
@@ -28,18 +28,18 @@ import {
   RepeatWrapping,
   SRGBColorSpace,
   Vector3,
-} from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+} from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 
-import { crearAtlas } from '@/components/dados/atlas';
+import { crearAtlas } from "@/components/dados/atlas";
 import {
   DADOS,
   alturaDeApoyo,
   geometriaBiselada,
   orientacionFinal,
   type TipoDeDado,
-} from '@/components/dados/dados-geometria';
-import { colorDelHumo, crearMaterialDeHumo } from '@/components/dados/humo';
+} from "@/components/dados/dados-geometria";
+import { colorDelHumo, crearMaterialDeHumo } from "@/components/dados/humo";
 
 /** Perillas de la escena. Calibradas mirando la bandeja renderizada. */
 export const ESCENA = {
@@ -49,11 +49,11 @@ export const ESCENA = {
   columnas: 4,
   camara: { posicion: [0, 8.2, 7.1] as [number, number, number], fov: 38 },
   cristal: {
-    color: '#e4ecff',
+    color: "#e4ecff",
     ior: 1.52,
     dispersion: 5,
     espesor: 1.6,
-    atenuacion: '#b9cdfa',
+    atenuacion: "#b9cdfa",
     distanciaAtenuacion: 3.2,
     relieve: -7,
     brilloGrabado: 0.1,
@@ -91,7 +91,10 @@ function azar(semilla: number) {
 }
 
 /** Dónde queda cada dado: una rejilla centrada con un poco de desorden. */
-export function posicionesEnMesa(n: number, semilla = 1): Array<[number, number]> {
+export function posicionesEnMesa(
+  n: number,
+  semilla = 1,
+): Array<[number, number]> {
   const columnas = Math.min(ESCENA.columnas, n);
   const filas = Math.ceil(n / columnas);
   const r = azar(semilla);
@@ -100,7 +103,8 @@ export function posicionesEnMesa(n: number, semilla = 1): Array<[number, number]
     const enFila = fila === filas - 1 ? n - fila * columnas : columnas;
     const col = i % columnas;
     const x = (col - (enFila - 1) / 2) * ESCENA.separacion + (r() - 0.5) * 0.5;
-    const z = (fila - (filas - 1) / 2) * ESCENA.separacionFilas + (r() - 0.5) * 0.4;
+    const z =
+      (fila - (filas - 1) / 2) * ESCENA.separacionFilas + (r() - 0.5) * 0.4;
     return [x, z];
   });
 }
@@ -119,13 +123,13 @@ let texturaSombra: CanvasTexture | null = null;
 /** Mancha radial compartida por todas las sombras (las sombras reales con transmisión costarían otro pase). */
 function sombraCompartida(): CanvasTexture {
   if (!texturaSombra) {
-    const lienzo = document.createElement('canvas');
+    const lienzo = document.createElement("canvas");
     lienzo.width = lienzo.height = 128;
-    const ctx = lienzo.getContext('2d')!;
+    const ctx = lienzo.getContext("2d")!;
     const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    g.addColorStop(0, 'rgba(0,0,0,0.9)');
-    g.addColorStop(0.45, 'rgba(0,0,0,0.45)');
-    g.addColorStop(1, 'rgba(0,0,0,0)');
+    g.addColorStop(0, "rgba(0,0,0,0.9)");
+    g.addColorStop(0.45, "rgba(0,0,0,0.45)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 128, 128);
     texturaSombra = new CanvasTexture(lienzo);
@@ -157,7 +161,7 @@ function Dado({ dado, x, z }: { dado: DadoEnMesa; x: number; z: number }) {
         attenuationDistance: ESCENA.cristal.distanciaAtenuacion,
         bumpMap: atlas,
         bumpScale: ESCENA.cristal.relieve,
-        emissive: new Color('#dbe8ff'),
+        emissive: new Color("#dbe8ff"),
         emissiveMap: atlas,
         emissiveIntensity: ESCENA.cristal.brilloGrabado,
         clearcoat: ESCENA.cristal.clearcoat,
@@ -165,11 +169,17 @@ function Dado({ dado, x, z }: { dado: DadoEnMesa; x: number; z: number }) {
       }),
     [atlas],
   );
-  const materialHumo = useMemo(() => crearMaterialDeHumo(dado.semilla, radio), [dado.semilla, radio]);
-  useEffect(() => () => {
-    material.dispose();
-    materialHumo.dispose();
-  }, [material, materialHumo]);
+  const materialHumo = useMemo(
+    () => crearMaterialDeHumo(dado.semilla, radio),
+    [dado.semilla, radio],
+  );
+  useEffect(
+    () => () => {
+      material.dispose();
+      materialHumo.dispose();
+    },
+    [material, materialHumo],
+  );
 
   const plan = useMemo(() => {
     const r = azar(dado.semilla);
@@ -194,43 +204,60 @@ function Dado({ dado, x, z }: { dado: DadoEnMesa; x: number; z: number }) {
     if (!g) return;
     const ahora = state.clock.elapsedTime;
     if (inicio.current === null) inicio.current = ahora;
-    const t = dado.animar ? Math.min(1, (ahora - inicio.current) / plan.duracion) : 1;
+    const t = dado.animar
+      ? Math.min(1, (ahora - inicio.current) / plan.duracion)
+      : 1;
     const e = easeOut(t);
     g.position.set(
       plan.desdeX + (x - plan.desdeX) * e,
-      plan.apoyo + ESCENA.lanzamiento.altura * Math.pow(1 - t, 1.7) * Math.abs(Math.cos(Math.PI * plan.rebotes * t)),
+      plan.apoyo +
+        ESCENA.lanzamiento.altura *
+          Math.pow(1 - t, 1.7) *
+          Math.abs(Math.cos(Math.PI * plan.rebotes * t)),
       z + ESCENA.lanzamiento.adelante * (1 - e),
     );
-    g.quaternion.copy(q.setFromAxisAngle(plan.eje, plan.giro * (1 - e)).multiply(plan.final));
+    g.quaternion.copy(
+      q.setFromAxisAngle(plan.eje, plan.giro * (1 - e)).multiply(plan.final),
+    );
     if (sombra.current) {
       // Más chica y tenue cuanto más alto va el dado.
       const altura = Math.max(0, g.position.y - plan.apoyo);
       sombra.current.position.set(g.position.x, 0.01, g.position.z);
-      sombra.current.scale.setScalar(radio * ESCENA.sombra.tamano * (1 + altura * 0.25));
-      (sombra.current.material as MeshBasicMaterial).opacity = ESCENA.sombra.opacidad / (1 + altura * 0.9);
+      sombra.current.scale.setScalar(
+        radio * ESCENA.sombra.tamano * (1 + altura * 0.25),
+      );
+      (sombra.current.material as MeshBasicMaterial).opacity =
+        ESCENA.sombra.opacidad / (1 + altura * 0.9);
     }
 
-    const material = humo.current?.material as ReturnType<typeof crearMaterialDeHumo> | undefined;
+    const material = humo.current?.material as
+      ReturnType<typeof crearMaterialDeHumo> | undefined;
     if (material) material.uniforms.uTiempo.value = ahora;
     if (luz.current) {
       luz.current.color.copy(colorDelHumo(dado.semilla, ahora, color));
-      luz.current.intensity = ESCENA.luzHumo.intensidad * (0.85 + 0.15 * Math.sin(ahora * 2.3 + dado.semilla));
+      luz.current.intensity =
+        ESCENA.luzHumo.intensidad *
+        (0.85 + 0.15 * Math.sin(ahora * 2.3 + dado.semilla));
     }
   });
 
   return (
     <>
-    <mesh ref={sombra} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
-      <planeGeometry args={[1, 1]} />
-      <meshBasicMaterial map={sombraCompartida()} transparent depthWrite={false} />
-    </mesh>
-    <group ref={grupo}>
-      <mesh geometry={geometria} material={material} />
-      <mesh ref={humo} material={materialHumo} renderOrder={10}>
-        <planeGeometry args={[2, 2]} />
+      <mesh ref={sombra} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial
+          map={sombraCompartida()}
+          transparent
+          depthWrite={false}
+        />
       </mesh>
-      <pointLight ref={luz} distance={ESCENA.luzHumo.distancia} decay={2} />
-    </group>
+      <group ref={grupo}>
+        <mesh geometry={geometria} material={material} />
+        <mesh ref={humo} material={materialHumo} renderOrder={10}>
+          <planeGeometry args={[2, 2]} />
+        </mesh>
+        <pointLight ref={luz} distance={ESCENA.luzHumo.distancia} decay={2} />
+      </group>
     </>
   );
 }
@@ -238,12 +265,12 @@ function Dado({ dado, x, z }: { dado: DadoEnMesa; x: number; z: number }) {
 /** Tapete con trama fina: sin algo detrás que se deforme, la refracción del cristal no se nota. */
 function Tapete() {
   const textura = useMemo(() => {
-    const lienzo = document.createElement('canvas');
+    const lienzo = document.createElement("canvas");
     lienzo.width = lienzo.height = 512;
-    const ctx = lienzo.getContext('2d')!;
-    ctx.fillStyle = '#0d1018';
+    const ctx = lienzo.getContext("2d")!;
+    ctx.fillStyle = "#0d1018";
     ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = 'rgba(140, 160, 210, 0.16)';
+    ctx.strokeStyle = "rgba(140, 160, 210, 0.16)";
     ctx.lineWidth = 2;
     for (let i = 0; i <= 512; i += 64) {
       ctx.beginPath();
@@ -253,7 +280,7 @@ function Tapete() {
       ctx.lineTo(512, i);
       ctx.stroke();
     }
-    ctx.strokeStyle = 'rgba(140, 160, 210, 0.07)';
+    ctx.strokeStyle = "rgba(140, 160, 210, 0.07)";
     ctx.lineWidth = 1;
     for (let i = 32; i <= 512; i += 64) {
       ctx.beginPath();
@@ -308,7 +335,13 @@ export function distanciaDeCamara(n: number): number {
 
 /** Acerca o aleja la cámara con suavidad cuando cambia la bandeja (sin saltos). */
 function CamaraAjustada({ n }: { n: number }) {
-  const destino = useMemo(() => new Vector3(...ESCENA.camara.posicion).multiplyScalar(distanciaDeCamara(n)), [n]);
+  const destino = useMemo(
+    () =>
+      new Vector3(...ESCENA.camara.posicion).multiplyScalar(
+        distanciaDeCamara(n),
+      ),
+    [n],
+  );
   useFrame(({ camera }, delta) => {
     camera.position.lerp(destino, 1 - Math.exp(-delta * 4));
     camera.lookAt(0, 0, 0.4);
@@ -316,28 +349,41 @@ function CamaraAjustada({ n }: { n: number }) {
   return null;
 }
 
-export function EscenaDados({ dados, semillaMesa }: { dados: DadoEnMesa[]; semillaMesa: number }) {
+export function EscenaDados({
+  dados,
+  semillaMesa,
+}: {
+  dados: DadoEnMesa[];
+  semillaMesa: number;
+}) {
   const posiciones = posicionesEnMesa(dados.length, semillaMesa);
   return (
     <Canvas
       dpr={[1, 2]}
       camera={{
-        position: new Vector3(...ESCENA.camara.posicion).multiplyScalar(distanciaDeCamara(dados.length)).toArray() as [number, number, number],
+        position: new Vector3(...ESCENA.camara.posicion)
+          .multiplyScalar(distanciaDeCamara(dados.length))
+          .toArray() as [number, number, number],
         fov: ESCENA.camara.fov,
       }}
       onCreated={({ camera }) => camera.lookAt(0, 0, 0.4)}
       gl={{ antialias: true }}
-      style={{ background: '#07080d' }}
+      style={{ background: "#07080d" }}
     >
-      <color attach="background" args={['#07080d']} />
-      <fog attach="fog" args={['#07080d', 12, 24]} />
+      <color attach="background" args={["#07080d"]} />
+      <fog attach="fog" args={["#07080d", 12, 24]} />
       <ambientLight intensity={0.25} />
       <directionalLight position={[-4, 9, 5]} intensity={1.3} />
       <Entorno />
       <CamaraAjustada n={dados.length} />
       <Tapete />
       {dados.map((dado, i) => (
-        <Dado key={dado.clave} dado={dado} x={posiciones[i][0]} z={posiciones[i][1]} />
+        <Dado
+          key={dado.clave}
+          dado={dado}
+          x={posiciones[i][0]}
+          z={posiciones[i][1]}
+        />
       ))}
     </Canvas>
   );

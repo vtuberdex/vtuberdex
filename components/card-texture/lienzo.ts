@@ -1,13 +1,19 @@
 /**
  * Creación de los canvas de capa: uno por capa, con la escala ya aplicada.
  */
-import { CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT } from './dimensiones';
+import { CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT } from "./dimensiones";
 
 /** Crea un canvas con el tamaño destino y escala canónica. */
-export function createLayer(width: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null; scale: number; W: number; H: number } {
+export function createLayer(width: number): {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D | null;
+  scale: number;
+  W: number;
+  H: number;
+} {
   const scale = width / CARD_TEXTURE_WIDTH;
   const H = Math.round(width * (CARD_TEXTURE_HEIGHT / CARD_TEXTURE_WIDTH));
-  const canvas = document.createElement('canvas');
+  const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = H;
   /**
@@ -20,7 +26,7 @@ export function createLayer(width: number): { canvas: HTMLCanvasElement; ctx: Ca
    * desde un canvas de CPU es una subida normal (`texImage2D`) y el dibujo 2D de texto y
    * degradados cuesta lo medido en AGENTS.md (~14 ms por carta a 512).
    */
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (ctx) {
     ctx.scale(scale, scale);
     ctx.save();
@@ -37,7 +43,7 @@ export function createLayer(width: number): { canvas: HTMLCanvasElement; ctx: Ca
  * renumerar movería las posiciones de PARALLAX_LAYERS y el resto de uniformes.
  */
 export function emptyLayer(): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
+  const canvas = document.createElement("canvas");
   canvas.width = 1;
   canvas.height = 1;
   return canvas;

@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Voz de la ficha: al entrar, una voz sintética «de aparato» lee el nombre y la historia, y un
  * parlantito la silencia. El clip lo sirve `/voces/<slug>.mp3`; si la ficha no tiene, el botón
@@ -13,15 +13,15 @@
  *   · Al salir de la ficha el audio se detiene (el componente se desmonta), para que no se
  *     solape con la voz de la siguiente.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useI18n } from '@/lib/i18n';
+import { useI18n } from "@/lib/i18n";
 
-export const CLAVE_SILENCIO = 'vtuberdex:voz-silenciada';
+export const CLAVE_SILENCIO = "vtuberdex:voz-silenciada";
 
 function leerSilencio(): boolean {
   try {
-    return window.localStorage.getItem(CLAVE_SILENCIO) === '1';
+    return window.localStorage.getItem(CLAVE_SILENCIO) === "1";
   } catch {
     return false;
   }
@@ -29,7 +29,7 @@ function leerSilencio(): boolean {
 
 function guardarSilencio(silenciada: boolean): void {
   try {
-    window.localStorage.setItem(CLAVE_SILENCIO, silenciada ? '1' : '0');
+    window.localStorage.setItem(CLAVE_SILENCIO, silenciada ? "1" : "0");
   } catch {
     /* sin almacenamiento: la preferencia vale solo para esta visita */
   }
@@ -37,11 +37,17 @@ function guardarSilencio(silenciada: boolean): void {
 
 /** `flotante`: píldora translúcida para ir SOBRE la carta (se lee sobre cualquier fondo). */
 const ESTILO_NORMAL =
-  'rounded-lg border border-dex-line bg-dex-panel px-3 py-1.5 text-xs text-dex-muted hover:border-dex-accent/60 hover:text-dex-ink';
+  "rounded-lg border border-dex-line bg-dex-panel px-3 py-1.5 text-xs text-dex-muted hover:border-dex-accent/60 hover:text-dex-ink";
 const ESTILO_FLOTANTE =
-  'rounded-full border border-white/20 bg-black/55 px-3 py-1.5 text-xs text-white/85 shadow-lg backdrop-blur hover:border-dex-accent/70 hover:text-white';
+  "rounded-full border border-white/20 bg-black/55 px-3 py-1.5 text-xs text-white/85 shadow-lg backdrop-blur hover:border-dex-accent/70 hover:text-white";
 
-export function VoiceButton({ slug, flotante = false }: { slug: string; flotante?: boolean }) {
+export function VoiceButton({
+  slug,
+  flotante = false,
+}: {
+  slug: string;
+  flotante?: boolean;
+}) {
   const { t } = useI18n();
   const audio = useRef<HTMLAudioElement>(null);
   const [disponible, setDisponible] = useState(false);
@@ -51,7 +57,7 @@ export function VoiceButton({ slug, flotante = false }: { slug: string; flotante
   useEffect(() => {
     let vivo = true;
     setSilenciada(leerSilencio());
-    fetch(`/voces/${slug}.mp3`, { method: 'HEAD' })
+    fetch(`/voces/${slug}.mp3`, { method: "HEAD" })
       .then((respuesta) => vivo && setDisponible(respuesta.ok))
       .catch(() => undefined);
     return () => {
@@ -88,7 +94,8 @@ export function VoiceButton({ slug, flotante = false }: { slug: string; flotante
       return;
     }
     guardarSilencio(false);
-    if (silenciada) setSilenciada(false); // el efecto la reproduce
+    if (silenciada)
+      setSilenciada(false); // el efecto la reproduce
     else reproducir();
   };
 
@@ -106,7 +113,9 @@ export function VoiceButton({ slug, flotante = false }: { slug: string; flotante
       <button
         type="button"
         onClick={alPulsar}
-        aria-label={sonando ? t('voz.silenciarEtiqueta') : t('voz.escucharEtiqueta')}
+        aria-label={
+          sonando ? t("voz.silenciarEtiqueta") : t("voz.escucharEtiqueta")
+        }
         aria-pressed={silenciada}
         data-testid="voz-boton"
         className={`inline-flex items-center gap-2 transition-colors ${flotante ? ESTILO_FLOTANTE : ESTILO_NORMAL}`}
@@ -115,18 +124,43 @@ export function VoiceButton({ slug, flotante = false }: { slug: string; flotante
           <path d="M4 9v6h4l5 4V5L8 9H4Z" fill="currentColor" />
           {silenciada || !sonando ? (
             silenciada ? (
-              <path d="m17 9 5 6m0-6-5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path
+                d="m17 9 5 6m0-6-5 6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
             ) : (
-              <path d="M16 9.5a4 4 0 0 1 0 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.5" />
+              <path
+                d="M16 9.5a4 4 0 0 1 0 5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                opacity="0.5"
+              />
             )
           ) : (
             <>
-              <path d="M16 9a4.5 4.5 0 0 1 0 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              <path d="M18.5 6.5a8 8 0 0 1 0 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <path
+                d="M16 9a4.5 4.5 0 0 1 0 6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M18.5 6.5a8 8 0 0 1 0 11"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
             </>
           )}
         </svg>
-        {sonando ? t('voz.silenciar') : silenciada ? t('voz.silenciada') : t('voz.escuchar')}
+        {sonando
+          ? t("voz.silenciar")
+          : silenciada
+            ? t("voz.silenciada")
+            : t("voz.escuchar")}
       </button>
     </>
   );

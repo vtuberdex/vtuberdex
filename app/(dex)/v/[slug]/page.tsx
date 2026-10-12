@@ -12,18 +12,18 @@
  *    que el buscador consolida las dos URLs en una.
  *  - JSON-LD (`ProfilePage` + `Person` + migas de pan).
  */
-import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
-import { DetailPage } from '@/components/detail-page';
-import { fichaPublica } from '@/lib/seo-datos.mjs';
+import { DetailPage } from "@/components/detail-page";
+import { fichaPublica } from "@/lib/seo-datos.mjs";
 import {
   descripcionDeFicha,
   jsonLdDeFicha,
   rutaDeFicha,
   serializarJsonLd,
   tituloDeFicha,
-} from '@/lib/seo';
+} from "@/lib/seo";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -31,7 +31,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const card = await fichaPublica(slug).catch(() => null);
   // Sin ficha, `notFound()` de la página decide; aquí solo se evita publicar un título falso.
-  if (!card) return { title: 'VTuber no encontrado', robots: { index: false, follow: false } };
+  if (!card)
+    return {
+      title: "VTuber no encontrado",
+      robots: { index: false, follow: false },
+    };
 
   const titulo = tituloDeFicha(card);
   const descripcion = descripcionDeFicha(card);
@@ -42,14 +46,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: descripcion,
     alternates: { canonical: url },
     openGraph: {
-      type: 'profile',
+      type: "profile",
       title: titulo,
       description: descripcion,
       url,
-      ...(imagen ? { images: [{ url: imagen, width: 720, height: 1008, alt: `Carta de ${card.name}` }] } : {}),
+      ...(imagen
+        ? {
+            images: [
+              {
+                url: imagen,
+                width: 720,
+                height: 1008,
+                alt: `Carta de ${card.name}`,
+              },
+            ],
+          }
+        : {}),
     },
     twitter: {
-      card: imagen ? 'summary_large_image' : 'summary',
+      card: imagen ? "summary_large_image" : "summary",
       title: titulo,
       description: descripcion,
       ...(imagen ? { images: [imagen] } : {}),
@@ -68,7 +83,9 @@ export default async function DetailRoute({ params }: Props) {
       {card ? (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializarJsonLd(jsonLdDeFicha(card)) }}
+          dangerouslySetInnerHTML={{
+            __html: serializarJsonLd(jsonLdDeFicha(card)),
+          }}
         />
       ) : null}
       <DetailPage slug={slug} />

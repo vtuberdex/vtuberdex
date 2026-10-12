@@ -21,41 +21,48 @@
  * Si alguien vuelve a poner el canvas en el flujo (p. ej. «simplificando» la caja
  * posicionada), este test cae antes de que el fallo llegue al navegador.
  */
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
 
 /** La suite corre desde la raíz del paquete (vitest), así que la ruta es la del repo. */
-const fuente = readFileSync(path.resolve(process.cwd(), 'components/holo-card.tsx'), 'utf8');
+const fuente = readFileSync(
+  path.resolve(process.cwd(), "components/holo-card.tsx"),
+  "utf8",
+);
 
 /** Bloque JSX devuelto por `HoloCard`. */
-const render = fuente.slice(fuente.indexOf('return (\n    <div className={className ?'));
+const render = fuente.slice(
+  fuente.indexOf("return (\n    <div className={className ?"),
+);
 
-describe('layout del canvas', () => {
-  it('la raíz de HoloCard es `relative`', () => {
+describe("layout del canvas", () => {
+  it("la raíz de HoloCard es `relative`", () => {
     expect(render).toContain('data-testid="holo-card"');
-    expect(render).toMatch(/className=\{className \? `relative \$\{className\}` : 'relative'\}/);
+    expect(render).toMatch(
+      /className=\{className \? `relative \$\{className\}` : 'relative'\}/,
+    );
   });
 
-  it('el canvas vive en una caja posicionada, fuera del flujo', () => {
+  it("el canvas vive en una caja posicionada, fuera del flujo", () => {
     const caja = render.indexOf('<div className="absolute inset-0">');
-    const canvas = render.indexOf('<Canvas');
+    const canvas = render.indexOf("<Canvas");
     expect(caja).toBeGreaterThan(-1);
     // Entre la caja y el canvas no puede cerrarse la caja: el canvas va DENTRO.
     expect(canvas).toBeGreaterThan(caja);
-    expect(render.slice(caja, canvas)).not.toContain('</div>');
+    expect(render.slice(caja, canvas)).not.toContain("</div>");
   });
 
-  it('no hay vista 2D de respaldo: el producto asume GPU', () => {
-    expect(render).not.toContain('CardFallback');
-    expect(fuente).not.toContain('supportsWebGL');
+  it("no hay vista 2D de respaldo: el producto asume GPU", () => {
+    expect(render).not.toContain("CardFallback");
+    expect(fuente).not.toContain("supportsWebGL");
   });
 
-  it('el canvas no se declara con tamaño propio (la medida la fija el contenedor)', () => {
+  it("el canvas no se declara con tamaño propio (la medida la fija el contenedor)", () => {
     // Un `style` o una clase de tamaño en el Canvas devolvería el lazo: el contenedor
     // pasaría a depender de la medida que el canvas escribe.
-    const canvas = render.indexOf('<Canvas');
-    const cierre = render.indexOf('</Canvas>');
+    const canvas = render.indexOf("<Canvas");
+    const cierre = render.indexOf("</Canvas>");
     const bloque = render.slice(canvas, cierre);
     expect(bloque).not.toMatch(/style=\{\{/);
     expect(bloque).not.toMatch(/\bwidth:|\bheight:/);
@@ -67,22 +74,28 @@ describe('layout del canvas', () => {
  * contenedor fija el alto por `aspect-ratio`, y si el canvas entrara en el flujo el
  * ancho inline que escribe three.js impediría encoger al rotar el móvil.
  */
-const fuenteLibro = readFileSync(path.resolve(process.cwd(), 'components/card-binder.tsx'), 'utf8');
+const fuenteLibro = readFileSync(
+  path.resolve(process.cwd(), "components/card-binder.tsx"),
+  "utf8",
+);
 
-describe('layout del canvas del libro', () => {
-  it('el canvas del libro vive en una caja posicionada dentro de una raíz `relative`', () => {
+describe("layout del canvas del libro", () => {
+  it("el canvas del libro vive en una caja posicionada dentro de una raíz `relative`", () => {
     const caja = fuenteLibro.indexOf('<div className="absolute inset-0">');
-    const canvas = fuenteLibro.indexOf('<Canvas');
+    const canvas = fuenteLibro.indexOf("<Canvas");
     expect(caja).toBeGreaterThan(-1);
     expect(canvas).toBeGreaterThan(caja);
-    expect(fuenteLibro.slice(caja, canvas)).not.toContain('</div>');
+    expect(fuenteLibro.slice(caja, canvas)).not.toContain("</div>");
     // La raíz que lo contiene es la superficie de gestos, posicionada.
     expect(fuenteLibro).toMatch(/className="relative mx-auto select-none"/);
   });
 
-  it('el canvas del libro no se declara con tamaño propio', () => {
-    const canvas = fuenteLibro.indexOf('<Canvas');
-    const cierre = fuenteLibro.indexOf('>', fuenteLibro.indexOf('onCreated', canvas));
+  it("el canvas del libro no se declara con tamaño propio", () => {
+    const canvas = fuenteLibro.indexOf("<Canvas");
+    const cierre = fuenteLibro.indexOf(
+      ">",
+      fuenteLibro.indexOf("onCreated", canvas),
+    );
     const bloque = fuenteLibro.slice(canvas, cierre);
     expect(bloque).not.toMatch(/style=\{\{/);
     expect(bloque).not.toMatch(/\bwidth:|\bheight:/);

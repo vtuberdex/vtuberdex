@@ -21,21 +21,40 @@
  * El BISEL es la envolvente de cada cara encogida hacia su centro (`DADOS.bisel`): las caras quedan
  * un poco más chicas y entre ellas aparecen las tiras del bisel y un polígono en cada vértice.
  */
-import { BufferGeometry, Float32BufferAttribute, Quaternion, Vector3 } from 'three';
-import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
-import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js';
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  Quaternion,
+  Vector3,
+} from "three";
+import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
+import { ConvexHull } from "three/examples/jsm/math/ConvexHull.js";
 
-export const TIPOS_DE_DADO = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'] as const;
+export const TIPOS_DE_DADO = ["d4", "d6", "d8", "d10", "d12", "d20"] as const;
 export type TipoDeDado = (typeof TIPOS_DE_DADO)[number];
 
-export const CARAS: Record<TipoDeDado, number> = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20 };
+export const CARAS: Record<TipoDeDado, number> = {
+  d4: 4,
+  d6: 6,
+  d8: 8,
+  d10: 10,
+  d12: 12,
+  d20: 20,
+};
 
 /** Perillas de los dados. Los valores visuales se calibraron mirando la escena renderizada. */
 export const DADOS = {
   /** Fracción con que se encoge cada cara hacia su centro para formar el bisel. */
   bisel: 0.14,
   /** Radio (centro → vértice) de cada dado en unidades de mundo: los de menos caras se ven chicos si no. */
-  radio: { d4: 1.08, d6: 0.92, d8: 0.98, d10: 0.98, d12: 0.98, d20: 1.02 } as Record<TipoDeDado, number>,
+  radio: {
+    d4: 1.08,
+    d6: 0.92,
+    d8: 0.98,
+    d10: 0.98,
+    d12: 0.98,
+    d20: 1.02,
+  } as Record<TipoDeDado, number>,
   /** Altura del d10 respecto de su radio: el real es algo más alto que ancho. */
   alturaD10: 1.1,
   /** Cuántos dados caben en la bandeja a la vez. */
@@ -80,21 +99,44 @@ function verticesBase(tipo: TipoDeDado): Vector3[] {
   const v = (x: number, y: number, z: number) => new Vector3(x, y, z);
   const signos = [-1, 1];
   switch (tipo) {
-    case 'd4':
+    case "d4":
       return [v(1, 1, 1), v(1, -1, -1), v(-1, 1, -1), v(-1, -1, 1)];
-    case 'd6':
-      return signos.flatMap((x) => signos.flatMap((y) => signos.map((z) => v(x, y, z))));
-    case 'd8':
-      return [v(1, 0, 0), v(-1, 0, 0), v(0, 1, 0), v(0, -1, 0), v(0, 0, 1), v(0, 0, -1)];
-    case 'd10':
-      return verticesD10();
-    case 'd12':
+    case "d6":
+      return signos.flatMap((x) =>
+        signos.flatMap((y) => signos.map((z) => v(x, y, z))),
+      );
+    case "d8":
       return [
-        ...signos.flatMap((x) => signos.flatMap((y) => signos.map((z) => v(x, y, z)))),
-        ...signos.flatMap((a) => signos.flatMap((b) => [v(0, a / PHI, b * PHI), v(a / PHI, b * PHI, 0), v(a * PHI, 0, b / PHI)])),
+        v(1, 0, 0),
+        v(-1, 0, 0),
+        v(0, 1, 0),
+        v(0, -1, 0),
+        v(0, 0, 1),
+        v(0, 0, -1),
       ];
-    case 'd20':
-      return signos.flatMap((a) => signos.flatMap((b) => [v(0, a, b * PHI), v(a, b * PHI, 0), v(a * PHI, 0, b)]));
+    case "d10":
+      return verticesD10();
+    case "d12":
+      return [
+        ...signos.flatMap((x) =>
+          signos.flatMap((y) => signos.map((z) => v(x, y, z))),
+        ),
+        ...signos.flatMap((a) =>
+          signos.flatMap((b) => [
+            v(0, a / PHI, b * PHI),
+            v(a / PHI, b * PHI, 0),
+            v(a * PHI, 0, b / PHI),
+          ]),
+        ),
+      ];
+    case "d20":
+      return signos.flatMap((a) =>
+        signos.flatMap((b) => [
+          v(0, a, b * PHI),
+          v(a, b * PHI, 0),
+          v(a * PHI, 0, b),
+        ]),
+      );
   }
 }
 
@@ -105,7 +147,9 @@ function escalar(puntos: Vector3[], radio: number): Vector3[] {
 }
 
 /** Caras de la envolvente convexa: triángulos coplanares fundidos en un polígono ordenado. */
-export function carasDe(puntos: Vector3[]): Array<{ normal: Vector3; centro: Vector3; vertices: Vector3[] }> {
+export function carasDe(
+  puntos: Vector3[],
+): Array<{ normal: Vector3; centro: Vector3; vertices: Vector3[] }> {
   const hull = new ConvexHull().setFromPoints(puntos);
   const grupos: Array<{ normal: Vector3; vertices: Vector3[] }> = [];
   for (const face of hull.faces) {
@@ -117,19 +161,24 @@ export function carasDe(puntos: Vector3[]): Array<{ normal: Vector3; centro: Vec
     let edge = face.edge;
     do {
       const p = edge.head().point;
-      if (!grupo.vertices.some((q) => q.distanceToSquared(p) < 1e-10)) grupo.vertices.push(p.clone());
+      if (!grupo.vertices.some((q) => q.distanceToSquared(p) < 1e-10))
+        grupo.vertices.push(p.clone());
       edge = edge.next;
     } while (edge !== face.edge);
   }
   return grupos.map(({ normal, vertices }) => {
-    const centro = vertices.reduce((acc, p) => acc.add(p), new Vector3()).multiplyScalar(1 / vertices.length);
+    const centro = vertices
+      .reduce((acc, p) => acc.add(p), new Vector3())
+      .multiplyScalar(1 / vertices.length);
     // Orden angular alrededor de la normal (antihorario visto desde fuera).
     const u = vertices[0].clone().sub(centro).normalize();
     const w = new Vector3().crossVectors(normal, u);
     const ordenados = [...vertices].sort((a, b) => {
       const da = a.clone().sub(centro);
       const db = b.clone().sub(centro);
-      return Math.atan2(da.dot(w), da.dot(u)) - Math.atan2(db.dot(w), db.dot(u));
+      return (
+        Math.atan2(da.dot(w), da.dot(u)) - Math.atan2(db.dot(w), db.dot(u))
+      );
     });
     return { normal, centro, vertices: ordenados };
   });
@@ -143,7 +192,12 @@ function arribaDe(centro: Vector3, vertices: Vector3[]): Vector3 {
   const distancias = vertices.map((p) => p.distanceTo(centro));
   const regular = Math.max(...distancias) - Math.min(...distancias) < 1e-6;
   if (regular && vertices.length === 4) {
-    return vertices[0].clone().add(vertices[1]).multiplyScalar(0.5).sub(centro).normalize();
+    return vertices[0]
+      .clone()
+      .add(vertices[1])
+      .multiplyScalar(0.5)
+      .sub(centro)
+      .normalize();
   }
   const i = distancias.indexOf(Math.max(...distancias));
   return vertices[i].clone().sub(centro).normalize();
@@ -153,13 +207,26 @@ function arribaDe(centro: Vector3, vertices: Vector3[]): Vector3 {
  * Numeración: las caras OPUESTAS suman N+1, como en un dado real (1–6, 2–5…). En el d4 no hay caras
  * opuestas: se numeran los vértices y cada cara lleva el número del vértice que tiene enfrente.
  */
-function numerar(tipo: TipoDeDado, crudas: ReturnType<typeof carasDe>, puntos: Vector3[]): FormaDeDado {
+function numerar(
+  tipo: TipoDeDado,
+  crudas: ReturnType<typeof carasDe>,
+  puntos: Vector3[],
+): FormaDeDado {
   const n = CARAS[tipo];
-  if (tipo === 'd4') {
-    const verticesNumerados = puntos.map((punto, i) => ({ punto, numero: i + 1 }));
+  if (tipo === "d4") {
+    const verticesNumerados = puntos.map((punto, i) => ({
+      punto,
+      numero: i + 1,
+    }));
     const caras = crudas.map((c) => {
-      const opuesto = verticesNumerados.find((v) => !c.vertices.some((p) => p.distanceToSquared(v.punto) < 1e-10))!;
-      return { ...c, arriba: arribaDe(c.centro, c.vertices), numero: opuesto.numero };
+      const opuesto = verticesNumerados.find(
+        (v) => !c.vertices.some((p) => p.distanceToSquared(v.punto) < 1e-10),
+      )!;
+      return {
+        ...c,
+        arriba: arribaDe(c.centro, c.vertices),
+        numero: opuesto.numero,
+      };
     });
     return { tipo, caras, verticesNumerados };
   }
@@ -167,12 +234,18 @@ function numerar(tipo: TipoDeDado, crudas: ReturnType<typeof carasDe>, puntos: V
   let siguiente = 1;
   crudas.forEach((c, i) => {
     if (numeros[i]) return;
-    const j = crudas.findIndex((o, k) => k !== i && !numeros[k] && o.normal.dot(c.normal) < -0.9999);
+    const j = crudas.findIndex(
+      (o, k) => k !== i && !numeros[k] && o.normal.dot(c.normal) < -0.9999,
+    );
     numeros[i] = siguiente;
     if (j >= 0) numeros[j] = n + 1 - siguiente;
     siguiente++;
   });
-  const caras = crudas.map((c, i) => ({ ...c, arriba: arribaDe(c.centro, c.vertices), numero: numeros[i] }));
+  const caras = crudas.map((c, i) => ({
+    ...c,
+    arriba: arribaDe(c.centro, c.vertices),
+    numero: numeros[i],
+  }));
   return { tipo, caras, verticesNumerados: [] };
 }
 
@@ -189,7 +262,10 @@ export function formaDe(tipo: TipoDeDado): FormaDeDado {
 }
 
 /** Casilla del atlas de cada cara (en orden de `caras`); la última, vacía, es la del bisel. */
-export function rejillaDelAtlas(tipo: TipoDeDado): { lado: number; casillas: number } {
+export function rejillaDelAtlas(tipo: TipoDeDado): {
+  lado: number;
+  casillas: number;
+} {
   const casillas = formaDe(tipo).caras.length + 1;
   return { lado: Math.ceil(Math.sqrt(casillas)), casillas };
 }
@@ -201,7 +277,11 @@ const MARGEN = 0.92;
  * Coordenadas de un punto de la cara en el atlas, en [0,1]². `u` va a la derecha y `v` hacia arriba
  * del número, con `u × v = normal`: visto desde FUERA el número no sale espejado.
  */
-export function uvEnCara(tipo: TipoDeDado, indice: number, punto: Vector3): [number, number] {
+export function uvEnCara(
+  tipo: TipoDeDado,
+  indice: number,
+  punto: Vector3,
+): [number, number] {
   const forma = formaDe(tipo);
   const cara = forma.caras[indice];
   const { lado } = rejillaDelAtlas(tipo);
@@ -213,7 +293,10 @@ export function uvEnCara(tipo: TipoDeDado, indice: number, punto: Vector3): [num
   const pv = d.dot(v) / R;
   const col = indice % lado;
   const fila = Math.floor(indice / lado);
-  return [(col + 0.5 + 0.5 * MARGEN * pu) / lado, 1 - (fila + 0.5 - 0.5 * MARGEN * pv) / lado];
+  return [
+    (col + 0.5 + 0.5 * MARGEN * pu) / lado,
+    1 - (fila + 0.5 - 0.5 * MARGEN * pv) / lado,
+  ];
 }
 
 /**
@@ -222,12 +305,17 @@ export function uvEnCara(tipo: TipoDeDado, indice: number, punto: Vector3): [num
  */
 export function geometriaBiselada(tipo: TipoDeDado): BufferGeometry {
   const forma = formaDe(tipo);
-  const puntos = forma.caras.flatMap((c) => c.vertices.map((p) => c.centro.clone().lerp(p, 1 - DADOS.bisel)));
+  const puntos = forma.caras.flatMap((c) =>
+    c.vertices.map((p) => c.centro.clone().lerp(p, 1 - DADOS.bisel)),
+  );
   const convexa = new ConvexGeometry(puntos);
-  const pos = convexa.getAttribute('position');
+  const pos = convexa.getAttribute("position");
   const { lado, casillas } = rejillaDelAtlas(tipo);
   const vacia = casillas - 1;
-  const uvVacia: [number, number] = [((vacia % lado) + 0.5) / lado, 1 - (Math.floor(vacia / lado) + 0.5) / lado];
+  const uvVacia: [number, number] = [
+    ((vacia % lado) + 0.5) / lado,
+    1 - (Math.floor(vacia / lado) + 0.5) / lado,
+  ];
   const uvs: number[] = [];
   const a = new Vector3();
   const b = new Vector3();
@@ -236,14 +324,19 @@ export function geometriaBiselada(tipo: TipoDeDado): BufferGeometry {
     a.fromBufferAttribute(pos, i);
     b.fromBufferAttribute(pos, i + 1);
     c.fromBufferAttribute(pos, i + 2);
-    const normal = new Vector3().crossVectors(b.clone().sub(a), c.clone().sub(a)).normalize();
-    const indice = forma.caras.findIndex((cara) => cara.normal.dot(normal) > 0.9995);
-    for (const p of [a, b, c]) uvs.push(...(indice >= 0 ? uvEnCara(tipo, indice, p) : uvVacia));
+    const normal = new Vector3()
+      .crossVectors(b.clone().sub(a), c.clone().sub(a))
+      .normalize();
+    const indice = forma.caras.findIndex(
+      (cara) => cara.normal.dot(normal) > 0.9995,
+    );
+    for (const p of [a, b, c])
+      uvs.push(...(indice >= 0 ? uvEnCara(tipo, indice, p) : uvVacia));
   }
   const geometria = new BufferGeometry();
-  geometria.setAttribute('position', pos.clone());
-  geometria.setAttribute('normal', convexa.getAttribute('normal').clone());
-  geometria.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
+  geometria.setAttribute("position", pos.clone());
+  geometria.setAttribute("normal", convexa.getAttribute("normal").clone());
+  geometria.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
   convexa.dispose();
   return geometria;
 }
@@ -251,9 +344,12 @@ export function geometriaBiselada(tipo: TipoDeDado): BufferGeometry {
 const ARRIBA = new Vector3(0, 1, 0);
 
 /** La dirección local que debe quedar hacia arriba para mostrar `resultado`. */
-export function direccionDelResultado(tipo: TipoDeDado, resultado: number): Vector3 {
+export function direccionDelResultado(
+  tipo: TipoDeDado,
+  resultado: number,
+): Vector3 {
   const forma = formaDe(tipo);
-  if (tipo === 'd4') {
+  if (tipo === "d4") {
     const v = forma.verticesNumerados.find((x) => x.numero === resultado);
     if (!v) throw new Error(`resultado_invalido: ${tipo} ${resultado}`);
     return v.punto.clone().normalize();
@@ -264,23 +360,41 @@ export function direccionDelResultado(tipo: TipoDeDado, resultado: number): Vect
 }
 
 /** Orientación en reposo que deja `resultado` arriba, girada `giro` radianes sobre la vertical. */
-export function orientacionFinal(tipo: TipoDeDado, resultado: number, giro: number): Quaternion {
-  const alinear = new Quaternion().setFromUnitVectors(direccionDelResultado(tipo, resultado), ARRIBA);
+export function orientacionFinal(
+  tipo: TipoDeDado,
+  resultado: number,
+  giro: number,
+): Quaternion {
+  const alinear = new Quaternion().setFromUnitVectors(
+    direccionDelResultado(tipo, resultado),
+    ARRIBA,
+  );
   return new Quaternion().setFromAxisAngle(ARRIBA, giro).multiply(alinear);
 }
 
 /** Lo que el dado baja por debajo de su centro en esa orientación: a esa altura se apoya en la mesa. */
-export function alturaDeApoyo(tipo: TipoDeDado, orientacion: Quaternion): number {
+export function alturaDeApoyo(
+  tipo: TipoDeDado,
+  orientacion: Quaternion,
+): number {
   const forma = formaDe(tipo);
   let minimo = Infinity;
   for (const cara of forma.caras) {
-    for (const p of cara.vertices) minimo = Math.min(minimo, p.clone().lerp(cara.centro, DADOS.bisel).applyQuaternion(orientacion).y);
+    for (const p of cara.vertices)
+      minimo = Math.min(
+        minimo,
+        p.clone().lerp(cara.centro, DADOS.bisel).applyQuaternion(orientacion).y,
+      );
   }
   return -minimo;
 }
 
 /** Entero uniforme en [1, caras], sin sesgo de módulo. */
-export function tirar(caras: number, aleatorio: (buffer: Uint32Array) => Uint32Array = (b) => crypto.getRandomValues(b)): number {
+export function tirar(
+  caras: number,
+  aleatorio: (buffer: Uint32Array) => Uint32Array = (b) =>
+    crypto.getRandomValues(b),
+): number {
   const limite = Math.floor(0x1_0000_0000 / caras) * caras;
   const buffer = new Uint32Array(1);
   for (;;) {
@@ -293,5 +407,5 @@ export function tirar(caras: number, aleatorio: (buffer: Uint32Array) => Uint32A
 export function expresionDe(tipos: TipoDeDado[]): string {
   return TIPOS_DE_DADO.filter((t) => tipos.includes(t))
     .map((t) => `${tipos.filter((x) => x === t).length}${t}`)
-    .join(' + ');
+    .join(" + ");
 }

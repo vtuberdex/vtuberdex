@@ -45,23 +45,26 @@
  *   node scripts/check-shaders.mjs <shaders> <quien-declara-los-uniforms>
  * Sale != 0 si hay problema.
  */
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, existsSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const raiz = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const CANDIDATAS = [
-  'components/shaders.ts',
-  'components/shaders.js',
-  'src/shaders.ts',
-  'lib/shaders.ts',
+  "components/shaders.ts",
+  "components/shaders.js",
+  "src/shaders.ts",
+  "lib/shaders.ts",
 ];
 /** El archivo que crea los objetos de uniforms (los lee el shader, los escribe la CPU). */
-const DECLARANTE = 'components/card-material.ts';
+const DECLARANTE = "components/card-material.ts";
 
 const arg = process.argv[2];
-const ruta = resolve(raiz, arg ?? CANDIDATAS.find((c) => existsSync(resolve(raiz, c))) ?? CANDIDATAS[0]);
+const ruta = resolve(
+  raiz,
+  arg ?? CANDIDATAS.find((c) => existsSync(resolve(raiz, c))) ?? CANDIDATAS[0],
+);
 const rutaDeclarante = resolve(raiz, process.argv[3] ?? DECLARANTE);
 
 if (!existsSync(ruta)) {
@@ -69,17 +72,35 @@ if (!existsSync(ruta)) {
   process.exit(1);
 }
 
-const fuente = readFileSync(ruta, 'utf8');
+const fuente = readFileSync(ruta, "utf8");
 
 /** Identificadores que aporta GLSL o three.js y no hace falta declarar. */
 const APORTADOS = new Set([
-  'uv', 'uv1', 'uv2',
-  'position', 'normal', 'color', 'instanceMatrix',
-  'modelMatrix', 'modelViewMatrix', 'projectionMatrix', 'viewMatrix', 'normalMatrix',
-  'cameraPosition', 'gl_Position', 'gl_FragColor', 'gl_FragCoord', 'gl_PointSize',
-  'gl_PointCoord', 'gl_FrontFacing', 'gl_DepthRange',
+  "uv",
+  "uv1",
+  "uv2",
+  "position",
+  "normal",
+  "color",
+  "instanceMatrix",
+  "modelMatrix",
+  "modelViewMatrix",
+  "projectionMatrix",
+  "viewMatrix",
+  "normalMatrix",
+  "cameraPosition",
+  "gl_Position",
+  "gl_FragColor",
+  "gl_FragCoord",
+  "gl_PointSize",
+  "gl_PointCoord",
+  "gl_FrontFacing",
+  "gl_DepthRange",
   // varyings propios de esta base: los declara el vertex y los lee el fragment.
-  'vUv', 'vNormal', 'vViewPosition', 'vWorldPosition',
+  "vUv",
+  "vNormal",
+  "vViewPosition",
+  "vWorldPosition",
 ]);
 
 /**
@@ -90,10 +111,12 @@ const APORTADOS = new Set([
  * este mismo comentario (era lo que obligaba a meter un espacio invisible de
  * ancho cero en el texto, que `no-irregular-whitespace` marca con razón).
  */
-const bloques = [...fuente.matchAll(/\/\*\s*glsl\s*\*\/\s*`([\s\S]*?)`/g)].map((m) => ({
-  cuerpo: m[1],
-  linea: fuente.slice(0, m.index).split('\n').length,
-}));
+const bloques = [...fuente.matchAll(/\/\*\s*glsl\s*\*\/\s*`([\s\S]*?)`/g)].map(
+  (m) => ({
+    cuerpo: m[1],
+    linea: fuente.slice(0, m.index).split("\n").length,
+  }),
+);
 
 /**
  * GLSL SIN COMENTARIOS.
@@ -117,13 +140,13 @@ const bloques = [...fuente.matchAll(/\/\*\s*glsl\s*\*\/\s*`([\s\S]*?)`/g)].map((
  */
 const sinComentarios = (glsl) =>
   glsl
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-    .replace(/\/\/[^\n]*/g, (m) => ' '.repeat(m.length));
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    .replace(/\/\/[^\n]*/g, (m) => " ".repeat(m.length));
 
 if (bloques.length === 0) {
   console.error(
-    'check-shaders: no encontré ningún shader con la marca /* glsl *​/. ' +
-      'Si el archivo los declara de otro modo, este guard no está comprobando nada.',
+    "check-shaders: no encontré ningún shader con la marca /* glsl *​/. " +
+      "Si el archivo los declara de otro modo, este guard no está comprobando nada.",
   );
   process.exit(1);
 }
@@ -143,83 +166,101 @@ if (bloques.length === 0) {
  */
 const LITERALES_LEGITIMOS = [
   // Identidad y normalización a 0..1: estructura pura, válidos en cualquier sitio.
-  { valor: '0.0', en: /./ },
-  { valor: '1.0', en: /./ },
-  { valor: '1.000' , en: /./ },
+  { valor: "0.0", en: /./ },
+  { valor: "1.0", en: /./ },
+  { valor: "1.000", en: /./ },
   // Centrado respecto a la mitad (UV 0..1 y puntero -1..1) y umbral de ACTIVO/INACTIVO
   // de los emblemas de facción (una cuenta de facciones llega como 0 o 1, así que el
   // corte es 0.5 por construcción, no una perilla).
-  { valor: '0.5', en: /-\s*0\.5\b|vec2\(0\.5\)|\*\s*0\.5\s*\+\s*0\.5|fract\([^)]*\)\s*-\s*0\.5|uFactionCounts\.\w\s*>\s*0\.5|uHasBackground\s*>\s*0\.5|activo\s*<\s*0\.5|float\(i\)\s*\*\s*0\.5|uCardSize\s*\*\s*0\.5|\/\s*size\s*\+\s*0\.5|uUseLayers\s*>\s*0\.5/ },
+  {
+    valor: "0.5",
+    en: /-\s*0\.5\b|vec2\(0\.5\)|\*\s*0\.5\s*\+\s*0\.5|fract\([^)]*\)\s*-\s*0\.5|uFactionCounts\.\w\s*>\s*0\.5|uHasBackground\s*>\s*0\.5|activo\s*<\s*0\.5|float\(i\)\s*\*\s*0\.5|uCardSize\s*\*\s*0\.5|\/\s*size\s*\+\s*0\.5|uUseLayers\s*>\s*0\.5/,
+  },
   // Color de fondo por defecto cuando no hay background (capas): gris muy oscuro.
-  { valor: '0.031', en: /vec3\(\s*0\.031,\s*0\.035,\s*0\.063\s*\)/ },
-  { valor: '0.035', en: /vec3\(\s*0\.031,\s*0\.035,\s*0\.063\s*\)/ },
-  { valor: '0.063', en: /vec3\(\s*0\.031,\s*0\.035,\s*0\.063\s*\)/ },
+  { valor: "0.031", en: /vec3\(\s*0\.031,\s*0\.035,\s*0\.063\s*\)/ },
+  { valor: "0.035", en: /vec3\(\s*0\.031,\s*0\.035,\s*0\.063\s*\)/ },
+  { valor: "0.063", en: /vec3\(\s*0\.031,\s*0\.035,\s*0\.063\s*\)/ },
   // Mezcla del degradado por defecto (estructura, no perilla).
-  { valor: '0.55', en: /mix\(\s*uSecondary,\s*mix\(\s*uAccent,\s*vec3\([^)]*\),\s*vUv\.y\s*\),\s*0\.55\s*\)/ },
-  { valor: '2.0', en: /\*\s*2\.0\b|\/\s*2\.0\b/ },
+  {
+    valor: "0.55",
+    en: /mix\(\s*uSecondary,\s*mix\(\s*uAccent,\s*vec3\([^)]*\),\s*vUv\.y\s*\),\s*0\.55\s*\)/,
+  },
+  { valor: "2.0", en: /\*\s*2\.0\b|\/\s*2\.0\b/ },
   // Luminancia Rec.709: constante de la física del color, no un ajuste.
-  { valor: '0.2126', en: /\.2126|dot\(/ },
-  { valor: '0.7152', en: /\.7152|dot\(/ },
-  { valor: '0.0722', en: /\.0722|dot\(/ },
+  { valor: "0.2126", en: /\.2126|dot\(/ },
+  { valor: "0.7152", en: /\.7152|dot\(/ },
+  { valor: "0.0722", en: /\.0722|dot\(/ },
   // Cota superior del color del metal del logo (clamp), no una perilla.
-  { valor: '1.6', en: /clamp\([^;]*,\s*1\.6\s*\)/ },
+  { valor: "1.6", en: /clamp\([^;]*,\s*1\.6\s*\)/ },
   // Matiz del barniz: vec3(1.0, 0.99, 0.97), la desviación del blanco.
-  { valor: '0.99', en: /vec3\(1\.0,\s*0\.99,\s*0\.97\)/ },
-  { valor: '0.97', en: /vec3\(1\.0,\s*0\.99,\s*0\.97\)/ },
+  { valor: "0.99", en: /vec3\(1\.0,\s*0\.99,\s*0\.97\)/ },
+  { valor: "0.97", en: /vec3\(1\.0,\s*0\.99,\s*0\.97\)/ },
   // Umbral de "hay capa que evaluar": evita calcular una máscara vacía.
-  { valor: '0.001', en: />\s*0\.001/ },
+  { valor: "0.001", en: />\s*0\.001/ },
   // CONSTANTES DEL HASH (hash21): son la definición del generador de ruido, no perillas.
   // Los números irracionales grandes decorrelacionan celdas vecinas; sin ellos la
   // interpolación dibuja una rejilla visible. Cambiarlos NO ajusta el efecto: lo rompe.
-  { valor: '123.34', en: /fract\(\s*p\s*\*\s*vec2\(\s*123\.34,\s*456\.21\s*\)\s*\)/ },
-  { valor: '456.21', en: /fract\(\s*p\s*\*\s*vec2\(\s*123\.34,\s*456\.21\s*\)\s*\)/ },
-  { valor: '45.32', en: /dot\(\s*p,\s*p\s*\+\s*45\.32\s*\)/ },
+  {
+    valor: "123.34",
+    en: /fract\(\s*p\s*\*\s*vec2\(\s*123\.34,\s*456\.21\s*\)\s*\)/,
+  },
+  {
+    valor: "456.21",
+    en: /fract\(\s*p\s*\*\s*vec2\(\s*123\.34,\s*456\.21\s*\)\s*\)/,
+  },
+  { valor: "45.32", en: /dot\(\s*p,\s*p\s*\+\s*45\.32\s*\)/ },
   // Suavizado polinómico estándar entre celdas del ruido: f*f*(3-2f). Es la curva de
   // interpolación (estructura matemática), no una intensidad ajustable.
-  { valor: '3.0', en: /f\s*\*\s*f\s*\*\s*\(\s*3\.0\s*-\s*2\.0\s*\*\s*f\s*\)/ },
-  { valor: '2.0', en: /f\s*\*\s*f\s*\*\s*\(\s*3\.0\s*-\s*2\.0\s*\*\s*f\s*\)/ },
+  { valor: "3.0", en: /f\s*\*\s*f\s*\*\s*\(\s*3\.0\s*-\s*2\.0\s*\*\s*f\s*\)/ },
+  { valor: "2.0", en: /f\s*\*\s*f\s*\*\s*\(\s*3\.0\s*-\s*2\.0\s*\*\s*f\s*\)/ },
   // COTA del techo HDR: evita dividir por cero si el techo llega a 0. Es protección del
   // cálculo, no un ajuste (el techo real vive en HDR.lightCeiling).
-  { valor: '0.05', en: /max\(\s*uHdrCeiling,\s*0\.05\s*\)/ },
+  { valor: "0.05", en: /max\(\s*uHdrCeiling,\s*0\.05\s*\)/ },
   // SUELO del ruido al usarlo como perturbación de normal del espejo: evita dividir por
   // cero cuando la textura de superficie está apagada. Protección, no ajuste.
-  { valor: '0.05', en: /max\(\s*uBgNoiseStrength,\s*0\.05\s*\)/ },
+  { valor: "0.05", en: /max\(\s*uBgNoiseStrength,\s*0\.05\s*\)/ },
   // SUELO del gris medio del entorno al normalizar el reflejo: evita dividir por cero si la
   // imagen de entorno fuese negra. Protección del cálculo, no un ajuste (el gris real vive
   // en METAL_REFLECT.envMean).
-  { valor: '0.05', en: /max\(\s*gris,\s*vec3\(\s*0\.05\s*\)\)/ },
+  { valor: "0.05", en: /max\(\s*gris,\s*vec3\(\s*0\.05\s*\)\)/ },
   // RUIDO DEL GLOW: persistencia de amplitud, lacunaridad de frecuencia y suelo de
   // normalización. Son constantes del generador de humo procedural, no perillas.
-  { valor: '0.5', en: /amp\s*=\s*0\.5|amp\s*=\s*amp\s*\*\s*0\.5|amp\s*\*=\s*0\.5/ },
-  { valor: '2.0', en: /freq\s*=\s*freq\s*\*\s*2\.0|freq\s*\*=\s*2\.0/ },
-  { valor: '0.001', en: /max\(norma,\s*0\.001\)/ },
+  {
+    valor: "0.5",
+    en: /amp\s*=\s*0\.5|amp\s*=\s*amp\s*\*\s*0\.5|amp\s*\*=\s*0\.5/,
+  },
+  { valor: "2.0", en: /freq\s*=\s*freq\s*\*\s*2\.0|freq\s*\*=\s*2\.0/ },
+  { valor: "0.001", en: /max\(norma,\s*0\.001\)/ },
   // Suelo del normalize de la deriva radial del humo: evita división por cero
   // en el centro exacto (0.5, 0.5), donde uv - vec2(0.5) es vec2(0.0).
-  { valor: '0.001', en: /vec2\(0\.001\)/ },
+  { valor: "0.001", en: /vec2\(0\.001\)/ },
   // RUIDO DEL HUMO (valueNoise/fbm): curva quíntica f*f*f*(f*(f*6-15)+10), matriz de giro de
   // 36,87 grados (0.8/0.6 por construcción: 3-4-5), lacunaridad 2.02 y desfases que
   // decorrelacionan octavas y campos de la distorsión. Son la definición del generador, no
   // perillas: cambiarlos no ajusta el efecto, lo rompe o dibuja rejillas.
-  { valor: '6.0', en: /f\s*\*\s*\(\s*f\s*\*\s*6\.0\s*-\s*15\.0\s*\)\s*\+\s*10\.0/ },
-  { valor: '15.0', en: /f\s*\*\s*6\.0\s*-\s*15\.0/ },
-  { valor: '10.0', en: /-\s*15\.0\s*\)\s*\+\s*10\.0/ },
-  { valor: '0.8', en: /mat2\(\s*0\.8,\s*-0\.6,\s*0\.6,\s*0\.8\s*\)/ },
-  { valor: '0.6', en: /mat2\(\s*0\.8,\s*-0\.6,\s*0\.6,\s*0\.8\s*\)/ },
-  { valor: '2.02', en: /giro\s*\*\s*p\s*\*\s*2\.02/ },
-  { valor: '17.0', en: /vec2\(\s*17\.0,\s*9\.0\s*\)/ },
-  { valor: '9.0', en: /vec2\(\s*17\.0,\s*9\.0\s*\)/ },
-  { valor: '5.2', en: /vec2\(\s*5\.2,\s*1\.3\s*\)/ },
-  { valor: '1.3', en: /vec2\(\s*5\.2,\s*1\.3\s*\)/ },
+  {
+    valor: "6.0",
+    en: /f\s*\*\s*\(\s*f\s*\*\s*6\.0\s*-\s*15\.0\s*\)\s*\+\s*10\.0/,
+  },
+  { valor: "15.0", en: /f\s*\*\s*6\.0\s*-\s*15\.0/ },
+  { valor: "10.0", en: /-\s*15\.0\s*\)\s*\+\s*10\.0/ },
+  { valor: "0.8", en: /mat2\(\s*0\.8,\s*-0\.6,\s*0\.6,\s*0\.8\s*\)/ },
+  { valor: "0.6", en: /mat2\(\s*0\.8,\s*-0\.6,\s*0\.6,\s*0\.8\s*\)/ },
+  { valor: "2.02", en: /giro\s*\*\s*p\s*\*\s*2\.02/ },
+  { valor: "17.0", en: /vec2\(\s*17\.0,\s*9\.0\s*\)/ },
+  { valor: "9.0", en: /vec2\(\s*17\.0,\s*9\.0\s*\)/ },
+  { valor: "5.2", en: /vec2\(\s*5\.2,\s*1\.3\s*\)/ },
+  { valor: "1.3", en: /vec2\(\s*5\.2,\s*1\.3\s*\)/ },
   // HUMO ESPECTRAL DEL GLOW: modulación de intensidad y tinte del brillo.
   // Son perillas de la config escritas directamente por `f()`; sin una regla
   // explícita el guard las ve como literales sueltos.
-  { valor: '0.22', en: /smokeMod\s*=\s*0\.22\s*\*/ },
-  { valor: '0.45', en: /uSpectralMix\s*\*\s*smoke/ },
-  { valor: '0.4', en: /smoke\s*\*\s*0\.4/ },
-  { valor: '0.6', en: /warpOffset\s*\*\s*0\.6/ },
+  { valor: "0.22", en: /smokeMod\s*=\s*0\.22\s*\*/ },
+  { valor: "0.45", en: /uSpectralMix\s*\*\s*smoke/ },
+  { valor: "0.4", en: /smoke\s*\*\s*0\.4/ },
+  { valor: "0.6", en: /warpOffset\s*\*\s*0\.6/ },
   // CENTRO del UV: la proyección de esfera del reflejo se pivota en el medio de la carta.
   // Es geometría, no una intensidad (y la fuerza del reflejo va por uMetalReflect).
-  { valor: '0.5', en: /uv\s*-\s*vec2\(\s*0\.5\s*\)|0\.5\s*\+\s*dir/ },
+  { valor: "0.5", en: /uv\s*-\s*vec2\(\s*0\.5\s*\)|0\.5\s*\+\s*dir/ },
 ];
 
 const problemas = [];
@@ -242,8 +283,8 @@ for (const { cuerpo, linea } of bloques) {
 
   const declarados = new Set();
   for (const decl of limpio.matchAll(/\buniform\s+\w+\s+([^;]+);/g)) {
-    for (const nombre of decl[1].split(',')) {
-      const sucio = nombre.trim().replace(/\[.*\]$/, '');
+    for (const nombre of decl[1].split(",")) {
+      const sucio = nombre.trim().replace(/\[.*\]$/, "");
       // Un nombre de uniform es un identificador; si trae espacios o símbolos es
       // texto que se coló, no una declaración.
       if (/^[A-Za-z_]\w*$/.test(sucio)) declarados.add(sucio);
@@ -281,7 +322,7 @@ for (const { cuerpo, linea } of bloques) {
     problemas.push(
       `interpolación sin f()/vec3() en el shader que empieza en la línea ${linea}: ` +
         `\${${interp[1]}} — un entero sale sin el .0 y GLSL ES 3.0 no lo promociona ` +
-        '(la carta sale negra en el navegador)',
+        "(la carta sale negra en el navegador)",
     );
   }
 
@@ -293,19 +334,21 @@ for (const { cuerpo, linea } of bloques) {
    * shader. Solo se miran literales con punto (un entero suelto es casi siempre un
    * índice) y se ignoran los comentarios, porque ahí el número es documentación.
    */
-  for (const [i, l] of cuerpo.split('\n').entries()) {
+  for (const [i, l] of cuerpo.split("\n").entries()) {
     // Se QUITAN las interpolaciones (que ya vienen de la config) en vez de saltar la
     // línea entera: saltarla escondía el caso más común, una línea con un `f()` legítimo
     // Y una perilla suelta a la vez (p. ej. `uTilt.y * 1.4 + uTime * ${f(...)}`).
-    const sinConfig = l.replace(/\$\{[^}]*\}/g, ' ');
+    const sinConfig = l.replace(/\$\{[^}]*\}/g, " ");
     if (/^\s*(\*|\/\/|\/\*)/.test(sinConfig)) continue; // comentario
     for (const lit of sinConfig.matchAll(/(?<![\w$.])(\d+\.\d+)(?![\w.])/g)) {
-      const legitimo = LITERALES_LEGITIMOS.some((r) => r.valor === lit[1] && r.en.test(sinConfig));
+      const legitimo = LITERALES_LEGITIMOS.some(
+        (r) => r.valor === lit[1] && r.en.test(sinConfig),
+      );
       if (legitimo) continue;
       problemas.push(
         `literal ${lit[1]} suelto en el shader que empieza en la línea ${linea} ` +
           `(línea ${linea + i}): si es una perilla del efecto, va en card3d-config.ts; ` +
-          'si es estructura, añádelo a LITERALES_LEGITIMOS con SU construcción justificada',
+          "si es estructura, añádelo a LITERALES_LEGITIMOS con SU construcción justificada",
       );
     }
   }
@@ -335,12 +378,14 @@ for (const { cuerpo, linea } of bloques) {
  * otro (los dos shaders de un material comparten el objeto).
  */
 if (existsSync(rutaDeclarante)) {
-  const declarante = readFileSync(rutaDeclarante, 'utf8');
+  const declarante = readFileSync(rutaDeclarante, "utf8");
   const enShaders = new Set();
   for (const { cuerpo } of bloques) {
-    for (const decl of sinComentarios(cuerpo).matchAll(/\buniform\s+\w+\s+([^;]+);/g)) {
-      for (const nombre of decl[1].split(',')) {
-        const limpio = nombre.trim().replace(/\[.*\]$/, '');
+    for (const decl of sinComentarios(cuerpo).matchAll(
+      /\buniform\s+\w+\s+([^;]+);/g,
+    )) {
+      for (const nombre of decl[1].split(",")) {
+        const limpio = nombre.trim().replace(/\[.*\]$/, "");
         if (limpio) enShaders.add(limpio);
       }
     }
@@ -349,15 +394,15 @@ if (existsSync(rutaDeclarante)) {
     const nombre = asignacion[1];
     if (!enShaders.has(nombre)) {
       problemas.push(
-        `${rutaDeclarante.split('/').pop()}: ${nombre} se crea como uniforme pero ningún ` +
-          'shader lo declara (se sube a la GPU cada frame y se ignora)',
+        `${rutaDeclarante.split("/").pop()}: ${nombre} se crea como uniforme pero ningún ` +
+          "shader lo declara (se sube a la GPU cada frame y se ignora)",
       );
     }
   }
 } else {
   problemas.push(
-    `no encuentro ${rutaDeclarante.split('/').pop()}: sin él no se puede comprobar que los ` +
-      'uniformes creados en CPU los lea algún shader',
+    `no encuentro ${rutaDeclarante.split("/").pop()}: sin él no se puede comprobar que los ` +
+      "uniformes creados en CPU los lea algún shader",
   );
 }
 
@@ -369,7 +414,7 @@ if (problemas.length > 0) {
 
 console.log(
   `check-shaders: OK — ${bloques.length} shader(s) sin uniforms sin declarar, sin uniforms ` +
-    'muertos, sin uniforms huérfanos en CPU, sin perillas sueltas (todo valor ajustable ' +
-    'vive en card3d-config.ts) y con los números de la config como literal flotante ' +
-    '(el backtick suelto en comentarios lo cubre tsc)',
+    "muertos, sin uniforms huérfanos en CPU, sin perillas sueltas (todo valor ajustable " +
+    "vive en card3d-config.ts) y con los números de la config como literal flotante " +
+    "(el backtick suelto en comentarios lo cubre tsc)",
 );

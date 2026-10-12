@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Contexto del idioma de la interfaz.
  *
@@ -7,10 +7,25 @@
  * (`elegirLocale`). Sin proveedor, `useI18n` devuelve el español: los componentes y sus pruebas
  * funcionan sin envolver nada.
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
-import { BCP47, CLAVE_IDIOMA, LOCALE_POR_DEFECTO, elegirLocale, esLocale, type Locale } from './locales';
-import { traducir, type Clave, type Variables } from './mensajes';
+import {
+  BCP47,
+  CLAVE_IDIOMA,
+  LOCALE_POR_DEFECTO,
+  elegirLocale,
+  esLocale,
+  type Locale,
+} from "./locales";
+import { traducir, type Clave, type Variables } from "./mensajes";
 
 export interface ContextoI18n {
   locale: Locale;
@@ -34,12 +49,27 @@ function leerGuardado(): string | null {
   }
 }
 
-export function I18nProvider({ children, inicial }: { children: ReactNode; inicial?: Locale }) {
-  const [locale, setLocaleEstado] = useState<Locale>(inicial ?? LOCALE_POR_DEFECTO);
+export function I18nProvider({
+  children,
+  inicial,
+}: {
+  children: ReactNode;
+  inicial?: Locale;
+}) {
+  const [locale, setLocaleEstado] = useState<Locale>(
+    inicial ?? LOCALE_POR_DEFECTO,
+  );
 
   useEffect(() => {
     if (inicial) return;
-    setLocaleEstado(elegirLocale(leerGuardado(), navigator.languages?.length ? navigator.languages : [navigator.language]));
+    setLocaleEstado(
+      elegirLocale(
+        leerGuardado(),
+        navigator.languages?.length
+          ? navigator.languages
+          : [navigator.language],
+      ),
+    );
   }, [inicial]);
 
   useEffect(() => {
@@ -57,7 +87,11 @@ export function I18nProvider({ children, inicial }: { children: ReactNode; inici
   }, []);
 
   const valor = useMemo<ContextoI18n>(
-    () => ({ locale, setLocale, t: (clave, variables) => traducir(locale, clave, variables) }),
+    () => ({
+      locale,
+      setLocale,
+      t: (clave, variables) => traducir(locale, clave, variables),
+    }),
     [locale, setLocale],
   );
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;

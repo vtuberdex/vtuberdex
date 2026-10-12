@@ -1,6 +1,6 @@
-'use client';
+"use client";
 /** Paginación simple con ventana de páginas. */
-import { useI18n } from '@/lib/i18n';
+import { useI18n } from "@/lib/i18n";
 
 export interface PaginationProps {
   page: number;
@@ -24,18 +24,30 @@ export function Pagination({ page, pageCount, onPage }: PaginationProps) {
   const buttonClass = (active: boolean) =>
     `min-w-9 rounded-lg border px-3 py-1.5 font-mono text-xs transition-colors ${
       active
-        ? 'border-dex-accent bg-dex-accent/15 text-dex-accent'
-        : 'border-dex-line text-dex-muted hover:border-dex-accent/50 hover:text-dex-ink'
+        ? "border-dex-accent bg-dex-accent/15 text-dex-accent"
+        : "border-dex-line text-dex-muted hover:border-dex-accent/50 hover:text-dex-ink"
     }`;
 
   return (
-    <nav className="mt-4 flex flex-wrap items-center justify-center gap-2" aria-label={t('paginacion.etiqueta')}>
-      <button type="button" onClick={() => onPage(page - 1)} disabled={page <= 1} className={buttonClass(false)}>
-        {t('paginacion.anterior')}
+    <nav
+      className="mt-4 flex flex-wrap items-center justify-center gap-2"
+      aria-label={t("paginacion.etiqueta")}
+    >
+      <button
+        type="button"
+        onClick={() => onPage(page - 1)}
+        disabled={page <= 1}
+        className={buttonClass(false)}
+      >
+        {t("paginacion.anterior")}
       </button>
       {pages[0] > 1 && (
         <>
-          <button type="button" onClick={() => onPage(1)} className={buttonClass(page === 1)}>
+          <button
+            type="button"
+            onClick={() => onPage(1)}
+            className={buttonClass(page === 1)}
+          >
             1
           </button>
           {pages[0] > 2 && <span className="text-dex-muted">…</span>}
@@ -46,7 +58,7 @@ export function Pagination({ page, pageCount, onPage }: PaginationProps) {
           key={value}
           type="button"
           onClick={() => onPage(value)}
-          aria-current={value === page ? 'page' : undefined}
+          aria-current={value === page ? "page" : undefined}
           className={buttonClass(value === page)}
         >
           {value}
@@ -54,14 +66,25 @@ export function Pagination({ page, pageCount, onPage }: PaginationProps) {
       ))}
       {pages[pages.length - 1] < pageCount && (
         <>
-          {pages[pages.length - 1] < pageCount - 1 && <span className="text-dex-muted">…</span>}
-          <button type="button" onClick={() => onPage(pageCount)} className={buttonClass(page === pageCount)}>
+          {pages[pages.length - 1] < pageCount - 1 && (
+            <span className="text-dex-muted">…</span>
+          )}
+          <button
+            type="button"
+            onClick={() => onPage(pageCount)}
+            className={buttonClass(page === pageCount)}
+          >
             {pageCount}
           </button>
         </>
       )}
-      <button type="button" onClick={() => onPage(page + 1)} disabled={page >= pageCount} className={buttonClass(false)}>
-        {t('paginacion.siguiente')}
+      <button
+        type="button"
+        onClick={() => onPage(page + 1)}
+        disabled={page >= pageCount}
+        className={buttonClass(false)}
+      >
+        {t("paginacion.siguiente")}
       </button>
     </nav>
   );

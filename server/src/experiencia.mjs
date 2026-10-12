@@ -1,4 +1,4 @@
-import { rachaDe, rangoDeGrado } from './premium.mjs';
+import { rachaDe, rangoDeGrado } from "./premium.mjs";
 
 /**
  * Experiencia de un VTuber: cómo los likes la hacen subir.
@@ -96,10 +96,16 @@ export function multiplicadorPremium(grado) {
 
 /** Días enteros desde `desde` (`AAAA-MM-DD` o `AAAA-MM-DD HH:MM:SS`, UTC) hasta `hasta`; 0 si falta una o es futura. */
 export function diasEntre(desde, hasta = new Date()) {
-  const texto = String(desde ?? '').trim().replace(' ', 'T');
-  const inicio = Date.parse(texto.includes('T') ? `${texto}Z` : `${texto}T00:00:00Z`);
+  const texto = String(desde ?? "")
+    .trim()
+    .replace(" ", "T");
+  const inicio = Date.parse(
+    texto.includes("T") ? `${texto}Z` : `${texto}T00:00:00Z`,
+  );
   const fin = hasta instanceof Date ? hasta.getTime() : Date.parse(hasta);
-  return Number.isFinite(inicio) && Number.isFinite(fin) ? Math.max(0, Math.floor((fin - inicio) / 86_400_000)) : 0;
+  return Number.isFinite(inicio) && Number.isFinite(fin)
+    ? Math.max(0, Math.floor((fin - inicio) / 86_400_000))
+    : 0;
 }
 
 /**
@@ -109,16 +115,36 @@ export function diasEntre(desde, hasta = new Date()) {
  *   `dias` es la antigüedad en el sitio; `ahora` (`AAAA-MM-DD`) fija la fecha de la racha.
  * @returns lo mismo que `experienciaConLikes`, más `desglose` con lo que aportó cada fuente.
  */
-export function experienciaDeFicha({ likes = 0, xpJuego = 0, dias = 0, premium = null, ahora } = {}) {
+export function experienciaDeFicha({
+  likes = 0,
+  xpJuego = 0,
+  dias = 0,
+  premium = null,
+  ahora,
+} = {}) {
   const totalLikes = Math.max(0, entero(likes, 0));
   const xpLikes = totalLikes * XP_POR_LIKE;
-  const xpAntiguedad = Math.min(Math.max(0, entero(dias, 0)), ANTIGUEDAD_TOPE_DIAS) * XP_POR_DIA;
+  const xpAntiguedad =
+    Math.min(Math.max(0, entero(dias, 0)), ANTIGUEDAD_TOPE_DIAS) * XP_POR_DIA;
   const xpPartida = Math.max(0, entero(xpJuego, 0));
   const multiplicador = multiplicadorPremium(premium?.grade);
-  const xpRacha = Math.min(rachaDe(premium, ahora), RACHA_TOPE_MESES) * XP_POR_MES_RACHA;
-  const total = Math.round((xpLikes + xpAntiguedad + xpPartida) * multiplicador) + xpRacha;
+  const xpRacha =
+    Math.min(rachaDe(premium, ahora), RACHA_TOPE_MESES) * XP_POR_MES_RACHA;
+  const total =
+    Math.round((xpLikes + xpAntiguedad + xpPartida) * multiplicador) + xpRacha;
   const exp = experienciaConLikes({}, 0, total);
-  return { ...exp, likes: totalLikes, desglose: { likes: xpLikes, antiguedad: xpAntiguedad, juego: xpPartida, multiplicador, racha: xpRacha, total } };
+  return {
+    ...exp,
+    likes: totalLikes,
+    desglose: {
+      likes: xpLikes,
+      antiguedad: xpAntiguedad,
+      juego: xpPartida,
+      multiplicador,
+      racha: xpRacha,
+      total,
+    },
+  };
 }
 
 /** Tope de niveles por cálculo: corta cualquier entrada absurda (`max` ínfimo, likes enormes). */
@@ -129,7 +155,10 @@ export function umbralDeNivel(nivel) {
   return BASE_NIVEL + PASO_NIVEL * (Math.max(1, nivel) - 1);
 }
 
-const entero = (valor, porDefecto) => (Number.isFinite(Number(valor)) && valor !== null ? Math.trunc(Number(valor)) : porDefecto);
+const entero = (valor, porDefecto) =>
+  Number.isFinite(Number(valor)) && valor !== null
+    ? Math.trunc(Number(valor))
+    : porDefecto;
 
 /**
  * Nivel y barra de experiencia resultantes de sumar `likes` a la base de la ficha.
@@ -150,10 +179,22 @@ export function experienciaConLikes(base, likes, xpJuego = 0) {
   // Lo que valieron los niveles que la ficha ya traía + su barra + los likes + el juego: no se reinicia nunca.
   let total = actualBase + totalLikes * XP_POR_LIKE + extra;
   for (let n = 1; n < nivelBase; n += 1) total += umbralDeNivel(n);
-  for (let vueltas = 0; actual >= max && vueltas < MAX_NIVELES_POR_CALCULO; vueltas += 1) {
+  for (
+    let vueltas = 0;
+    actual >= max && vueltas < MAX_NIVELES_POR_CALCULO;
+    vueltas += 1
+  ) {
     actual -= max;
     nivel += 1;
     max = Math.max(max, umbralDeNivel(nivel));
   }
-  return { level: nivel, current: actual, max, total, nivelesGanados: nivel - nivelBase, likes: totalLikes, xpPorLike: XP_POR_LIKE };
+  return {
+    level: nivel,
+    current: actual,
+    max,
+    total,
+    nivelesGanados: nivel - nivelBase,
+    likes: totalLikes,
+    xpPorLike: XP_POR_LIKE,
+  };
 }

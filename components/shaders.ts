@@ -18,7 +18,7 @@
  * el reverso nunca entraba en cuadro y su contorno solo servía para asomar por los
  * cantos.
  */
-import * as CFG from '@/components/card3d-config';
+import * as CFG from "@/components/card3d-config";
 
 /**
  * Número de la config como literal FLOTANTE de GLSL.
@@ -39,7 +39,7 @@ import * as CFG from '@/components/card3d-config';
 const f = (n: number): string => (Number.isInteger(n) ? `${n}.0` : String(n));
 
 /** Trío de números de la config como literal `vec3(...)` de GLSL. */
-const vec3 = (v: readonly number[]): string => `vec3(${v.map(f).join(', ')})`;
+const vec3 = (v: readonly number[]): string => `vec3(${v.map(f).join(", ")})`;
 
 /**
  * `wavelengthToRgb` GENERADA desde SPECTRUM.stops.
@@ -63,15 +63,17 @@ const SPECTRUM_FN = (() => {
   const corte = (i: number) => f(Number(((i + 1) * paso).toFixed(4)));
   const base = (i: number) => f(Number((i * paso).toFixed(4)));
   const lineas = paradas.slice(0, -1).map((s, i) => {
-    const origen = i === 0 ? 'w' : `(w - ${base(i)})`;
+    const origen = i === 0 ? "w" : `(w - ${base(i)})`;
     const cuerpo = `mix(${s.name}, ${paradas[i + 1].name}, ${origen} / ${f(Number(paso.toFixed(4)))})`;
     // El último tramo cubre hasta 1.0 inclusive: es el retorno final.
-    return i === n - 2 ? `    return ${cuerpo};` : `    if (w < ${corte(i)}) return ${cuerpo};`;
+    return i === n - 2
+      ? `    return ${cuerpo};`
+      : `    if (w < ${corte(i)}) return ${cuerpo};`;
   });
   return `  vec3 wavelengthToRgb(float w) {
     w = clamp(w, 0.0, 1.0);
-${paradas.map((s) => `    vec3 ${s.name} = ${vec3(s.rgb)};`).join('\n')}
-${lineas.join('\n')}
+${paradas.map((s) => `    vec3 ${s.name} = ${vec3(s.rgb)};`).join("\n")}
+${lineas.join("\n")}
   }`;
 })();
 
@@ -82,8 +84,12 @@ ${lineas.join('\n')}
  * reparten (dos emblemas en la cabecera), no dónde están. El tamaño es un `vec2` porque el UV
  * de la carta no es cuadrado: un emblema cuadrado mide distinto en cada eje.
  */
-const FACTION_SLOTS = CFG.FACTION.slots.map((s, i) => `        slots[${i}] = vec2(${f(s.x)}, ${f(s.y)});`).join('\n');
-const FACTION_SIZES = CFG.FACTION.slots.map((s, i) => `        sizes[${i}] = vec2(${f(s.w)}, ${f(s.h)});`).join('\n');
+const FACTION_SLOTS = CFG.FACTION.slots
+  .map((s, i) => `        slots[${i}] = vec2(${f(s.x)}, ${f(s.y)});`)
+  .join("\n");
+const FACTION_SIZES = CFG.FACTION.slots
+  .map((s, i) => `        sizes[${i}] = vec2(${f(s.w)}, ${f(s.h)});`)
+  .join("\n");
 
 export const cardVertexShader = /* glsl */ `
   uniform vec2 uPointer;

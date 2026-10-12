@@ -1,4 +1,4 @@
-import type { EditorForm } from '@/components/admin/form-model';
+import type { EditorForm } from "@/components/admin/form-model";
 
 /** Lo que recibe cada paso del asistente: el formulario compartido y cómo cambiarlo. */
 export interface StepProps {

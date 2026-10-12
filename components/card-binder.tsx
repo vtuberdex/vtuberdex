@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * El libro de cartas del catálogo: las 8 cartas de la página en UNA escena WebGL, como
  * un álbum abierto con dos hojas de 4 fundas, y el paso de página como una hoja que
@@ -42,23 +42,38 @@
  * ACCESIBILIDAD: el canvas no expone las cartas al lector de pantalla, así que se añade una lista
  * `sr-only` de enlaces (también es lo que ve un rastreador sin JS).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-import { marcarAbriendo } from '@/lib/abriendo-detalle';
-import { useI18n } from '@/lib/i18n';
-import { Canvas, useFrame, useThree, type RootState, type ThreeEvent } from '@react-three/fiber';
-import * as THREE from 'three';
+import { marcarAbriendo } from "@/lib/abriendo-detalle";
+import { useI18n } from "@/lib/i18n";
+import {
+  Canvas,
+  useFrame,
+  useThree,
+  type RootState,
+  type ThreeEvent,
+} from "@react-three/fiber";
+import * as THREE from "three";
 
-import type { VtuberCard } from '@/lib/types';
-import * as CFG from '@/components/card3d-config';
-import { BINDER } from '@/components/card3d-config';
-import { CardMeshes, Rig, WebGLBoundary, usePointerTilt } from '@/components/holo-card';
-import { RenderGovernor } from '@/components/render-governor';
-import { esFichaDeteriorada } from '@/lib/premium';
-import { useWebGLRecovery } from '@/components/webgl-recovery';
-import { CardEnvContext, useCardMaterials, useSharedCardEnv } from '@/components/card-material';
+import type { VtuberCard } from "@/lib/types";
+import * as CFG from "@/components/card3d-config";
+import { BINDER } from "@/components/card3d-config";
+import {
+  CardMeshes,
+  Rig,
+  WebGLBoundary,
+  usePointerTilt,
+} from "@/components/holo-card";
+import { RenderGovernor } from "@/components/render-governor";
+import { esFichaDeteriorada } from "@/lib/premium";
+import { useWebGLRecovery } from "@/components/webgl-recovery";
+import {
+  CardEnvContext,
+  useCardMaterials,
+  useSharedCardEnv,
+} from "@/components/card-material";
 import {
   advanceFlip,
   bookDimensions,
@@ -73,8 +88,8 @@ import {
   type FlipDir,
   type Placement,
   type Side,
-} from '@/components/card-binder-layout';
-import { ShaderWarmup } from '@/components/shader-warmup';
+} from "@/components/card-binder-layout";
+import { ShaderWarmup } from "@/components/shader-warmup";
 
 export interface CardBinderProps {
   items: VtuberCard[];
@@ -143,12 +158,20 @@ interface BinderCardProps {
   onOpen: (card: VtuberCard) => void;
 }
 
-function BinderCard({ placement, frame, textureWidth, onOpen }: BinderCardProps) {
+function BinderCard({
+  placement,
+  frame,
+  textureWidth,
+  onOpen,
+}: BinderCardProps) {
   const group = useRef<THREE.Group>(null);
   const hovered = useRef(false);
   const lift = useRef(0);
   const local = useMemo(() => new THREE.Matrix4(), []);
-  const position = useMemo(() => slotPosition(placement.slot), [placement.slot]);
+  const position = useMemo(
+    () => slotPosition(placement.slot),
+    [placement.slot],
+  );
   const mats = useCardMaterials(placement.card, {
     holo: CFG.INTENSITY.holo.tile,
     gloss: CFG.INTENSITY.gloss.tile,
@@ -157,7 +180,7 @@ function BinderCard({ placement, frame, textureWidth, onOpen }: BinderCardProps)
 
   useEffect(
     () => () => {
-      if (hovered.current) document.body.style.cursor = '';
+      if (hovered.current) document.body.style.cursor = "";
     },
     [],
   );
@@ -166,16 +189,23 @@ function BinderCard({ placement, frame, textureWidth, onOpen }: BinderCardProps)
     frame.advance(state, delta);
     const g = group.current;
     if (!g) return;
-    const liftTarget = hovered.current && placement.role === 'static' ? BINDER.hoverLift : 0;
-    lift.current += (liftTarget - lift.current) * (1 - Math.pow(BINDER.hoverDampingBase, delta));
+    const liftTarget =
+      hovered.current && placement.role === "static" ? BINDER.hoverLift : 0;
+    lift.current +=
+      (liftTarget - lift.current) *
+      (1 - Math.pow(BINDER.hoverDampingBase, delta));
 
     let visible = mats.ready;
     let tiltY = frame.book.y;
-    if (placement.role === 'static') {
+    if (placement.role === "static") {
       staticCardMatrix(position, lift.current, g.matrix);
       visible = visible && isStaticCardVisible(placement.reveal, frame.theta);
     } else {
-      sheetCardLocalMatrix(position, placement.role === 'sheet-front' ? 'front' : 'back', local);
+      sheetCardLocalMatrix(
+        position,
+        placement.role === "sheet-front" ? "front" : "back",
+        local,
+      );
       g.matrix.multiplyMatrices(frame.sheet, local);
       // El holograma «barre» la carta con el ángulo de su hoja: es lo que hace que el giro
       // se lea como una lámina real que cambia de brillo al moverse.
@@ -185,7 +215,8 @@ function BinderCard({ placement, frame, textureWidth, onOpen }: BinderCardProps)
     g.visible = visible;
     // Una carta oculta no se dibuja: actualizar sus uniforms en cada frame es trabajo perdido.
     // Al volver a ser visible se actualiza ese mismo frame, antes de pintarse.
-    if (visible) mats.tick(frame.time, frame.pointer, { x: frame.book.x, y: tiltY });
+    if (visible)
+      mats.tick(frame.time, frame.pointer, { x: frame.book.x, y: tiltY });
   });
 
   const onClick = (event: ThreeEvent<MouseEvent>) => {
@@ -196,11 +227,11 @@ function BinderCard({ placement, frame, textureWidth, onOpen }: BinderCardProps)
   const onPointerOver = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
     hovered.current = true;
-    document.body.style.cursor = 'pointer';
+    document.body.style.cursor = "pointer";
   };
   const onPointerOut = () => {
     hovered.current = false;
-    document.body.style.cursor = '';
+    document.body.style.cursor = "";
   };
 
   return (
@@ -237,10 +268,21 @@ function cameraTarget(focus: Focus, aspect: number) {
   const tan = Math.tan(halfFov);
   const byHeight = pageH / 2 / tan;
   const byWidth = pageW / 2 / (tan * Math.max(0.2, aspect));
-  return { x: focus === 'left' ? -pageCenterX : pageCenterX, z: Math.max(byHeight, byWidth) / BINDER.cameraFill };
+  return {
+    x: focus === "left" ? -pageCenterX : pageCenterX,
+    z: Math.max(byHeight, byWidth) / BINDER.cameraFill,
+  };
 }
 
-function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, onOpen }: BinderSceneProps) {
+function BinderScene({
+  placements,
+  flip,
+  ready,
+  focus,
+  textureWidth,
+  onFlipEnd,
+  onOpen,
+}: BinderSceneProps) {
   const env = useSharedCardEnv();
 
   const book = useRef<THREE.Group>(null);
@@ -289,7 +331,8 @@ function BinderScene({ placements, flip, ready, focus, textureWidth, onFlipEnd, 
         f.stamp = t;
         f.time = t;
         f.pointer = pointer.current;
-        if (f.token >= 0 && !f.done) f.progress = advanceFlip(f.progress, delta, f.ready);
+        if (f.token >= 0 && !f.done)
+          f.progress = advanceFlip(f.progress, delta, f.ready);
         f.theta = f.token >= 0 ? sheetAngle(f.dir, f.progress) : 0;
         sheetMatrix(f.theta, f.sheet);
         const b = book.current;
@@ -360,13 +403,13 @@ function BinderUnavailable() {
       className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl text-center text-sm text-dex-muted"
       style={{ background: BINDER.coverColor }}
     >
-      <p>{t('libro.noDisponible')}</p>
+      <p>{t("libro.noDisponible")}</p>
       <button
         type="button"
         onClick={() => window.location.reload()}
         className="rounded-full border border-dex-line px-4 py-1.5 text-dex-ink hover:border-dex-accent/60"
       >
-        {t('libro.recargar')}
+        {t("libro.recargar")}
       </button>
     </div>
   );
@@ -378,17 +421,29 @@ function BinderUnavailable() {
 
 const isTypingTarget = (target: EventTarget | null) => {
   const el = target as HTMLElement | null;
-  if (!el || typeof el.tagName !== 'string') return false;
+  if (!el || typeof el.tagName !== "string") return false;
   const tag = el.tagName.toUpperCase();
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    el.isContentEditable === true
+  );
 };
 
 /** Alto que ocupan cabecera, buscador, paginación y pie. Es una variable CSS (`globals.css`) porque en celular la barra de búsqueda se parte en dos filas. */
-const BINDER_CHROME = 'var(--binder-chrome)';
+const BINDER_CHROME = "var(--binder-chrome)";
 /** Ancho mínimo del libro cuando el viewport es muy bajo. */
-const BINDER_MIN_WIDTH = 'var(--binder-min-width)';
+const BINDER_MIN_WIDTH = "var(--binder-min-width)";
 
-export function CardBinder({ items, page, pageCount, loading, onPage, single = false }: CardBinderProps) {
+export function CardBinder({
+  items,
+  page,
+  pageCount,
+  loading,
+  onPage,
+  single = false,
+}: CardBinderProps) {
   const { t } = useI18n();
   const router = useRouter();
   /**
@@ -404,7 +459,7 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
   const threeD = mounted && recovery.canRender;
 
   // En una hoja, la cámara mira siempre la derecha: ahí viven las 4 cartas de la página.
-  const focus: Focus = single ? 'right' : null;
+  const focus: Focus = single ? "right" : null;
 
   const [flip, setFlip] = useState<Flip | null>(null);
   const previousPage = useRef(page);
@@ -423,7 +478,12 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
     previousPage.current = page;
     if (!threeD) return;
     tokens.current += 1;
-    setFlip({ dir, outgoing: shown.current, pending: items, token: tokens.current });
+    setFlip({
+      dir,
+      outgoing: shown.current,
+      pending: items,
+      token: tokens.current,
+    });
   }, [page, threeD, items]);
 
   useEffect(() => {
@@ -454,19 +514,29 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey
+      )
+        return;
       if (isTypingTarget(event.target)) return;
-      if (event.key === 'ArrowRight' && go(1)) event.preventDefault();
-      else if (event.key === 'ArrowLeft' && go(-1)) event.preventDefault();
+      if (event.key === "ArrowRight" && go(1)) event.preventDefault();
+      else if (event.key === "ArrowLeft" && go(-1)) event.preventDefault();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [go]);
 
   const gesture = useRef<{ x: number; y: number; id: number } | null>(null);
   const onPointerDown = (event: React.PointerEvent) => {
     if (event.button !== 0) return;
-    gesture.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
+    gesture.current = {
+      x: event.clientX,
+      y: event.clientY,
+      id: event.pointerId,
+    };
   };
   const onPointerUp = (event: React.PointerEvent) => {
     const start = gesture.current;
@@ -474,7 +544,8 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
     if (!start || start.id !== event.pointerId) return;
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-    if (Math.abs(dx) < BINDER.swipeMinPx || Math.abs(dx) <= Math.abs(dy) * 1.2) return;
+    if (Math.abs(dx) < BINDER.swipeMinPx || Math.abs(dx) <= Math.abs(dy) * 1.2)
+      return;
     go(dx < 0 ? 1 : -1);
   };
   const onPointerCancel = () => {
@@ -505,14 +576,14 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
   const frameW = focus ? pageW : spreadW;
 
   const arrowClass =
-    'absolute top-1/2 z-10 -translate-y-1/2 rounded-full border border-dex-line bg-dex-void/70 p-2 text-xl leading-none text-dex-muted backdrop-blur transition-colors hover:border-dex-accent/60 hover:text-dex-ink disabled:cursor-not-allowed disabled:opacity-30';
+    "absolute top-1/2 z-10 -translate-y-1/2 rounded-full border border-dex-line bg-dex-void/70 p-2 text-xl leading-none text-dex-muted backdrop-blur transition-colors hover:border-dex-accent/60 hover:text-dex-ink disabled:cursor-not-allowed disabled:opacity-30";
 
   return (
     <section
-      aria-label={t('libro.etiqueta', { page, total: pageCount })}
+      aria-label={t("libro.etiqueta", { page, total: pageCount })}
       data-testid="card-binder"
-      data-flipping={flip ? 'true' : 'false'}
-      data-single={single ? 'true' : 'false'}
+      data-flipping={flip ? "true" : "false"}
+      data-single={single ? "true" : "false"}
     >
       <div
         className="relative mx-auto select-none"
@@ -523,7 +594,10 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
           // pantalla. `BINDER_CHROME` reserva cabecera, buscador y paginación; el mínimo evita
           // que en una ventana muy baja las cartas queden ilegibles (ahí manda el scroll).
           width: `min(100%, max(${BINDER_MIN_WIDTH}, calc((100dvh - ${BINDER_CHROME}) * ${frameW / pageH})))`,
-          touchAction: 'pan-y', opacity: loading && !flip ? 0.6 : 1, transition: 'opacity 200ms' }}
+          touchAction: "pan-y",
+          opacity: loading && !flip ? 0.6 : 1,
+          transition: "opacity 200ms",
+        }}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
@@ -539,8 +613,15 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
                   key={recovery.canvasKey}
                   frameloop="demand"
                   dpr={[1, CFG.RENDER.dprMax]}
-                  gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-                  camera={{ fov: CFG.GEOMETRY.cameraFov, position: [0, 0, fitCameraZ(frameW / pageH)] }}
+                  gl={{
+                    antialias: true,
+                    alpha: true,
+                    powerPreference: "high-performance",
+                  }}
+                  camera={{
+                    fov: CFG.GEOMETRY.cameraFov,
+                    position: [0, 0, fitCameraZ(frameW / pageH)],
+                  }}
                   onCreated={({ gl }) => recovery.attach(gl.domElement)}
                 >
                   <BinderScene
@@ -558,13 +639,19 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
           </WebGLBoundary>
         )}
         <ul className="sr-only">
-          {items.filter((card) => !esFichaDeteriorada(card)).map((card) => (
-            <li key={card.id}>
-              <Link href={`/v/${card.slug}`} data-testid="binder-link" data-dex={card.dexNumber}>
-                {card.name}, VTuber número {card.dexNumber}
-              </Link>
-            </li>
-          ))}
+          {items
+            .filter((card) => !esFichaDeteriorada(card))
+            .map((card) => (
+              <li key={card.id}>
+                <Link
+                  href={`/v/${card.slug}`}
+                  data-testid="binder-link"
+                  data-dex={card.dexNumber}
+                >
+                  {card.name}, VTuber número {card.dexNumber}
+                </Link>
+              </li>
+            ))}
         </ul>
 
         <button
@@ -572,7 +659,7 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
           className={`${arrowClass} left-1`}
           onClick={() => go(-1)}
           disabled={!canGo(-1)}
-          aria-label={t('libro.anterior')}
+          aria-label={t("libro.anterior")}
         >
           ‹
         </button>
@@ -581,14 +668,17 @@ export function CardBinder({ items, page, pageCount, loading, onPage, single = f
           className={`${arrowClass} right-1`}
           onClick={() => go(1)}
           disabled={!canGo(1)}
-          aria-label={t('libro.siguiente')}
+          aria-label={t("libro.siguiente")}
         >
           ›
         </button>
       </div>
       <p className="mt-1 text-center font-mono text-xs text-dex-muted">
-        {t('libro.pagina', { page, total: pageCount })}
-        <span className="hidden sm:inline"> · ← → o desliza para pasar de página</span>
+        {t("libro.pagina", { page, total: pageCount })}
+        <span className="hidden sm:inline">
+          {" "}
+          · ← → o desliza para pasar de página
+        </span>
       </p>
     </section>
   );

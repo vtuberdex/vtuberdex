@@ -37,7 +37,12 @@
  * `shaders.ts`. Aquí solo están los números.
  */
 
-import { CARD_TEXTURE_HEIGHT, CARD_TEXTURE_WIDTH, FACTION_SOCKET, HEADER } from './card-texture/dimensiones';
+import {
+  CARD_TEXTURE_HEIGHT,
+  CARD_TEXTURE_WIDTH,
+  FACTION_SOCKET,
+  HEADER,
+} from "./card-texture/dimensiones";
 
 /**
  * PALETA DEL ESPECTRO: de aquí sale el color de TODAS las capas holográficas.
@@ -63,12 +68,12 @@ export const SPECTRUM = {
    * modelo del espectro y no como una lista de c0..c5.
    */
   stops: [
-    { name: 'violeta', rgb: [0.62, 0.22, 1.0] },
-    { name: 'azul', rgb: [0.16, 0.34, 1.0] },
-    { name: 'cian', rgb: [0.1, 0.92, 1.0] },
-    { name: 'verde', rgb: [0.18, 1.0, 0.36] },
-    { name: 'amarillo', rgb: [1.0, 0.94, 0.22] },
-    { name: 'rojo', rgb: [1.0, 0.2, 0.16] },
+    { name: "violeta", rgb: [0.62, 0.22, 1.0] },
+    { name: "azul", rgb: [0.16, 0.34, 1.0] },
+    { name: "cian", rgb: [0.1, 0.92, 1.0] },
+    { name: "verde", rgb: [0.18, 1.0, 0.36] },
+    { name: "amarillo", rgb: [1.0, 0.94, 0.22] },
+    { name: "rojo", rgb: [1.0, 0.2, 0.16] },
   ],
   /**
    * Patrón espacial del foil (`spectralFoil`): cuánto pesa cada eje del UV y cuántas
@@ -354,7 +359,6 @@ export const BACKGROUND = {
  * se pinta: ahí se puede aplicar en CPU sobre el canvas, que es lo que el shader ya no ve.
  */
 
-
 /**
  * HDR: reflejos que PASAN de blanco y se comprimen, en vez de recortarse en plano.
  *
@@ -612,13 +616,13 @@ export const TEXT_FINISH = {
    * el 15% final es la sombra del canto inferior. Separarlas mata el efecto.
    */
   metalStops: [
-    { at: 0.0, color: '#7d8797' },
-    { at: 0.08, color: '#ffffff' },
-    { at: 0.24, color: '#b9c1cf' },
-    { at: 0.5, color: '#f6f8fc' },
-    { at: 0.72, color: '#cfd6e1' },
-    { at: 0.9, color: '#8b95a4' },
-    { at: 1.0, color: '#aab3c1' },
+    { at: 0.0, color: "#7d8797" },
+    { at: 0.08, color: "#ffffff" },
+    { at: 0.24, color: "#b9c1cf" },
+    { at: 0.5, color: "#f6f8fc" },
+    { at: 0.72, color: "#cfd6e1" },
+    { at: 0.9, color: "#8b95a4" },
+    { at: 1.0, color: "#aab3c1" },
   ],
   /**
    * Cuánto se tiñe el metal con el color de marca. Bajo a propósito: por encima de
@@ -637,13 +641,19 @@ export const TEXT_FINISH = {
     { at: 1.0, alpha: 0.0 },
   ],
   /** Bisel de la placa: filo claro arriba y línea oscura abajo, en px del lienzo. */
-  bevel: { light: '#ffffff', lightAlpha: 0.5, dark: '#0a0c11', darkAlpha: 0.38, width: 2 },
+  bevel: {
+    light: "#ffffff",
+    lightAlpha: 0.5,
+    dark: "#0a0c11",
+    darkAlpha: 0.38,
+    width: 2,
+  },
   /**
    * GRABADO del texto oscuro sobre el metal: una copia clara desplazada hacia abajo
    * hace que la letra parezca hundida en la placa. El desplazamiento va hacia ABAJO
    * (la luz viene de arriba) y es corto: con más de 2 px la letra se ve borrosa.
    */
-  engrave: { color: '#ffffff', alpha: 0.42, offsetY: 1.4, blur: 1.2 },
+  engrave: { color: "#ffffff", alpha: 0.42, offsetY: 1.4, blur: 1.2 },
   /**
    * Número de dex en BLANCO (petición del usuario). Iba en casi negro (#0a0c11).
    *
@@ -654,8 +664,8 @@ export const TEXT_FINISH = {
    * carta. El contorno es fino (1.6 px a 1008 de ancho) para que no se lea como una letra
    * "hinchada".
    */
-  badgeColor: '#ffffff',
-  badgeOutlineColor: '#0a0c11',
+  badgeColor: "#ffffff",
+  badgeOutlineColor: "#0a0c11",
   badgeOutlineAlpha: 0.5,
   badgeOutlineWidth: 1.6,
   /**
@@ -668,18 +678,18 @@ export const TEXT_FINISH = {
    * marca (sobre acero claro teñido de rojo, o sobre una placa oscura, un emblema de luz se perdía).
    */
   emblemSocketStops: [
-    { at: 0.0, color: '#3b414d' },
-    { at: 0.1, color: '#7a8496' },
-    { at: 0.3, color: '#171b22' },
-    { at: 0.85, color: '#0b0d12' },
-    { at: 1.0, color: '#262c36' },
+    { at: 0.0, color: "#3b414d" },
+    { at: 0.1, color: "#7a8496" },
+    { at: 0.3, color: "#171b22" },
+    { at: 0.85, color: "#0b0d12" },
+    { at: 1.0, color: "#262c36" },
   ],
   badgeStops: [
-    { at: 0.0, color: '#4a5260' },
-    { at: 0.08, color: '#a3adbd' },
-    { at: 0.42, color: '#616a79' },
-    { at: 0.82, color: '#39404c' },
-    { at: 1.0, color: '#525b69' },
+    { at: 0.0, color: "#4a5260" },
+    { at: 0.08, color: "#a3adbd" },
+    { at: 0.42, color: "#616a79" },
+    { at: 0.82, color: "#39404c" },
+    { at: 1.0, color: "#525b69" },
   ],
   /**
    * MARCA del pie (VTUBERDEX): metálica SOLO EN LAS LETRAS.
@@ -692,12 +702,12 @@ export const TEXT_FINISH = {
    */
   wordmark: {
     stops: [
-      { at: 0.0, color: '#6f7887' },
-      { at: 0.12, color: '#ffffff' },
-      { at: 0.34, color: '#98a1b0' },
-      { at: 0.56, color: '#e6ebf3' },
-      { at: 0.78, color: '#7d8797' },
-      { at: 1.0, color: '#bcc4d0' },
+      { at: 0.0, color: "#6f7887" },
+      { at: 0.12, color: "#ffffff" },
+      { at: 0.34, color: "#98a1b0" },
+      { at: 0.56, color: "#e6ebf3" },
+      { at: 0.78, color: "#7d8797" },
+      { at: 1.0, color: "#bcc4d0" },
     ],
     brandTint: 0.26,
     bevelDarkOffset: 1.8,
@@ -715,7 +725,7 @@ export const TEXT_FINISH = {
    *
    * `blur` corto: por encima de ~8 px la letra blanca se ensucia.
    */
-  shadow: { color: '#000000', alpha: 0.95, blur: 8, offsetX: 3, offsetY: 3 },
+  shadow: { color: "#000000", alpha: 0.95, blur: 8, offsetX: 3, offsetY: 3 },
 } as const;
 
 /**
@@ -845,8 +855,13 @@ export const GLOSS = {
  */
 function ranuraDeCabecera(indice: 0 | 1) {
   const emblema = FACTION_SOCKET.size - FACTION_SOCKET.margin * 2;
-  const centroDerecho = CARD_TEXTURE_WIDTH - HEADER.pad - FACTION_SOCKET.inset - FACTION_SOCKET.size / 2;
-  const cx = centroDerecho - (1 - indice) * (FACTION_SOCKET.size + FACTION_SOCKET.gap);
+  const centroDerecho =
+    CARD_TEXTURE_WIDTH -
+    HEADER.pad -
+    FACTION_SOCKET.inset -
+    FACTION_SOCKET.size / 2;
+  const cx =
+    centroDerecho - (1 - indice) * (FACTION_SOCKET.size + FACTION_SOCKET.gap);
   const cy = HEADER.top + HEADER.height / 2;
   return {
     x: cx / CARD_TEXTURE_WIDTH,
@@ -1014,7 +1029,7 @@ export const LOGO = {
   sweepY: 0.9,
   sweepTilt: 1.6,
   sweepPointer: 0.5,
-  bandHalfWidth: 0.30,
+  bandHalfWidth: 0.3,
   /** La marca oscura brilla menos que una clara, como el metal real. */
   bandWeight: 0.85,
   specularWeight: 0.35,
@@ -1086,18 +1101,22 @@ export const LOGO = {
  * hace dudar de si el efecto está roto.
  */
 export const PARALLAX_LAYERS = [
-  { name: 'surface', index: 0, factor: 0.04 },
-  { name: 'character', index: 1, factor: 0.005 },
-  { name: 'logo', index: 2, factor: -0.03 },
-  { name: 'title', index: 3, factor: 0.015 },
-  { name: 'texts', index: 4, factor: 0.012 },
-  { name: 'tags', index: 5, factor: 0.018 },
-  { name: 'wordmark', index: 6, factor: 0.01 },
+  { name: "surface", index: 0, factor: 0.04 },
+  { name: "character", index: 1, factor: 0.005 },
+  { name: "logo", index: 2, factor: -0.03 },
+  { name: "title", index: 3, factor: 0.015 },
+  { name: "texts", index: 4, factor: 0.012 },
+  { name: "tags", index: 5, factor: 0.018 },
+  { name: "wordmark", index: 6, factor: 0.01 },
 ] as const;
 
-export type LayerName = typeof PARALLAX_LAYERS[number]['name'];
-export const LAYER_UNIFORM_NAMES: string[] = PARALLAX_LAYERS.map((l) => `uLayer${l.index}`);
-export const LAYER_PARALLAX_FACTORS: number[] = PARALLAX_LAYERS.map((l) => l.factor);
+export type LayerName = (typeof PARALLAX_LAYERS)[number]["name"];
+export const LAYER_UNIFORM_NAMES: string[] = PARALLAX_LAYERS.map(
+  (l) => `uLayer${l.index}`,
+);
+export const LAYER_PARALLAX_FACTORS: number[] = PARALLAX_LAYERS.map(
+  (l) => l.factor,
+);
 
 /**
  * Resplandor de marca ALREDEDOR de la carta (plano aparte, aditivo).
@@ -1199,10 +1218,10 @@ export const LIGHTS = {
   ambient: 0.75,
   key: { position: [3, 4, 6], intensity: 1.15 },
   /** Relleno lateral: un metal con `metalness` alto refleja el entorno. */
-  fillLeft: { position: [-5, 2, 3], intensity: 0.55, color: '#eef2ff' },
-  fillBottom: { position: [0, -4, 2], intensity: 0.35, color: '#cdd6e6' },
+  fillLeft: { position: [-5, 2, 3], intensity: 0.55, color: "#eef2ff" },
+  fillBottom: { position: [0, -4, 2], intensity: 0.35, color: "#cdd6e6" },
   accent: { position: [-3, -2, 3], intensity: 18, distance: 12 },
-  top: { position: [0, 3, -4], intensity: 8, color: '#ffffff', distance: 10 },
+  top: { position: [0, 3, -4], intensity: 8, color: "#ffffff", distance: 10 },
 } as const;
 
 /**
@@ -1214,7 +1233,7 @@ export const BODY = {
 } as const;
 
 /** Fondo de la escena: un gris claro, no la niebla oscura anterior (#05060a). */
-export const FOG = { color: '#c9cdd6', near: 8, far: 20 } as const;
+export const FOG = { color: "#c9cdd6", near: 8, far: 20 } as const;
 
 /**
  * EL LIBRO DE CARTAS (catálogo): una sola escena WebGL con las 8 cartas de la página.
@@ -1259,7 +1278,7 @@ export const BINDER = {
    * No hay tapa, hojas ni fundas: las cartas flotan sobre el fondo del sitio. `coverColor`
    * queda solo como fondo del aviso «No se pudo mostrar el libro 3D».
    */
-  coverColor: '#080b11',
+  coverColor: "#080b11",
   /** Duración del paso de página, en ms (una hoja de cartón, sin curvarse). */
   flipMs: 1100,
   /**
@@ -1380,7 +1399,6 @@ export const TEXTURAS = {
   esperaOciosaMaxMs: 1500,
 } as const;
 
-
 /**
  * CARTAS PREMIUM: la placa de acrílico (slab) que encierra una carta gradeada, como las de CGC.
  *
@@ -1449,7 +1467,16 @@ export const PREMIUM = {
     porPaso: 0.22,
     extraBlackLabel: 0.35,
     /** Techo del multiplicador total por perilla (evita quemar el arte con grados altos). */
-    techo: { layerWeight: 2.6, bgHolo: 2.0, bgLayerWeight: 2.4, glare: 2.4, edge: 1.8, faction: 2.2, glow: 2.2, holo: 2.4 },
+    techo: {
+      layerWeight: 2.6,
+      bgHolo: 2.0,
+      bgLayerWeight: 2.4,
+      glare: 2.4,
+      edge: 1.8,
+      faction: 2.2,
+      glow: 2.2,
+      holo: 2.4,
+    },
   },
   /** Z de la hoja interior y de la carta, dentro del espacio de la placa. */
   insertZ: -0.02,
@@ -1476,44 +1503,49 @@ export const PREMIUM = {
     bandCenter: 0.16,
     bandWidth: 0.075,
     bandStrength: 0.2,
-    tint: '#bcd4ff',
+    tint: "#bcd4ff",
     light: [-0.45, 0.6, 0.66] as const,
   },
   /** La hoja interior (el «insert») que rodea la ventana. */
   insert: {
     /** Ancho del lienzo de la hoja, en px. El alto sale de la proporción de la placa. */
     pxWidth: 640,
-    frame: '#e6e9ef',
-    frameShade: '#c9ced9',
-    windowLine: '#8d95a6',
+    frame: "#e6e9ef",
+    frameShade: "#c9ced9",
+    windowLine: "#8d95a6",
   },
   /**
    * La ETIQUETA. Cada grado tiene su banda: azul para el 8, acero para el 9, dorada para el 10;
    * la Black Label (BL) es negra con letra plateada. Dos colores = degradado de la banda.
    */
   label: {
-    paper: '#f7f8fb',
-    ink: '#14171f',
-    mutedInk: '#5b6372',
-    black: { paper: '#0b0c10', ink: '#f2f4f8', mutedInk: '#9aa1b0', line: '#c9a24a' },
+    paper: "#f7f8fb",
+    ink: "#14171f",
+    mutedInk: "#5b6372",
+    black: {
+      paper: "#0b0c10",
+      ink: "#f2f4f8",
+      mutedInk: "#9aa1b0",
+      line: "#c9a24a",
+    },
     bands: {
-      '8': ['#2f62a8', '#1f4780'],
-      '8.5': ['#2f62a8', '#1f4780'],
-      '9': ['#5d6677', '#3e4654'],
-      '9.5': ['#5d6677', '#3e4654'],
-      '10': ['#d8b44d', '#a8802a'],
-      BL: ['#17181d', '#050507'],
+      "8": ["#2f62a8", "#1f4780"],
+      "8.5": ["#2f62a8", "#1f4780"],
+      "9": ["#5d6677", "#3e4654"],
+      "9.5": ["#5d6677", "#3e4654"],
+      "10": ["#d8b44d", "#a8802a"],
+      BL: ["#17181d", "#050507"],
       // Entrada de la escala premium (6…7,5): bandas apagadas de ocre, que ganan color hasta el azul del 8.
-      '7.5': ['#6d7a6a', '#4a5648'],
-      '7': ['#7d7a52', '#575431'],
-      '6.5': ['#7b7249', '#554d2d'],
-      '6': ['#7a6b45', '#54482b'],
+      "7.5": ["#6d7a6a", "#4a5648"],
+      "7": ["#7d7a52", "#575431"],
+      "6.5": ["#7b7249", "#554d2d"],
+      "6": ["#7a6b45", "#54482b"],
       // Cartas degradadas: la banda se apaga del óxido al gris sucio a medida que baja el grado.
-      '5': ['#775a3e', '#503a24'],
-      '4': ['#6f4a37', '#4a2f21'],
-      '3': ['#66403a', '#432723'],
-      '2': ['#523b3b', '#342323'],
-      '1': ['#3a3636', '#1d1b1b'],
+      "5": ["#775a3e", "#503a24"],
+      "4": ["#6f4a37", "#4a2f21"],
+      "3": ["#66403a", "#432723"],
+      "2": ["#523b3b", "#342323"],
+      "1": ["#3a3636", "#1d1b1b"],
     } as Record<string, readonly [string, string]>,
   },
 } as const;
@@ -1532,16 +1564,21 @@ export const PREMIUM = {
  */
 export const DETERIORO = {
   /** Color de lo que se ve donde falta un trozo de carta: el de la ventana de la placa (`#0a0b10`). */
-  window: '#0a0b10',
+  window: "#0a0b10",
   /** Blanqueado del canto (el cartón al descubierto), como en una carta manoseada. */
-  whitening: { color: '#e8e4d8', depth: 0.022, alpha: 0.9 },
+  whitening: { color: "#e8e4d8", depth: 0.022, alpha: 0.9 },
   /**
    * Trozos que faltan en los bordes. `depth` es la profundidad MÁXIMA como fracción del ancho; el
    * número de mordidas es `count[0] + count[1] x severidad`.
    */
   chips: { depth: 0.16, count: [4, 26] as const, minSeverity: 0.12 },
   /** Rayones: líneas claras (y, desde la mitad, surcos oscuros) que cruzan la carta. */
-  scratches: { count: [2, 46] as const, length: [0.12, 0.7] as const, alpha: [0.18, 0.7] as const, darkFrom: 0.5 },
+  scratches: {
+    count: [2, 46] as const,
+    length: [0.12, 0.7] as const,
+    alpha: [0.18, 0.7] as const,
+    darkFrom: 0.5,
+  },
   /** Ruido de grano sobre todo el arte: `alpha` es el máximo con severidad 1. */
   noise: { alpha: 0.78, tile: 192 },
   /** Desgaste del color: se apaga hacia gris y se oscurece. */
@@ -1552,7 +1589,12 @@ export const DETERIORO = {
    */
   blur: { maxBlock: 110, minSeverity: 0.25, pixelFrom: 0.6 },
   /** Texto de la cabecera y de la etiqueta: fracción de letras corrompidas = `(s - from) x gain`. */
-  text: { from: 0.1, gain: 1.15, unreadableFrom: 0.95, glyphs: '#%&@*?/\\~=+<>' },
+  text: {
+    from: 0.1,
+    gain: 1.15,
+    unreadableFrom: 0.95,
+    glyphs: "#%&@*?/\\~=+<>",
+  },
   /** Con esta severidad la bandera del país ya no se imprime. */
   hideCountryFrom: 0.55,
 } as const;

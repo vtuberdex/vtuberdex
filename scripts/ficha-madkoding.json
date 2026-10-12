@@ -2,14 +2,8 @@
   "phrase": "Developer, VTuber y VRPlayer. Fan de la IA y gamer tranquilo.",
   "birthday": "31 de Octubre",
   "height": "1.70 m",
-  "languages": [
-    "es",
-    "en"
-  ],
-  "factions": [
-    "glitchborn",
-    "machina-revenant"
-  ],
+  "languages": ["es", "en"],
+  "factions": ["glitchborn", "machina-revenant"],
   "profile": [
     {
       "label": "País",

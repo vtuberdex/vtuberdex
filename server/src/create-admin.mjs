@@ -2,16 +2,16 @@
  * Crea o restablece el usuario del mantenedor.
  * Uso: node src/create-admin.mjs <usuario> <password>
  */
-import { openDatabase } from './db/index.mjs';
-import { hashPassword } from './auth.mjs';
+import { openDatabase } from "./db/index.mjs";
+import { hashPassword } from "./auth.mjs";
 
 const [username, password] = process.argv.slice(2);
 if (!username || !password) {
-  console.error('uso: node src/create-admin.mjs <usuario> <password>');
+  console.error("uso: node src/create-admin.mjs <usuario> <password>");
   process.exit(1);
 }
 if (password.length < 8) {
-  console.error('la contraseña debe tener al menos 8 caracteres');
+  console.error("la contraseña debe tener al menos 8 caracteres");
   process.exit(1);
 }
 

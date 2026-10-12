@@ -6,12 +6,12 @@ números del problema y del arreglo, porque el fallo **no lo veía ningún gate*
 
 ## El síntoma
 
-| Ruta | Mediana en producción | Qué consulta |
-|---|---|---|
-| `/api/meta` | **313 ms** | solo SQLite empaquetada |
-| `/api/vtubers?perPage=1` | 417 ms | SQLite + Turso |
-| `/api/vtubers?perPage=24` | **824 ms** | SQLite + Turso |
-| `/api/vtubers?perPage=100` | 1.854 ms | SQLite + Turso |
+| Ruta                       | Mediana en producción | Qué consulta            |
+| -------------------------- | --------------------- | ----------------------- |
+| `/api/meta`                | **313 ms**            | solo SQLite empaquetada |
+| `/api/vtubers?perPage=1`   | 417 ms                | SQLite + Turso          |
+| `/api/vtubers?perPage=24`  | **824 ms**            | SQLite + Turso          |
+| `/api/vtubers?perPage=100` | 1.854 ms              | SQLite + Turso          |
 
 `/api/meta` no toca Turso y aun así tardaba 313 ms; el piso local del catálogo, medido con
 `scripts/probe-timings.mjs`, es de **2,2 ms para las 24 fichas**. Es decir: de los 824 ms,
@@ -47,11 +47,11 @@ resultado era correcto; solo estaba multiplicado por 146. Por eso el test que se
 Con `scripts/bench-ediciones.mjs`, que sirve el protocolo de Turso sobre SQLite real y compara
 el `lib/ediciones.mjs` de `HEAD` contra el actual, con el mismo cliente `@libsql/client`:
 
-| `perPage` | Antes | Después | Peticiones |
-|---|---|---|---|
-| 24 | 292 POST | **2 POST** | −99,3 % |
-| 48 | 580 POST | **2 POST** | −99,7 % |
-| 100 | 1.204 POST | **2 POST** | −99,8 % |
+| `perPage` | Antes      | Después    | Peticiones |
+| --------- | ---------- | ---------- | ---------- |
+| 24        | 292 POST   | **2 POST** | −99,3 %    |
+| 48        | 580 POST   | **2 POST** | −99,7 %    |
+| 100       | 1.204 POST | **2 POST** | −99,8 %    |
 
 Equivalencia: **24/24 fichas idénticas** en `images` y `assets` entre los dos caminos.
 
@@ -80,17 +80,17 @@ Barrido con `npm run sweep:dead-code` (informa; no borra). Se retiraron **10 exp
 ningún consumidor** —cada uno aparecía solo en su propia línea de definición— más el endpoint
 muerto:
 
-| Qué | Dónde | Nota |
-|---|---|---|
-| `GET /api/meta` + `api.meta()` + `ApiMetaResponse` | `app/api/meta/`, `lib/api.ts`, `lib/types.ts` | 313 ms por un dato que nadie pedía; las facetas viajan en `/api/vtubers?facet=all` |
-| `canvasToTextureSource` | `components/card-texture.ts` | identidad pura |
-| `backlightGlow` | `components/card-texture.ts` | el halo lo pinta la escena 3D, no un canvas |
-| `__resetCardVisibility` | `components/card-visibility.ts` | su gemelo `__resetCardQuality` **sí** se usa; este no |
-| `LAYER_COUNT`, `LAYER_SCALES`, `LAYER_LABELS` | `components/card3d-config.ts` | nadie los leía |
-| `API_BASE` | `lib/api.ts` | alias de un `BASE` que solo usa el propio módulo |
-| `glowShadow` | `lib/color.ts` | nadie lo llamaba |
-| `encodePath` | `scraper/src/http.mjs` | nadie lo llamaba |
-| `requireSession` | `server/src/auth.mjs` | **duplicado**: la protección real de las rutas del mantenedor es `requireAdmin` (`server/src/routes.mjs:207`), que inlinea el mismo código |
+| Qué                                                | Dónde                                         | Nota                                                                                                                                       |
+| -------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/meta` + `api.meta()` + `ApiMetaResponse` | `app/api/meta/`, `lib/api.ts`, `lib/types.ts` | 313 ms por un dato que nadie pedía; las facetas viajan en `/api/vtubers?facet=all`                                                         |
+| `canvasToTextureSource`                            | `components/card-texture.ts`                  | identidad pura                                                                                                                             |
+| `backlightGlow`                                    | `components/card-texture.ts`                  | el halo lo pinta la escena 3D, no un canvas                                                                                                |
+| `__resetCardVisibility`                            | `components/card-visibility.ts`               | su gemelo `__resetCardQuality` **sí** se usa; este no                                                                                      |
+| `LAYER_COUNT`, `LAYER_SCALES`, `LAYER_LABELS`      | `components/card3d-config.ts`                 | nadie los leía                                                                                                                             |
+| `API_BASE`                                         | `lib/api.ts`                                  | alias de un `BASE` que solo usa el propio módulo                                                                                           |
+| `glowShadow`                                       | `lib/color.ts`                                | nadie lo llamaba                                                                                                                           |
+| `encodePath`                                       | `scraper/src/http.mjs`                        | nadie lo llamaba                                                                                                                           |
+| `requireSession`                                   | `server/src/auth.mjs`                         | **duplicado**: la protección real de las rutas del mantenedor es `requireAdmin` (`server/src/routes.mjs:207`), que inlinea el mismo código |
 
 La comprobación de `verify` que consultaba `/api/meta` **se movió** a las facetas de la lista
 en vez de borrarse: "31 países" es un dato que conviene vigilar, y si la consulta de facetas

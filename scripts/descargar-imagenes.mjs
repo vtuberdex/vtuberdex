@@ -64,17 +64,17 @@
  *   node scripts/descargar-imagenes.mjs --solo-ediciones  # sin imágenes
  *   node scripts/descargar-imagenes.mjs --env-file .env.dev.local
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { createClient } from '@libsql/client/node';
+import { createClient } from "@libsql/client/node";
 
-import { EXTENSION_DE_CARPETA, KINDS_GESTIONABLES } from '../lib/carpetas.mjs';
-import { leerOpciones } from './lib/terminal.mjs';
+import { EXTENSION_DE_CARPETA, KINDS_GESTIONABLES } from "../lib/carpetas.mjs";
+import { leerOpciones } from "./lib/terminal.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, '..');
+const ROOT = path.resolve(HERE, "..");
 
 /**
  * El origen que se baja, y el único.
@@ -88,7 +88,7 @@ const ROOT = path.resolve(HERE, '..');
  * el scrape, y bajarlo encima es exactamente lo que contaminaba el manifiesto. Por eso no hay
  * un `--origen`: la única cosa que este script puede bajar es lo que no está en ningún disco.
  */
-export const ORIGEN_QUE_SE_BAJA = 'mantenedor';
+export const ORIGEN_QUE_SE_BAJA = "mantenedor";
 
 /**
  * Dónde viven los bytes bajados: carpeta TEMPORAL, fuera del artefacto desplegable.
@@ -96,14 +96,16 @@ export const ORIGEN_QUE_SE_BAJA = 'mantenedor';
  * El nombre es deliberado —`mantenedor`, el mismo vocabulario que el `origen` de Turso— para
  * que la correspondencia sea evidente. Ver la cabecera para la razón de no usar `data/images/`.
  */
-export const CARPETA_TEMPORAL = path.join('data', 'mantenedor');
+export const CARPETA_TEMPORAL = path.join("data", "mantenedor");
 
-const { tiene: has, opcion: value } = leerOpciones(process.argv.slice(2), { conIgual: true });
+const { tiene: has, opcion: value } = leerOpciones(process.argv.slice(2), {
+  conIgual: true,
+});
 
 /** Lee un `.env` de Vercel (`CLAVE="valor"`) y lo devuelve como objeto. */
 export function leerEnvFile(ruta) {
   const env = {};
-  for (const linea of fs.readFileSync(ruta, 'utf8').split('\n')) {
+  for (const linea of fs.readFileSync(ruta, "utf8").split("\n")) {
     const m = linea.match(/^([A-Z0-9_]+)="?(.*?)"?$/);
     if (m) env[m[1]] = m[2];
   }
@@ -126,11 +128,18 @@ export function leerEnvFile(ruta) {
  */
 export function motivoDestinoInseguro(destino) {
   const prohibidos = [
-    { ruta: path.join(ROOT, 'data', 'images'), porque: 'es el árbol del catálogo, y el manifiesto sale de él' },
-    { ruta: path.join(ROOT, 'deploy'), porque: 'es el artefacto que se despliega y se versiona' },
+    {
+      ruta: path.join(ROOT, "data", "images"),
+      porque: "es el árbol del catálogo, y el manifiesto sale de él",
+    },
+    {
+      ruta: path.join(ROOT, "deploy"),
+      porque: "es el artefacto que se despliega y se versiona",
+    },
   ];
   for (const { ruta, porque } of prohibidos) {
-    if (destino === ruta || destino.startsWith(`${ruta}${path.sep}`)) return `${path.relative(ROOT, ruta)} (${porque})`;
+    if (destino === ruta || destino.startsWith(`${ruta}${path.sep}`))
+      return `${path.relative(ROOT, ruta)} (${porque})`;
   }
   return null;
 }
@@ -147,17 +156,23 @@ export function motivoDestinoInseguro(destino) {
  * @param {{stat: (abs: string) => number|null, raiz?: string, forzar?: boolean}} opciones
  * @returns {Array<{slug: string, kind: string, abs: string, rel: string, size: number, motivo: string, local: number|null}>}
  */
-export function planDeDescarga(filas, { stat, raiz = path.join(ROOT, CARPETA_TEMPORAL), forzar = false }) {
+export function planDeDescarga(
+  filas,
+  { stat, raiz = path.join(ROOT, CARPETA_TEMPORAL), forzar = false },
+) {
   const plan = [];
   for (const fila of filas) {
-    const ext = EXTENSION_DE_CARPETA[fila.kind] ?? 'webp';
+    const ext = EXTENSION_DE_CARPETA[fila.kind] ?? "webp";
     const rel = path.join(fila.kind, `${fila.slug}.${ext}`);
     const abs = path.join(raiz, rel);
     const local = stat(abs);
     const size = Number(fila.size);
-    if (forzar) plan.push({ ...fila, abs, rel, size, motivo: 'forzado', local });
-    else if (local === null) plan.push({ ...fila, abs, rel, size, motivo: 'falta', local });
-    else if (local !== size) plan.push({ ...fila, abs, rel, size, motivo: 'distinto', local });
+    if (forzar)
+      plan.push({ ...fila, abs, rel, size, motivo: "forzado", local });
+    else if (local === null)
+      plan.push({ ...fila, abs, rel, size, motivo: "falta", local });
+    else if (local !== size)
+      plan.push({ ...fila, abs, rel, size, motivo: "distinto", local });
   }
   return plan;
 }
@@ -185,7 +200,11 @@ export function indiceDeReemplazos(filas) {
       height: fila.height ?? null,
       actualizado: fila.actualizado ?? null,
     }))
-    .sort((a, b) => (a.kind === b.kind ? a.slug.localeCompare(b.slug) : a.kind.localeCompare(b.kind)));
+    .sort((a, b) =>
+      a.kind === b.kind
+        ? a.slug.localeCompare(b.slug)
+        : a.kind.localeCompare(b.kind),
+    );
 }
 
 /** `stat` de un archivo en bytes, o `null` si no existe. */
@@ -198,43 +217,60 @@ function tamanoDe(abs) {
 }
 
 async function main() {
-  const DRY_RUN = has('dry-run');
-  const FORZAR = has('forzar');
-  const SOLO_EDICIONES = has('solo-ediciones');
-  const SIN_EDICIONES = has('sin-ediciones');
-  const DESTINO = path.resolve(ROOT, value('destino', CARPETA_TEMPORAL));
-  const ENV_FILE = value('env-file', path.join(ROOT, '.env.dev.local'));
-  const EDICIONES = value('ediciones', path.join(ROOT, 'data', 'mantenedor-ediciones.json'));
+  const DRY_RUN = has("dry-run");
+  const FORZAR = has("forzar");
+  const SOLO_EDICIONES = has("solo-ediciones");
+  const SIN_EDICIONES = has("sin-ediciones");
+  const DESTINO = path.resolve(ROOT, value("destino", CARPETA_TEMPORAL));
+  const ENV_FILE = value("env-file", path.join(ROOT, ".env.dev.local"));
+  const EDICIONES = value(
+    "ediciones",
+    path.join(ROOT, "data", "mantenedor-ediciones.json"),
+  );
 
   const inseguro = motivoDestinoInseguro(DESTINO);
   if (inseguro) {
     console.error(`✖ --destino no puede ser ${inseguro}:`);
-    console.error('  bajarlos ahí mete los reemplazos del mantenedor en el MANIFIESTO, y una corrida');
-    console.error('  de publish:images los subiría como origen=catalogo, destruyendo la imagen original');
-    console.error(`  del catálogo en Turso. Usa la carpeta temporal (${CARPETA_TEMPORAL}).`);
+    console.error(
+      "  bajarlos ahí mete los reemplazos del mantenedor en el MANIFIESTO, y una corrida",
+    );
+    console.error(
+      "  de publish:images los subiría como origen=catalogo, destruyendo la imagen original",
+    );
+    console.error(
+      `  del catálogo en Turso. Usa la carpeta temporal (${CARPETA_TEMPORAL}).`,
+    );
     process.exit(1);
   }
 
-  let url = value('turso-url', process.env.TURSO_DATABASE_URL ?? '');
-  let token = value('turso-token', process.env.TURSO_AUTH_TOKEN ?? '');
+  let url = value("turso-url", process.env.TURSO_DATABASE_URL ?? "");
+  let token = value("turso-token", process.env.TURSO_AUTH_TOKEN ?? "");
   let deArchivo = null;
   if ((!url || !token) && fs.existsSync(ENV_FILE)) {
     const env = leerEnvFile(ENV_FILE);
-    url = url || env.TURSO_DATABASE_URL || '';
-    token = token || env.TURSO_AUTH_TOKEN || '';
+    url = url || env.TURSO_DATABASE_URL || "";
+    token = token || env.TURSO_AUTH_TOKEN || "";
     deArchivo = ENV_FILE;
   }
   if (!url) {
-    console.error('✖ falta la URL de Turso.');
-    console.error('  Pásala con --turso-url o TURSO_DATABASE_URL, o deja un .env-file legible.');
-    console.error('  Las de PRODUCCIÓN están marcadas *sensitive* en Vercel y no se pueden leer:');
-    console.error('  usa las de *development* (npx vercel env pull --environment=development).');
+    console.error("✖ falta la URL de Turso.");
+    console.error(
+      "  Pásala con --turso-url o TURSO_DATABASE_URL, o deja un .env-file legible.",
+    );
+    console.error(
+      "  Las de PRODUCCIÓN están marcadas *sensitive* en Vercel y no se pueden leer:",
+    );
+    console.error(
+      "  usa las de *development* (npx vercel env pull --environment=development).",
+    );
     process.exit(1);
   }
   console.log(
-    `[bajar] Turso: ${url}${deArchivo ? ` (credenciales de ${path.relative(ROOT, deArchivo)})` : ' (del entorno)'}`,
+    `[bajar] Turso: ${url}${deArchivo ? ` (credenciales de ${path.relative(ROOT, deArchivo)})` : " (del entorno)"}`,
   );
-  console.log(`[bajar] destino: ${path.relative(ROOT, DESTINO)} (temporal, fuera del artefacto desplegable)`);
+  console.log(
+    `[bajar] destino: ${path.relative(ROOT, DESTINO)} (temporal, fuera del artefacto desplegable)`,
+  );
 
   const db = createClient({ url, authToken: token || undefined });
 
@@ -244,10 +280,21 @@ async function main() {
    * sirve la app son las filas de Turso.
    */
   if (!SIN_EDICIONES) {
-    const { rows } = await db.execute('SELECT slug, campo, valor, actualizado FROM edicion ORDER BY slug, campo');
+    const { rows } = await db.execute(
+      "SELECT slug, campo, valor, actualizado FROM edicion ORDER BY slug, campo",
+    );
     fs.mkdirSync(path.dirname(EDICIONES), { recursive: true });
-    fs.writeFileSync(EDICIONES, `${JSON.stringify(rows.map((r) => ({ ...r })), null, 2)}\n`);
-    console.log(`[bajar] ediciones respaldadas: ${rows.length} -> ${path.relative(ROOT, EDICIONES)}`);
+    fs.writeFileSync(
+      EDICIONES,
+      `${JSON.stringify(
+        rows.map((r) => ({ ...r })),
+        null,
+        2,
+      )}\n`,
+    );
+    console.log(
+      `[bajar] ediciones respaldadas: ${rows.length} -> ${path.relative(ROOT, EDICIONES)}`,
+    );
   }
   if (SOLO_EDICIONES) {
     await db.close();
@@ -261,28 +308,41 @@ async function main() {
    * mantenedor puede reemplazar (`KINDS_GESTIONABLES`): `faction` se publica pero no se toca a
    * mano, así que no hay nada suyo que bajar.
    */
-  const marcadoresKind = KINDS_GESTIONABLES.map(() => '?').join(', ');
+  const marcadoresKind = KINDS_GESTIONABLES.map(() => "?").join(", ");
   const { rows } = await db.execute({
     sql: `SELECT slug, kind, size, width, height, actualizado FROM asset_remoto
           WHERE origen = ? AND kind IN (${marcadoresKind})
           ORDER BY kind, slug`,
     args: [ORIGEN_QUE_SE_BAJA, ...KINDS_GESTIONABLES],
   });
-  console.log(`[bajar] filas en Turso (origen ${ORIGEN_QUE_SE_BAJA}): ${rows.length}`);
+  console.log(
+    `[bajar] filas en Turso (origen ${ORIGEN_QUE_SE_BAJA}): ${rows.length}`,
+  );
 
-  const plan = planDeDescarga(rows, { stat: tamanoDe, raiz: DESTINO, forzar: FORZAR });
-  const porMotivo = plan.reduce((acc, p) => ({ ...acc, [p.motivo]: (acc[p.motivo] ?? 0) + 1 }), {});
-  const totalMB = (plan.reduce((s, p) => s + p.size, 0) / 1024 / 1024).toFixed(1);
+  const plan = planDeDescarga(rows, {
+    stat: tamanoDe,
+    raiz: DESTINO,
+    forzar: FORZAR,
+  });
+  const porMotivo = plan.reduce(
+    (acc, p) => ({ ...acc, [p.motivo]: (acc[p.motivo] ?? 0) + 1 }),
+    {},
+  );
+  const totalMB = (plan.reduce((s, p) => s + p.size, 0) / 1024 / 1024).toFixed(
+    1,
+  );
   console.log(
     `[bajar] al día: ${rows.length - plan.length} | por bajar: ${plan.length} (${totalMB} MB) ${JSON.stringify(porMotivo)}`,
   );
   for (const p of plan.slice(0, 30)) {
-    console.log(`   · ${p.kind}/${p.slug} ${p.motivo} (${p.local ?? '—'} -> ${p.size})`);
+    console.log(
+      `   · ${p.kind}/${p.slug} ${p.motivo} (${p.local ?? "—"} -> ${p.size})`,
+    );
   }
   if (plan.length > 30) console.log(`   · ... y ${plan.length - 30} más`);
 
   if (DRY_RUN) {
-    console.log('[bajar] dry-run: no se escribe nada');
+    console.log("[bajar] dry-run: no se escribe nada");
     await db.close();
     return;
   }
@@ -297,11 +357,14 @@ async function main() {
        * decisión ya está tomada por tamaño, lo que falla se reintenta al volver a correrlo.
        */
       const { rows: contenido } = await db.execute({
-        sql: 'SELECT bytes FROM asset_remoto WHERE slug = ? AND kind = ? AND origen = ?',
+        sql: "SELECT bytes FROM asset_remoto WHERE slug = ? AND kind = ? AND origen = ?",
         args: [p.slug, p.kind, ORIGEN_QUE_SE_BAJA],
       });
       if (contenido.length === 0 || contenido[0].bytes == null) {
-        fallos.push({ rel: p.rel, error: 'la fila desapareció entre la lista y la descarga' });
+        fallos.push({
+          rel: p.rel,
+          error: "la fila desapareció entre la lista y la descarga",
+        });
         continue;
       }
       const bytes = Buffer.from(contenido[0].bytes);
@@ -312,7 +375,9 @@ async function main() {
       fallos.push({ rel: p.rel, error: error.message });
     }
     if ((i + 1) % 15 === 0 || i + 1 === plan.length) {
-      console.log(`[bajar] ${i + 1}/${plan.length} (escritas ${escritas}, fallos ${fallos.length})`);
+      console.log(
+        `[bajar] ${i + 1}/${plan.length} (escritas ${escritas}, fallos ${fallos.length})`,
+      );
     }
   }
 
@@ -324,7 +389,10 @@ async function main() {
    */
   const indice = indiceDeReemplazos(rows);
   fs.mkdirSync(DESTINO, { recursive: true });
-  fs.writeFileSync(path.join(DESTINO, 'indice.json'), `${JSON.stringify(indice, null, 2)}\n`);
+  fs.writeFileSync(
+    path.join(DESTINO, "indice.json"),
+    `${JSON.stringify(indice, null, 2)}\n`,
+  );
 
   /**
    * Verificación final leyendo el DISCO, no lo que se creía haber escrito: el tamaño de cada
@@ -333,29 +401,39 @@ async function main() {
   let verificadas = 0;
   const discrepantes = [];
   for (const fila of indice) {
-    const ext = EXTENSION_DE_CARPETA[fila.kind] ?? 'webp';
+    const ext = EXTENSION_DE_CARPETA[fila.kind] ?? "webp";
     const abs = path.join(DESTINO, fila.kind, `${fila.slug}.${ext}`);
     const local = tamanoDe(abs);
     if (local === fila.size) verificadas++;
-    else discrepantes.push({ rel: `${fila.kind}/${fila.slug}`, local, turso: fila.size });
+    else
+      discrepantes.push({
+        rel: `${fila.kind}/${fila.slug}`,
+        local,
+        turso: fila.size,
+      });
   }
 
   await db.close();
 
   console.log(`\n[bajar] escritas: ${escritas} | fallos: ${fallos.length}`);
-  console.log(`[bajar] índice: ${indice.length} entradas -> ${path.relative(ROOT, path.join(DESTINO, 'indice.json'))}`);
-  console.log(`[bajar] verificación en disco: ${verificadas}/${indice.length} con el tamaño de Turso`);
-  for (const d of discrepantes.slice(0, 10)) console.log(`   ✖ ${d.rel}: disco ${d.local} vs Turso ${d.turso}`);
+  console.log(
+    `[bajar] índice: ${indice.length} entradas -> ${path.relative(ROOT, path.join(DESTINO, "indice.json"))}`,
+  );
+  console.log(
+    `[bajar] verificación en disco: ${verificadas}/${indice.length} con el tamaño de Turso`,
+  );
+  for (const d of discrepantes.slice(0, 10))
+    console.log(`   ✖ ${d.rel}: disco ${d.local} vs Turso ${d.turso}`);
   for (const f of fallos.slice(0, 10)) console.log(`   ✖ ${f.rel}: ${f.error}`);
   if (fallos.length > 0 || discrepantes.length > 0) {
-    console.log('[bajar] vuelve a ejecutarlo: reintenta solo lo que falta');
+    console.log("[bajar] vuelve a ejecutarlo: reintenta solo lo que falta");
     process.exitCode = 1;
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   main().catch((error) => {
-    console.error('[bajar] ERROR', error.message);
+    console.error("[bajar] ERROR", error.message);
     process.exit(1);
   });
 }

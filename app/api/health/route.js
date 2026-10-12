@@ -15,9 +15,9 @@
  * `meta.dataset_generated_at` de la base. El Express del mantenedor conserva el suyo
  * (`server/src/routes.mjs:167`, con sus tests): es otra superficie, no este endpoint.
  */
-import { getDb } from '../../../lib/db.mjs';
+import { getDb } from "../../../lib/db.mjs";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const db = getDb();
@@ -30,5 +30,5 @@ export async function GET() {
     .get();
   // `sessions` se mantiene en 0: en producción el catálogo es de solo lectura y
   // no hay sesiones de mantenedor que contar. El front no lo usa para decidir nada.
-  return Response.json({ status: 'ok', ...counts, sessions: 0 });
+  return Response.json({ status: "ok", ...counts, sessions: 0 });
 }

@@ -45,11 +45,27 @@ export interface VtuberImages {
  * `card`/`thumb` sobreviven aquí solo por compatibilidad con el esquema del
  * servidor.
  */
-export type UploadKind = 'character' | 'card' | 'thumb' | 'logo' | 'radar' | 'background';
+export type UploadKind =
+  "character" | "card" | "thumb" | "logo" | "radar" | "background";
 
 /** Un grado de la escala premium. Es texto: `'BL'` no es un número (ver `server/src/premium.mjs`). */
 /** Escala premium (8…BL) y de deterioro (7…1): ver `server/src/premium.mjs`. */
-export type PremiumGrade = '1' | '2' | '3' | '4' | '5' | '6' | '6.5' | '7' | '7.5' | '8' | '8.5' | '9' | '9.5' | '10' | 'BL';
+export type PremiumGrade =
+  | "1"
+  | "2"
+  | "3"
+  | "4"
+  | "5"
+  | "6"
+  | "6.5"
+  | "7"
+  | "7.5"
+  | "8"
+  | "8.5"
+  | "9"
+  | "9.5"
+  | "10"
+  | "BL";
 
 /**
  * Datos de una carta PREMIUM (gradeada, dentro de una placa de acrílico). `null`/ausente en una
@@ -81,7 +97,7 @@ export interface VtuberCard {
   level: number | null;
   powerScore: number | null;
   hasDetail: boolean;
-  status: 'published' | 'draft' | 'hidden';
+  status: "published" | "draft" | "hidden";
   birthday: string | null;
   height: string | null;
   hashtag: string | null;
@@ -91,7 +107,11 @@ export interface VtuberCard {
   artists: string[];
   factions: string[];
   /** Facciones con su emblema; la carta lo superpone como holograma. */
-  factionIcons?: Array<{ label: string | null; slug?: string | null; icon: string | null }>;
+  factionIcons?: Array<{
+    label: string | null;
+    slug?: string | null;
+    icon: string | null;
+  }>;
   languages: string[];
   /** Muestra de stats (máx. 5) para la barra segmentada de la carta. */
   statsPreview: number[];
@@ -121,7 +141,7 @@ export interface StatRow {
 }
 
 export interface SkillRow {
-  category: 'active' | 'passive' | 'ultimate' | 'other';
+  category: "active" | "passive" | "ultimate" | "other";
   section: string | null;
   type: string | null;
   name: string | null;
@@ -141,7 +161,7 @@ export interface SocialRow {
 }
 
 export interface AssetRow {
-  kind: 'character' | 'card' | 'thumb' | 'logo' | 'radar' | 'background';
+  kind: "character" | "card" | "thumb" | "logo" | "radar" | "background";
   path: string;
   sourceUrl: string | null;
   width: number | null;
@@ -160,7 +180,11 @@ export interface VtuberDetail extends VtuberCard {
   socials: SocialRow[];
   assets: AssetRow[];
   /** `total` es la experiencia ACUMULADA de siempre: la barra se vacía al subir de nivel, el total no. */
-  experience: { current: number | null; max: number | null; total?: number } | null;
+  experience: {
+    current: number | null;
+    max: number | null;
+    total?: number;
+  } | null;
   /** Likes recibidos. La experiencia y el nivel ya vienen calculados con ellos (`server/src/experiencia.mjs`). */
   likes?: number;
 }
@@ -204,7 +228,7 @@ export interface Neighbors {
   next: { dexNumber: number; slug: string; name: string } | null;
 }
 
-export type SortKey = 'dex' | 'dex-desc' | 'name' | 'power';
+export type SortKey = "dex" | "dex-desc" | "name" | "power";
 
 export interface SearchParams {
   q: string;
@@ -223,17 +247,22 @@ export interface SearchParams {
 
 /* ───────────── Mantenedor ───────────── */
 
-export type VtuberStatus = VtuberCard['status'];
+export type VtuberStatus = VtuberCard["status"];
 
 /** Filtro de estado del listado del mantenedor (`all` incluye borradores y ocultos). */
-export type AdminStatusFilter = 'all' | VtuberStatus;
+export type AdminStatusFilter = "all" | VtuberStatus;
 
 /** Filtro por correo asociado del listado del mantenedor (`todos` = sin filtrar). */
-export type AdminCorreoFilter = 'todos' | 'con' | 'sin';
+export type AdminCorreoFilter = "todos" | "con" | "sin";
 
 /** `GET /api/admin/stats` (`server/src/estadisticas-admin.mjs`). `correo`/`solicitudes` son nulos sin cola. */
 export interface AdminStats {
-  totals: { total: number; withDetail: number; notPublished: number; sinProblemas: number };
+  totals: {
+    total: number;
+    withDetail: number;
+    notPublished: number;
+    sinProblemas: number;
+  };
   estados: { published: number; draft: number; hidden: number };
   themes: number;
   quality: Array<{ flags: string[]; count: number }>;
@@ -241,7 +270,9 @@ export interface AdminStats {
   facciones: Array<{ name: string; count: number }>;
   grados: Array<{ grade: string; count: number }>;
   correo: { con: number; sin: number } | null;
-  solicitudes: { pendientes: { inscripcion: number; baja: number; modificacion: number } } | null;
+  solicitudes: {
+    pendientes: { inscripcion: number; baja: number; modificacion: number };
+  } | null;
 }
 
 /** Fila del catálogo cerrado de facciones, con su uso (`total` = fichas, `publicadas` = visibles). */
@@ -272,7 +303,7 @@ export interface StatInput {
 }
 
 export interface SkillInput {
-  category: SkillRow['category'];
+  category: SkillRow["category"];
   section?: string | null;
   type?: string | null;
   name?: string | null;
@@ -298,7 +329,7 @@ export interface VtuberPatch {
   name?: string;
   slug?: string;
   /** Entero libre, o `'end'` = siguiente al último. */
-  dexNumber?: number | 'end';
+  dexNumber?: number | "end";
   phrase?: string | null;
   cardText?: string | null;
   themeColor?: string | null;

@@ -39,23 +39,25 @@
  *   node scripts/publish-images.mjs --force          # resubir todo
  *   node scripts/publish-images.mjs --turso-url ... --turso-token ...
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { createClient } from '@libsql/client/node';
+import { createClient } from "@libsql/client/node";
 
-import { CARPETAS_PUBLICADAS } from '../lib/carpetas.mjs';
-import { leerOpciones } from './lib/terminal.mjs';
+import { CARPETAS_PUBLICADAS } from "../lib/carpetas.mjs";
+import { leerOpciones } from "./lib/terminal.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, '..');
+const ROOT = path.resolve(HERE, "..");
 
-const { tiene: has, opcion: value } = leerOpciones(process.argv.slice(2), { conIgual: true });
+const { tiene: has, opcion: value } = leerOpciones(process.argv.slice(2), {
+  conIgual: true,
+});
 
-const DRY_RUN = has('dry-run');
-const FORCE = has('force');
-const MANIFEST = path.resolve(ROOT, 'deploy/data/images.json');
+const DRY_RUN = has("dry-run");
+const FORCE = has("force");
+const MANIFEST = path.resolve(ROOT, "deploy/data/images.json");
 
 /**
  * Carpetas que se publican. Las retiradas (`thumb`, `avatar`, `ficha`, `radar`, `card`)
@@ -64,11 +66,11 @@ const MANIFEST = path.resolve(ROOT, 'deploy/data/images.json');
  */
 const USED_FOLDERS = new Set(CARPETAS_PUBLICADAS);
 
-const URL_TURSO = value('turso-url', process.env.TURSO_DATABASE_URL ?? '');
-const AUTH = value('turso-token', process.env.TURSO_AUTH_TOKEN ?? '');
+const URL_TURSO = value("turso-url", process.env.TURSO_DATABASE_URL ?? "");
+const AUTH = value("turso-token", process.env.TURSO_AUTH_TOKEN ?? "");
 
 /** Tipo por extensión: las carpetas publicadas son `.webp` y los emblemas `.png`. */
-const MIME = { '.webp': 'image/webp', '.png': 'image/png' };
+const MIME = { ".webp": "image/webp", ".png": "image/png" };
 
 /**
  * Assets a subir, leídos del MANIFIESTO y no de un recorrido de `data/images/`: así solo
@@ -78,9 +80,9 @@ const MIME = { '.webp': 'image/webp', '.png': 'image/png' };
 function pendientesDelManifiesto(manifest) {
   const lista = [];
   for (const rel of Object.keys(manifest.images ?? {})) {
-    const partes = String(rel).split('/');
+    const partes = String(rel).split("/");
     if (!USED_FOLDERS.has(partes[1])) continue;
-    const abs = path.join(ROOT, 'data', rel);
+    const abs = path.join(ROOT, "data", rel);
     if (!fs.existsSync(abs)) {
       console.warn(`[publish] ⚠ omitido (no está en disco): ${rel}`);
       continue;
@@ -91,7 +93,7 @@ function pendientesDelManifiesto(manifest) {
       abs,
       kind: partes[1],
       slug: path.basename(abs, ext),
-      mime: MIME[ext] ?? 'application/octet-stream',
+      mime: MIME[ext] ?? "application/octet-stream",
       bytes: fs.statSync(abs).size,
     });
   }
@@ -122,8 +124,12 @@ function pendientesDelManifiesto(manifest) {
  * @returns {Promise<Array<string>>} claves sospechosas
  */
 export async function reemplazosEnElArbolDelCatalogo(db, todos) {
-  const { rows } = await db.execute("SELECT slug, kind, size FROM asset_remoto WHERE origen = 'mantenedor'");
-  const porClave = new Map(rows.map((r) => [`${r.kind}/${r.slug}`, Number(r.size)]));
+  const { rows } = await db.execute(
+    "SELECT slug, kind, size FROM asset_remoto WHERE origen = 'mantenedor'",
+  );
+  const porClave = new Map(
+    rows.map((r) => [`${r.kind}/${r.slug}`, Number(r.size)]),
+  );
   return todos
     .filter((a) => porClave.get(`${a.kind}/${a.slug}`) === a.bytes)
     .map((a) => a.rel);
@@ -131,28 +137,32 @@ export async function reemplazosEnElArbolDelCatalogo(db, todos) {
 
 async function main() {
   if (!fs.existsSync(MANIFEST)) {
-    console.error(`✖ falta el manifiesto: ${MANIFEST} (corre antes: node scripts/build-db.mjs)`);
+    console.error(
+      `✖ falta el manifiesto: ${MANIFEST} (corre antes: node scripts/build-db.mjs)`,
+    );
     process.exit(1);
   }
-  const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync(MANIFEST, "utf8"));
   const todos = pendientesDelManifiesto(manifest);
   if (todos.length === 0) {
-    console.error('✖ el manifiesto no tiene imágenes publicables');
+    console.error("✖ el manifiesto no tiene imágenes publicables");
     process.exit(1);
   }
   console.log(
-    `[publish] ${todos.length} imágenes (${(todos.reduce((s, a) => s + a.bytes, 0) / 1024 / 1024).toFixed(1)} MB)${FORCE ? ' — FORZANDO resubida' : ''}`,
+    `[publish] ${todos.length} imágenes (${(todos.reduce((s, a) => s + a.bytes, 0) / 1024 / 1024).toFixed(1)} MB)${FORCE ? " — FORZANDO resubida" : ""}`,
   );
 
   if (DRY_RUN) {
-    console.log('[publish] dry-run: no se sube nada');
+    console.log("[publish] dry-run: no se sube nada");
     console.log(`[publish] carpetas: ${JSON.stringify(manifest.folders)}`);
     return;
   }
 
   if (!URL_TURSO) {
-    console.error('✖ falta TURSO_DATABASE_URL (o --turso-url).');
-    console.error('  Vercel Blob quedó bloqueado por cuota: no es un destino válido.');
+    console.error("✖ falta TURSO_DATABASE_URL (o --turso-url).");
+    console.error(
+      "  Vercel Blob quedó bloqueado por cuota: no es un destino válido.",
+    );
     process.exit(1);
   }
   const db = createClient({ url: URL_TURSO, authToken: AUTH || undefined });
@@ -164,7 +174,7 @@ async function main() {
    */
   process.env.TURSO_DATABASE_URL = URL_TURSO;
   if (AUTH) process.env.TURSO_AUTH_TOKEN = AUTH;
-  const { asegurarTablas } = await import('../lib/ediciones.mjs');
+  const { asegurarTablas } = await import("../lib/ediciones.mjs");
   await asegurarTablas();
 
   /**
@@ -175,8 +185,12 @@ async function main() {
    * reemplazos hechos a mano, y peor, el conteo de "ya publicado" taparía una imagen del
    * catálogo que sí falta subir.
    */
-  const { rows } = await db.execute("SELECT slug, kind, size FROM asset_remoto WHERE origen = 'catalogo'");
-  const yaEstan = new Map(rows.map((r) => [`${r.kind}/${r.slug}`, Number(r.size)]));
+  const { rows } = await db.execute(
+    "SELECT slug, kind, size FROM asset_remoto WHERE origen = 'catalogo'",
+  );
+  const yaEstan = new Map(
+    rows.map((r) => [`${r.kind}/${r.slug}`, Number(r.size)]),
+  );
   console.log(`[publish] ya en Turso: ${yaEstan.size}`);
 
   /**
@@ -186,10 +200,18 @@ async function main() {
    */
   const contaminados = await reemplazosEnElArbolDelCatalogo(db, todos);
   if (contaminados.length > 0) {
-    console.error(`✖ ${contaminados.length} archivo(s) de data/images/ coinciden con un REEMPLAZO del mantenedor.`);
-    console.error('  Subirlos los guardaría como origen=catalogo y perdería la imagen pública original.');
-    console.error('  Causa habitual: los reemplazos se bajaron a data/images/ en vez de a data/mantenedor/.');
-    console.error(`  Arréglalo con: rm -rf data/images && npm run download:images, y regenera con npm run build:data`);
+    console.error(
+      `✖ ${contaminados.length} archivo(s) de data/images/ coinciden con un REEMPLAZO del mantenedor.`,
+    );
+    console.error(
+      "  Subirlos los guardaría como origen=catalogo y perdería la imagen pública original.",
+    );
+    console.error(
+      "  Causa habitual: los reemplazos se bajaron a data/images/ en vez de a data/mantenedor/.",
+    );
+    console.error(
+      `  Arréglalo con: rm -rf data/images && npm run download:images, y regenera con npm run build:data`,
+    );
     for (const rel of contaminados.slice(0, 10)) console.error(`   · ${rel}`);
     await db.close();
     process.exit(1);
@@ -216,21 +238,21 @@ async function main() {
         const lote = residuos.slice(i, i + 100);
         await db.batch(
           lote.map((clave) => {
-            const [kind, ...resto] = clave.split('/');
+            const [kind, ...resto] = clave.split("/");
             return {
               sql: "DELETE FROM asset_remoto WHERE slug = ? AND kind = ? AND origen = 'catalogo'",
-              args: [resto.join('/'), kind],
+              args: [resto.join("/"), kind],
             };
           }),
-          'write',
+          "write",
         );
       }
-      console.log('[publish] residuos borrados');
+      console.log("[publish] residuos borrados");
     }
   }
 
   if (cola.length === 0) {
-    console.log('[publish] todo estaba ya publicado; nada que subir');
+    console.log("[publish] todo estaba ya publicado; nada que subir");
     await db.close();
     return;
   }
@@ -262,7 +284,7 @@ async function main() {
     }
     if (sentencias.length > 0) {
       try {
-        await db.batch(sentencias, 'write');
+        await db.batch(sentencias, "write");
         subidas += sentencias.length;
       } catch (error) {
         for (const a of lote) fallos.push({ rel: a.rel, error: error.message });
@@ -270,7 +292,9 @@ async function main() {
     }
     const hechos = Math.min(i + LOTE, cola.length);
     if (hechos % 250 < LOTE || hechos === cola.length) {
-      console.log(`[publish] ${hechos}/${cola.length} (subidas ${subidas}, fallos ${fallos.length})`);
+      console.log(
+        `[publish] ${hechos}/${cola.length} (subidas ${subidas}, fallos ${fallos.length})`,
+      );
     }
   }
 
@@ -280,22 +304,31 @@ async function main() {
   const n = Number(finales[0].n);
   const bytes = Number(finales[0].bytes ?? 0);
   console.log(`\n[publish] subidas: ${subidas} | fallos: ${fallos.length}`);
-  console.log(`[publish] catálogo en Turso ahora: ${n} objetos, ${(bytes / 1024 / 1024).toFixed(1)} MB`);
+  console.log(
+    `[publish] catálogo en Turso ahora: ${n} objetos, ${(bytes / 1024 / 1024).toFixed(1)} MB`,
+  );
   // Los reemplazos del mantenedor se informan aparte: cuentan como "no es lo que publicó
   // el manifiesto", pero no deben alterar la comprobación de integridad del catálogo.
   const { rows: propios } = await db.execute(
     "SELECT COUNT(*) AS n FROM asset_remoto WHERE origen = 'mantenedor'",
   );
   if (Number(propios[0].n) > 0) {
-    console.log(`[publish] reemplazos del mantenedor (intactos, no se tocan): ${Number(propios[0].n)}`);
+    console.log(
+      `[publish] reemplazos del mantenedor (intactos, no se tocan): ${Number(propios[0].n)}`,
+    );
   }
   if (n !== todos.length) {
-    console.warn(`[publish] ⚠ el manifiesto declara ${todos.length} y en Turso hay ${n}`);
+    console.warn(
+      `[publish] ⚠ el manifiesto declara ${todos.length} y en Turso hay ${n}`,
+    );
   }
   if (fallos.length > 0) {
-    console.log('[publish] fallos (muestra):');
-    for (const f of fallos.slice(0, 10)) console.log(`   ✖ ${f.rel}: ${f.error}`);
-    console.log('[publish] vuelve a ejecutar el script: reintenta solo lo que falta');
+    console.log("[publish] fallos (muestra):");
+    for (const f of fallos.slice(0, 10))
+      console.log(`   ✖ ${f.rel}: ${f.error}`);
+    console.log(
+      "[publish] vuelve a ejecutar el script: reintenta solo lo que falta",
+    );
     process.exitCode = 1;
   }
   await db.close();
@@ -308,9 +341,9 @@ async function main() {
  * (`reemplazosEnElArbolDelCatalogo`) para probarla sin Turso: sin esta comprobación, importarla
  * dispararía el script entero —y con él una escritura real— durante la suite.
  */
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   main().catch((error) => {
-    console.error('[publish] ERROR', error.message);
+    console.error("[publish] ERROR", error.message);
     process.exit(1);
   });
 }

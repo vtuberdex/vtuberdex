@@ -5,15 +5,16 @@
  * por cláusula para poder enlazar a las que importan (`#salida`, `#datos-personales`). Los metadatos
  * del servidor quedan en español.
  */
-import type { Metadata } from 'next';
+import type { Metadata } from "next";
 
-import { TerminosContenido } from '@/components/terminos-contenido';
-import { NOMBRE_SITIO } from '@/lib/seo';
+import { TerminosContenido } from "@/components/terminos-contenido";
+import { NOMBRE_SITIO } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: `Términos y Condiciones · ${NOMBRE_SITIO}`,
-  description: 'Términos y condiciones de la inscripción, el uso y la baja de fichas en VTuberDex.',
-  alternates: { canonical: '/terminos' },
+  description:
+    "Términos y condiciones de la inscripción, el uso y la baja de fichas en VTuberDex.",
+  alternates: { canonical: "/terminos" },
 };
 
 export default function TerminosRoute() {

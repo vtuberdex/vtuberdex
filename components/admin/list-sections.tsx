@@ -1,25 +1,31 @@
-'use client';
+"use client";
 /**
  * Listas editables de una ficha que usan `ListEditor` (perfil y redes). Atributos y habilidades
  * tienen su propia vista compacta en `steps/` (una línea por elemento). El estado vive en el editor
  * padre para que un único «Guardar cambios» envíe un solo PATCH.
  */
-import { SocialIcon } from '@/components/social-icon';
-import { ListEditor } from '@/components/admin/list-editor';
-import { emptySocial, type SocialForm } from '@/components/admin/form-model';
-import { placeholderFor } from '@/components/admin/suggestions';
-import { inputClass, labelClass } from '@/components/admin/ui';
-import type { ProfileField } from '@/lib/types';
+import { SocialIcon } from "@/components/social-icon";
+import { ListEditor } from "@/components/admin/list-editor";
+import { emptySocial, type SocialForm } from "@/components/admin/form-model";
+import { placeholderFor } from "@/components/admin/suggestions";
+import { inputClass, labelClass } from "@/components/admin/ui";
+import type { ProfileField } from "@/lib/types";
 
 const compact = `${inputClass} !mt-1`;
 
-export function ProfileEditor({ items, onChange }: { items: ProfileField[]; onChange: (items: ProfileField[]) => void }) {
+export function ProfileEditor({
+  items,
+  onChange,
+}: {
+  items: ProfileField[];
+  onChange: (items: ProfileField[]) => void;
+}) {
   return (
     <ListEditor
       noun="dato"
       items={items}
       onChange={onChange}
-      newItem={() => ({ label: '', value: '' })}
+      newItem={() => ({ label: "", value: "" })}
       addLabel="Agregar dato de perfil"
       emptyText="Sin datos de perfil todavía."
       max={40}
@@ -27,11 +33,19 @@ export function ProfileEditor({ items, onChange }: { items: ProfileField[]; onCh
         <div className="grid gap-2 sm:grid-cols-[1fr_2fr]">
           <label className={labelClass}>
             Nombre
-            <input value={item.label} onChange={(event) => update({ label: event.target.value })} className={compact} />
+            <input
+              value={item.label}
+              onChange={(event) => update({ label: event.target.value })}
+              className={compact}
+            />
           </label>
           <label className={labelClass}>
             Valor
-            <input value={item.value} onChange={(event) => update({ value: event.target.value })} className={compact} />
+            <input
+              value={item.value}
+              onChange={(event) => update({ value: event.target.value })}
+              className={compact}
+            />
           </label>
         </div>
       )}
@@ -39,7 +53,13 @@ export function ProfileEditor({ items, onChange }: { items: ProfileField[]; onCh
   );
 }
 
-export function SocialsEditor({ items, onChange }: { items: SocialForm[]; onChange: (items: SocialForm[]) => void }) {
+export function SocialsEditor({
+  items,
+  onChange,
+}: {
+  items: SocialForm[];
+  onChange: (items: SocialForm[]) => void;
+}) {
   return (
     <ListEditor
       noun="red"
@@ -50,18 +70,33 @@ export function SocialsEditor({ items, onChange }: { items: SocialForm[]; onChan
       emptyText="Sin redes sociales todavía."
       max={20}
       renderItem={(item, update) => {
-        const bad = item.url.trim() !== '' && !/^https?:\/\/\S+$/i.test(item.url.trim());
+        const bad =
+          item.url.trim() !== "" && !/^https?:\/\/\S+$/i.test(item.url.trim());
         return (
           <div className="grid gap-2 sm:grid-cols-3">
             <label className={labelClass}>
               <span className="inline-flex items-center gap-1.5">
-                <SocialIcon platform={item.platform} url={item.url} className="h-3.5 w-3.5" /> Plataforma
+                <SocialIcon
+                  platform={item.platform}
+                  url={item.url}
+                  className="h-3.5 w-3.5"
+                />{" "}
+                Plataforma
               </span>
-              <input value={item.platform} onChange={(event) => update({ platform: event.target.value })} className={compact} placeholder="twitch" />
+              <input
+                value={item.platform}
+                onChange={(event) => update({ platform: event.target.value })}
+                className={compact}
+                placeholder="twitch"
+              />
             </label>
             <label className={`${labelClass} sm:col-span-2`}>
               Etiqueta (opcional)
-              <input value={item.label} onChange={(event) => update({ label: event.target.value })} className={compact} />
+              <input
+                value={item.label}
+                onChange={(event) => update({ label: event.target.value })}
+                className={compact}
+              />
             </label>
             <label className={`${labelClass} sm:col-span-3`}>
               URL
@@ -69,10 +104,14 @@ export function SocialsEditor({ items, onChange }: { items: SocialForm[]; onChan
                 value={item.url}
                 onChange={(event) => update({ url: event.target.value })}
                 aria-invalid={bad}
-                className={`${compact} ${bad ? '!border-red-400' : ''}`}
+                className={`${compact} ${bad ? "!border-red-400" : ""}`}
                 placeholder={placeholderFor(item.platform)}
               />
-              {bad && <span className="mt-1 block text-[11px] normal-case tracking-normal text-red-300">Debe empezar con http:// o https://</span>}
+              {bad && (
+                <span className="mt-1 block text-[11px] normal-case tracking-normal text-red-300">
+                  Debe empezar con http:// o https://
+                </span>
+              )}
             </label>
           </div>
         );

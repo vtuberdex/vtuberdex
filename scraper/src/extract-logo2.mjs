@@ -16,27 +16,27 @@
  *   node src/extract-logo2.mjs --sample 40   # validación (rejilla + informe)
  *   node src/extract-logo2.mjs               # todas las que faltan
  */
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { findLogoBox as findLogoBoxEdges } from './logo-edges.mjs';
-import { BAND, BADGE, MIN_SAT, MIN_VAL, MAX_DARK } from './logo-bands.mjs';
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { findLogoBox as findLogoBoxEdges } from "./logo-edges.mjs";
+import { BAND, BADGE, MIN_SAT, MIN_VAL, MAX_DARK } from "./logo-bands.mjs";
 
-import sharp from 'sharp';
+import sharp from "sharp";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, '..', '..');
-const LOGOS = path.join(ROOT, 'data', 'images', 'logo');
-const DATASET = path.join(HERE, '..', 'out', 'dataset.json');
-const REPORT = path.join(HERE, '..', 'out', 'logo-extraction2.json');
+const ROOT = path.resolve(HERE, "..", "..");
+const LOGOS = path.join(ROOT, "data", "images", "logo");
+const DATASET = path.join(HERE, "..", "out", "dataset.json");
+const REPORT = path.join(HERE, "..", "out", "logo-extraction2.json");
 
 const args = process.argv.slice(2);
 const value = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
 };
-const SAMPLE = Number(value('sample', '0')) || 0;
-const CONCURRENCY = Number(value('concurrency', '6'));
+const SAMPLE = Number(value("sample", "0")) || 0;
+const CONCURRENCY = Number(value("concurrency", "6"));
 
 /**
  * Banda de búsqueda del logo, derivada de la calibración.
@@ -60,21 +60,44 @@ const EDGE_OPTIONS = { edgeMin: 60, cellMinEdge: 3, minCells: 20, ratio: 0.45 };
  * Criterio: píxeles saturados o muy claros suelen ser el logo o su borde blanco,
  * mientras el fondo de la carta es oscuro y poco saturado.
  */
-export function findLogoBoxInBand(data, width, height, channels, band = BAND, badge = BADGE) {
+export function findLogoBoxInBand(
+  data,
+  width,
+  height,
+  channels,
+  band = BAND,
+  badge = BADGE,
+) {
   // Cadena de intentos, del criterio más fiable al más permisivo:
   //   1. `sat`  — solo saturación. Discrimina mejor; con él se validaron ~770.
   //   2. `both` — saturación o brillo: rescata logos BLANCOS sobre fondo oscuro.
   //   3. `dark` — píxeles oscuros: para cartas con fondo CLARO (crema, rosa vivo)
   //               donde el logo es lo oscuro, que es el caso invertido.
   // Se corta en cuanto un intento produce una caja plausible.
-  for (const mode of ['sat', 'both', 'dark']) {
-    const found = detectWithMask(data, width, height, channels, mode, band, badge);
+  for (const mode of ["sat", "both", "dark"]) {
+    const found = detectWithMask(
+      data,
+      width,
+      height,
+      channels,
+      mode,
+      band,
+      badge,
+    );
     if (found) return found;
   }
   return null;
 }
 
-function detectWithMask(data, width, height, channels, mode, band = BAND, badge = BADGE) {
+function detectWithMask(
+  data,
+  width,
+  height,
+  channels,
+  mode,
+  band = BAND,
+  badge = BADGE,
+) {
   const x0 = Math.floor(width * band.x0);
   const y0 = Math.floor(height * band.y0);
   const x1 = Math.floor(width * band.x1);
@@ -108,8 +131,10 @@ function detectWithMask(data, width, height, channels, mode, band = BAND, badge 
       //   both → además brillo alto: rescata logos blancos sobre fondo oscuro.
       //   dark → píxeles oscuros: cartas de fondo claro con logo oscuro.
       const isLogo =
-        mode === 'sat' ? sat > MIN_SAT
-          : mode === 'both' ? (sat > MIN_SAT || max > MIN_VAL)
+        mode === "sat"
+          ? sat > MIN_SAT
+          : mode === "both"
+            ? sat > MIN_SAT || max > MIN_VAL
             : max < MAX_DARK;
       if (isLogo) {
         grid[Math.floor(y / CELL) * gridCols + Math.floor(x / CELL)] += 1;
@@ -163,9 +188,16 @@ function detectWithMask(data, width, height, channels, mode, band = BAND, badge 
     return end > start ? [start, end] : null;
   };
 
-  const colsRange = coreRange(colHits, Math.floor(x0 / CELL), Math.floor(x1 / CELL));
+  const colsRange = coreRange(
+    colHits,
+    Math.floor(x0 / CELL),
+    Math.floor(x1 / CELL),
+  );
   if (!colsRange) return null;
-  const cols = [colsRange[0] * CELL, Math.min(width - 1, colsRange[1] * CELL + CELL - 1)];
+  const cols = [
+    colsRange[0] * CELL,
+    Math.min(width - 1, colsRange[1] * CELL + CELL - 1),
+  ];
 
   // --- Corte vertical por DENSIDAD (en celdas) --------------------------------
   // El logo es la masa más densa de la banda; el panel de historia tiene filas
@@ -174,7 +206,10 @@ function detectWithMask(data, width, height, channels, mode, band = BAND, badge 
   // aunque tenga algunas filas cargadas.
   const cellY0 = Math.floor(y0 / CELL);
   const cellY1 = Math.floor(y1 / CELL);
-  const rowsBand = Array.from({ length: cellY1 - cellY0 }, (_, i) => rowHits[cellY0 + i]);
+  const rowsBand = Array.from(
+    { length: cellY1 - cellY0 },
+    (_, i) => rowHits[cellY0 + i],
+  );
   const peak = Math.max(...rowsBand);
   if (peak < 3) return null;
 
@@ -202,7 +237,10 @@ function detectWithMask(data, width, height, channels, mode, band = BAND, badge 
     }
   }
 
-  const rows = [Math.max(0, (cellY0 + firstDense) * CELL), Math.min(height - 1, (cellY0 + lastDense) * CELL + CELL - 1)];
+  const rows = [
+    Math.max(0, (cellY0 + firstDense) * CELL),
+    Math.min(height - 1, (cellY0 + lastDense) * CELL + CELL - 1),
+  ];
   if (rows[1] <= rows[0]) return null;
 
   const box = {
@@ -222,27 +260,48 @@ function detectWithMask(data, width, height, channels, mode, band = BAND, badge 
 
 /** Extrae el logo de una carta. Devuelve {buffer, box, meta} o null. */
 export async function extractLogoFromCard(file) {
-  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = await sharp(file)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   // Detección por BORDES: medida contra las 211 cartas con logo conocido da
   // recall 0.87 / precisión 0.67, el mejor resultado de los enfoques probados
   // (densidad 0.90/0.35, diversidad de color 0.67/0.61). El logo tiene
   // estructura; el fondo del panel de historia es plano, así que no entra.
-  const edge = findLogoBoxEdges(data, info.width, info.height, info.channels, EDGE_OPTIONS);
+  const edge = findLogoBoxEdges(
+    data,
+    info.width,
+    info.height,
+    info.channels,
+    EDGE_OPTIONS,
+  );
   // Respaldo: el detector por densidad, para cartas con logos muy lisos.
-  const found = edge ? { box: edge.box } : findLogoBoxInBand(data, info.width, info.height, info.channels);
+  const found = edge
+    ? { box: edge.box }
+    : findLogoBoxInBand(data, info.width, info.height, info.channels);
   if (!found) return null;
 
   const pad = 4;
   const crop = {
     left: Math.max(0, found.box.left - pad),
     top: Math.max(0, found.box.top - pad),
-    width: Math.min(info.width - Math.max(0, found.box.left - pad), found.box.width + pad * 2),
-    height: Math.min(info.height - Math.max(0, found.box.top - pad), found.box.height + pad * 2),
+    width: Math.min(
+      info.width - Math.max(0, found.box.left - pad),
+      found.box.width + pad * 2,
+    ),
+    height: Math.min(
+      info.height - Math.max(0, found.box.top - pad),
+      found.box.height + pad * 2,
+    ),
   };
 
   // Se extrae y se BORRA el badge del número (esquina superior derecha), que no
   // forma parte del logo. Se hace con transparencia para no cortar el arte.
-  const raw = await sharp(file).extract(crop).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const raw = await sharp(file)
+    .extract(crop)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   const out = Buffer.from(raw.data);
   const { width, height, channels } = raw.info;
   const badgeX = Math.floor(width * 0.72);
@@ -252,68 +311,99 @@ export async function extractLogoFromCard(file) {
       out[(y * width + x) * channels + 3] = 0;
     }
   }
-  const buffer = await sharp(out, { raw: { width, height, channels } }).png().toBuffer();
+  const buffer = await sharp(out, { raw: { width, height, channels } })
+    .png()
+    .toBuffer();
   return { buffer, box: crop, meta: found };
 }
 
 async function main() {
-  const dataset = JSON.parse(fs.readFileSync(DATASET, 'utf8'));
+  const dataset = JSON.parse(fs.readFileSync(DATASET, "utf8"));
   // Solo cartas que aún no tienen logo (las 574 sin ficha de detalle).
-  const missing = dataset.vtubers.filter((v) => v.assets?.card && !fs.existsSync(path.join(LOGOS, `${v.slug}.webp`)));
+  const missing = dataset.vtubers.filter(
+    (v) => v.assets?.card && !fs.existsSync(path.join(LOGOS, `${v.slug}.webp`)),
+  );
   let targets = missing;
   if (SAMPLE > 0) {
     const step = Math.max(1, Math.floor(missing.length / SAMPLE));
     targets = missing.filter((_, i) => i % step === 0).slice(0, SAMPLE);
   }
-  console.log(`[logo2] cartas sin logo: ${missing.length} | procesando ${targets.length}`);
+  console.log(
+    `[logo2] cartas sin logo: ${missing.length} | procesando ${targets.length}`,
+  );
 
   const results = [];
   let cursor = 0;
   const worker = async () => {
     while (cursor < targets.length) {
       const card = targets[cursor++];
-      const file = path.join(ROOT, 'data', card.assets.card);
+      const file = path.join(ROOT, "data", card.assets.card);
       try {
         const found = await extractLogoFromCard(file);
         if (!found) {
-          results.push({ slug: card.slug, dexNumber: card.dexNumber, status: 'no-detectado' });
+          results.push({
+            slug: card.slug,
+            dexNumber: card.dexNumber,
+            status: "no-detectado",
+          });
           continue;
         }
-        await sharp(found.buffer).webp({ quality: 92, alphaQuality: 95 }).toFile(path.join(LOGOS, `${card.slug}.webp`));
+        await sharp(found.buffer)
+          .webp({ quality: 92, alphaQuality: 95 })
+          .toFile(path.join(LOGOS, `${card.slug}.webp`));
         results.push({
           slug: card.slug,
           dexNumber: card.dexNumber,
-          status: 'extraido',
+          status: "extraido",
           box: found.box,
           width: found.box.width,
           height: found.box.height,
           aspect: Number((found.box.width / found.box.height).toFixed(2)),
         });
       } catch (error) {
-        results.push({ slug: card.slug, dexNumber: card.dexNumber, status: 'error', detail: String(error).slice(0, 100) });
+        results.push({
+          slug: card.slug,
+          dexNumber: card.dexNumber,
+          status: "error",
+          detail: String(error).slice(0, 100),
+        });
       }
     }
   };
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
-  const byStatus = results.reduce((acc, r) => ({ ...acc, [r.status]: (acc[r.status] ?? 0) + 1 }), {});
-  const ok = results.filter((r) => r.status === 'extraido');
+  const byStatus = results.reduce(
+    (acc, r) => ({ ...acc, [r.status]: (acc[r.status] ?? 0) + 1 }),
+    {},
+  );
+  const ok = results.filter((r) => r.status === "extraido");
   fs.writeFileSync(
     REPORT,
-    JSON.stringify({ generatedAt: new Date().toISOString(), band: BAND, resumen: { total: results.length, ...byStatus }, results }, null, 1),
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        band: BAND,
+        resumen: { total: results.length, ...byStatus },
+        results,
+      },
+      null,
+      1,
+    ),
   );
   console.log(`[logo2] ${JSON.stringify(byStatus)}`);
   if (ok.length) {
     const w = ok.map((r) => r.width).sort((a, b) => a - b);
     const h = ok.map((r) => r.height).sort((a, b) => a - b);
-    console.log(`[logo2] ancho mediano ${w[Math.floor(w.length / 2)]} | alto mediano ${h[Math.floor(h.length / 2)]}`);
+    console.log(
+      `[logo2] ancho mediano ${w[Math.floor(w.length / 2)]} | alto mediano ${h[Math.floor(h.length / 2)]}`,
+    );
   }
-  console.log('[logo2] informe: out/logo-extraction2.json');
+  console.log("[logo2] informe: out/logo-extraction2.json");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
-    console.error('[logo2] ERROR', error);
+    console.error("[logo2] ERROR", error);
     process.exit(1);
   });
 }

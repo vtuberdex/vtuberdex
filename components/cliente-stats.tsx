@@ -1,9 +1,9 @@
-'use client';
+"use client";
 /** Latido anónimo de rendimiento (ver `lib/telemetria-cliente.ts`). No pinta nada. */
-import { usePathname } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 
-import { iniciarTelemetria, type Telemetria } from '@/lib/telemetria-cliente';
+import { iniciarTelemetria, type Telemetria } from "@/lib/telemetria-cliente";
 
 export function ClienteStats() {
   const pathname = usePathname();

@@ -12,15 +12,18 @@
  * sin ningún filtro en JS. Antes las ediciones se pintaban encima de la página y `total` no
  * descontaba lo despublicado. Sin Turso, `dbConDiario()` es la base de siempre.
  */
-import { dbConDiario } from '../../../lib/diario.mjs';
-import { aplicarReemplazosALista } from '../../../lib/ediciones.mjs';
-import { conExperiencia, contarLikesVarios } from '../../../lib/likes.mjs';
-import { xpJuegoDeVarias } from '../../../lib/minecraft.mjs';
-import { marcarSinCorreo } from '../../../lib/sin-correo.mjs';
-import { facetCounts, searchVtubers } from '../../../server/src/search.mjs';
-import { formatIssues, listQuerySchema } from '../../../server/src/validation.mjs';
+import { dbConDiario } from "../../../lib/diario.mjs";
+import { aplicarReemplazosALista } from "../../../lib/ediciones.mjs";
+import { conExperiencia, contarLikesVarios } from "../../../lib/likes.mjs";
+import { xpJuegoDeVarias } from "../../../lib/minecraft.mjs";
+import { marcarSinCorreo } from "../../../lib/sin-correo.mjs";
+import { facetCounts, searchVtubers } from "../../../server/src/search.mjs";
+import {
+  formatIssues,
+  listQuerySchema,
+} from "../../../server/src/validation.mjs";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 /**
  * Caché de BORDE de la respuesta pública: 30 s frescos y 60 s más sirviendo la copia mientras se
@@ -29,14 +32,15 @@ export const dynamic = 'force-dynamic';
  * del mantenedor tarda hasta ~30-90 s en verse en el sitio público. Solo las respuestas 200: un
  * 400 no se cachea. Sin `max-age`: el navegador siempre pregunta al borde.
  */
-const CACHE_PUBLICA = 'public, max-age=0, s-maxage=30, stale-while-revalidate=60';
+const CACHE_PUBLICA =
+  "public, max-age=0, s-maxage=30, stale-while-revalidate=60";
 /** TTL de la clave del diario en lecturas públicas (ver `dbConDiario`). */
 const TTL_DIARIO_MS = 2000;
 
 /** El servidor Express acepta `?countries=a,b` además de `?countries=a&countries=b`. */
 function splitCsv(value) {
-  return String(value ?? '')
-    .split(',')
+  return String(value ?? "")
+    .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -48,10 +52,26 @@ export async function GET(request) {
   const raw = Object.fromEntries(new URL(request.url).searchParams);
   const parsed = listQuerySchema.safeParse(raw);
   if (!parsed.success) {
-    return Response.json({ error: 'query_invalida', issues: formatIssues(parsed.error) }, { status: 400 });
+    return Response.json(
+      { error: "query_invalida", issues: formatIssues(parsed.error) },
+      { status: 400 },
+    );
   }
 
-  const { q, countries, languages, groups, artists, factions, sort, page, perPage, language, premium, facet } = parsed.data;
+  const {
+    q,
+    countries,
+    languages,
+    groups,
+    artists,
+    factions,
+    sort,
+    page,
+    perPage,
+    language,
+    premium,
+    facet,
+  } = parsed.data;
   const result = searchVtubers(db, {
     q,
     countries: splitCsv(countries),
@@ -76,8 +96,16 @@ export async function GET(request) {
    * 0 likes, nunca el manual.
    */
   const ids = conImagenes.map((c) => c.id);
-  const [likes, juego] = await Promise.all([contarLikesVarios(ids).catch(() => new Map()), xpJuegoDeVarias(ids)]);
-  const conNivel = conImagenes.map((c) => conExperiencia(c, likes.get(c.id) ?? 0, juego.get(c.id) ?? 0));
+  const [likes, juego] = await Promise.all([
+    contarLikesVarios(ids).catch(() => new Map()),
+    xpJuegoDeVarias(ids),
+  ]);
+  const conNivel = conImagenes.map((c) =>
+    conExperiencia(c, likes.get(c.id) ?? 0, juego.get(c.id) ?? 0),
+  );
   const items = await marcarSinCorreo(db, conNivel);
-  return Response.json({ ...result, items, facets }, { headers: { 'cache-control': CACHE_PUBLICA } });
+  return Response.json(
+    { ...result, items, facets },
+    { headers: { "cache-control": CACHE_PUBLICA } },
+  );
 }

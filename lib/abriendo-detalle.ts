@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Estado global mínimo de «Accediendo al detalle».
  *
@@ -8,7 +8,7 @@
  * retrasada. Por eso el estado es de módulo, lo pinta `components/abriendo-detalle.tsx` desde
  * el layout (que NO se desmonta al navegar) y lo baja la ficha cuando ya tiene sus datos.
  */
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from "react";
 
 /** Si la navegación nunca llega a la ficha, el aviso no puede quedarse para siempre. */
 export const ABRIENDO_MAX_MS = 10_000;

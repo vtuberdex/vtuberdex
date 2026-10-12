@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Texturas, uniforms y materiales de UNA carta holográfica, como hook reutilizable.
  *
@@ -28,16 +28,24 @@
  * carta y ancho adaptado a lo que la máquina tarda. Este hook solo convierte los canvases
  * en texturas de three y los conecta a los uniforms.
  */
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useThree } from '@react-three/fiber';
-import * as THREE from 'three';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useThree } from "@react-three/fiber";
+import * as THREE from "three";
 
-import type { VtuberCard } from '@/lib/types';
-import metalEnvImport from './metal-env.webp';
-import { cardPalette } from '@/lib/color';
-import * as CFG from '@/components/card3d-config';
-import { LAYER_UNIFORM_NAMES } from '@/components/card3d-config';
-import { live, tocada } from '@/components/card3d-live';
+import type { VtuberCard } from "@/lib/types";
+import metalEnvImport from "./metal-env.webp";
+import { cardPalette } from "@/lib/color";
+import * as CFG from "@/components/card3d-config";
+import { LAYER_UNIFORM_NAMES } from "@/components/card3d-config";
+import { live, tocada } from "@/components/card3d-live";
 
 /**
  * URL del mapa de entorno del metal. En Next, importar una imagen da un OBJETO
@@ -46,15 +54,25 @@ import { live, tocada } from '@/components/card3d-live';
  * `/[object Object]` (404), el entorno nunca cargaba y el metal salía sin reflejo, sin
  * ningún error visible. Vitest sí entrega la cadena, por eso ningún test lo vio.
  */
-const metalEnvUrl: string = typeof metalEnvImport === 'string'
-  ? metalEnvImport
-  : (metalEnvImport as { src: string }).src;
-import { CARD_TEXTURE_FULL_WIDTH, loadImage } from '@/components/card-texture';
-import { cardFragmentShader, cardVertexShader, glowFragmentShader, glowVertexShader } from '@/components/shaders';
-import { iconosDeFaccion } from '@/components/card-texture/facciones';
-import type { ColorPredominante } from '@/components/card-texture/predominante';
-import { refuerzoDeGrado } from '@/components/premium-boost';
-import { anclar, generarTexturas, type TexturasDeCarta } from '@/components/card-texture/fabrica';
+const metalEnvUrl: string =
+  typeof metalEnvImport === "string"
+    ? metalEnvImport
+    : (metalEnvImport as { src: string }).src;
+import { CARD_TEXTURE_FULL_WIDTH, loadImage } from "@/components/card-texture";
+import {
+  cardFragmentShader,
+  cardVertexShader,
+  glowFragmentShader,
+  glowVertexShader,
+} from "@/components/shaders";
+import { iconosDeFaccion } from "@/components/card-texture/facciones";
+import type { ColorPredominante } from "@/components/card-texture/predominante";
+import { refuerzoDeGrado } from "@/components/premium-boost";
+import {
+  anclar,
+  generarTexturas,
+  type TexturasDeCarta,
+} from "@/components/card-texture/fabrica";
 
 /** Proporción real de una carta coleccionable (5x7 pulgadas -> 1.4). */
 const CARD_W = CFG.GEOMETRY.cardWidth;
@@ -141,7 +159,11 @@ export interface CardMaterials {
   cardWidth: number;
   cardHeight: number;
   /** Actualización por frame: tiempo, puntero (NDC) e inclinación (rad) que ve el shader. */
-  tick: (time: number, pointer: { x: number; y: number }, tilt: { x: number; y: number }) => void;
+  tick: (
+    time: number,
+    pointer: { x: number; y: number },
+    tilt: { x: number; y: number },
+  ) => void;
 }
 
 interface CardTextures {
@@ -176,17 +198,27 @@ const texturaDeCanvas = (canvas: HTMLCanvasElement, anisotropy: number) => {
  * cada una y se subían otra vez a la GPU (con sus mipmaps) aunque el píxel fuera el mismo; el
  * entorno metálico propio de la carta suelta tampoco cambia entre etapas.
  */
-function aTexturasThree(t: TexturasDeCarta, envMap: HTMLImageElement | null, previa: CardTextures | null): CardTextures {
+function aTexturasThree(
+  t: TexturasDeCarta,
+  envMap: HTMLImageElement | null,
+  previa: CardTextures | null,
+): CardTextures {
   return {
     dominant: t.dominant,
     layers: t.layers.map((canvas, i) =>
-      previa && previa.canvases[i] === canvas ? previa.layers[i] : texturaDeCanvas(canvas, 8),
+      previa && previa.canvases[i] === canvas
+        ? previa.layers[i]
+        : texturaDeCanvas(canvas, 8),
     ),
     canvases: t.layers,
     edge: texturaDeCanvas(t.edge, 4),
     logoMask: new THREE.CanvasTexture(t.logoMask),
     logoSticker: new THREE.CanvasTexture(t.logoSticker),
-    envMap: previa?.envMap ?? (envMap ? texturaDeCanvas(envMap as unknown as HTMLCanvasElement, 8) : null),
+    envMap:
+      previa?.envMap ??
+      (envMap
+        ? texturaDeCanvas(envMap as unknown as HTMLCanvasElement, 8)
+        : null),
     completa: t.completa,
   };
 }
@@ -200,7 +232,10 @@ const todasLasTexturas = (c: CardTextures): THREE.Texture[] => [
   ...(c.envMap ? [c.envMap] : []),
 ];
 
-export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions = {}): CardMaterials {
+export function useCardMaterials(
+  card: VtuberCard,
+  options: CardMaterialOptions = {},
+): CardMaterials {
   const {
     holo = CFG.INTENSITY.holo.default,
     gloss = CFG.INTENSITY.gloss.default,
@@ -208,10 +243,16 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
   } = options;
   const shared = useContext(CardEnvContext);
   /** Una carta gradeada refuerza su holografía (`PREMIUM.boost`); una normal queda en 1 en todo. */
-  const boost = useMemo(() => refuerzoDeGrado(card.premium?.grade), [card.premium?.grade]);
+  const boost = useMemo(
+    () => refuerzoDeGrado(card.premium?.grade),
+    [card.premium?.grade],
+  );
   const [textures, setTextures] = useState<CardTextures | null>(null);
   const texturasActuales = useRef<CardTextures | null>(null);
-  const palette = useMemo(() => cardPalette(card.themeColor, card.secondaryColor), [card.themeColor, card.secondaryColor]);
+  const palette = useMemo(
+    () => cardPalette(card.themeColor, card.secondaryColor),
+    [card.themeColor, card.secondaryColor],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -241,7 +282,7 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
       if (cancelled) return;
       void generarTexturas(card, {
         width,
-        prioridad: 'alta',
+        prioridad: "alta",
         cancelada: () => cancelled,
         alRapida: (rapida) => publicar(rapida, envMap),
       }).then((completa) => {
@@ -262,14 +303,24 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
    */
   useEffect(
     () => () => {
-      const vigentes = new Set(texturasActuales.current ? todasLasTexturas(texturasActuales.current) : []);
-      if (textures) todasLasTexturas(textures).forEach((tex) => !vigentes.has(tex) && tex.dispose());
+      const vigentes = new Set(
+        texturasActuales.current
+          ? todasLasTexturas(texturasActuales.current)
+          : [],
+      );
+      if (textures)
+        todasLasTexturas(textures).forEach(
+          (tex) => !vigentes.has(tex) && tex.dispose(),
+        );
     },
     [textures],
   );
   useEffect(
     () => () => {
-      if (texturasActuales.current) todasLasTexturas(texturasActuales.current).forEach((tex) => tex.dispose());
+      if (texturasActuales.current)
+        todasLasTexturas(texturasActuales.current).forEach((tex) =>
+          tex.dispose(),
+        );
     },
     [],
   );
@@ -300,7 +351,10 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
     };
   }, [card]);
 
-  useEffect(() => () => factionTextures.forEach((t) => t.dispose()), [factionTextures]);
+  useEffect(
+    () => () => factionTextures.forEach((t) => t.dispose()),
+    [factionTextures],
+  );
 
   const uniforms = useMemo<CardUniforms>(() => {
     const accent = new THREE.Color(palette.accent);
@@ -322,10 +376,14 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
       uTilt: { value: new THREE.Vector2(0, 0) },
       uTime: { value: 0 },
       uHolo: { value: holo },
-      uHasHolo: { value: card.themeColor ? 1 : CFG.INTENSITY.holo.noThemeFloor },
+      uHasHolo: {
+        value: card.themeColor ? 1 : CFG.INTENSITY.holo.noThemeFloor,
+      },
       uGloss: { value: gloss },
       uCardSize: { value: new THREE.Vector2(CARD_W, CARD_H) },
-      uArtZone: { value: new THREE.Vector2(CFG.ART_ZONE.top, CFG.ART_ZONE.bottom) },
+      uArtZone: {
+        value: new THREE.Vector2(CFG.ART_ZONE.top, CFG.ART_ZONE.bottom),
+      },
       uLogoMask: { value: null as THREE.Texture | null },
       uLogoSticker: { value: null as THREE.Texture | null },
       uCardRadius: { value: CFG.GEOMETRY.cornerRadius },
@@ -380,8 +438,15 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
       glow: {
         uGlowColor: { value: accent.clone() },
         uGlowStrength: { value: CFG.GLOW.strength as number },
-        uCardRect: { value: new THREE.Vector2(1 / CFG.GEOMETRY.glowSpread, 1 / CFG.GEOMETRY.glowSpread) },
-        uCardRadius: { value: CFG.GEOMETRY.cornerRadius / CFG.GEOMETRY.glowSpread },
+        uCardRect: {
+          value: new THREE.Vector2(
+            1 / CFG.GEOMETRY.glowSpread,
+            1 / CFG.GEOMETRY.glowSpread,
+          ),
+        },
+        uCardRadius: {
+          value: CFG.GEOMETRY.cornerRadius / CFG.GEOMETRY.glowSpread,
+        },
         uTime: { value: 0 },
         uSmokeScale: { value: CFG.GLOW.smokeScale as number },
         uSmokeSpeed: { value: CFG.GLOW.smokeSpeed as number },
@@ -404,16 +469,19 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
   useLayoutEffect(() => {
     if (!textures) return;
     LAYER_UNIFORM_NAMES.forEach((name, i) => {
-      (uniforms.front[name] as { value: THREE.Texture | null }).value = textures.layers[i] ?? null;
+      (uniforms.front[name] as { value: THREE.Texture | null }).value =
+        textures.layers[i] ?? null;
     });
     uniforms.front.uEdgeMap.value = textures.edge;
     uniforms.front.uLogoMask.value = textures.logoMask;
     uniforms.front.uLogoSticker.value = textures.logoSticker;
-    (uniforms.front.uBgDominant.value as THREE.Vector3).set(...textures.dominant.rgb);
+    (uniforms.front.uBgDominant.value as THREE.Vector3).set(
+      ...textures.dominant.rgb,
+    );
     uniforms.front.uBgDominantAmount.value = textures.dominant.amount;
   }, [textures, uniforms]);
 
-  const envMapForFace = shared ? shared.envMap : textures?.envMap ?? null;
+  const envMapForFace = shared ? shared.envMap : (textures?.envMap ?? null);
   useLayoutEffect(() => {
     uniforms.front.uMetalEnvMap.value = envMapForFace;
   }, [envMapForFace, uniforms]);
@@ -429,13 +497,19 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
     const izquierda = segundo ? primero : null;
     uniforms.front.uFactionMap0.value = izquierda ?? null;
     uniforms.front.uFactionMap1.value = derecha;
-    (uniforms.front.uFactionCounts.value as THREE.Vector2).set(izquierda ? 1 : 0, derecha ? 1 : 0);
+    (uniforms.front.uFactionCounts.value as THREE.Vector2).set(
+      izquierda ? 1 : 0,
+      derecha ? 1 : 0,
+    );
     // Proporción del PNG para encajarlo «contain» en el engarce cuadrado (ver uFactionAspect).
     const proporcion = (tex: THREE.Texture | null | undefined) => {
       const img = tex?.image as { width?: number; height?: number } | undefined;
       return img?.width && img?.height ? img.width / img.height : 1;
     };
-    (uniforms.front.uFactionAspect.value as THREE.Vector2).set(proporcion(izquierda), proporcion(derecha));
+    (uniforms.front.uFactionAspect.value as THREE.Vector2).set(
+      proporcion(izquierda),
+      proporcion(derecha),
+    );
   }, [factionTextures, uniforms]);
 
   useEffect(() => {
@@ -480,74 +554,85 @@ export function useCardMaterials(card: VtuberCard, options: CardMaterialOptions 
   );
 
   const tick = useMemo(
-    () => (t: number, pointer: { x: number; y: number }, tilt: { x: number; y: number }) => {
-      uniforms.front.uTime.value = t;
-      uniforms.front.uLayerWeight.value = live.layerWeight * boost.layerWeight;
-      uniforms.front.uGlareStrength.value = live.glareStrength * boost.glare;
-      uniforms.front.uSheenStrength.value = live.sheenStrength;
-      uniforms.front.uTiltFactor.value = live.tiltFactor;
-      uniforms.front.uBaseMask.value = live.baseMask;
-      uniforms.front.uBgNoiseStrength.value = live.bgNoise;
-      uniforms.front.uMetalReflect.value = live.metalReflect;
-      uniforms.front.uHdrBoost.value = live.hdrBoost;
-      uniforms.front.uHdrCeiling.value = live.hdrCeiling;
-      uniforms.front.uLogoParallax.value = live.logoParallax;
-      uniforms.front.uGlossSelf.value = live.glossSelf;
-      uniforms.front.uHoloSelf.value = live.holoSelf;
-      uniforms.front.uHighlightWeight.value = live.highlightWeight;
-      uniforms.front.uBgHolo.value = live.bgHolo * boost.bgHolo;
-      uniforms.front.uBgLayerWeight.value = live.bgLayerWeight * boost.bgLayerWeight;
-      uniforms.front.uBgBaseMask.value = live.bgBaseMask;
-      uniforms.front.uBgTiltFactor.value = live.bgTiltFactor;
-      uniforms.front.uBgArtFloor.value = live.bgArtFloor;
-      uniforms.front.uBgArtGain.value = live.bgArtGain;
-      uniforms.front.uBgFoilX.value = live.bgFoilX;
-      uniforms.front.uBgFoilY.value = live.bgFoilY;
-      uniforms.front.uBgFoilViewAngle.value = live.bgFoilViewAngle;
-      uniforms.front.uBgFoilDesaturation.value = live.bgFoilDesaturation;
-      uniforms.front.uBgDominantMix.value = live.bgDominantMix;
-      if (tocada('holo')) uniforms.front.uHolo.value = live.holo * boost.holo;
-      if (tocada('gloss')) uniforms.front.uGloss.value = live.gloss;
-      uniforms.front.uEdgeStrength.value = live.edge * boost.edge;
-      uniforms.front.uFactionStrength.value = live.faction * boost.faction;
-      uniforms.glow.uGlowStrength.value = live.glow * boost.glow;
-      uniforms.glow.uTime.value = t;
-      (uniforms.front.uPointer.value as THREE.Vector2).set(pointer.x, pointer.y);
-      /**
-       * LA CAPA 0 NO SE DESPLAZA: ES LA SUPERFICIE DE LA CARTA.
-       *
-       * Aquí se escribía `live.bgParallax` en uParallaxFactors[0] en cada frame, y ese valor
-       * (0.06) era el paralaje MÁS GRANDE de la carta — doce veces el del personaje. Era el
-       * diseño de "capa de fondo lejana", y es justo lo que hay que quitar: el arte del fondo
-       * ya se pinta en la capa 0 opaca (`drawSurfaceLayer`), así que desplazarlo haría que la
-       * TEXTURA DEL MESH se despegara de su propia geometría.
-       *
-       * El factor 0 lo pone PARALLAX_LAYERS[0] al construir el uniforme, y aquí no se toca.
-       * Lo que conserva la profundidad son las otras capas (personaje, logo, textos), que sí
-       * son planos distintos del sustrato.
-       */
-      /**
-       * El LOGO se dibuja DOS veces: la capa 2 (el arte de la marca en su caja) y el
-       * STICKER final (sus píxeles originales, sin efectos, recompuestos encima). Cada
-       * uno tenía su PROPIA fuente de desplazamiento:
-       *
-       *   - la capa 2 lee uParallaxFactors[2], que es un valor de CONFIG que solo se
-       *     escribe al crear los uniformes;
-       *   - el sticker lee uLogoParallax, que es el que mueve el slider "Paralaje del
-       *     logo" en cada frame.
-       *
-       * Coincidían por casualidad (ambos -0.03), así que en el estado por defecto el
-       * logo se veía bien — pero en cuanto el slider se movía, solo se desplazaba el
-       * sticker y quedaban DOS copias de la marca, una por cada fuente. Es el
-       * "logo duplicado" que reportaba el usuario, y se reproduce de forma
-       * determinista moviendo el slider.
-       *
-       * Los dos tienen que salir del MISMO número: el logo es una capa, y su sticker
-       * es la recomposición de esa misma capa, así que no pueden desincronizarse.
-       */
-      (uniforms.front.uParallaxFactors.value as Float32Array)[2] = live.logoParallax;
-      (uniforms.front.uTilt.value as THREE.Vector2).set(tilt.x, tilt.y);
-    },
+    () =>
+      (
+        t: number,
+        pointer: { x: number; y: number },
+        tilt: { x: number; y: number },
+      ) => {
+        uniforms.front.uTime.value = t;
+        uniforms.front.uLayerWeight.value =
+          live.layerWeight * boost.layerWeight;
+        uniforms.front.uGlareStrength.value = live.glareStrength * boost.glare;
+        uniforms.front.uSheenStrength.value = live.sheenStrength;
+        uniforms.front.uTiltFactor.value = live.tiltFactor;
+        uniforms.front.uBaseMask.value = live.baseMask;
+        uniforms.front.uBgNoiseStrength.value = live.bgNoise;
+        uniforms.front.uMetalReflect.value = live.metalReflect;
+        uniforms.front.uHdrBoost.value = live.hdrBoost;
+        uniforms.front.uHdrCeiling.value = live.hdrCeiling;
+        uniforms.front.uLogoParallax.value = live.logoParallax;
+        uniforms.front.uGlossSelf.value = live.glossSelf;
+        uniforms.front.uHoloSelf.value = live.holoSelf;
+        uniforms.front.uHighlightWeight.value = live.highlightWeight;
+        uniforms.front.uBgHolo.value = live.bgHolo * boost.bgHolo;
+        uniforms.front.uBgLayerWeight.value =
+          live.bgLayerWeight * boost.bgLayerWeight;
+        uniforms.front.uBgBaseMask.value = live.bgBaseMask;
+        uniforms.front.uBgTiltFactor.value = live.bgTiltFactor;
+        uniforms.front.uBgArtFloor.value = live.bgArtFloor;
+        uniforms.front.uBgArtGain.value = live.bgArtGain;
+        uniforms.front.uBgFoilX.value = live.bgFoilX;
+        uniforms.front.uBgFoilY.value = live.bgFoilY;
+        uniforms.front.uBgFoilViewAngle.value = live.bgFoilViewAngle;
+        uniforms.front.uBgFoilDesaturation.value = live.bgFoilDesaturation;
+        uniforms.front.uBgDominantMix.value = live.bgDominantMix;
+        if (tocada("holo")) uniforms.front.uHolo.value = live.holo * boost.holo;
+        if (tocada("gloss")) uniforms.front.uGloss.value = live.gloss;
+        uniforms.front.uEdgeStrength.value = live.edge * boost.edge;
+        uniforms.front.uFactionStrength.value = live.faction * boost.faction;
+        uniforms.glow.uGlowStrength.value = live.glow * boost.glow;
+        uniforms.glow.uTime.value = t;
+        (uniforms.front.uPointer.value as THREE.Vector2).set(
+          pointer.x,
+          pointer.y,
+        );
+        /**
+         * LA CAPA 0 NO SE DESPLAZA: ES LA SUPERFICIE DE LA CARTA.
+         *
+         * Aquí se escribía `live.bgParallax` en uParallaxFactors[0] en cada frame, y ese valor
+         * (0.06) era el paralaje MÁS GRANDE de la carta — doce veces el del personaje. Era el
+         * diseño de "capa de fondo lejana", y es justo lo que hay que quitar: el arte del fondo
+         * ya se pinta en la capa 0 opaca (`drawSurfaceLayer`), así que desplazarlo haría que la
+         * TEXTURA DEL MESH se despegara de su propia geometría.
+         *
+         * El factor 0 lo pone PARALLAX_LAYERS[0] al construir el uniforme, y aquí no se toca.
+         * Lo que conserva la profundidad son las otras capas (personaje, logo, textos), que sí
+         * son planos distintos del sustrato.
+         */
+        /**
+         * El LOGO se dibuja DOS veces: la capa 2 (el arte de la marca en su caja) y el
+         * STICKER final (sus píxeles originales, sin efectos, recompuestos encima). Cada
+         * uno tenía su PROPIA fuente de desplazamiento:
+         *
+         *   - la capa 2 lee uParallaxFactors[2], que es un valor de CONFIG que solo se
+         *     escribe al crear los uniformes;
+         *   - el sticker lee uLogoParallax, que es el que mueve el slider "Paralaje del
+         *     logo" en cada frame.
+         *
+         * Coincidían por casualidad (ambos -0.03), así que en el estado por defecto el
+         * logo se veía bien — pero en cuanto el slider se movía, solo se desplazaba el
+         * sticker y quedaban DOS copias de la marca, una por cada fuente. Es el
+         * "logo duplicado" que reportaba el usuario, y se reproduce de forma
+         * determinista moviendo el slider.
+         *
+         * Los dos tienen que salir del MISMO número: el logo es una capa, y su sticker
+         * es la recomposición de esa misma capa, así que no pueden desincronizarse.
+         */
+        (uniforms.front.uParallaxFactors.value as Float32Array)[2] =
+          live.logoParallax;
+        (uniforms.front.uTilt.value as THREE.Vector2).set(tilt.x, tilt.y);
+      },
     [uniforms, boost],
   );
 

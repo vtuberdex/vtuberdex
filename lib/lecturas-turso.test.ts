@@ -18,7 +18,7 @@
  * El cliente de Turso se sustituye por uno falso: contar consultas no necesita red, y la
  * suite tiene que correr en CI sin credenciales.
  */
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 /** Consultas que el código hizo al cliente falso, separadas por método. */
 const registro = {
@@ -32,8 +32,8 @@ let filasAResponder: Array<Record<string, unknown>> = [];
 
 const clienteFalso = {
   execute: async (arg: string | { sql: string; args?: unknown[] }) => {
-    const sql = typeof arg === 'string' ? arg : arg.sql;
-    const args = typeof arg === 'string' ? [] : (arg.args ?? []);
+    const sql = typeof arg === "string" ? arg : arg.sql;
+    const args = typeof arg === "string" ? [] : (arg.args ?? []);
     registro.execute.push({ sql, args });
     return { rows: filasAResponder, rowsAffected: filasAResponder.length };
   },
@@ -47,12 +47,12 @@ const clienteFalso = {
   },
 };
 
-vi.mock('@libsql/client/node', () => ({ createClient: () => clienteFalso }));
+vi.mock("@libsql/client/node", () => ({ createClient: () => clienteFalso }));
 
 /** Importa el módulo con el memo a cero: cada caso mide una instancia nueva. */
 async function moduloLimpio() {
   vi.resetModules();
-  return import('@/lib/ediciones.mjs');
+  return import("@/lib/ediciones.mjs");
 }
 
 const SLUGS = Array.from({ length: 24 }, (_, i) => `ficha-${i}`);
@@ -62,8 +62,8 @@ beforeEach(() => {
   registro.executeMultiple = [];
   registro.batch = 0;
   filasAResponder = [];
-  process.env.TURSO_DATABASE_URL = 'http://turso-de-mentira';
-  process.env.TURSO_AUTH_TOKEN = 'no-hace-falta';
+  process.env.TURSO_DATABASE_URL = "http://turso-de-mentira";
+  process.env.TURSO_AUTH_TOKEN = "no-hace-falta";
 });
 
 /** Las consultas de DATOS (las que no son el DDL de arranque). */
@@ -71,8 +71,8 @@ function consultasDeDatos() {
   return registro.execute.filter((c) => /slug IN \(/.test(c.sql));
 }
 
-describe('consultas por página', () => {
-  test('24 fichas se resuelven con UNA consulta, no con 72', async () => {
+describe("consultas por página", () => {
+  test("24 fichas se resuelven con UNA consulta, no con 72", async () => {
     const { reemplazosDePagina } = await moduloLimpio();
     await reemplazosDePagina(SLUGS);
 
@@ -80,7 +80,7 @@ describe('consultas por página', () => {
     expect(consultasDeDatos()).toHaveLength(1);
   });
 
-  test('el DDL no se repite entre lecturas de la misma instancia', async () => {
+  test("el DDL no se repite entre lecturas de la misma instancia", async () => {
     const { leerEdiciones, reemplazosDePagina } = await moduloLimpio();
     await leerEdiciones();
     const ddlTrasLaPrimera = registro.executeMultiple.length;
@@ -95,34 +95,36 @@ describe('consultas por página', () => {
     expect(registro.executeMultiple).toHaveLength(ddlTrasLaPrimera);
     // Las consultas de datos sí son una por operación: una de ediciones y una por página.
     expect(consultasDeDatos()).toHaveLength(2);
-    expect(registro.execute.filter((c) => /FROM edicion/.test(c.sql))).toHaveLength(1);
+    expect(
+      registro.execute.filter((c) => /FROM edicion/.test(c.sql)),
+    ).toHaveLength(1);
   });
 
-  test('la consulta de la página filtra por slug y por tipo en el SQL', async () => {
+  test("la consulta de la página filtra por slug y por tipo en el SQL", async () => {
     const { reemplazosDePagina } = await moduloLimpio();
-    await reemplazosDePagina(['a', 'b']);
+    await reemplazosDePagina(["a", "b"]);
 
     const { sql, args } = consultasDeDatos()[0];
     expect(sql).toMatch(/slug IN \(\?,\s*\?\)/);
     expect(sql).toMatch(/origen = \?/);
     expect(sql).toMatch(/kind IN \(/);
     // Los slugs van como parámetros: un slug llega de la URL.
-    expect(args).toContain('a');
-    expect(args).toContain('b');
+    expect(args).toContain("a");
+    expect(args).toContain("b");
     expect(sql).not.toContain("'a'");
   });
 
-  test('no pide los bytes: cada fila de asset lleva una imagen entera', async () => {
+  test("no pide los bytes: cada fila de asset lleva una imagen entera", async () => {
     const { reemplazosDePagina } = await moduloLimpio();
-    await reemplazosDePagina(['a']);
+    await reemplazosDePagina(["a"]);
 
     // Traer `bytes` multiplicaría por ~40 KB cada fila y nadie en esta ruta los usa.
     expect(consultasDeDatos()[0].sql).not.toMatch(/bytes/i);
   });
 
-  test('pide la marca de la subida: sin ella la URL no se puede versionar', async () => {
+  test("pide la marca de la subida: sin ella la URL no se puede versionar", async () => {
     const { reemplazosDePagina } = await moduloLimpio();
-    await reemplazosDePagina(['a']);
+    await reemplazosDePagina(["a"]);
 
     /**
      * `actualizado` es lo que versiona la URL (`?v=`) y alimenta el `ETag`. Si dejar de
@@ -133,7 +135,7 @@ describe('consultas por página', () => {
     expect(consultasDeDatos()[0].sql).toMatch(/actualizado/);
   });
 
-  test('una página vacía no consulta nada', async () => {
+  test("una página vacía no consulta nada", async () => {
     const { reemplazosDePagina } = await moduloLimpio();
     expect(await reemplazosDePagina([])).toEqual({});
     expect(registro.execute).toHaveLength(0);
@@ -141,63 +143,99 @@ describe('consultas por página', () => {
   });
 });
 
-describe('resultado de la consulta por página', () => {
-  test('compone la ruta canónica de cada tipo con su extensión', async () => {
+describe("resultado de la consulta por página", () => {
+  test("compone la ruta canónica de cada tipo con su extensión", async () => {
     filasAResponder = [
-      { slug: 'yeicokp-harv', kind: 'character', width: 720, height: 1008, size: 90000, actualizado: '2026-09-23T15:23:32.277Z' },
-      { slug: 'yeicokp-harv', kind: 'logo', width: 720, height: 1008, size: 12000, actualizado: null },
-      { slug: 'otra', kind: 'background', width: null, height: null, size: 5, actualizado: null },
+      {
+        slug: "yeicokp-harv",
+        kind: "character",
+        width: 720,
+        height: 1008,
+        size: 90000,
+        actualizado: "2026-09-23T15:23:32.277Z",
+      },
+      {
+        slug: "yeicokp-harv",
+        kind: "logo",
+        width: 720,
+        height: 1008,
+        size: 12000,
+        actualizado: null,
+      },
+      {
+        slug: "otra",
+        kind: "background",
+        width: null,
+        height: null,
+        size: 5,
+        actualizado: null,
+      },
     ];
     const { reemplazosDePagina } = await moduloLimpio();
-    const salida = await reemplazosDePagina(['yeicokp-harv', 'otra']);
+    const salida = await reemplazosDePagina(["yeicokp-harv", "otra"]);
 
-    expect(salida['yeicokp-harv'].character).toEqual({
-      path: 'images/character/yeicokp-harv.webp',
+    expect(salida["yeicokp-harv"].character).toEqual({
+      path: "images/character/yeicokp-harv.webp",
       width: 720,
       height: 1008,
       bytes: 90000,
       // La marca de la subida viaja con el reemplazo: es lo que versiona la URL.
-      actualizado: '2026-09-23T15:23:32.277Z',
+      actualizado: "2026-09-23T15:23:32.277Z",
     });
-    expect(salida['yeicokp-harv'].logo.path).toBe('images/logo/yeicokp-harv.webp');
+    expect(salida["yeicokp-harv"].logo.path).toBe(
+      "images/logo/yeicokp-harv.webp",
+    );
     // Medidas nulas siguen siendo `null`, no `undefined` ni `NaN`: el gestor las pinta.
     expect(salida.otra.background.width).toBeNull();
     // Una fila antigua sin marca no inventa una versión.
-    expect(salida['yeicokp-harv'].logo.actualizado).toBeNull();
+    expect(salida["yeicokp-harv"].logo.actualizado).toBeNull();
   });
 
-  test('una ficha es el caso N=1 y devuelve la MISMA forma que la consulta múltiple', async () => {
-    filasAResponder = [{ slug: 'yeicokp-harv', kind: 'character', width: 720, height: 1008, size: 1 }];
-    const { reemplazosDePagina, reemplazosDelMantenedor } = await moduloLimpio();
+  test("una ficha es el caso N=1 y devuelve la MISMA forma que la consulta múltiple", async () => {
+    filasAResponder = [
+      {
+        slug: "yeicokp-harv",
+        kind: "character",
+        width: 720,
+        height: 1008,
+        size: 1,
+      },
+    ];
+    const { reemplazosDePagina, reemplazosDelMantenedor } =
+      await moduloLimpio();
 
-    const porPagina = await reemplazosDePagina(['yeicokp-harv']);
-    const uno = await reemplazosDelMantenedor('yeicokp-harv');
+    const porPagina = await reemplazosDePagina(["yeicokp-harv"]);
+    const uno = await reemplazosDelMantenedor("yeicokp-harv");
 
     // El detalle del mantenedor y la grilla tienen que componer igual o la imagen subida
     // aparecería en una vista y no en la otra (el fallo que documenta el módulo).
-    expect(uno).toEqual(porPagina['yeicokp-harv']);
+    expect(uno).toEqual(porPagina["yeicokp-harv"]);
   });
 
-  test('los slugs repetidos no se piden dos veces', async () => {
+  test("los slugs repetidos no se piden dos veces", async () => {
     const { reemplazosDePagina } = await moduloLimpio();
-    await reemplazosDePagina(['a', 'a', 'b', 'a']);
+    await reemplazosDePagina(["a", "a", "b", "a"]);
 
     const args = consultasDeDatos()[0].args as string[];
-    expect(args.filter((a) => a === 'a')).toHaveLength(1);
-    expect(args.filter((a) => a === 'b')).toHaveLength(1);
+    expect(args.filter((a) => a === "a")).toHaveLength(1);
+    expect(args.filter((a) => a === "b")).toHaveLength(1);
   });
 });
 
-describe('sin Turso configurado', () => {
-  test('no se hace ni una consulta: local y CI no pagan la red', async () => {
+describe("sin Turso configurado", () => {
+  test("no se hace ni una consulta: local y CI no pagan la red", async () => {
     delete process.env.TURSO_DATABASE_URL;
-    const { leerEdiciones, reemplazosDePagina, asegurarTablas, aplicarReemplazosALista } =
-      await moduloLimpio();
+    const {
+      leerEdiciones,
+      reemplazosDePagina,
+      asegurarTablas,
+      aplicarReemplazosALista,
+    } = await moduloLimpio();
 
     expect(await leerEdiciones()).toEqual({});
     expect(await reemplazosDePagina(SLUGS)).toEqual({});
     await asegurarTablas();
-    const cartas = [{ slug: 'x' }];
+    const cartas = [{ slug: "x" }];
     // Devuelve el MISMO array: sin Turso no hay nada que aplicar ni copia que hacer.
     expect(await aplicarReemplazosALista(cartas)).toBe(cartas);
 

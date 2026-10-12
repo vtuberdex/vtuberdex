@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Generación de texturas en 7 capas separadas con paralaje propio.
  *
@@ -12,14 +12,25 @@
  * limpia.
  */
 
-export { CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT, CARD_TEXTURE_TILE_WIDTH, CARD_TEXTURE_FULL_WIDTH } from './dimensiones';
-export type { CardDrawInfo, CardLayers } from './tipos';
-export { drawSurfaceLayer } from './capa-superficie';
-export { drawCharacterLayer } from './capa-personaje';
-export { drawTitleLayer } from './capa-titulo';
-export { drawTextsLayer } from './capa-textos';
-export { drawTagsLayer } from './capa-tags';
-export { drawWordmarkLayer } from './capa-wordmark';
-export { drawCardLayers, drawCardFront } from './componer';
-export { loadImage } from './imagen';
-export { inkAndSkinMask, inkAndSkinMaskAsync, logoMask, logoMaskAsync, logoSticker } from './mascaras';
+export {
+  CARD_TEXTURE_WIDTH,
+  CARD_TEXTURE_HEIGHT,
+  CARD_TEXTURE_TILE_WIDTH,
+  CARD_TEXTURE_FULL_WIDTH,
+} from "./dimensiones";
+export type { CardDrawInfo, CardLayers } from "./tipos";
+export { drawSurfaceLayer } from "./capa-superficie";
+export { drawCharacterLayer } from "./capa-personaje";
+export { drawTitleLayer } from "./capa-titulo";
+export { drawTextsLayer } from "./capa-textos";
+export { drawTagsLayer } from "./capa-tags";
+export { drawWordmarkLayer } from "./capa-wordmark";
+export { drawCardLayers, drawCardFront } from "./componer";
+export { loadImage } from "./imagen";
+export {
+  inkAndSkinMask,
+  inkAndSkinMaskAsync,
+  logoMask,
+  logoMaskAsync,
+  logoSticker,
+} from "./mascaras";

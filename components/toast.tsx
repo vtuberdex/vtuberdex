@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * Sistema de toasts ligero para el mantenedor.
  *
@@ -7,11 +7,11 @@
  * cañonazo. Este componente usa React puro, no toca `document.body` (funciona
  * en SSR de Next) y se autodescarta.
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from "react";
 
 export interface ToastItem {
   id: string;
-  kind: 'ok' | 'error';
+  kind: "ok" | "error";
   text: string;
 }
 
@@ -21,8 +21,8 @@ interface ToastContainerProps {
 }
 
 const ICON = {
-  ok: '✓',
-  error: '✕',
+  ok: "✓",
+  error: "✕",
 };
 
 export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
@@ -35,7 +35,13 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
   );
 }
 
-function Toast({ toast, onRemove }: { toast: ToastItem; onRemove: (id: string) => void }) {
+function Toast({
+  toast,
+  onRemove,
+}: {
+  toast: ToastItem;
+  onRemove: (id: string) => void;
+}) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -52,16 +58,16 @@ function Toast({ toast, onRemove }: { toast: ToastItem; onRemove: (id: string) =
   }, [toast.id, onRemove]);
 
   const colors =
-    toast.kind === 'ok'
-      ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-100'
-      : 'border-red-500/40 bg-red-500/15 text-red-100';
+    toast.kind === "ok"
+      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-100"
+      : "border-red-500/40 bg-red-500/15 text-red-100";
 
   return (
     <div
       role="status"
       data-testid={`toast-${toast.kind}`}
       className={`flex max-w-xs items-start gap-2 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm transition-all duration-300 ${colors} ${
-        visible ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0'
+        visible ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
       }`}
     >
       <span className="mt-0.5 text-sm font-bold">{ICON[toast.kind]}</span>
@@ -93,9 +99,9 @@ let secuenciaDeToasts = 0;
 export function useToasts() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const add = useCallback((kind: ToastItem['kind'], text: string) => {
+  const add = useCallback((kind: ToastItem["kind"], text: string) => {
     const id =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
         : `${Date.now()}-${++secuenciaDeToasts}`;
     setToasts((current) => [...current, { id, kind, text }]);

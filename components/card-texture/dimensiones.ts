@@ -2,7 +2,6 @@
  * Medidas canónicas del lienzo de la carta y la tipografía del front.
  */
 
-
 export const CARD_TEXTURE_WIDTH = 1008;
 
 export const CARD_TEXTURE_HEIGHT = 1411;
@@ -34,7 +33,12 @@ export const HEADER = { pad: 46, top: 44, height: 116 } as const;
  * grande. A 74 px de 1008 un emblema con detalle mide ~15 px en la grilla y ~25 en la ficha, y
  * era justo lo que no dejaba verlo. La placa mide 116, así que sobran 8 px por lado.
  */
-export const FACTION_SOCKET = { size: 100, margin: 6, gap: 10, inset: 12 } as const;
+export const FACTION_SOCKET = {
+  size: 100,
+  margin: 6,
+  gap: 10,
+  inset: 12,
+} as const;
 
 /** Máximo de emblemas en la carta: la regla de negocio es «máximo dos facciones por VTuber». */
 export const MAX_FACTION_EMBLEMS = 2;

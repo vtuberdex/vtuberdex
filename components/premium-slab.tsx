@@ -1,4 +1,4 @@
-'use client';
+"use client";
 /**
  * La PLACA DE ACRÍLICO de una carta premium (como las de CGC) y su material.
  *
@@ -16,13 +16,13 @@
  * sin samplers. Solo existen para las cartas premium (un puñado), así que el catálogo normal no
  * paga nada. Material, geometría y textura se crean UNA vez por carta y se sueltan al desmontar.
  */
-import { useEffect, useMemo, type ReactNode } from 'react';
-import * as THREE from 'three';
+import { useEffect, useMemo, type ReactNode } from "react";
+import * as THREE from "three";
 
-import type { PremiumInfo, VtuberCard } from '@/lib/types';
-import { GEOMETRY, PREMIUM } from '@/components/card3d-config';
-import { slabLayout, type SlabLayout } from '@/components/premium-layout';
-import { dibujarHojaInterior } from '@/components/premium-label';
+import type { PremiumInfo, VtuberCard } from "@/lib/types";
+import { GEOMETRY, PREMIUM } from "@/components/card3d-config";
+import { slabLayout, type SlabLayout } from "@/components/premium-layout";
+import { dibujarHojaInterior } from "@/components/premium-label";
 
 const VERTEX = /* glsl */ `
   varying vec3 vNormalView;
@@ -121,7 +121,11 @@ export function formaRedondeada(w: number, h: number, r: number): THREE.Shape {
 export function crearCuerpo(layout: SlabLayout): THREE.ExtrudeGeometry {
   const { body, layout: medidas } = PREMIUM;
   const inset = body.bevel;
-  const shape = formaRedondeada(layout.width - 2 * inset, layout.height - 2 * inset, medidas.cornerRadius - inset);
+  const shape = formaRedondeada(
+    layout.width - 2 * inset,
+    layout.height - 2 * inset,
+    medidas.cornerRadius - inset,
+  );
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: body.front + body.back - 2 * body.bevel,
     bevelEnabled: true,
@@ -135,7 +139,9 @@ export function crearCuerpo(layout: SlabLayout): THREE.ExtrudeGeometry {
   return geometry;
 }
 
-export function crearMaterialDeAcrilico(layout: SlabLayout): THREE.ShaderMaterial {
+export function crearMaterialDeAcrilico(
+  layout: SlabLayout,
+): THREE.ShaderMaterial {
   const a = PREMIUM.acrylic;
   return new THREE.ShaderMaterial({
     vertexShader: VERTEX,
@@ -164,7 +170,11 @@ export function crearMaterialDeAcrilico(layout: SlabLayout): THREE.ShaderMateria
 }
 
 /** Dibuja la hoja interior de una carta y la convierte en textura (sRGB, sin mipmaps de más). */
-export function crearTexturaDeHoja(layout: SlabLayout, card: VtuberCard, premium: PremiumInfo): THREE.CanvasTexture {
+export function crearTexturaDeHoja(
+  layout: SlabLayout,
+  card: VtuberCard,
+  premium: PremiumInfo,
+): THREE.CanvasTexture {
   const canvas = dibujarHojaInterior(layout, {
     name: card.name,
     dexNumber: card.dexNumber,
@@ -190,15 +200,35 @@ export interface PremiumSlabProps {
   children: ReactNode;
 }
 
-export function PremiumSlab({ card, premium, cardWidth, cardHeight, outerPad, glowMaterial, children }: PremiumSlabProps) {
-  const layout = useMemo(() => slabLayout(cardWidth, cardHeight, outerPad), [cardWidth, cardHeight, outerPad]);
+export function PremiumSlab({
+  card,
+  premium,
+  cardWidth,
+  cardHeight,
+  outerPad,
+  glowMaterial,
+  children,
+}: PremiumSlabProps) {
+  const layout = useMemo(
+    () => slabLayout(cardWidth, cardHeight, outerPad),
+    [cardWidth, cardHeight, outerPad],
+  );
   const body = useMemo(() => crearCuerpo(layout), [layout]);
   const acrylic = useMemo(() => crearMaterialDeAcrilico(layout), [layout]);
   // La hoja se redibuja solo si cambia algo que la etiqueta muestra, no en cada render.
   const insertTexture = useMemo(
     () => crearTexturaDeHoja(layout, card, premium),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depende de los CAMPOS que se dibujan, no de la identidad del objeto
-    [layout, card.name, card.dexNumber, card.countries[0]?.name, premium.grade, premium.cert, premium.since, premium.gradedAt],
+    [
+      layout,
+      card.name,
+      card.dexNumber,
+      card.countries[0]?.name,
+      premium.grade,
+      premium.cert,
+      premium.since,
+      premium.gradedAt,
+    ],
   );
 
   useEffect(() => () => body.dispose(), [body]);
@@ -210,16 +240,29 @@ export function PremiumSlab({ card, premium, cardWidth, cardHeight, outerPad, gl
       {/* Humo brillante: detrás de todo. Mismo material y misma proporción que el de una carta normal. */}
       {glowMaterial && (
         <mesh position={[0, 0, GEOMETRY.glowZ]} material={glowMaterial}>
-          <planeGeometry args={[layout.width * GEOMETRY.glowSpread, layout.height * GEOMETRY.glowSpread]} />
+          <planeGeometry
+            args={[
+              layout.width * GEOMETRY.glowSpread,
+              layout.height * GEOMETRY.glowSpread,
+            ]}
+          />
         </mesh>
       )}
       {/* Hoja interior: opaca, recortada por el alfa del lienzo (esquinas redondeadas). */}
       <mesh position={[0, 0, PREMIUM.insertZ]}>
         <planeGeometry args={[layout.width, layout.height]} />
-        <meshBasicMaterial map={insertTexture} alphaTest={0.5} toneMapped={false} fog={false} />
+        <meshBasicMaterial
+          map={insertTexture}
+          alphaTest={0.5}
+          toneMapped={false}
+          fog={false}
+        />
       </mesh>
       {/* La carta, dentro de la ventana y a la escala que la hace caber. */}
-      <group position={[0, layout.window.y, PREMIUM.cardZ]} scale={layout.cardScale}>
+      <group
+        position={[0, layout.window.y, PREMIUM.cardZ]}
+        scale={layout.cardScale}
+      >
         {children}
       </group>
       {/* Cuerpo de acrílico: el último en pintarse, por encima de la carta y de la etiqueta. */}

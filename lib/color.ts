@@ -6,13 +6,26 @@ export interface Rgb {
   b: number;
 }
 
-export const FALLBACK_THEME = '#5eead4';
+export const FALLBACK_THEME = "#5eead4";
 
 /** '#abc' | 'abc' | '#aabbcc' -> '#aabbcc' (o el fallback si es inválido). */
-export function normalizeHex(value: string | null | undefined, fallback = FALLBACK_THEME): string {
-  const raw = String(value ?? '').trim().replace('#', '');
-  const expanded = raw.length === 3 ? raw.split('').map((char) => char + char).join('') : raw;
-  return /^[0-9a-fA-F]{6}$/.test(expanded) ? `#${expanded.toLowerCase()}` : fallback;
+export function normalizeHex(
+  value: string | null | undefined,
+  fallback = FALLBACK_THEME,
+): string {
+  const raw = String(value ?? "")
+    .trim()
+    .replace("#", "");
+  const expanded =
+    raw.length === 3
+      ? raw
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : raw;
+  return /^[0-9a-fA-F]{6}$/.test(expanded)
+    ? `#${expanded.toLowerCase()}`
+    : fallback;
 }
 
 export function hexToRgb(hex: string): Rgb {
@@ -26,7 +39,7 @@ export function hexToRgb(hex: string): Rgb {
 
 export function rgbToHex({ r, g, b }: Rgb): string {
   const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-  return `#${[clamp(r), clamp(g), clamp(b)].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+  return `#${[clamp(r), clamp(g), clamp(b)].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
 /** Mezcla lineal hacia otro color (ratio 0..1). */
@@ -57,7 +70,7 @@ export function luminance(hex: string): number {
 
 /** Color de texto legible sobre el fondo dado. */
 export function readableInk(hex: string): string {
-  return luminance(hex) > 0.55 ? '#0b0d12' : '#f8fafc';
+  return luminance(hex) > 0.55 ? "#0b0d12" : "#f8fafc";
 }
 
 /**
@@ -75,40 +88,46 @@ export function readableInk(hex: string): string {
  * secundario.
  */
 const COLORES_POR_NOMBRE: Array<[RegExp, string]> = [
-  [/\b(rojo|carmesi|escarlata|guinda|bordo|burdeos|granate)\b/, '#d62839'],
-  [/\b(naranja|naranjo|ocre|anaranjado)\b/, '#f07b1a'],
-  [/\b(amarillo|dorado|oro)\b/, '#f5c518'],
-  [/\b(verde|menta|lima|leaf)\b/, '#2fb35a'],
-  [/\b(turquesa|cian|cyan|aqua)\b/, '#1fc8c8'],
-  [/\b(celeste)\b/, '#6ec6ff'],
-  [/\b(azul|cobalto|ultramarino|periwinkle)\b/, '#2f6bf0'],
-  [/\b(morado|purpura|violeta|lila|lavanda|magenta)\b/, '#8e44d8'],
-  [/\b(rosa|rosado|rosita|fucsia)\b/, '#f06eaa'],
-  [/\b(marron|cafe|beige)\b/, '#8b5a2b'],
-  [/\b(blanco|plateado|plata)\b/, '#e8ecf5'],
-  [/\b(gris)\b/, '#8a93a3'],
-  [/\b(negro)\b/, '#14161c'],
+  [/\b(rojo|carmesi|escarlata|guinda|bordo|burdeos|granate)\b/, "#d62839"],
+  [/\b(naranja|naranjo|ocre|anaranjado)\b/, "#f07b1a"],
+  [/\b(amarillo|dorado|oro)\b/, "#f5c518"],
+  [/\b(verde|menta|lima|leaf)\b/, "#2fb35a"],
+  [/\b(turquesa|cian|cyan|aqua)\b/, "#1fc8c8"],
+  [/\b(celeste)\b/, "#6ec6ff"],
+  [/\b(azul|cobalto|ultramarino|periwinkle)\b/, "#2f6bf0"],
+  [/\b(morado|purpura|violeta|lila|lavanda|magenta)\b/, "#8e44d8"],
+  [/\b(rosa|rosado|rosita|fucsia)\b/, "#f06eaa"],
+  [/\b(marron|cafe|beige)\b/, "#8b5a2b"],
+  [/\b(blanco|plateado|plata)\b/, "#e8ecf5"],
+  [/\b(gris)\b/, "#8a93a3"],
+  [/\b(negro)\b/, "#14161c"],
 ];
 
 /** El color al que se refiere un texto libre (`Rojo y negro` -> el rojo), o `null` si no se reconoce. */
-export function colorDesdeNombre(texto: string | null | undefined): string | null {
-  const limpio = String(texto ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+export function colorDesdeNombre(
+  texto: string | null | undefined,
+): string | null {
+  const limpio = String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
   let mejor: { indice: number; hex: string } | null = null;
   // Gana el primer color que se menciona: es el dominante en frases como «Rojo y negro».
   for (const [patron, hex] of COLORES_POR_NOMBRE) {
     const encontrado = patron.exec(limpio);
-    if (encontrado && (!mejor || encontrado.index < mejor.indice)) mejor = { indice: encontrado.index, hex };
+    if (encontrado && (!mejor || encontrado.index < mejor.indice))
+      mejor = { indice: encontrado.index, hex };
   }
   return mejor?.hex ?? null;
 }
 
-export function cardPalette(themeColor: string | null, secondaryColor: string | null) {
+export function cardPalette(
+  themeColor: string | null,
+  secondaryColor: string | null,
+) {
   const accent = normalizeHex(themeColor);
-  const derivado = mixHex(accent, '#a855f7', 0.45);
-  const crudo = String(secondaryColor ?? '').trim();
+  const derivado = mixHex(accent, "#a855f7", 0.45);
+  const crudo = String(secondaryColor ?? "").trim();
   const secondary = /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(crudo)
     ? normalizeHex(crudo)
     : (colorDesdeNombre(crudo) ?? derivado);
@@ -124,14 +143,18 @@ export function cardPalette(themeColor: string | null, secondaryColor: string | 
      * de verdad pero conservando el matiz del primario en vez de un gris neutro.
      * `mid` mantiene la relación entre ambos tonos.
      */
-    deep: mixHex(accent, '#05060a', 0.86),
-    mid: mixHex(accent, '#05060a', 0.64),
-    sheen: mixHex(accent, '#ffffff', 0.55),
-    ink: readableInk(mixHex(accent, '#05060a', 0.72)),
+    deep: mixHex(accent, "#05060a", 0.86),
+    mid: mixHex(accent, "#05060a", 0.64),
+    sheen: mixHex(accent, "#ffffff", 0.55),
+    ink: readableInk(mixHex(accent, "#05060a", 0.72)),
   };
 }
 
 /** Gradiente CSS reutilizable (cabeceras, chips, bordes). */
-export function gradientCss(accent: string, secondary: string, angle = 135): string {
+export function gradientCss(
+  accent: string,
+  secondary: string,
+  angle = 135,
+): string {
   return `linear-gradient(${angle}deg, ${accent} 0%, ${secondary} 100%)`;
 }

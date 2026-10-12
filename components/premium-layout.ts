@@ -8,7 +8,7 @@
  * La placa ocupa exactamente el hueco de la funda (alto = carta + 2 x holgura de funda), así que
  * en el libro no se sale de su casilla y el resto de la maqueta no se entera.
  */
-import { PREMIUM } from '@/components/card3d-config';
+import { PREMIUM } from "@/components/card3d-config";
 
 export interface Rect {
   /** Centro. */
@@ -36,23 +36,40 @@ export interface SlabLayout {
  * @param cardH    alto de la carta sin escalar
  * @param outerPad holgura de la funda a cada lado: el alto de la placa es `cardH + 2 * outerPad`
  */
-export function slabLayout(cardW: number, cardH: number, outerPad: number): SlabLayout {
+export function slabLayout(
+  cardW: number,
+  cardH: number,
+  outerPad: number,
+): SlabLayout {
   const { margin, labelHeight, labelGap } = PREMIUM.layout;
   const height = cardH + 2 * outerPad;
   const aspect = cardH / cardW;
   // Alto de la placa en anchos de placa: margen + etiqueta + aire + ventana + margen.
-  const heightInWidths = margin + labelHeight + labelGap + aspect * (1 - 2 * margin) + margin;
+  const heightInWidths =
+    margin + labelHeight + labelGap + aspect * (1 - 2 * margin) + margin;
   const width = height / heightInWidths;
   const windowW = width * (1 - 2 * margin);
   const windowH = windowW * aspect;
   const top = height / 2;
   const labelH = width * labelHeight;
-  const label: Rect = { x: 0, y: top - width * margin - labelH / 2, w: windowW, h: labelH };
+  const label: Rect = {
+    x: 0,
+    y: top - width * margin - labelH / 2,
+    w: windowW,
+    h: labelH,
+  };
   const window: Rect = {
     x: 0,
     y: top - width * margin - labelH - width * labelGap - windowH / 2,
     w: windowW,
     h: windowH,
   };
-  return { width, height, label, window, cardScale: windowW / cardW, margin: width * margin };
+  return {
+    width,
+    height,
+    label,
+    window,
+    cardScale: windowW / cardW,
+    margin: width * margin,
+  };
 }
