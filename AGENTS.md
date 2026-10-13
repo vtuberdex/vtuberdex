@@ -582,13 +582,27 @@ mochilas y principal → entregas. Todo es del mundo principal; los de la sala d
 - **Odradek**: se entrega solo al aceptar el primer encargo (y se re-entrega si se pierde con uno en curso). Activo = lo tiene Y está en
   una zona (o lanzó un pulso). Activo, el varado deja de estar oculto para él (`hideEntity` por jugador), la barra de acción muestra
   flecha, metros y la barra de alerta, y suena un ping más rápido cuanto más cerca. Es un ítem ligado (no se tira ni se guarda en cofres).
-- **Moto** (`Moto`): un CABALLO invisible/mudo/invulnerable con silla, a velocidad fijada por el plugin, con un modelo de `BlockDisplay`
-  de pasajeros (el conductor tiene que ser el PRIMER pasajero: el caballo solo deja controlar al primero, por eso `montar` baja y
-  vuelve a subir los displays). Se pide en el cargador del puesto, siempre con la batería llena; la carga la frena y gasta más batería;
-  para los varados cuenta ×2,2. **Sin probar a la vista**: la altura del anclaje (`moto.ajuste-y`, 1,19) es una estimación.
+- **Moto** (`Moto`): un CABALLO invisible/mudo/invulnerable, a velocidad fijada por el plugin, con un modelo de 20 `BlockDisplay`
+  pasajeros (el conductor tiene que ser el PRIMER pasajero: el caballo solo deja controlar al primero; `montar` baja y vuelve a subir
+  los displays). Se GANA (3 entregas; libre para las fichas de `moto.libre-para-fichas`, reconocidas por la ficha VINCULADA vía
+  `slugDe`, nunca por el nombre de cuenta) y se entrega como **Llave de moto** (ítem ligado). Trampas que ya costaron:
+  · **Clicar la moto con la llave en la mano la reemplazaba**: el cliente manda «usar sobre la entidad» Y «usar el ítem»; el segundo
+    retiraba la moto recién montada y tiraba al conductor. Hoy la llave MONTA tu moto si está a ≤ 8 bloques y no hace nada montado.
+  · **Medidas reales, no estimadas** (servidor de prueba + cliente): un pasajero se ancla a **1,444 × escala** sobre los pies del caballo
+    (lineal: 1 → 1,444, 0,8 → 1,155) y 0 en X/Z. Con escala 1 el conductor quedaba ~25 cm alto: el caballo va a **escala 0,82**.
+  · Un caballo invisible SIGUE dibujando silla y riendas: la silla lleva un modelo de equipo inexistente (`vtuberdex:vacio`).
+  · Los displays nacen con guiñada 0 (si heredan la de quien llama, la moto sale «ladeada» ese ángulo).
+  · La caja del caballo es menor que el modelo: hay una `Interaction` de 1,8×1,1 que sigue al caballo (no como pasajera: se anclaría
+    a 1,18 de alto) y se encoge a 0 montado (si no, se tragaría los clics del conductor).
+  · Aparece en el primer hueco libre con suelo firme por delante (antes, a ciegas, podía quedar dentro de un bloque).
+- **Probar con un cliente REAL (lo que de verdad funcionó)**: Paper 26.2 de prueba + `portablemc` (cliente 26.2 offline, instalado en
+  `~/.local/share/vtuberdex-build/mc-cliente`, NO en /tmp que es RAM) en `Xvfb` con `LIBGL_ALWAYS_SOFTWARE=1`, control por XTest
+  (`python-xlib`), capturas con `ffmpeg -f x11grab`, y una web falsa que vincule a todos (con HTTP/1.0: con keep-alive el cliente HTTP
+  de Java daba timeouts). Para ver al propio jugador montado hace falta un SEGUNDO cliente observador en espectador (otro Xvfb). No
+  hay bot posible: `minecraft-data` llega a 26.1. Al matar procesos, por PID: `pkill -f <patrón>` mata la propia shell si el patrón
+  aparece en el comando.
 - **Mapa** (`Mapa`): UN mapa compartido (escala 1:16) con una capa contextual que pinta puestos, zonas y el destino del encargo.
-- **Qué NO está probado**: el comportamiento en vivo (IA de los varados, visibilidad, moto, mapa). No existe un cliente automatizable
-  para 26.2 (`minecraft-data` llega a 26.1). Lo comprobado: compila contra Paper 26.2, 22 pruebas de lógica pura (geometría, sigilo,
+- **Qué NO está probado**: en vivo, la IA de los varados, su visibilidad y el mapa (la moto sí, ver arriba). Lo comprobado: compila contra Paper 26.2, 22 pruebas de lógica pura (geometría, sigilo,
   recompensa, contratos, zonas), y un Paper 26.2 de prueba carga los tres plugins, construye los 6 puestos y crea las 9 zonas sin errores.
   Falta jugarlo con un cliente real; las perillas para afinarlo están en `config.yml` del plugin.
 
