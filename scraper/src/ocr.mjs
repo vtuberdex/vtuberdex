@@ -18,7 +18,7 @@
  * El resultado se acumula en out/ocr.json (se salta lo ya hecho).
  */
 import fs from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,6 +27,7 @@ import { createWorker } from "tesseract.js";
 
 import { fetchBinary, mapLimit } from './http.mjs';
 import { slugify } from './normalize.mjs';
+import { writeInside } from './safe-write.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(HERE, "..", "out");
@@ -180,8 +181,8 @@ async function main() {
       const text = data.text.replace(/\s+/g, " ").trim();
       if (KEEP_RAW) {
         const rawName = slugify(card.slug) || `v${card.dexNumber}`;
-        await writeFile(path.join(RAW_DIR, `${rawName}.png`), image).catch(() => undefined);
-        await writeFile(path.join(RAW_DIR, `${rawName}.jpg`), original).catch(() => undefined);
+        await writeInside(RAW_DIR, path.join(RAW_DIR, `${rawName}.png`), image).catch(() => undefined);
+        await writeInside(RAW_DIR, path.join(RAW_DIR, `${rawName}.jpg`), original).catch(() => undefined);
       }
       if (text.length < 12) empty += 1;
       else ok += 1;
