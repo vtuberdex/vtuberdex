@@ -29,7 +29,7 @@ export function AppHeader() {
           <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-dex-accent/60 bg-dex-accent/10">
             <span className="h-2.5 w-2.5 rounded-full bg-dex-accent" style={{ boxShadow: '0 0 12px var(--color-dex-accent)' }} />
           </span>
-          <span className="font-heading text-base uppercase tracking-[0.2em] text-dex-ink">VTuberDex</span>
+          <span className="font-heading text-sm uppercase tracking-[0.08em] sm:text-base sm:tracking-[0.2em] text-dex-ink">VTuberDex</span>
         </Link>
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           <Link href="/minecraft" className="hidden text-sm text-dex-muted hover:text-dex-ink md:inline">
