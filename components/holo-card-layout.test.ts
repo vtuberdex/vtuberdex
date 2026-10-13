@@ -32,15 +32,13 @@ const fuente = readFileSync(
 );
 
 /** Bloque JSX devuelto por `HoloCard`. */
-const render = fuente.slice(
-  fuente.indexOf("return (\n    <div className={className ?"),
-);
+const render = fuente.slice(fuente.indexOf("return (\n    <div"));
 
 describe("layout del canvas", () => {
   it("la raíz de HoloCard es `relative`", () => {
     expect(render).toContain('data-testid="holo-card"');
     expect(render).toMatch(
-      /className=\{className \? `relative \$\{className\}` : 'relative'\}/,
+      /className=\{className \? `relative \$\{className\}` : ["']relative["']\}/,
     );
   });
 
