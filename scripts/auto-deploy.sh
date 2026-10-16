@@ -111,8 +111,15 @@ instalar_java() {
   sudo cp -a "$JAR_DESTINO" "$resp" 2>/dev/null
   sudo install -o minecraft -g minecraft -m 640 "$ESTADO/pendiente.jar" "$JAR_DESTINO" || return 1
   sudo systemctl restart "$SERVICIO_MC"
-  sleep 45
-  if systemctl is-active --quiet "$SERVICIO_MC" && [ "$(jugadores)" != "?" ]; then
+  # POR QUÉ se sondea y no se mira una vez a los 45 s: este servidor (Paper + BlueMap + Chunky + Geyser, mundo grande)
+  # tarda más en aceptar conexiones. Con un único chequeo fijo, el 17-oct-2026 DOS despliegues seguidos se dieron
+  # por fallidos a los 54 s y se revirtieron (uno con código idéntico al ya instalado) aunque el plugin estaba bien.
+  local esperado=0 vivo=0
+  while [ "$esperado" -lt "${ESPERA_ARRANQUE_S:-300}" ]; do
+    sleep 5; esperado=$((esperado + 5))
+    if systemctl is-active --quiet "$SERVICIO_MC" && [ "$(jugadores)" != "?" ]; then vivo=1; break; fi
+  done
+  if [ "$vivo" = 1 ]; then
     anotar java.desplegado "$sha"; rm -f "$ESTADO/java.pendiente" "$ESTADO/pendiente.jar"
     log "java: ${sha:0:7} instalado y el servidor responde"
   else
