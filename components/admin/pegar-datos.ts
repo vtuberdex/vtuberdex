@@ -20,7 +20,6 @@ const norm = (text: string) =>
 /** Extrae los pares título/contenido; descarta los que vienen sin valor. */
 export function parsearDatos(html: string): ProfileField[] {
   if (!html.trim()) return [];
-  // codeql[js/xss-through-dom] -- falso positivo: documento inerte (no se inserta en el DOM); se quitan script/style/iframe/object/embed y solo se lee textContent.
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const out: ProfileField[] = [];
   // Solo interesa el texto: se descarta todo lo ejecutable/embebido antes de leer textContent.
