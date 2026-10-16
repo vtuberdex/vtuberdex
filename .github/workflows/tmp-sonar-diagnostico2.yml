@@ -1,0 +1,21 @@
+name: tmp-sonar-diagnostico2
+on:
+  pull_request:
+    paths: [".github/workflows/tmp-sonar-diagnostico2.yml"]
+permissions:
+  contents: read
+jobs:
+  consulta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quality gate y issues (solo lectura)
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          echo "== project_status"
+          curl -fsS -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?projectKey=vtuberdex" \
+            | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d).projectStatus;console.log("status",j.status);for(const c of j.conditions)console.log(c.status,c.metricKey,"actual=",c.actualValue,"umbral=",c.errorThreshold,c.comparator)})'
+          echo "== issues externas CodeQL abiertas"
+          curl -fsS -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/issues/search?componentKeys=vtuberdex&resolved=false&rules=external_CodeQL:js/xss-through-dom,external_CodeQL:js/http-to-file-access&ps=50" \
+            | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);console.log("total",j.total);for(const i of j.issues)console.log(i.rule,"|",i.component,"|",i.line,"|",i.status,"|",i.creationDate)})'
