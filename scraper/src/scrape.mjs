@@ -13,7 +13,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-
 import { BASE_URL, fetchBinary, fetchText, mapLimit } from "./http.mjs";
 import { parseIndex } from "./parse-index.mjs";
 import { parseDetail } from "./parse-detail.mjs";
@@ -22,28 +21,24 @@ import {
   languagesForCountries,
   slugify,
 } from "./normalize.mjs";
-
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
 const CACHE = path.join(HERE, "..", "cache");
 const DETAIL_CACHE = path.join(CACHE, "detail");
 const OUT = path.join(HERE, "..", "out");
 const IMAGES = path.join(ROOT, "data", "images");
-
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
 const value = (name, fallback) => {
   const index = args.indexOf(`--${name}`);
   return index >= 0 && args[index + 1] ? args[index + 1] : fallback;
 };
-
 const LIMIT = Number(value("limit", "0")) || Infinity;
 const FORCE = flag("force");
 const FROM_CACHE = flag("from-cache");
 const SKIP_IMAGES = flag("no-images");
 const DETAIL_CONCURRENCY = Number(value("concurrency", "8"));
 const IMAGE_CONCURRENCY = Number(value("image-concurrency", "6"));
-
 async function exists(target) {
   try {
     await fs.access(target);
@@ -52,7 +47,7 @@ async function exists(target) {
     return false;
   }
 }
-
+import { writeInside } from "./safe-write.mjs";
 async function readCache(target) {
   try {
     return await fs.readFile(target, "utf8");
@@ -60,7 +55,6 @@ async function readCache(target) {
     return null;
   }
 }
-
 /** Slugs candidatos para una carta: enlace del index, nombre y número. */
 function candidateSlugs(entry) {
   const candidates = [];
@@ -84,7 +78,6 @@ function candidateSlugs(entry) {
   }
   return [...new Set(candidates.filter(Boolean))];
 }
-
 /** Ruta de caché del HTML de detalle, compartida por scrape y re-parseo. */
 export function detailCachePath(slug, dexNumber) {
   const safe = slugify(slug) || `v${dexNumber}`;
@@ -93,7 +86,6 @@ export function detailCachePath(slug, dexNumber) {
     `${safe}--${Buffer.from(slug).toString("base64url")}.html`,
   );
 }
-
 /** Baja (o lee de caché) el detalle. Devuelve {html, slug} o null. */
 async function loadDetail(entry) {
   for (const slug of candidateSlugs(entry)) {
@@ -106,7 +98,7 @@ async function loadDetail(entry) {
         `${BASE_URL}${slug.split("/").map(encodeURIComponent).join("/")}`,
       );
       if (!soft404 && html.includes('class="terminal-bar"')) {
-        await fs.writeFile(cacheFile, html);
+        await writeInside(DETAIL_CACHE, cacheFile, html);
         return { html, slug, cacheFile };
       }
     } catch {
@@ -115,7 +107,6 @@ async function loadDetail(entry) {
   }
   return null;
 }
-
 /**
  * Convierte un data URI (base64 embebido en la ficha) en Buffer.
  */
@@ -131,7 +122,6 @@ function bufferFromDataUri(src) {
     return null;
   }
 }
-
 /** Descarga una imagen y la convierte a WebP. Devuelve la ruta relativa o null. */
 /**
  * Reutiliza el logo ya recortado de la carta (data/images/logo/<slug>.webp),
@@ -148,16 +138,12 @@ async function reuseCardLogo({ sharp, folder, slug }) {
   if (sharp && folder !== "character") {
     const current = await sharp(file).metadata();
     if ((current.width ?? 0) > 900) {
-      const resized = await sharp(file)
-        .resize({ width: 900, withoutEnlargement: true })
-        .webp({ quality: 92, alphaQuality: 90 })
-        .toBuffer();
-      await fs.writeFile(file, resized);
+      const resized = await sharp(file).resize({ width: 900, withoutEnlargement: true }).webp({ quality: 92, alphaQuality: 90 }).toBuffer();
+      await writeInside(IMAGES, file, resized);
     }
   }
   return `images/${folder}/${slug}.webp`;
 }
-
 async function convertImage(
   src,
   { sharp, folder, slug, width, quality = 82, keepAlpha = false, trim = false },
@@ -195,7 +181,7 @@ async function convertImage(
       .resize({ width, withoutEnlargement: true, fit: "inside" })
       .webp({ quality, alphaQuality: keepAlpha ? 90 : undefined })
       .toBuffer();
-    await fs.writeFile(file, converted);
+    await writeInside(IMAGES, file, converted);
     return `images/${folder}/${slug}.webp`;
   } catch {
     // Formato no soportado: guarda el original como fallback con su extensión.
@@ -208,27 +194,24 @@ async function convertImage(
           ? "webp"
           : "jpg";
     const fallback = path.join(targetDir, `${slug}.${ext}`);
-    if (!(await exists(fallback))) await fs.writeFile(fallback, buffer);
+    if (!(await exists(fallback))) await writeInside(IMAGES, fallback, buffer);
     return `images/${folder}/${slug}.${ext}`;
   }
 }
-
 async function main() {
   const started = Date.now();
   await fs.mkdir(DETAIL_CACHE, { recursive: true });
   await fs.mkdir(OUT, { recursive: true });
-
   // ---- 1. index ------------------------------------------------------------
   const indexPath = path.join(CACHE, "index.html");
   let indexHtml = FORCE ? null : await readCache(indexPath);
   if (!indexHtml) {
     const { html } = await fetchText(BASE_URL);
-    await fs.writeFile(indexPath, html);
+    await writeInside(CACHE, indexPath, html);
     indexHtml = html;
   }
   const entries = parseIndex(indexHtml).slice(0, LIMIT);
   console.log(`[scrape] index: ${entries.length} cartas`);
-
   // ---- 2. detalles ---------------------------------------------------------
   let done = 0;
   const withDetail = await mapLimit(
@@ -244,7 +227,6 @@ async function main() {
   );
   const found = withDetail.filter((item) => item.detail).length;
   console.log(`[scrape] detalles encontrados: ${found}/${entries.length}`);
-
   // ---- 3. imágenes ---------------------------------------------------------
   const { default: sharp } = SKIP_IMAGES
     ? { default: null }
@@ -257,7 +239,6 @@ async function main() {
     radar: 0,
     failed: [],
   };
-
   const dataset = await mapLimit(
     withDetail,
     IMAGE_CONCURRENCY,
@@ -266,7 +247,6 @@ async function main() {
       const dexNumber = entry.dexNumber ?? index + 1;
       const slug = slugify(entry.name) || `vtuber-${dexNumber}`;
       const languages = languagesForCountries(entry.countries);
-
       let assets = {
         card: null,
         thumb: null,
@@ -292,7 +272,6 @@ async function main() {
           slug,
           folder: "character",
         });
-
         // ---------------------------------------------------------- IMÁGENES ---
         // REGLA DE ORO (y corrección de diseño): la única imagen propia del VTuber
         // es el PERSONAJE. La CARTA no se guarda: la compone el visor 3D en el
@@ -304,7 +283,6 @@ async function main() {
         // el respaldo: si un VTuber no tiene personaje, las vistas muestran la ficha
         // en su lugar en vez de un hueco vacío.
         const fichaSrc = entry.imageSrc;
-
         assets = {
           // La FICHA apaisada del sitio (legacy). Es el respaldo cuando no hay
           // personaje: así `card` siempre resuelve a algo mostrable.
@@ -327,7 +305,8 @@ async function main() {
                   .resize({ width: 360, withoutEnlargement: true })
                   .webp({ quality: 84, alphaQuality: 100, effort: 6 })
                   .toBuffer();
-                await fs.writeFile(
+                await writeInside(
+                  IMAGES,
                   path.join(IMAGES, "thumb", `${slug}.webp`),
                   buf,
                 );
@@ -391,7 +370,6 @@ async function main() {
         if (assets.thumb) imageStats.thumb += 1;
         void fallbackSlug;
       }
-
       return {
         dexNumber,
         name: entry.name,
@@ -418,7 +396,6 @@ async function main() {
       };
     },
   );
-
   const output = {
     generatedAt: new Date().toISOString(),
     source: BASE_URL,
@@ -430,7 +407,6 @@ async function main() {
     },
     vtubers: dataset,
   };
-
   await fs.writeFile(
     path.join(OUT, "dataset.json"),
     JSON.stringify(
@@ -459,7 +435,6 @@ async function main() {
     JSON.stringify(missing, null, 1),
   );
 }
-
 main().catch((error) => {
   console.error("[scrape] ERROR", error);
   process.exit(1);
