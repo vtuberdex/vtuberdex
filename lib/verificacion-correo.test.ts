@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Correo de confirmación y enlace mágico: de punta a punta, con Turso falso (SQLite en memoria) y un
  * transporte de correo falso que guarda lo que se «enviaría». Lo que se fija aquí es lo que ninguna

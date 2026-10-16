@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Solicitudes (inscripción y baja): reglas de la cola, confidencialidad del contacto, términos
  * obligatorios y el pegamento HTTP público. Corre contra SQLite en memoria con el MISMO SQL que
