@@ -1,0 +1,17 @@
+name: tmp-sonar-diagnostico
+on:
+  pull_request:
+    paths: [".github/workflows/tmp-sonar-diagnostico.yml"]
+permissions:
+  contents: read
+jobs:
+  consulta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vulnerabilidades abiertas en Sonar (solo lectura)
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          curl -fsS -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/issues/search?componentKeys=vtuberdex&resolved=false&ps=100&facets=types" \
+            | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);console.log("total",j.total);for(const i of j.issues)if(/codeql|semgrep/i.test(i.rule)||i.type==="VULNERABILITY")console.log(i.rule,"|",i.component,"|",i.line,"|",i.status,"|",i.type,"|",i.key)})'
