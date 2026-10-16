@@ -57,12 +57,13 @@ export function ReviewStep({
             <span className="block text-xs text-dex-muted">Solo la ves tú aquí; puedes publicarla cuando esté lista.</span>
           </span>
         </label>
-        {form.status === 'hidden' && (
-          <label className="flex items-start gap-2 text-sm text-dex-ink">
-            <input type="radio" name="visibilidad" checked readOnly />
-            <span>Oculta (se mantiene así)</span>
-          </label>
-        )}
+        <label className="flex items-start gap-2 text-sm text-dex-ink">
+          <input type="radio" name="visibilidad" checked={form.status === 'hidden'} onChange={() => set('status', 'hidden')} />
+          <span>
+            Ocultar
+            <span className="block text-xs text-dex-muted">No sale en el catálogo ni tiene página pública; tú la sigues viendo aquí.</span>
+          </span>
+        </label>
       </fieldset>
 
       <p className="text-xs text-dex-muted">
