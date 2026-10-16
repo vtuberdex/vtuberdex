@@ -7,6 +7,5 @@ export async function writeInside(base, target, data) {
   if (!rel || rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel)) {
     throw new Error(`ruta fuera de ${base}: ${target}`);
   }
-  // codeql[js/http-to-file-access] -- falso positivo: escribir lo descargado es el propósito del scraper y la ruta ya se validó contra `base` arriba.
-  await writeFile(target, data);
+  await writeFile(target, data); // codeql[js/http-to-file-access] -- falso positivo: escribir lo descargado es el propósito del scraper; la ruta ya se validó contra `base`.
 }

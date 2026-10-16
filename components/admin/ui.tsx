@@ -61,8 +61,7 @@ export function EmblemSocket({ icon, previewUrl, size = 96 }: { icon?: string | 
       style={{ width: size, height: size, background: 'radial-gradient(circle at 50% 40%, #1b1f2e 0%, #07080d 75%)' }}
     >
       {src ? (
-        // codeql[js/xss-through-dom] -- falso positivo: `src` pasa por safeImageSrc (solo http(s), blob:, data:image/* y rutas relativas).
-        <img src={src} alt="" className="object-contain" style={{ width: size * 0.74, height: size * 0.74 }} />
+        <img src={src} alt="" className="object-contain" style={{ width: size * 0.74, height: size * 0.74 }} /> // codeql[js/xss-through-dom] -- falso positivo: `src` pasa por safeImageSrc (solo http(s), blob:, data:image/* y rutas relativas).
       ) : (
         <span className="text-[10px] uppercase tracking-wide text-white/30">sin emblema</span>
       )}
