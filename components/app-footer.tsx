@@ -24,6 +24,9 @@ export function AppFooter() {
         <Link href="/niveles" className="hover:text-dex-ink">
           {t("pie.niveles")}
         </Link>
+        <Link href="/minecraft" className="hover:text-dex-ink">
+          {t("pie.minecraft")}
+        </Link>
         <Link href="/mi-ficha" className="hover:text-dex-ink">
           {t("pie.miFicha")}
         </Link>

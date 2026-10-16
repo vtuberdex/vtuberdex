@@ -65,6 +65,12 @@ export const PUNTOS_STATS_POR_NIVEL = 10;
  */
 export const XP_JUEGO_MAX_DIA = 300;
 /**
+ * XP que una ficha puede sumar al día SOLO por entregas del plugin de Minecraft (motivo `entrega`), aparte y ADEMÁS de
+ * `XP_JUEGO_MAX_DIA`. Es lo que hace rentable el trabajo de repartidor (llevar paquetes en la mochila, cruzar zonas de
+ * varados) sin abrir la puerta a que matar mobs rinda más: cada tope cuenta solo lo suyo.
+ */
+export const XP_ENTREGA_MAX_DIA = 600;
+/**
  * LA EXPERIENCIA DE UNA FICHA (la fórmula única, sin ajustes a mano)
  * ------------------------------------------------------------------
  * `experienciaDeFicha` IGNORA el nivel y la barra que traiga la ficha (scrape o mantenedor): esos números eran

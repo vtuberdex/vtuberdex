@@ -4,6 +4,13 @@
  * español: aquí solo está lo que se MUESTRA.
  */
 export const fichasEs = {
+  "ins.falta.titulo": "Antes de seguir te falta:",
+  "ins.falta.vacio": "{campo}: está vacío",
+  "ins.falta.invalido": "{campo}: no es válido (revisa que sea un enlace completo con https:// o un correo con @)",
+  "ins.falta.terminos": "Aceptar los términos y condiciones",
+  "ins.falta.ir": "Ir al campo",
+  "ins.falta.redes": "Cada red necesita su plataforma y un enlace completo",
+  "ins.falta.idiomas": "Elige al menos un idioma",
   "ficha.paso": "Paso {n} de {total} · {titulo}",
   "ficha.volver": "← Volver",
   "ficha.siguiente": "Siguiente →",
@@ -167,6 +174,13 @@ export const fichasEs = {
 } as const;
 
 export const fichasEn: { [K in keyof typeof fichasEs]: string } = {
+  "ins.falta.titulo": "Before you continue, you are missing:",
+  "ins.falta.vacio": "{campo}: is empty",
+  "ins.falta.invalido": "{campo}: is not valid (check it is a full link with https:// or an email with @)",
+  "ins.falta.terminos": "Accept the terms and conditions",
+  "ins.falta.ir": "Go to field",
+  "ins.falta.redes": "Each network needs its platform and a full link",
+  "ins.falta.idiomas": "Pick at least one language",
   "ficha.paso": "Step {n} of {total} · {titulo}",
   "ficha.volver": "← Back",
   "ficha.siguiente": "Next →",
@@ -331,6 +345,13 @@ export const fichasEn: { [K in keyof typeof fichasEs]: string } = {
 };
 
 export const fichasJa: { [K in keyof typeof fichasEs]: string } = {
+  "ins.falta.titulo": "次へ進む前に、足りない項目があります：",
+  "ins.falta.vacio": "{campo}：未入力です",
+  "ins.falta.invalido": "{campo}：正しくありません（https:// から始まるリンク、または @ を含むメールか確認してください）",
+  "ins.falta.terminos": "利用規約に同意する",
+  "ins.falta.ir": "項目へ移動",
+  "ins.falta.redes": "各SNSにはプラットフォーム名と完全なリンクが必要です",
+  "ins.falta.idiomas": "言語を1つ以上選んでください",
   "ficha.paso": "ステップ {n}/{total} · {titulo}",
   "ficha.volver": "← 戻る",
   "ficha.siguiente": "次へ →",

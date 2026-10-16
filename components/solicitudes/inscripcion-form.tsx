@@ -18,7 +18,7 @@
  * formulario público que recibe archivos es una puerta abierta a subir basura; el mantenedor lo descarga y lo
  * sube por su gestor de imágenes.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
 import type { Clave } from "@/lib/i18n/mensajes";
@@ -34,6 +34,10 @@ import {
   Campo,
   claseInput,
 } from "@/components/solicitudes/campos";
+import {
+  faltasDelPaso,
+  type Falta,
+} from "@/components/solicitudes/validar-inscripcion";
 import {
   BarraDePasos,
   BotoneraPasos,
@@ -79,6 +83,9 @@ export function InscripcionForm() {
   const [socials, setSocials] = useState<Red[]>([{ platform: "", url: "" }]);
   const [acepta, setAcepta] = useState(false);
   const [website, setWebsite] = useState("");
+  /** Paso en el que se intentó avanzar con campos sin completar: desde ahí la lista se recalcula al escribir. */
+  const [intento, setIntento] = useState<Paso | null>(null);
+  const formulario = useRef<HTMLFormElement>(null);
   const { enviando, error, setError, intentar } = useEnvio();
   const [enviada, setEnviada] = useState(false);
   /** Estado del borrador: lo que se le muestra a la persona. */
@@ -87,6 +94,29 @@ export function InscripcionForm() {
     hora?: string;
   } | null>(null);
   const [recuperado, setRecuperado] = useState<string | null>(null);
+
+  const faltas: Falta[] =
+    intento === paso
+      ? faltasDelPaso(paso, { name, email, codigo, languages, socials, imageUrl, logoUrl, cardText, perfil, acepta })
+      : [];
+  /** `aria-invalid` de un campo: lo pinta de rojo (ver `claseInput`) y avisa a lectores de pantalla. */
+  const malo = (campo: string) => (faltas.some((f) => f.campo === campo) ? true : undefined);
+  const hayFalta = (campo: string) => faltas.some((f) => f.campo === campo);
+
+  /** Lleva el foco al control (o al primero del grupo) que falta. */
+  const irAlCampo = (campo: string) => {
+    const destino = formulario.current?.querySelector<HTMLElement>(`[data-campo="${campo}"]`);
+    if (!destino) return;
+    destino.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    (destino.matches("input,select,textarea,button") ? destino : destino.querySelector<HTMLElement>("input,button"))?.focus({ preventScroll: true });
+  };
+
+  const textoDeFalta = (f: Falta) => {
+    if (f.campo === "acepta") return t("ins.falta.terminos");
+    if (f.campo === "languages") return t("ins.falta.idiomas");
+    if (f.campo === "socials") return `${t("ins.redes")}: ${t("ins.falta.redes")}`;
+    return t(f.motivo === "vacio" ? "ins.falta.vacio" : "ins.falta.invalido", { campo: t(f.etiqueta as Clave) });
+  };
 
   useCodigoDelEnlace((deEnlace) => {
     setCodigo(deEnlace);
@@ -163,8 +193,14 @@ export function InscripcionForm() {
   const enviar = async (evento: React.FormEvent) => {
     evento.preventDefault();
     setError(null);
-    // La validación nativa (`required`) del paso corre antes de este `submit`: si llegamos aquí los datos de
-    // este paso están completos.
+    // La validación es nuestra (el formulario va `noValidate`): la burbuja nativa señala un solo campo y no
+    // cubre idiomas, redes ni términos. Se muestra la lista completa del paso y el foco va al primer faltante.
+    const pendientes = faltasDelPaso(paso, { name, email, codigo, languages, socials, imageUrl, logoUrl, cardText, perfil, acepta });
+    if (pendientes.length) {
+      setIntento(paso);
+      requestAnimationFrame(() => irAlCampo(pendientes[0].campo));
+      return;
+    }
     if (paso === 1) {
       await intentar(async () => {
         await api.pedirCodigoDeInscripcion(email, website);
@@ -198,10 +234,6 @@ export function InscripcionForm() {
     if (paso < 5) {
       setPaso((paso + 1) as Paso);
       window.scrollTo({ top: 0 });
-      return;
-    }
-    if (!acepta) {
-      setError(t("ins.errorTerminos"));
       return;
     }
     await intentar(
@@ -253,7 +285,8 @@ export function InscripcionForm() {
       onSubmit={enviar}
       className="relative space-y-6"
       data-testid="inscripcion-form"
-      noValidate={false}
+      ref={formulario}
+      noValidate
     >
       <BarraDePasos
         testId="inscripcion-paso"
@@ -286,6 +319,7 @@ export function InscripcionForm() {
 
       {paso === 1 && (
         <PasoCorreo
+          marcado={malo}
           leyenda={t("ins.paraEmpezar")}
           ayuda={t("ins.correoAyuda")}
           privacidad={t("ins.privacidad")}
@@ -298,6 +332,8 @@ export function InscripcionForm() {
             <input
               className={claseInput}
               required
+              data-campo="name"
+              aria-invalid={malo("name")}
               maxLength={160}
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -312,6 +348,7 @@ export function InscripcionForm() {
           email={email}
           codigo={codigo}
           setCodigo={setCodigo}
+          marcado={malo}
         />
       )}
 
@@ -330,6 +367,7 @@ export function InscripcionForm() {
             />
           </Campo>
           <SelectorIdiomas
+            marcado={hayFalta("languages")}
             leyenda={
               <>
                 {t("ficha.leyendaIdiomas")}{" "}
@@ -351,6 +389,7 @@ export function InscripcionForm() {
             />
           </Campo>
           <EditorRedes
+            marcado={hayFalta("socials")}
             titulo={
               <>
                 {t("ins.redes")}{" "}
@@ -385,6 +424,8 @@ export function InscripcionForm() {
                   type="url"
                   className={claseInput}
                   required
+                  data-campo="imageUrl"
+                  aria-invalid={malo("imageUrl")}
                   maxLength={500}
                   placeholder="https://"
                   value={imageUrl}
@@ -396,6 +437,8 @@ export function InscripcionForm() {
                   type="url"
                   className={claseInput}
                   required
+                  data-campo="logoUrl"
+                  aria-invalid={malo("logoUrl")}
                   maxLength={500}
                   placeholder="https://"
                   value={logoUrl}
@@ -417,6 +460,7 @@ export function InscripcionForm() {
             <div className="grid gap-4 sm:grid-cols-2">
               <CamposDelPaso
                 n={2}
+                marcado={malo}
                 perfil={perfil}
                 setPerfil={setPerfil}
                 obligatorio
@@ -438,6 +482,8 @@ export function InscripcionForm() {
               <textarea
                 className={`${claseInput} min-h-28`}
                 required
+                data-campo="cardText"
+                aria-invalid={malo("cardText")}
                 maxLength={4000}
                 value={cardText}
                 onChange={(e) => setCardText(e.target.value)}
@@ -460,6 +506,7 @@ export function InscripcionForm() {
             <div className="grid gap-4 sm:grid-cols-2">
               <CamposDelPaso
                 n={3}
+                marcado={malo}
                 perfil={perfil}
                 setPerfil={setPerfil}
                 obligatorio
@@ -471,8 +518,30 @@ export function InscripcionForm() {
             idUnico="acepta-terminos-inscripcion"
             marcada={acepta}
             alCambiar={setAcepta}
+            invalida={malo("acepta")}
           />
         </>
+      )}
+
+      {faltas.length > 0 && (
+        <div data-testid="inscripcion-faltas">
+          <Aviso tipo="error">
+            <p className="font-bold">{t("ins.falta.titulo")}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {faltas.map((f) => (
+                <li key={f.campo}>
+                  <button
+                    type="button"
+                    className="text-left underline underline-offset-2"
+                    onClick={() => irAlCampo(f.campo)}
+                  >
+                    {textoDeFalta(f)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </Aviso>
+        </div>
       )}
 
       <BotoneraPasos
@@ -480,7 +549,6 @@ export function InscripcionForm() {
         total={TOTAL_PASOS}
         error={error}
         enviando={enviando}
-        acepta={acepta}
         conVolver={paso === 2 || paso >= 4}
         alVolver={() => {
           setError(null);
