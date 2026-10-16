@@ -8,14 +8,26 @@ jobs:
   consulta:
     runs-on: ubuntu-latest
     steps:
-      - name: Quality gate y issues (solo lectura)
+      - name: Marcar como falsos positivos las 3 issues de CodeQL revisadas
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          echo "== project_status"
+          set -e
+          keys=$(curl -fsS -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/issues/search?componentKeys=vtuberdex&resolved=false&rules=external_CodeQL:js/xss-through-dom,external_CodeQL:js/http-to-file-access&ps=50" \
+            | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{for(const i of JSON.parse(d).issues)console.log(i.key+"|"+i.component+"|"+i.rule)})')
+          echo "$keys"
+          echo "$keys" | while IFS='|' read -r key comp rule; do
+            case "$comp" in
+              *scraper/src/safe-write.mjs) motivo="Falso positivo: escribir lo descargado es el propósito del scraper; writeInside valida la ruta contra su directorio base (scraper/test/ocr-write.test.mjs).";;
+              *components/admin/pegar-datos.ts) motivo="Falso positivo: DOMParser sobre HTML pegado por el admin; documento inerte, sin script/style/iframe/object/embed, solo se lee textContent.";;
+              *components/admin/ui.tsx) motivo="Falso positivo: el src de la imagen pasa por safeImageSrc (http(s), blob:, data:image/* y rutas relativas).";;
+              *) echo "sin motivo para $comp, se omite"; continue;;
+            esac
+            curl -fsS -u "$SONAR_TOKEN:" -X POST "$SONAR_HOST_URL/api/issues/add_comment" --data-urlencode "issue=$key" --data-urlencode "text=$motivo" >/dev/null
+            curl -fsS -u "$SONAR_TOKEN:" -X POST "$SONAR_HOST_URL/api/issues/do_transition" --data-urlencode "issue=$key" --data-urlencode "transition=falsepositive" >/dev/null
+            echo "falsepositive: $comp ($rule)"
+          done
+          echo "== estado final"
           curl -fsS -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?projectKey=vtuberdex" \
-            | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d).projectStatus;console.log("status",j.status);for(const c of j.conditions)console.log(c.status,c.metricKey,"actual=",c.actualValue,"umbral=",c.errorThreshold,c.comparator)})'
-          echo "== issues externas CodeQL abiertas"
-          curl -fsS -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/issues/search?componentKeys=vtuberdex&resolved=false&rules=external_CodeQL:js/xss-through-dom,external_CodeQL:js/http-to-file-access&ps=50" \
-            | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d);console.log("total",j.total);for(const i of j.issues)console.log(i.rule,"|",i.component,"|",i.line,"|",i.status,"|",i.creationDate)})'
+            | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const j=JSON.parse(d).projectStatus;console.log("status",j.status);for(const c of j.conditions)console.log(c.status,c.metricKey,"actual=",c.actualValue)})'
