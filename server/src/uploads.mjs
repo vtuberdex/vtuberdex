@@ -143,9 +143,9 @@ export function alphaBounds(data, width, height, channels) {
  * Las comprobaciones de tamaño usan este número, no `buffer.length` repetido en cada sitio.
  */
 function tamanoDeSubida(buffer) {
-  if (!Buffer.isBuffer(buffer) || buffer.length === 0)
-    throw new Error("archivo_vacio");
-  const tamano = buffer.length;
+  if (!Buffer.isBuffer(buffer)) throw new Error("archivo_vacio");
+  const tamano = buffer.byteLength;
+  if (tamano === 0) throw new Error("archivo_vacio");
   if (tamano > MAX_UPLOAD_BYTES) throw new Error("archivo_demasiado_grande");
   return tamano;
 }
