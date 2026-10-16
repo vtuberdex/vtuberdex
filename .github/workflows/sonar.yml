@@ -71,6 +71,10 @@ jobs:
   sonar:
     needs: [semgrep, codeql]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write # decoración del PR (Sonar)
+      pull-requests: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:

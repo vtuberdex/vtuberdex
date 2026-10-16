@@ -33,6 +33,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.3,
     },
     {
+      url: urlAbsoluta("/minecraft"),
+      changeFrequency: "yearly" as const,
+      priority: 0.3,
+    },
+    {
       url: urlAbsoluta("/terminos"),
       changeFrequency: "yearly" as const,
       priority: 0.2,

@@ -45,6 +45,8 @@ export type Perfil = Record<ClavePerfil, string>;
 const claseFieldset =
   "space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-5";
 const claseLeyenda = "px-2 text-sm font-bold text-dex-ink";
+/** Anillo rojo de un grupo (idiomas, redes) que falta; el ajuste de compensación lo mantiene dentro del borde. */
+const ANILLO_ERROR = "rounded-lg ring-1 ring-rose-400/70 ring-offset-4 ring-offset-transparent";
 
 /** Un perfil con todas las preguntas en blanco. */
 export const perfilVacio = (): Perfil =>
@@ -171,6 +173,7 @@ export function PasoCorreo({
   setEmail,
   website,
   setWebsite,
+  marcado,
   children,
 }: {
   leyenda: string;
@@ -180,6 +183,8 @@ export function PasoCorreo({
   setEmail: (v: string) => void;
   website: string;
   setWebsite: (v: string) => void;
+  /** Marca (`aria-invalid`) el campo que falta; lo decide quien usa el paso. */
+  marcado?: (campo: string) => true | undefined;
   children?: ReactNode;
 }) {
   const { t } = useI18n();
@@ -197,6 +202,8 @@ export function PasoCorreo({
           type="email"
           className={claseInput}
           required
+          data-campo="email"
+          aria-invalid={marcado?.("email")}
           maxLength={200}
           autoComplete="email"
           value={email}
@@ -226,11 +233,13 @@ export function PasoCodigo({
   email,
   codigo,
   setCodigo,
+  marcado,
 }: {
   testId: string;
   email: string;
   codigo: string;
   setCodigo: (v: string) => void;
+  marcado?: (campo: string) => true | undefined;
 }) {
   const { t } = useI18n();
   return (
@@ -247,7 +256,8 @@ export function PasoCodigo({
         <input
           className={`${claseInput} font-mono`}
           required
-          minLength={20}
+          data-campo="codigo"
+          aria-invalid={marcado?.("codigo")}
           maxLength={100}
           autoComplete="one-time-code"
           spellCheck={false}
@@ -265,11 +275,13 @@ export function CamposDelPaso({
   perfil,
   setPerfil,
   obligatorio = false,
+  marcado,
 }: {
   n: number;
   perfil: Perfil;
   setPerfil: Dispatch<SetStateAction<Perfil>>;
   obligatorio?: boolean;
+  marcado?: (campo: string) => true | undefined;
 }) {
   const { t } = useI18n();
   return (
@@ -283,6 +295,8 @@ export function CamposDelPaso({
           <input
             className={claseInput}
             required={obligatorio}
+            data-campo={campo.clave}
+            aria-invalid={marcado?.(campo.clave)}
             maxLength={campo.max}
             placeholder={
               campo.ejemplo
@@ -369,11 +383,13 @@ export function SelectorIdiomas({
   idiomas,
   languages,
   setLanguages,
+  marcado = false,
 }: {
   leyenda: ReactNode;
   idiomas: Opcion[];
   languages: string[];
   setLanguages: Dispatch<SetStateAction<string[]>>;
+  marcado?: boolean;
 }) {
   const alternar = (codigo: string) =>
     setLanguages((actuales) =>
@@ -382,7 +398,7 @@ export function SelectorIdiomas({
         : [...actuales, codigo],
     );
   return (
-    <fieldset>
+    <fieldset data-campo="languages" className={marcado ? ANILLO_ERROR : undefined}>
       <legend className="text-xs uppercase tracking-[0.14em] text-dex-muted">
         {leyenda}
       </legend>
@@ -415,11 +431,13 @@ export function EditorRedes({
   titulo,
   socials,
   setSocials,
+  marcado = false,
   children,
 }: {
   titulo: ReactNode;
   socials: Red[];
   setSocials: Dispatch<SetStateAction<Red[]>>;
+  marcado?: boolean;
   children?: ReactNode;
 }) {
   const { t } = useI18n();
@@ -428,7 +446,7 @@ export function EditorRedes({
       actuales.map((r, i) => (i === indice ? { ...r, ...cambio } : r)),
     );
   return (
-    <div>
+    <div data-campo="socials" className={marcado ? ANILLO_ERROR : undefined}>
       <p className="text-xs uppercase tracking-[0.14em] text-dex-muted">
         {titulo}
       </p>
@@ -510,7 +528,8 @@ export function BotoneraPasos({
   error: string | null;
   total: number;
   enviando: boolean;
-  acepta: boolean;
+  /** Solo el paso con términos (inscripción) lo pasa; sin él el botón no se apaga por los términos. */
+  acepta?: boolean;
   conVolver: boolean;
   alVolver: () => void;
   textoEnviar: string;
@@ -539,7 +558,7 @@ export function BotoneraPasos({
         <button
           type="submit"
           className={claseBoton}
-          disabled={enviando || (paso === total && !acepta)}
+          disabled={enviando || (paso === total && acepta === false)}
         >
           {texto}
         </button>

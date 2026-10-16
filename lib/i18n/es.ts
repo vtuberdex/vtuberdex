@@ -1,6 +1,7 @@
 import { formulariosEs } from "./textos/formularios";
 import { miFichaEs } from "./textos/mificha";
 import { nivelesEs } from "./textos/niveles";
+import { minecraftEs } from "./textos/minecraft";
 import { fichasEs } from "./textos/fichas";
 /**
  * Textos de la interfaz en español: la FUENTE de las claves. `en.ts` y `ja.ts` se tipan contra
@@ -196,6 +197,7 @@ export const es = {
   ...fichasEs,
   ...miFichaEs,
   ...nivelesEs,
+  ...minecraftEs,
 } as const;
 
 export type Mensajes = { [K in keyof typeof es]: string };

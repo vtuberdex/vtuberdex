@@ -39,7 +39,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 
 ```bash
 # Tests (desde la raíz)
-npm test                   # 912 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 915 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 154 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
 
@@ -222,6 +222,14 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   el Express). Si la ficha no se puede crear (URL repetida, país desconocido) la solicitud sigue pendiente.
 - **«Procesar» una baja NO degrada la ficha**: solo cierra la solicitud. La degradación de la cláusula de salida es un
   paso manual aparte (no está automatizada) y el mantenedor lo avisa.
+- **La inscripción valida PASO A PASO con lista de faltantes** (`validar-inscripcion.ts`, función pura `faltasDelPaso`; el formulario va
+  `noValidate`): la burbuja nativa señalaba un solo campo y no cubría idiomas, redes ni términos, que solo fallaban con un 400 al final.
+  Al pulsar «Siguiente» (o «Enviar») con algo sin completar NO se avanza: sale la lista completa del paso (cada ítem lleva el foco a su
+  campo), los campos quedan en rojo (`aria-invalid`) y la lista se recalcula al corregir. El botón de enviar ya NO se deshabilita sin
+  términos (un botón apagado sin explicación era justo el problema). Mantén `validar-inscripcion.ts` igual a `inscripcionSchema`.
+- **Botón «Inscribir mi ficha» en la cabecera** (`app-header.tsx`, relleno y siempre visible) y página **`/minecraft`** (guía para entrar al
+  servidor, `components/minecraft/`, textos en `lib/i18n/textos/minecraft.ts`, enlazada en cabecera `md+`, pie y sitemap). Si cambia el flujo
+  del plugin (`/vtd email`, `/vtd codigo`, puertos), actualiza ese texto.
 - **La inscripción es un formulario de 5 pasos** (`inscripcion-form.tsx`; el estado vive en el padre, así que «Volver» no pierde nada y la
   validación nativa `required` de cada paso corre antes de avanzar): 1) nombre artístico y correo, 2) código del correo, 3) tu ficha
   (color, idiomas, frase, redes), 4) tu personaje (avatar y logo como ENLACE, modelo, hashtag, estatura, cumpleaños, país, signo, lore), 5) gustos + términos. Obligatorios todos salvo país y signo. Los textos cortos
@@ -481,7 +489,7 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
   juega desde OTRA IP. Por defecto Minecraft hace lo contrario (expulsa al que ya estaba), y en offline cualquiera echaría a una VTuber
   escribiendo su nombre. Desde la MISMA IP sí entra (reconexión tras un corte). Sin probar con dos clientes reales.
 - **La XP del juego es un dato más de la curva**: `experienciaConLikes(base, likes, xpJuego)` la suma como la de los likes; niveles,
-  puntos y aviso de subida salen solos. `xpJuego` = `SUM(cantidad)` de `xp_juego` (ejecutor de `lib/solicitudes.mjs`), la leen la ficha
+  puntos y aviso de subida salen solos. `xpJuego` = `SUM(cantidad)` de `xp_juego` (incluida la de entregas) (ejecutor de `lib/solicitudes.mjs`), la leen la ficha
   pública, el like y «Mi ficha» (`xpJuegoDe` vale 0 si el almacén falla). El LISTADO no la aplica (tampoco los likes).
 - **Lotes idempotentes con tope en UNA sentencia**: lotes de ≤ `XP_POR_LOTE_MAX` (100) con `idLote` UUID fijado al crearlo (un
   reintento no suma dos veces); el INSERT recorta a lo que cabe en `XP_JUEGO_MAX_DIA` (300, día de Chile). Motivos: `MOTIVOS_XP`.
@@ -515,7 +523,7 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
   responder («HTTP/1.1 header parser received no bytes»; `curl --http2` reproduce: exit 52). `ApiClient` fuerza HTTP/1.1. Ningún
   gate lo vio: salió en la primera entrada real (Bedrock) y dejaba a todos en la sala de espera.
 - **Producción (VPS)**: servicio `vtuberdex-minecraft` (usuario `minecraft`, `/srv/minecraft`, Java 25 de apt, `-Xmx1536M`
-  `-XX:ActiveProcessorCount=2`, `ProtectSystem=strict`), puertos **25565/tcp** (Java) y **19132/udp** (Bedrock) públicos, `online-mode=false` (híbrido, ver arriba), sin RCON. **No hagas
+  `-XX:ActiveProcessorCount=2`, `ProtectSystem=strict`), puertos **25565/tcp** (Java) y **19132/udp** (Bedrock) públicos, `online-mode=false` (híbrido, ver arriba). **RCON activado el 2026-10-12** a petición del mantenedor (puerto 25575, contraseña en `server.properties` y en `~/.local/share/vtuberdex-auto/rcon-pass`; cliente `~/.local/bin/mc-rcon "<comando>"`): no hay cortafuegos, así que el drop-in `rcon-local.conf` del servicio añade una regla iptables que descarta 25575 salvo desde `lo`. Si cambias de máquina o quitas el drop-in, RCON queda abierto a internet. **No hagas
   op por nombre a cuentas Java**: el permiso lo hereda quien use ese nombre (el plugin no lo deja saltarse el lobby, pero el op sigue
   siendo op en el resto del servidor). Se entra con `vtuberdex.com`
   (el registro A no pasa por el proxy de Cloudflare). El plugin habla con la app LOCAL (`api-url: http://127.0.0.1:3100`; `sitio-url`
@@ -544,6 +552,60 @@ JAVA_HOME=…/jdk25 ./gradlew build`.
   prefijo `✦`, sin títulos grandes (solo subtítulo), panel de 7 líneas, BossBar «Nv N · x/y», recordatorio del lobby en chat UNA vez.
 - **Probado a medias con un cliente real**: un Bedrock (Android) entró por Geyser/Floodgate el 2026-10-08 y destapó la trampa h2c;
   tras el arreglo falta jugar el flujo completo (sala de espera → `/vtd email` → `/vtd codigo` → stats y BossBar).
+
+## Entregas estilo Death Stranding (plugin `vtuberdex-entregas`, XP `entrega`)
+
+Un TERCER plugin, aparte del principal y de las mochilas (`~/projects/vtuberdex-entregas`, paquete `com.vtuberdex.entregas`), que
+depende de los dos y solo usa su API pública. Se compila DESPUÉS de ellos (`build.gradle.kts` lee sus jars de `build/libs/`):
+mochilas y principal → entregas. Todo es del mundo principal; los de la sala de espera no llegan.
+- **API que se añadió a los otros dos**: `MochilasPlugin` (`llevaMochila`, `capacidadLibre`, `fraccionDeCarga`, `guardar`, `contar`,
+  `sacar`; cierran la ventana de la mochila antes de escribir, porque al cerrarse reescribe la página y pisaría el cambio) y
+  `VtuberDexPlugin` (`darXp(jugador, motivo, cantidad)`, `tieneFicha`).
+- **El paquete SOLO viaja en la mochila**: entra directo en la mochila puesta (no en el inventario), su cantidad son sus unidades de
+  peso (cuentan para el tope de 100, el peso y el equilibrio) y `ReglasDeCarga` cierra las salidas (no se tira, no se coloca, no entra en
+  ventanas ajenas, el del suelo es invulnerable y solo lo recoge su dueño con la mochila puesta; si aparece en el inventario, cada
+  segundo vuelve). Entregar exige la mochila puesta. Una caída de la mochila lo esparce, y eso es el obstáculo del trayecto.
+- **Puestos** (`Puestos`): 6, del anillo de `config.yml` (ángulo y distancia al spawn), cada uno en el sitio más plano y seco de sus
+  alrededores; se guardan en `puestos.yml` y NO se mueven. Plataforma 11×11 con atril (terminal), piedra imán (cargador de moto) y
+  mástil. Protegidos. El mapa (1:16) cubre ±1.024 bloques: no pongas puestos más allá de ~950.
+- **Encargos sin estado** (`Contratos`): salen de (puesto, ranura de 20 min, número), así que todos ven los mismos y no hay nada que
+  guardar. Un jugador tiene UN encargo (`misiones.yml`). Paga `Recompensa.xp` (distancia, peso, zonas en la ruta recta) × lo que
+  llega × factor de tiempo (1,2 / 1 / 0,5); menos de un cuarto entregado = fallido.
+- **XP**: motivo `entrega`, con tope diario propio en la web (`XP_ENTREGA_MAX_DIA` = 600) **además** de los 300 de siempre. Un lote de
+  entrega no se mezcla con otros motivos (`entrega_aparte`); `XpCollector.enviar` los empaqueta aparte. `hoy`/`topeDia` de la respuesta
+  siguen siendo solo los de siempre (el panel del juego muestra «hoy x/300»); lo de entregas va en `entregaHoy`/`topeEntrega`.
+- **Zonas varadas** (`Zonas`, `Varados`): 9, sobre las rutas entre puestos y nunca a < 90 de un puesto ni < 220 del spawn (donde están
+  el lobby, el coliseo, la caseta y la casa). Los varados son zombis a los que se les quitó su IA de ataque: el objetivo automático de
+  vanilla se cancela y solo `Sigilo` decide cuándo atacan (alcance base 20 × lo que hagas: moto 2,2, correr 1,6, caminar 1, lento 0,7,
+  agachado 0,4, quieto 0,25; cono de 140° y línea de visión; a < 2,5 bloques te oyen). La alerta SUBE mientras te ven y BAJA si te
+  pierden: al llegar a 1 atacan (y los de 12 bloques se unen). Existen solo con jugadores cerca (no persistentes). Dentro de una zona
+  llueve solo para quien está en ella.
+- **Odradek**: se entrega solo al aceptar el primer encargo (y se re-entrega si se pierde con uno en curso). Activo = lo tiene Y está en
+  una zona (o lanzó un pulso). Activo, el varado deja de estar oculto para él (`hideEntity` por jugador), la barra de acción muestra
+  flecha, metros y la barra de alerta, y suena un ping más rápido cuanto más cerca. Es un ítem ligado (no se tira ni se guarda en cofres).
+- **Moto** (`Moto`): un CABALLO invisible/mudo/invulnerable, a velocidad fijada por el plugin, con un modelo de 20 `BlockDisplay`
+  pasajeros (el conductor tiene que ser el PRIMER pasajero: el caballo solo deja controlar al primero; `montar` baja y vuelve a subir
+  los displays). Se GANA (3 entregas; libre para las fichas de `moto.libre-para-fichas`, reconocidas por la ficha VINCULADA vía
+  `slugDe`, nunca por el nombre de cuenta) y se entrega como **Llave de moto** (ítem ligado). Trampas que ya costaron:
+  · **Clicar la moto con la llave en la mano la reemplazaba**: el cliente manda «usar sobre la entidad» Y «usar el ítem»; el segundo
+    retiraba la moto recién montada y tiraba al conductor. Hoy la llave MONTA tu moto si está a ≤ 8 bloques y no hace nada montado.
+  · **Medidas reales, no estimadas** (servidor de prueba + cliente): un pasajero se ancla a **1,444 × escala** sobre los pies del caballo
+    (lineal: 1 → 1,444, 0,8 → 1,155) y 0 en X/Z. Con escala 1 el conductor quedaba ~25 cm alto: el caballo va a **escala 0,82**.
+  · Un caballo invisible SIGUE dibujando silla y riendas: la silla lleva un modelo de equipo inexistente (`vtuberdex:vacio`).
+  · Los displays nacen con guiñada 0 (si heredan la de quien llama, la moto sale «ladeada» ese ángulo).
+  · La caja del caballo es menor que el modelo: hay una `Interaction` de 1,8×1,1 que sigue al caballo (no como pasajera: se anclaría
+    a 1,18 de alto) y se encoge a 0 montado (si no, se tragaría los clics del conductor).
+  · Aparece en el primer hueco libre con suelo firme por delante (antes, a ciegas, podía quedar dentro de un bloque).
+- **Probar con un cliente REAL (lo que de verdad funcionó)**: Paper 26.2 de prueba + `portablemc` (cliente 26.2 offline, instalado en
+  `~/.local/share/vtuberdex-build/mc-cliente`, NO en /tmp que es RAM) en `Xvfb` con `LIBGL_ALWAYS_SOFTWARE=1`, control por XTest
+  (`python-xlib`), capturas con `ffmpeg -f x11grab`, y una web falsa que vincule a todos (con HTTP/1.0: con keep-alive el cliente HTTP
+  de Java daba timeouts). Para ver al propio jugador montado hace falta un SEGUNDO cliente observador en espectador (otro Xvfb). No
+  hay bot posible: `minecraft-data` llega a 26.1. Al matar procesos, por PID: `pkill -f <patrón>` mata la propia shell si el patrón
+  aparece en el comando.
+- **Mapa** (`Mapa`): UN mapa compartido (escala 1:16) con una capa contextual que pinta puestos, zonas y el destino del encargo.
+- **Qué NO está probado**: en vivo, la IA de los varados, su visibilidad y el mapa (la moto sí, ver arriba). Lo comprobado: compila contra Paper 26.2, 22 pruebas de lógica pura (geometría, sigilo,
+  recompensa, contratos, zonas), y un Paper 26.2 de prueba carga los tres plugins, construye los 6 puestos y crea las 9 zonas sin errores.
+  Falta jugarlo con un cliente real; las perillas para afinarlo están en `config.yml` del plugin.
 
 ## Habilidades del RPG: catálogo de estados y validador
 

@@ -1,0 +1,16 @@
+[Unit]
+Description=VTuberDex: publica lo nuevo de master (web y plugin de Minecraft)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=madkoding
+Environment=HOME=/home/madkoding
+ExecStart=/usr/local/sbin/vtuberdex-autodeploy
+# Un build entero no debe quitarle CPU a la web ni al juego.
+Nice=10
+CPUWeight=20
+IOSchedulingClass=idle
+TimeoutStartSec=45min
+# Sin NoNewPrivileges a propósito: usa sudo para enlazar el release y reiniciar servicios.
