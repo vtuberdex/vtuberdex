@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Registro de rechazos de los formularios públicos: qué se apunta (formulario, código, campo) y, sobre
  * todo, qué NO (correo, contenido). SQLite en memoria con el mismo SQL que Turso.

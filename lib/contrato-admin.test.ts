@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * El CONTRATO entre la ruta de escritura del mantenedor y el cliente que la consume.
  *

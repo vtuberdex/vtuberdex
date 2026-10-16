@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Solicitudes de MODIFICACIÓN: el esquema (todo opcional salvo identificar la ficha, y al menos un
  * cambio) y el parche que sale al aprobar, aplicado de verdad con las reglas del mantenedor sobre una

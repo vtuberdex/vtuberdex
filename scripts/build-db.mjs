@@ -178,7 +178,7 @@ function buildDatabase() {
       `INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
     )
     .run("build_sanitized_at", new Date().toISOString());
-  let integrity = null;
+  let integrity;
   try {
     integrity =
       out.prepare("PRAGMA integrity_check").get()?.integrity_check ?? null;

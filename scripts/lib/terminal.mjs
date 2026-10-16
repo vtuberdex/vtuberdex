@@ -106,7 +106,7 @@ export function pedirCredencial(prompt = "Contraseña del mantenedor: ") {
 export async function pedirJson(url, init = {}, siNoEsJson = (texto) => texto) {
   const respuesta = await fetch(url, init);
   const texto = await respuesta.text();
-  let cuerpo = null;
+  let cuerpo;
   try {
     cuerpo = texto ? JSON.parse(texto) : null;
   } catch {

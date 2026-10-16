@@ -81,7 +81,7 @@ async function pedir(ruta, init = {}) {
     headers: { "content-type": "application/json", ...(init.headers ?? {}) },
   });
   const texto = await respuesta.text();
-  let cuerpo = null;
+  let cuerpo;
   try {
     cuerpo = texto ? JSON.parse(texto) : null;
   } catch {

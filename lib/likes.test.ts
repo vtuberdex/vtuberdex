@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Likes: la regla de UNO por día y por VTuber, el tope por red, el día de Chile y el pegamento HTTP.
  * Corre contra SQLite en memoria con el MISMO SQL que usa Turso (`ejecutorSqlite`): sin red.

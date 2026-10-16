@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Vista previa de una solicitud: lo que pasaría al aprobar, SIN escribir nada. Se prueba contra la base de ejemplo
  * (la misma que usan las demás pruebas de solicitudes) y, sobre todo, que la simulación NO deja rastro.

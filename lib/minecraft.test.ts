@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Minecraft: las rutas del plugin (token de servidor) y el código de «Mi ficha», de punta a punta sobre SQLite en
  * memoria. La ficha y los likes se simulan; lo que se prueba es el contrato HTTP y que la XP llega a la experiencia.

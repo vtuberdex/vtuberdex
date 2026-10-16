@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * «Mi ficha»: el aviso de subida de nivel por correo, el enlace mágico y el reparto de puntos. SQLite en
  * memoria para la cola y un transporte de correo falso; la ficha y los likes se simulan.

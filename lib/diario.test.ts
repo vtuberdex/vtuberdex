@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Tests del DIARIO de cambios del mantenedor en producción (`lib/diario.mjs`).
  *
