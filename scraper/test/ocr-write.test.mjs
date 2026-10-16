@@ -5,42 +5,45 @@
  * ocr.mjs escribe con `writeInside(RAW_DIR, path.join(RAW_DIR, `${rawName}.png`), image)`
  * donde `rawName = slugify(card.slug)`. Este test reproduce ese path con un slug
  * de path traversal ('../../evil') y verifica que el fichero no sale de RAW_DIR.
+ *
+ * Corre con `node --test` (como el resto del scraper): NO importar `vitest` aquí.
+ * Un test con `vitest` dentro de `node --test` rompe el CI entero.
  */
-import { mkdtemp, readdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
-import { slugify } from "../src/normalize.mjs";
-import { writeInside } from "../src/safe-write.mjs";
+import { slugify } from '../src/normalize.mjs';
+import { writeInside } from '../src/safe-write.mjs';
 
-describe("escritura de crudos del OCR", () => {
-  let base;
-
-  beforeEach(async () => {
-    base = await mkdtemp(path.join(tmpdir(), "ocr-raw-"));
-  });
-
-  afterEach(async () => {
-    await rm(base, { recursive: true, force: true });
-  });
-
-  it("un slug con path traversal no saca el fichero del directorio de salida", async () => {
-    const rawName = slugify("../../evil") || "v1";
+test('escritura de crudos del OCR: un slug con path traversal no saca el fichero del directorio de salida', async () => {
+  const base = await mkdtemp(path.join(tmpdir(), 'ocr-raw-'));
+  try {
+    const rawName = slugify('../../evil') || 'v1';
     const target = path.join(base, `${rawName}.png`);
 
-    await writeInside(base, target, Buffer.from("png"));
+    await writeInside(base, target, Buffer.from('png'));
 
     const entries = await readdir(base);
-    expect(entries).toEqual([`${rawName}.png`]);
+    assert.deepEqual(entries, [`${rawName}.png`]);
     const rel = path.relative(path.resolve(base), path.resolve(target));
-    expect(rel.startsWith("..")).toBe(false);
-    expect(path.isAbsolute(rel)).toBe(false);
-  });
+    assert.equal(rel.startsWith('..'), false);
+    assert.equal(path.isAbsolute(rel), false);
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
 
-  it("writeInside rechaza un destino que sale del directorio", async () => {
-    await expect(
-      writeInside(base, path.join(base, "..", "evil.png"), Buffer.from("x")),
-    ).rejects.toThrow(/fuera de/);
-  });
+test('writeInside rechaza un destino que sale del directorio', async () => {
+  const base = await mkdtemp(path.join(tmpdir(), 'ocr-raw-'));
+  try {
+    await assert.rejects(
+      writeInside(base, path.join(base, '..', 'evil.png'), Buffer.from('x')),
+      /fuera de/,
+    );
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
 });
