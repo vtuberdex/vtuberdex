@@ -138,6 +138,18 @@ export function alphaBounds(data, width, height, channels) {
  * @param {object} args.sharp    instancia de sharp
  * @returns {Promise<{path:string,width:number,height:number,bytes:number}>}
  */
+/**
+ * Valida que lo recibido sea un Buffer no vacío y de tamaño permitido, y devuelve su longitud.
+ * Las comprobaciones de tamaño usan este número, no `buffer.length` repetido en cada sitio.
+ */
+function tamanoDeSubida(buffer) {
+  if (!Buffer.isBuffer(buffer)) throw new Error("archivo_vacio");
+  const tamano = buffer.byteLength;
+  if (tamano === 0) throw new Error("archivo_vacio");
+  if (tamano > MAX_UPLOAD_BYTES) throw new Error("archivo_demasiado_grande");
+  return tamano;
+}
+
 export async function saveUploadedImage({
   buffer,
   kind,
@@ -148,10 +160,7 @@ export async function saveUploadedImage({
   const spec = specDeKind(kind);
   if (!spec) throw new Error("kind_invalido");
   assertSlug(slug);
-  if (!Buffer.isBuffer(buffer) || buffer.length === 0)
-    throw new Error("archivo_vacio");
-  if (buffer.length > MAX_UPLOAD_BYTES)
-    throw new Error("archivo_demasiado_grande");
+  const tamanoOriginal = tamanoDeSubida(buffer);
 
   // Validación por CONTENIDO: si sharp no lo decodifica, no es una imagen.
   let meta;
@@ -239,7 +248,7 @@ export async function saveUploadedImage({
   // Si el resultado pesa MÁS que el original, se reintenta con pérdida más
   // agresiva. Sin esto, un original ya optimizado (un JPEG pequeño) salía más
   // grande que antes de subirlo, que es justo lo contrario de "optimizar".
-  if (converted.length > buffer.length) {
+  if (converted.length > tamanoOriginal) {
     const alt = await (
       fitsCard
         ? pipeline.resize({
@@ -310,10 +319,7 @@ export function specDeKind(kind) {
  */
 export async function saveFactionEmblem({ buffer, slug, imageRoot, sharp }) {
   assertSlug(slug);
-  if (!Buffer.isBuffer(buffer) || buffer.length === 0)
-    throw new Error("archivo_vacio");
-  if (buffer.length > MAX_UPLOAD_BYTES)
-    throw new Error("archivo_demasiado_grande");
+  tamanoDeSubida(buffer);
   let meta;
   try {
     meta = await sharp(buffer).metadata();
