@@ -77,6 +77,19 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 las reales son **25/94/451** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
+## Publicación de cambios (regla operativa)
+
+Este proyecto está clonado en la **misma máquina donde se ejecuta**, así que lo que
+hay en disco es lo que corre. Por eso **cada cambio hecho debe publicarse** al
+terminar: commit (mensaje semántico `tipo(ámbito): descripción`) y `git push` al
+remoto de la rama en la que se trabaja. En Vercel el push dispara el despliegue.
+
+- Se publica **solo tras pasar el gate**: `npm run lint && npm run typecheck && npm test`.
+  Si algo falla, se arregla antes de publicar; nunca se publica en rojo.
+- El commit contiene únicamente los archivos del cambio; no se tocan scripts ni
+  `package.json` para publicar.
+- Tras el push se verifica con `git status` y `git log -1` que quedó publicado.
+
 ## Arquitectura: las reglas que no se negocian
 
 1. **El PERSONAJE es la única imagen fuente del VTuber.**
