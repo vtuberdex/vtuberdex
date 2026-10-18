@@ -38,8 +38,11 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 ## Comandos
 
 ```bash
+# Node/npm NO están en el PATH por defecto: antes de cualquier comando npm
+#   export PATH=/home/madkoding/.nvm/versions/node/v22.23.3/bin:$PATH
+
 # Tests (desde la raíz)
-npm test                   # 915 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 926 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 154 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
 

@@ -76,3 +76,6 @@ sarif/
 
 # Plugin de Paper: vive en su propio repo (vtuberdex/vtuberdex-minecraft)
 /minecraft/
+
+# Caché incremental de tsc: la regenera typecheck
+tsconfig.tsbuildinfo
