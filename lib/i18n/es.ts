@@ -18,6 +18,9 @@ export const es = {
   "pie.actualizar": "Actualizar mi ficha",
   "pie.baja": "Darme de baja",
   "pie.terminos": "Términos y Condiciones",
+  "pie.derechos":
+    "© VTuberDex. Contenido protegido: se prohíbe la extracción automatizada y su uso para entrenar inteligencia artificial.",
+  "pie.derechosVer": "Ver cláusula 18",
 
   "abriendo.detalle": "Accediendo al detalle",
 

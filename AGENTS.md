@@ -1420,6 +1420,9 @@ Copias versionadas en `infra/` (la fuente viva está en `/etc/nginx` y `/etc/fai
   Un navegador real la pasa: lo que frena a ese es el presupuesto de fichas. Probado con `next start` + `X-Real-IP` simulada.
 - **Términos**: la cláusula 18 (`/terminos#seguridad`) prohíbe el scraping, los usos derivados (incluido entrenar IA), la elusión de
   estas medidas y lo declara con consecuencias; `TERMINOS_VERSION` pasó a `2026-10-20` (los formularios abiertos se rechazan).
+- **Aviso de derechos visible y reserva legible por máquina**: línea en el pie (`pie.derechos`, es/en/ja) que enlaza a la cláusula 18;
+  `<meta name="tdm-reservation" content="1">` y `robots: noai, noimageai` (`app/layout.tsx`); `/.well-known/tdmrep.json`
+  (protocolo TDM del W3C). Son declaraciones, no barreras: las respetan los rastreadores formales y sirven de prueba de que se reservó el derecho.
 - **Trampa**: enlace invisible en el pie (`/v/archivo-completo`, `<a>` y no `<Link>` para que no se precargue); nginx 403 y el jail
   `vtuberdex-trampa` banea 24 h al primer toque. robots.txt la prohíbe, así que los buscadores no caen.
 - `robots.txt` pide a los bots de IA/SEO que no pasen (cortesía; la barrera es nginx).

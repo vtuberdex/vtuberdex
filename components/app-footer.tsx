@@ -54,6 +54,16 @@ export function AppFooter() {
           {t("pie.terminos")}
         </Link>
       </nav>
+      {/* Aviso visible de derechos y de la prohibición de scraping (términos, cláusula 18). */}
+      <p className="mx-auto w-full max-w-[1600px] px-4 pb-6 text-[11px] leading-relaxed text-dex-muted sm:px-6 lg:px-8">
+        {t("pie.derechos")}{" "}
+        <Link
+          href="/terminos#seguridad"
+          className="underline hover:text-dex-ink"
+        >
+          {t("pie.derechosVer")}
+        </Link>
+      </p>
     </footer>
   );
 }

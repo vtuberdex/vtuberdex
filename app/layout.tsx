@@ -47,6 +47,13 @@ export const metadata: Metadata = {
   applicationName: NOMBRE_SITIO,
   openGraph: { siteName: NOMBRE_SITIO, locale: "es_CL", type: "website" },
   twitter: { card: "summary_large_image" },
+  /**
+   * Reserva de derechos legible por máquina: `tdm-reservation` (protocolo TDM del W3C, la reserva de
+   * minería de textos y datos de la directiva europea de copyright) y `noai`/`noimageai`, que respetan
+   * varios rastreadores de entrenamiento. Se repiten en cabeceras (nginx) y en /.well-known/tdmrep.json.
+   * Son una declaración, no una barrera: la barrera es nginx + sesión (ver AGENTS.md).
+   */
+  other: { "tdm-reservation": "1", robots: "noai, noimageai" },
 };
 
 export const viewport: Viewport = {

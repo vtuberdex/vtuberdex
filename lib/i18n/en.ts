@@ -13,6 +13,9 @@ export const en: Mensajes = {
   "pie.actualizar": "Update my card",
   "pie.baja": "Remove me",
   "pie.terminos": "Terms and Conditions",
+  "pie.derechos":
+    "© VTuberDex. Protected content: automated extraction and use to train artificial intelligence are prohibited.",
+  "pie.derechosVer": "See clause 18",
 
   "abriendo.detalle": "Opening details",
 
