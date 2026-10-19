@@ -38,8 +38,11 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 ## Comandos
 
 ```bash
+# Node/npm NO están en el PATH por defecto: antes de cualquier comando npm
+#   export PATH=/home/madkoding/.nvm/versions/node/v22.23.3/bin:$PATH
+
 # Tests (desde la raíz)
-npm test                   # 915 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 926 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 154 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
 
@@ -76,6 +79,19 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 `docs/README.md` es el documento humano y cita cifras **viejas** (100 tests, Blob):
 las reales son **25/94/451** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
+
+## Publicación de cambios (regla operativa)
+
+Este proyecto está clonado en la **misma máquina donde se ejecuta**, así que lo que
+hay en disco es lo que corre. Por eso **cada cambio hecho debe publicarse** al
+terminar: commit (mensaje semántico `tipo(ámbito): descripción`) y `git push` al
+remoto de la rama en la que se trabaja. En Vercel el push dispara el despliegue.
+
+- Se publica **solo tras pasar el gate**: `npm run lint && npm run typecheck && npm test`.
+  Si algo falla, se arregla antes de publicar; nunca se publica en rojo.
+- El commit contiene únicamente los archivos del cambio; no se tocan scripts ni
+  `package.json` para publicar.
+- Tras el push se verifica con `git status` y `git log -1` que quedó publicado.
 
 ## Arquitectura: las reglas que no se negocian
 
