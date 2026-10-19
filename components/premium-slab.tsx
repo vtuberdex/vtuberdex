@@ -215,6 +215,7 @@ export function PremiumSlab({
   );
   const body = useMemo(() => crearCuerpo(layout), [layout]);
   const acrylic = useMemo(() => crearMaterialDeAcrilico(layout), [layout]);
+  const countryName = card.countries[0]?.name;
   // La hoja se redibuja solo si cambia algo que la etiqueta muestra, no en cada render.
   const insertTexture = useMemo(
     () => crearTexturaDeHoja(layout, card, premium),
@@ -223,7 +224,7 @@ export function PremiumSlab({
       layout,
       card.name,
       card.dexNumber,
-      card.countries[0]?.name,
+      countryName,
       premium.grade,
       premium.cert,
       premium.since,
