@@ -181,11 +181,15 @@ export function SideMenu() {
                   <section
                     key={grupo.clave}
                     aria-labelledby={`${idPanel}-g${i}`}
-                    className={i > 0 ? "mt-4" : undefined}
+                    className={
+                      i > 0
+                        ? "mt-3 border-t border-dex-line/80 pt-3"
+                        : undefined
+                    }
                   >
                     <h2
                       id={`${idPanel}-g${i}`}
-                      className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-dex-muted/70"
+                      className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300"
                     >
                       {t(grupo.clave)}
                     </h2>
