@@ -1,8 +1,9 @@
+import userEvent from "@testing-library/user-event";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 
 import { NivelesContenido } from "@/components/niveles/niveles-contenido";
-import { AppFooter } from "@/components/app-footer";
+import { SideMenu } from "@/components/side-menu";
 import {
   BASE_NIVEL,
   PASO_NIVEL,
@@ -50,13 +51,14 @@ describe("página de niveles", () => {
     exp.slice(1).forEach((n, i) => expect(n).toBeGreaterThan(exp[i]));
   });
 
-  test("enlaza a Mi ficha, y el pie enlaza a esta página", () => {
+  test("enlaza a Mi ficha, y el menú lateral enlaza a esta página", async () => {
     const { unmount } = render(<NivelesContenido />);
     expect(
       screen.getByRole("link", { name: "Ir a Mi ficha" }).getAttribute("href"),
     ).toBe("/mi-ficha");
     unmount();
-    render(<AppFooter />);
+    render(<SideMenu />);
+    await userEvent.click(screen.getByTestId("menu-abrir"));
     expect(
       screen
         .getByRole("link", { name: "Cómo funcionan los niveles" })

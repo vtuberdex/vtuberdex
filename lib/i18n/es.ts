@@ -19,8 +19,12 @@ export const es = {
   "pie.baja": "Darme de baja",
   "pie.terminos": "Términos y Condiciones",
   "pie.derechos":
-    "© VTuberDex. Contenido protegido: se prohíbe la extracción automatizada y su uso para entrenar inteligencia artificial.",
-  "pie.derechosVer": "Ver cláusula 18",
+    "© VTuberDex · Prohibido el scraping y entrenar IA con este contenido ·",
+  "pie.derechosVer": "Cláusula 18",
+  "menu.abrir": "Abrir menú",
+  "menu.cerrar": "Cerrar menú",
+  "menu.titulo": "Menú",
+  "menu.inicio": "Catálogo",
 
   "abriendo.detalle": "Accediendo al detalle",
 

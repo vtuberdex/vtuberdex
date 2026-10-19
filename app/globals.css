@@ -102,19 +102,22 @@ h6 {
 .dex-grid:has([data-catalogo]) footer {
   margin-top: 0.5rem;
 }
-.dex-grid:has([data-catalogo]) footer nav {
+/* El pie es solo el aviso de derechos (los enlaces están en el menú lateral): en el catálogo, compacto. */
+.dex-grid:has([data-catalogo]) footer .footer-derechos {
   padding-block: 0.625rem;
 }
 
 /* Alto que NO es el libro en el catálogo (cabecera + barra + paginación + pie), MEDIDO en 1440x900:
-   17,13 rem sin chips de filtros activos, más un margen. En celular (< md) los valores son otros (ver abajo). */
+   17,13 rem sin chips de filtros activos, más un margen. Era con el pie de enlaces (una fila de 2,25 rem); hoy el
+   pie es el aviso de derechos (1 línea de 1 rem + 1,25 rem de relleno = 2,25 rem): MISMA altura, y la cabecera
+   no cambia (el botón del menú cabe en su fila). En celular (< md) los valores son otros (ver abajo). */
 :root {
   --binder-chrome: 17.6rem;
   --binder-min-width: 22rem;
 }
 @media (max-width: 767px) {
   :root {
-    --binder-chrome: 26.4rem; /* medido: 26 rem (barra y paginación en dos filas, pie en líneas) */
+    --binder-chrome: 26.4rem; /* medido: 26 rem con el pie de enlaces en varias líneas; el pie actual (aviso de 2 líneas + relleno, ~3,3 rem) es MENOR, así que sobra margen */
     --binder-min-width: 17rem;
   }
 }

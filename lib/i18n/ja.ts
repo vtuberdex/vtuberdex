@@ -13,9 +13,12 @@ export const ja: Mensajes = {
   "pie.actualizar": "カードを更新する",
   "pie.baja": "登録を取り消す",
   "pie.terminos": "利用規約",
-  "pie.derechos":
-    "© VTuberDex. 保護されたコンテンツです。自動抽出および人工知能の学習への利用は禁止されています。",
-  "pie.derechosVer": "第18条を見る",
+  "pie.derechos": "© VTuberDex · スクレイピングとAI学習への利用を禁止 ·",
+  "pie.derechosVer": "第18条",
+  "menu.abrir": "メニューを開く",
+  "menu.cerrar": "メニューを閉じる",
+  "menu.titulo": "メニュー",
+  "menu.inicio": "カタログ",
 
   "abriendo.detalle": "詳細を開いています",
 

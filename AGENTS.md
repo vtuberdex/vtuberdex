@@ -203,7 +203,7 @@ la tabla de antes y después, está en `docs/optimizacion-turso.md`.
 
 ## Inscripción, baja y términos: formularios públicos con cola de revisión
 
-Cuatro páginas públicas (`/inscripcion`, `/modificacion`, `/baja`, `/terminos`, con enlaces en `components/app-footer.tsx`) y una
+Cuatro páginas públicas (`/inscripcion`, `/modificacion`, `/baja`, `/terminos`, con enlaces en el menú lateral, `components/side-menu.tsx`) y una
 pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío es una fila `pendiente` de la tabla
 `solicitud` hasta que el mantenedor la resuelve.
 
@@ -1420,7 +1420,12 @@ Copias versionadas en `infra/` (la fuente viva está en `/etc/nginx` y `/etc/fai
   Un navegador real la pasa: lo que frena a ese es el presupuesto de fichas. Probado con `next start` + `X-Real-IP` simulada.
 - **Términos**: la cláusula 18 (`/terminos#seguridad`) prohíbe el scraping, los usos derivados (incluido entrenar IA), la elusión de
   estas medidas y lo declara con consecuencias; `TERMINOS_VERSION` pasó a `2026-10-20` (los formularios abiertos se rechazan).
-- **Aviso de derechos visible y reserva legible por máquina**: línea en el pie (`pie.derechos`, es/en/ja) que enlaza a la cláusula 18;
+- **Menú lateral en lugar de enlaces en el pie**: hamburguesa arriba a la izquierda de la cabecera (`components/side-menu.tsx`, diálogo modal con
+  foco atrapado, Escape, bloqueo de scroll y cierre al navegar). TODOS los enlaces del sitio viven en la lista `ENLACES` de ese archivo: al añadir
+  una página pública, añádela ahí. El pie quedó solo con el aviso de derechos (1 línea en escritorio, 2 en celular) y la trampa. **Alturas**: el botón
+  cabe en la fila de 3,5 rem de la cabecera y el pie ocupa lo mismo que el pie de enlaces de antes, así que `--binder-chrome` (globals.css) volvió
+  a 17,6 / 26,4 rem. Sin navegador en la VPS esto está calculado, no medido: si cambias el alto de cabecera o pie, mide 1440x900 y 390x844.
+- **Aviso de derechos visible y reserva legible por máquina**: línea en el pie (`pie.derechos`, es/en/ja; corta A PROPÓSITO, ver arriba) que enlaza a la cláusula 18;
   `<meta name="tdm-reservation" content="1">` y `robots: noai, noimageai` (`app/layout.tsx`); `/.well-known/tdmrep.json`
   (protocolo TDM del W3C). Son declaraciones, no barreras: las respetan los rastreadores formales y sirven de prueba de que se reservó el derecho.
 - **Licencia: todos los derechos reservados** (`LICENSE`, `NOTICE.md`, `"license": "UNLICENSED"`). Creative Commons no encaja: todas sus

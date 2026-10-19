@@ -14,8 +14,12 @@ export const en: Mensajes = {
   "pie.baja": "Remove me",
   "pie.terminos": "Terms and Conditions",
   "pie.derechos":
-    "© VTuberDex. Protected content: automated extraction and use to train artificial intelligence are prohibited.",
-  "pie.derechosVer": "See clause 18",
+    "© VTuberDex · Scraping and AI training on this content are prohibited ·",
+  "pie.derechosVer": "Clause 18",
+  "menu.abrir": "Open menu",
+  "menu.cerrar": "Close menu",
+  "menu.titulo": "Menu",
+  "menu.inicio": "Catalog",
 
   "abriendo.detalle": "Opening details",
 
