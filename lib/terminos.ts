@@ -21,7 +21,7 @@ export interface Clausula {
   parrafos: string[];
 }
 
-export const FECHA_VIGENCIA = "6 de octubre de 2026";
+export const FECHA_VIGENCIA = "20 de octubre de 2026";
 
 export const PREAMBULO: string[] = [
   "Los presentes Términos y Condiciones (en adelante, los «Términos») regulan de manera integral, completa y vinculante la relación entre VTuberDex (en adelante, «el Proyecto», «nosotros» o «el Mantenedor») y toda persona natural o jurídica que, por cualquier medio, solicite la inscripción de una ficha de VTuber en el catálogo, solicite su baja, visite el sitio, interactúe con él o utilice cualquiera de sus funcionalidades (en adelante, «el Titular», «la Persona Usuaria» o «usted»).",
@@ -235,12 +235,19 @@ export const CLAUSULAS: Clausula[] = [
   },
   {
     id: "seguridad",
-    titulo: "Decimoctava. Seguridad, uso aceptable y conducta en el sitio",
+    titulo:
+      "Decimoctava. Seguridad, uso aceptable y prohibición de extracción automatizada (scraping)",
     parrafos: [
       "18.1. Queda prohibido intentar vulnerar la seguridad del sitio, realizar pruebas de intrusión sin autorización, extraer masivamente datos mediante automatización, sobrecargar los servicios o introducir código malicioso.",
       "18.2. Quien descubra una vulnerabilidad deberá comunicarla de manera responsable al Mantenedor, absteniéndose de explotarla o divulgarla antes de su corrección.",
       "18.3. El Proyecto puede registrar datos técnicos mínimos de uso (como la huella de red y la fecha de envío) para proteger el servicio y prevenir abusos.",
-      "18.4. El incumplimiento de esta cláusula puede dar lugar a bloqueo, retiro de la Ficha y acciones legales.",
+      "18.4. Extracción automatizada. Sin autorización previa y por escrito del Mantenedor, queda prohibido extraer, recopilar o copiar de forma sistemática o masiva el contenido del sitio (fichas, textos, imágenes, cartas, voces, datos de la API, listados y metadatos) mediante cualquier medio automatizado o semiautomatizado, incluidos robots, arañas, rastreadores, scripts, navegadores sin interfaz, extensiones o servicios de terceros, así como mediante la consulta manual repetitiva con el mismo fin (en adelante, «Scraping»).",
+      "18.5. Usos derivados. También queda prohibido, respecto de lo obtenido del sitio por cualquier vía: (a) reproducirlo, almacenarlo, republicarlo, redistribuirlo o ponerlo a disposición de terceros, en todo o en parte sustancial; (b) construir con ello una base de datos, un servicio, una aplicación o un producto que lo copie, lo sustituya o compita con el Catálogo; (c) venderlo, licenciarlo u ofrecerlo a cambio de un precio o ventaja; y (d) usarlo para entrenar, ajustar, evaluar o alimentar sistemas de inteligencia artificial o de aprendizaje automático, incluida su recuperación aumentada.",
+      "18.6. Elusión de medidas. Queda prohibido eludir, desactivar o intentar burlar las medidas técnicas con que el Proyecto limita el acceso automatizado, tales como los límites de ritmo y de volumen por red, los cupos de consulta, las sesiones de visitante y sus pruebas de trabajo, los bloqueos de acceso y las directivas de robots.txt; falsear u ocultar la identidad del cliente (por ejemplo, el agente de usuario); y repartir las consultas entre varias direcciones de red, proxies o identidades para superar un límite.",
+      "18.7. Excepciones. No constituyen Scraping prohibido: la navegación ordinaria de una persona; el rastreo de los buscadores que respetan robots.txt y no eluden estas medidas; la generación de vistas previas de enlaces compartidos; ni el acceso que el Mantenedor autorice por escrito. Quien necesite un uso distinto puede solicitarlo al Mantenedor por los canales de contacto del sitio.",
+      "18.8. Titularidad y datos de los VTubers. Los Datos Públicos de cada Ficha pertenecen o son administrados por sus respectivos Titulares y se publican para su difusión en el Catálogo, no para su acopio por terceros. Sin perjuicio de los derechos de cada Titular, el Proyecto conserva los derechos que le correspondan sobre la selección, organización, diseño y presentación del Catálogo. La accesibilidad pública de un dato no implica licencia para su extracción ni reutilización.",
+      "18.9. Consecuencias. El Proyecto puede, sin aviso previo, limitar, ralentizar o bloquear el acceso de las redes o identidades que incumplan esta cláusula, y registrar para ello datos técnicos mínimos (como un identificador derivado de la red, no la dirección en claro). Además, podrá reclamar la eliminación de lo obtenido, la indemnización de los perjuicios causados y ejercer las acciones civiles, penales y administrativas que la ley permita, en especial cuando el Scraping afecte la disponibilidad del servicio, los derechos de los Titulares o su seguridad.",
+      "18.10. El incumplimiento de esta cláusula puede dar lugar a bloqueo, retiro de la Ficha y acciones legales.",
     ],
   },
   {

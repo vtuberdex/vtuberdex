@@ -17,6 +17,7 @@ import type {
   SearchParams,
 } from "@/lib/types";
 import { searchParamsToQuery } from "@/lib/query";
+import { asegurarSesion } from "@/lib/sesion-cliente";
 
 /**
  * Base de la API.
@@ -122,7 +123,11 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  reintento = false,
+): Promise<T> {
   // Los headers se COMBINAN, no se reemplazan: con `...init` después del objeto
   // de headers, pasar `headers: { authorization }` borraba el
   // `content-type: application/json` por defecto, `express.json` no parseaba el
@@ -136,6 +141,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const text = await response.text();
   const payload = text ? (JSON.parse(text) as unknown) : null;
+  // La API pública del catálogo exige una sesión de visitante (prueba de trabajo): se abre sola
+  // y la petición se repite UNA vez. Ver `lib/sesion-visitante.mjs`.
+  if (
+    response.status === 401 &&
+    !reintento &&
+    (payload as { error?: string } | null)?.error === "sesion_requerida"
+  ) {
+    await asegurarSesion();
+    return request<T>(path, init, true);
+  }
   if (!response.ok) {
     const detail = payload as {
       error?: string;

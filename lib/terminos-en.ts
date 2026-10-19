@@ -217,12 +217,19 @@ export const CLAUSULAS_EN: Clausula[] = [
   },
   {
     id: "seguridad",
-    titulo: "Eighteenth. Security, acceptable use and conduct on the site",
+    titulo:
+      "Eighteenth. Security, acceptable use and prohibition of automated extraction (scraping)",
     parrafos: [
       "18.1. It is forbidden to attempt to breach the site’s security, carry out penetration tests without authorization, mass-extract data by automation, overload the services or introduce malicious code.",
       "18.2. Anyone who discovers a vulnerability must report it responsibly to the Maintainer, refraining from exploiting or disclosing it before it is fixed.",
       "18.3. The Project may record minimal technical usage data (such as the network fingerprint and submission date) to protect the service and prevent abuse.",
-      "18.4. Breach of this clause may result in blocking, removal of the Card and legal action.",
+      "18.4. Automated extraction. Without the Maintainer’s prior written authorization, it is forbidden to systematically or massively extract, collect or copy the site’s content (cards, texts, images, voices, API data, listings and metadata) by any automated or semi-automated means, including robots, spiders, crawlers, scripts, headless browsers, extensions or third-party services, as well as by repetitive manual querying for the same purpose (“Scraping”).",
+      "18.5. Derivative uses. It is also forbidden, with respect to anything obtained from the site by any means, to: (a) reproduce, store, republish, redistribute or make it available to third parties, in whole or in a substantial part; (b) build with it a database, service, application or product that copies, replaces or competes with the Catalog; (c) sell, license or offer it for a price or advantage; and (d) use it to train, fine-tune, evaluate or feed artificial intelligence or machine learning systems, including retrieval-augmented generation.",
+      "18.6. Circumvention. It is forbidden to circumvent, disable or attempt to defeat the technical measures by which the Project limits automated access, such as rate and volume limits per network, query quotas, visitor sessions and their proof-of-work challenges, access blocks and robots.txt directives; to falsify or hide the client’s identity (for example, the user agent); and to spread queries across several network addresses, proxies or identities to exceed a limit.",
+      "18.7. Exceptions. The following are not prohibited Scraping: ordinary browsing by a person; crawling by search engines that respect robots.txt and do not circumvent these measures; generation of previews for shared links; or access that the Maintainer authorizes in writing. Anyone who needs a different use may request it from the Maintainer through the site’s contact channels.",
+      "18.8. Ownership and VTuber data. The Public Data of each Card belong to, or are managed by, their respective Holders and are published for display in the Catalog, not for accumulation by third parties. Without prejudice to each Holder’s rights, the Project retains the rights it holds in the selection, arrangement, design and presentation of the Catalog. The public accessibility of a datum does not imply a license to extract or reuse it.",
+      "18.9. Consequences. The Project may, without prior notice, limit, slow down or block access for networks or identities that breach this clause, and for that purpose record minimal technical data (such as an identifier derived from the network, not the address in the clear). It may also demand deletion of what was obtained and compensation for the harm caused, and bring the civil, criminal and administrative actions the law allows, especially where Scraping affects service availability, the Holders’ rights or their security.",
+      "18.10. Breach of this clause may result in blocking, removal of the Card and legal action.",
     ],
   },
   {

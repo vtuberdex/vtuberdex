@@ -3,11 +3,19 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+import { asegurarSesion, mantenerSesion } from "@/lib/sesion-cliente";
 import { iniciarTelemetria, type Telemetria } from "@/lib/telemetria-cliente";
 
 export function ClienteStats() {
   const pathname = usePathname();
   const telemetria = useRef<Telemetria | null>(null);
+
+  // La sesión de visitante se abre al cargar (en segundo plano), para que la primera petición al
+  // catálogo no espere la prueba de trabajo. Si falla, `request` la reintenta en la primera 401.
+  useEffect(() => {
+    asegurarSesion().catch(() => {});
+    return mantenerSesion();
+  }, []);
 
   useEffect(() => {
     telemetria.current = iniciarTelemetria();
