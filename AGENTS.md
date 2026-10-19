@@ -1405,7 +1405,7 @@ Copias versionadas en `infra/` (la fuente viva está en `/etc/nginx` y `/etc/fai
 - `conf.d/00-seguridad.conf`: 403 a UAs vacíos, librerías de scraping (curl, python-requests, Scrapy, headless…) y bots de
   SEO/IA (Ahrefs, Semrush, GPTBot, ClaudeBot…). Buscadores y previsualizadores de enlaces (Googlebot, Bing, Facebook, Discord…) pasan.
   `/api/vtubers` e `/images/` exigen `Sec-Fetch-Site` o `Referer` (un navegador siempre manda uno). Techo de 10 r/s por IP en imágenes.
-  Loopback y VPN están exentos (`$vtd_limitar`): **probar desde 127.0.0.1 no ejercita nada**; usa `curl --resolve vtuberdex.com:443:<IP pública>`.
+  Loopback y VPN están exentos (`$vtd_limitar`; en fail2ban, `ignoreip` incluye la IP pública de la propia VPS: probar la trampa desde aquí contra la IP pública SIN esa excepción baneó al servidor): **probar desde 127.0.0.1 no ejercita nada**; usa `curl --resolve vtuberdex.com:443:<IP pública>`.
 - fail2ban `vtuberdex-scraping`: 40 respuestas 403/429 sobre esas rutas en 10 min → ban 1 h (creciente). El filtro NO lleva fecha
   ni `\[`: fail2ban la recorta antes de aplicar la regex.
 - **Presupuesto de fichas distintas por red** (`lib/anti-scraping.mjs`, llamado desde `/api/vtubers` y `/api/vtubers/[slug]`): 300 fichas
@@ -1423,6 +1423,9 @@ Copias versionadas en `infra/` (la fuente viva está en `/etc/nginx` y `/etc/fai
 - **Aviso de derechos visible y reserva legible por máquina**: línea en el pie (`pie.derechos`, es/en/ja) que enlaza a la cláusula 18;
   `<meta name="tdm-reservation" content="1">` y `robots: noai, noimageai` (`app/layout.tsx`); `/.well-known/tdmrep.json`
   (protocolo TDM del W3C). Son declaraciones, no barreras: las respetan los rastreadores formales y sirven de prueba de que se reservó el derecho.
+- **Licencia: todos los derechos reservados** (`LICENSE`, `NOTICE.md`, `"license": "UNLICENSED"`). Creative Commons no encaja: todas sus
+  licencias permiten copiar y redistribuir algo y son irrevocables. El repo es público; `NOTICE.md` separa código (© VTuberDex) de los
+  datos e imágenes de cada VTuber (de sus titulares). nginx añade `X-Robots-Tag: noai, noimageai`, `tdm-reservation` y `tdm-policy`.
 - **Trampa**: enlace invisible en el pie (`/v/archivo-completo`, `<a>` y no `<Link>` para que no se precargue); nginx 403 y el jail
   `vtuberdex-trampa` banea 24 h al primer toque. robots.txt la prohíbe, así que los buscadores no caen.
 - `robots.txt` pide a los bots de IA/SEO que no pasen (cortesía; la barrera es nginx).
