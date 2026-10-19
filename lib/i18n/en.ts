@@ -57,9 +57,6 @@ export const en: Mensajes = {
   "filtros.verResultados_other": "Show {n} results",
 
   "catalogo.premium": "Premium",
-  "catalogo.premiumIntroTitulo": "Premium cards.",
-  "catalogo.premiumIntroTexto":
-    "VTubers who support the project: their card is kept graded in an acrylic case and goes up in grade (8 → 10 → Black Label) as long as they keep supporting it.",
   "catalogo.error": "The catalog could not be loaded: {error}",
   "catalogo.sinResultados": "No results",
   "catalogo.sinResultadosAyuda":

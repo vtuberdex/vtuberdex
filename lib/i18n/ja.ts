@@ -56,9 +56,6 @@ export const ja: Mensajes = {
   "filtros.verResultados_other": "{n}件の結果を表示",
 
   "catalogo.premium": "プレミアム",
-  "catalogo.premiumIntroTitulo": "プレミアムカード。",
-  "catalogo.premiumIntroTexto":
-    "プロジェクトを支援しているVTuberのカードは、アクリルケースに入った鑑定済みカードとして保管され、支援を続ける限りグレードが上がります（8 → 10 → ブラックラベル）。",
   "catalogo.error": "カタログを読み込めませんでした: {error}",
   "catalogo.sinResultados": "結果がありません",
   "catalogo.sinResultadosAyuda":

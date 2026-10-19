@@ -62,9 +62,6 @@ export const es = {
   "filtros.verResultados_other": "Ver {n} resultados",
 
   "catalogo.premium": "Premium",
-  "catalogo.premiumIntroTitulo": "Cartas premium.",
-  "catalogo.premiumIntroTexto":
-    "VTubers que apoyan el proyecto: su carta se guarda gradeada en una placa de acrílico y sube de grado (8 → 10 → Black Label) mientras siguen apoyando.",
   "catalogo.error": "No se pudo cargar el catálogo: {error}",
   "catalogo.sinResultados": "Sin resultados",
   "catalogo.sinResultadosAyuda":

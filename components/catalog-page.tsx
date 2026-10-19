@@ -32,7 +32,8 @@ export function CatalogPage() {
       perPage: single ? BINDER.cardsPerPage : BINDER.cardsPerPage * 2,
     });
   const [sheetOpen, setSheetOpen] = useState(false);
-  const filterCount = activeFilterCount(params);
+  // Premium tiene su propio botón (que también lo apaga): ni cuenta en «Filtros» ni lleva chip.
+  const filterCount = activeFilterCount(params) - (params.premium ? 1 : 0);
 
   // Bloquea el scroll del fondo cuando la hoja de filtros está abierta.
   useEffect(() => {
@@ -118,17 +119,6 @@ export function CatalogPage() {
             {/* Chips de filtros activos. */}
             {filterCount > 0 && (
               <ul className="flex flex-wrap gap-2">
-                {params.premium && (
-                  <li key="premium">
-                    <button
-                      type="button"
-                      onClick={() => setParams({ premium: false, page: 1 })}
-                      className="rounded-full border border-amber-300/50 bg-amber-300/10 px-3 py-1 text-xs text-amber-200"
-                    >
-                      ★ {t("catalogo.premium")} ✕
-                    </button>
-                  </li>
-                )}
                 {params.q && (
                   <li key="query">
                     <button
@@ -169,18 +159,6 @@ export function CatalogPage() {
               </ul>
             )}
           </div>
-
-          {params.premium && (
-            <p
-              data-testid="premium-intro"
-              className="mb-4 rounded-xl border border-amber-300/30 bg-amber-300/5 px-4 py-3 text-sm text-dex-muted"
-            >
-              <span className="font-bold text-amber-200">
-                {t("catalogo.premiumIntroTitulo")}
-              </span>{" "}
-              {t("catalogo.premiumIntroTexto")}
-            </p>
-          )}
 
           {error && (
             <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
