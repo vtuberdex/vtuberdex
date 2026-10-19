@@ -25,6 +25,10 @@ export const es = {
   "menu.cerrar": "Cerrar menú",
   "menu.titulo": "Menú",
   "menu.inicio": "Catálogo",
+  "menu.grupo.explorar": "Explorar",
+  "menu.grupo.fichas": "Mi ficha",
+  "menu.grupo.juego": "Juego y comunidad",
+  "menu.grupo.legal": "Legal",
 
   "abriendo.detalle": "Accediendo al detalle",
 

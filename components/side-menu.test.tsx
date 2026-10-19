@@ -29,9 +29,9 @@ describe("menú lateral", () => {
       "/inscripcion",
       "/modificacion",
       "/mi-ficha",
+      "/baja",
       "/niveles",
       "/minecraft",
-      "/baja",
       "/terminos",
     ]);
     expect(
@@ -49,6 +49,26 @@ describe("menú lateral", () => {
     const dialogo = screen.getByRole("dialog");
     expect(container.contains(dialogo)).toBe(false);
     expect(document.body.contains(dialogo)).toBe(true);
+  });
+
+  it("agrupa los enlaces por categoría, cada grupo con su título", async () => {
+    render(<SideMenu />);
+    await userEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+    const grupos = screen.getAllByRole("region").map((r) => ({
+      titulo: within(r).getByRole("heading").textContent,
+      hrefs: within(r)
+        .getAllByRole("link")
+        .map((a) => a.getAttribute("href")),
+    }));
+    expect(grupos).toEqual([
+      { titulo: "Explorar", hrefs: ["/", "/?premium=1"] },
+      {
+        titulo: "Mi ficha",
+        hrefs: ["/inscripcion", "/modificacion", "/mi-ficha", "/baja"],
+      },
+      { titulo: "Juego y comunidad", hrefs: ["/niveles", "/minecraft"] },
+      { titulo: "Legal", hrefs: ["/terminos"] },
+    ]);
   });
 
   it("Escape y el fondo lo cierran y el foco vuelve al botón", async () => {

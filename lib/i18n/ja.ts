@@ -19,6 +19,10 @@ export const ja: Mensajes = {
   "menu.cerrar": "メニューを閉じる",
   "menu.titulo": "メニュー",
   "menu.inicio": "カタログ",
+  "menu.grupo.explorar": "探す",
+  "menu.grupo.fichas": "マイカード",
+  "menu.grupo.juego": "ゲームとコミュニティ",
+  "menu.grupo.legal": "規約",
 
   "abriendo.detalle": "詳細を開いています",
 

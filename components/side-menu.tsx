@@ -14,17 +14,38 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
 
-/** Clave de texto y destino de cada enlace, en el orden en que se muestran. */
-const ENLACES = [
-  { href: "/", clave: "menu.inicio" },
-  { href: "/?premium=1", clave: "catalogo.premium" },
-  { href: "/inscripcion", clave: "pie.inscribir" },
-  { href: "/modificacion", clave: "pie.actualizar" },
-  { href: "/mi-ficha", clave: "pie.miFicha" },
-  { href: "/niveles", clave: "pie.niveles" },
-  { href: "/minecraft", clave: "pie.minecraft" },
-  { href: "/baja", clave: "pie.baja" },
-  { href: "/terminos", clave: "pie.terminos" },
+/**
+ * Enlaces del menú, agrupados por categoría y en el orden en que se muestran. Una página pública
+ * nueva se añade AQUÍ, en el grupo que le corresponda.
+ */
+const GRUPOS = [
+  {
+    clave: "menu.grupo.explorar",
+    enlaces: [
+      { href: "/", clave: "menu.inicio" },
+      { href: "/?premium=1", clave: "catalogo.premium" },
+    ],
+  },
+  {
+    clave: "menu.grupo.fichas",
+    enlaces: [
+      { href: "/inscripcion", clave: "pie.inscribir" },
+      { href: "/modificacion", clave: "pie.actualizar" },
+      { href: "/mi-ficha", clave: "pie.miFicha" },
+      { href: "/baja", clave: "pie.baja" },
+    ],
+  },
+  {
+    clave: "menu.grupo.juego",
+    enlaces: [
+      { href: "/niveles", clave: "pie.niveles" },
+      { href: "/minecraft", clave: "pie.minecraft" },
+    ],
+  },
+  {
+    clave: "menu.grupo.legal",
+    enlaces: [{ href: "/terminos", clave: "pie.terminos" }],
+  },
 ] as const;
 
 const FOCUSABLES = "a[href], button:not([disabled])";
@@ -156,20 +177,36 @@ export function SideMenu() {
                 aria-label={t("menu.titulo")}
                 className="flex-1 overflow-y-auto px-2 py-3"
               >
-                <ul className="flex flex-col gap-0.5">
-                  {ENLACES.map(({ href, clave }) => (
-                    <li key={href}>
-                      <Link
-                        href={href}
-                        onClick={cerrar}
-                        aria-current={href === pathname ? "page" : undefined}
-                        className="block rounded-lg px-3 py-2.5 text-sm text-dex-muted hover:bg-dex-accent/10 hover:text-dex-ink aria-[current=page]:text-dex-accent"
-                      >
-                        {t(clave)}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                {GRUPOS.map((grupo, i) => (
+                  <section
+                    key={grupo.clave}
+                    aria-labelledby={`${idPanel}-g${i}`}
+                    className={i > 0 ? "mt-4" : undefined}
+                  >
+                    <h2
+                      id={`${idPanel}-g${i}`}
+                      className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-dex-muted/70"
+                    >
+                      {t(grupo.clave)}
+                    </h2>
+                    <ul className="flex flex-col gap-0.5">
+                      {grupo.enlaces.map(({ href, clave }) => (
+                        <li key={href}>
+                          <Link
+                            href={href}
+                            onClick={cerrar}
+                            aria-current={
+                              href === pathname ? "page" : undefined
+                            }
+                            className="block rounded-lg px-3 py-2.5 text-sm text-dex-muted hover:bg-dex-accent/10 hover:text-dex-ink aria-[current=page]:text-dex-accent"
+                          >
+                            {t(clave)}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
               </nav>
             </aside>
           </div>,

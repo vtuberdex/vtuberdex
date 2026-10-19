@@ -20,6 +20,10 @@ export const en: Mensajes = {
   "menu.cerrar": "Close menu",
   "menu.titulo": "Menu",
   "menu.inicio": "Catalog",
+  "menu.grupo.explorar": "Explore",
+  "menu.grupo.fichas": "My card",
+  "menu.grupo.juego": "Game and community",
+  "menu.grupo.legal": "Legal",
 
   "abriendo.detalle": "Opening details",
 

@@ -1421,8 +1421,8 @@ Copias versionadas en `infra/` (la fuente viva está en `/etc/nginx` y `/etc/fai
 - **Términos**: la cláusula 18 (`/terminos#seguridad`) prohíbe el scraping, los usos derivados (incluido entrenar IA), la elusión de
   estas medidas y lo declara con consecuencias; `TERMINOS_VERSION` pasó a `2026-10-20` (los formularios abiertos se rechazan).
 - **Menú lateral en lugar de enlaces en el pie**: hamburguesa arriba a la izquierda de la cabecera (`components/side-menu.tsx`, diálogo modal con
-  foco atrapado, Escape, bloqueo de scroll y cierre al navegar). TODOS los enlaces del sitio viven en la lista `ENLACES` de ese archivo: al añadir
-  una página pública, añádela ahí. El pie quedó solo con el aviso de derechos (1 línea en escritorio, 2 en celular) y la trampa. **Alturas**: el botón
+  foco atrapado, Escape, bloqueo de scroll y cierre al navegar). TODOS los enlaces del sitio viven en la lista `GRUPOS` de ese archivo (Explorar, Mi ficha, Juego y comunidad, Legal): al añadir
+  una página pública, añádela ahí, en su grupo (y la clave `menu.grupo.*` en es/en/ja si creas uno). El pie quedó solo con el aviso de derechos (1 línea en escritorio, 2 en celular) y la trampa. **Alturas**: el botón
   cabe en la fila de 3,5 rem de la cabecera y el pie ocupa lo mismo que el pie de enlaces de antes, así que `--binder-chrome` (globals.css) volvió
   a 17,6 / 26,4 rem. Sin navegador en la VPS esto está calculado, no medido: si cambias el alto de cabecera o pie, mide 1440x900 y 390x844.
 - **Aviso de derechos visible y reserva legible por máquina**: línea en el pie (`pie.derechos`, es/en/ja; corta A PROPÓSITO, ver arriba) que enlaza a la cláusula 18;
