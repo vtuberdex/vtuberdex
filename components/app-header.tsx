@@ -24,12 +24,6 @@ export function AppHeader() {
       <div className="mx-auto flex h-14 w-full max-w-[1600px] items-center gap-2 px-3 sm:gap-4 sm:px-6 lg:px-8">
         <SideMenu />
         <Link href="/" className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-dex-accent/60 bg-dex-accent/10">
-            <span
-              className="h-2.5 w-2.5 rounded-full bg-dex-accent"
-              style={{ boxShadow: "0 0 12px var(--color-dex-accent)" }}
-            />
-          </span>
           <span className="font-heading text-sm uppercase tracking-[0.08em] text-dex-ink sm:text-base sm:tracking-[0.2em]">
             VTuberDex
           </span>
