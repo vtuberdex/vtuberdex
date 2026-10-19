@@ -27,6 +27,23 @@ export function AppFooter() {
         <Link href="/minecraft" className="hover:text-dex-ink">
           {t("pie.minecraft")}
         </Link>
+        {/*
+          Trampa para rastreadores: ningún humano la ve ni la alcanza con el teclado, robots.txt la
+          prohíbe, así que solo la sigue un bot que recorre todos los enlaces del HTML. nginx
+          responde 403 y fail2ban banea la red (infra/, jail vtuberdex-trampa). No la quites ni la
+          muestres: quien la pulse quedaría baneado 24 h. Es un <a> y no un <Link> A PROPÓSITO:
+          Link precarga lo que entra en pantalla y banearía a un visitante real.
+        */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a
+          href="/v/archivo-completo"
+          rel="nofollow"
+          aria-hidden="true"
+          tabIndex={-1}
+          className="sr-only"
+        >
+          Archivo completo
+        </a>
         <Link href="/mi-ficha" className="hover:text-dex-ink">
           {t("pie.miFicha")}
         </Link>

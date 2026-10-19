@@ -17,7 +17,13 @@
  * Si el slug es uno ANTERIOR (se le cambió la URL), el detalle responde con el slug ACTUAL en el
  * cuerpo y el cliente redirige: ningún enlace compartido se rompe al renombrar una página.
  */
+import {
+  gastarFichas,
+  redDeLaPeticion,
+  respuestaAgotada,
+} from "../../../../lib/anti-scraping.mjs";
 import { dbConDiario } from "../../../../lib/diario.mjs";
+import { exigirSesion } from "../../../../lib/sesion-visitante.mjs";
 import { conExperiencia, contarLikes } from "../../../../lib/likes.mjs";
 import {
   aplicarImagenesDelMantenedor,
@@ -46,11 +52,16 @@ const CACHE_PUBLICA =
   "public, max-age=0, s-maxage=30, stale-while-revalidate=60";
 const TTL_DIARIO_MS = 2000;
 
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
+  const sinSesion = exigirSesion(request);
+  if (sinSesion) return sinSesion;
   const { slug } = await params;
   const db = await dbConDiario({ ttlMs: TTL_DIARIO_MS });
   const card = getVtuberBySlug(db, slug);
   if (!card) return Response.json({ error: "no_encontrado" }, { status: 404 });
+  // Mismo presupuesto de fichas distintas que el listado (lib/anti-scraping.mjs).
+  const cupo = gastarFichas(redDeLaPeticion(request.headers), [card.id]);
+  if (!cupo.permitido) return respuestaAgotada(cupo);
 
   /**
    * Las IMÁGENES del mantenedor también ganan al catálogo, no solo los campos de texto.

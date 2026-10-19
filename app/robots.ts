@@ -9,7 +9,35 @@ import { urlAbsoluta } from "@/lib/seo";
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: "*", allow: "/", disallow: ["/api/", "/admin"] }],
+    rules: [
+      /**
+       * Rastreadores de IA y de SEO que no aportan tráfico: se les pide que no pasen (y nginx les
+       * responde 403 de todos modos, ver `conf.d/00-seguridad.conf`). robots.txt es cortesía; la
+       * barrera real es nginx.
+       */
+      {
+        userAgent: [
+          "GPTBot",
+          "ClaudeBot",
+          "CCBot",
+          "Bytespider",
+          "PerplexityBot",
+          "Amazonbot",
+          "Reflectionbot",
+          "AhrefsBot",
+          "SemrushBot",
+          "MJ12bot",
+          "DotBot",
+          "PetalBot",
+        ],
+        disallow: "/",
+      },
+      {
+        userAgent: "*",
+        allow: "/",
+        disallow: ["/api/", "/admin", "/v/archivo-completo"],
+      },
+    ],
     sitemap: urlAbsoluta("/sitemap.xml"),
   };
 }

@@ -12,7 +12,14 @@
  * sin ningún filtro en JS. Antes las ediciones se pintaban encima de la página y `total` no
  * descontaba lo despublicado. Sin Turso, `dbConDiario()` es la base de siempre.
  */
+import {
+  PER_PAGE_PUBLICO_MAX,
+  gastarFichas,
+  redDeLaPeticion,
+  respuestaAgotada,
+} from "../../../lib/anti-scraping.mjs";
 import { dbConDiario } from "../../../lib/diario.mjs";
+import { exigirSesion } from "../../../lib/sesion-visitante.mjs";
 import { aplicarReemplazosALista } from "../../../lib/ediciones.mjs";
 import { conExperiencia, contarLikesVarios } from "../../../lib/likes.mjs";
 import { xpJuegoDeVarias } from "../../../lib/minecraft.mjs";
@@ -46,6 +53,8 @@ function splitCsv(value) {
 }
 
 export async function GET(request) {
+  const sinSesion = exigirSesion(request);
+  if (sinSesion) return sinSesion;
   const db = await dbConDiario({ ttlMs: TTL_DIARIO_MS });
   // `Object.fromEntries` reproduce lo que Express deja en `req.query`: arrays
   // cuando el parámetro se repite. El esquema zod espera esa forma.
@@ -67,11 +76,12 @@ export async function GET(request) {
     factions,
     sort,
     page,
-    perPage,
     language,
     premium,
     facet,
   } = parsed.data;
+  // El público nunca necesita más que una página del libro: 100 por petición volcaba el catálogo en 8.
+  const perPage = Math.min(parsed.data.perPage, PER_PAGE_PUBLICO_MAX);
   const result = searchVtubers(db, {
     q,
     countries: splitCsv(countries),
@@ -84,6 +94,12 @@ export async function GET(request) {
     page,
     perPage,
   });
+  // Fichas DISTINTAS por red y hora/día (ver lib/anti-scraping.mjs): frena al scraper paciente.
+  const cupo = gastarFichas(
+    redDeLaPeticion(request.headers),
+    result.items.map((c) => c.id),
+  );
+  if (!cupo.permitido) return respuestaAgotada(cupo);
   const facets = facet ? facetCounts(db, { language, q }) : null;
   /**
    * Las imágenes del mantenedor, al final: viven en Turso por slug y no en la base del catálogo.

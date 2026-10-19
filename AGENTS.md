@@ -1397,6 +1397,34 @@ dispositivo. El panel pone los nombres al servir y una ficha retirada sale como 
   (barras apiladas por mes + tabla resumen). Solo muestra los meses con datos y el actual. Su CSP es estricta (`connect-src 'self'`):
   por eso consulta `clientes.json` del mismo origen y todo texto entra por `textContent`.
 
+## Anti-scraping (nginx + fail2ban, desde 2026-10-20)
+
+Es una **barrera de coste, no una garantía**: el catálogo es público y un scraper con navegador real lo saca igual.
+Copias versionadas en `infra/` (la fuente viva está en `/etc/nginx` y `/etc/fail2ban`; copia de vuelta si las tocas).
+
+- `conf.d/00-seguridad.conf`: 403 a UAs vacíos, librerías de scraping (curl, python-requests, Scrapy, headless…) y bots de
+  SEO/IA (Ahrefs, Semrush, GPTBot, ClaudeBot…). Buscadores y previsualizadores de enlaces (Googlebot, Bing, Facebook, Discord…) pasan.
+  `/api/vtubers` e `/images/` exigen `Sec-Fetch-Site` o `Referer` (un navegador siempre manda uno). Techo de 10 r/s por IP en imágenes.
+  Loopback y VPN están exentos (`$vtd_limitar`): **probar desde 127.0.0.1 no ejercita nada**; usa `curl --resolve vtuberdex.com:443:<IP pública>`.
+- fail2ban `vtuberdex-scraping`: 40 respuestas 403/429 sobre esas rutas en 10 min → ban 1 h (creciente). El filtro NO lleva fecha
+  ni `\[`: fail2ban la recorta antes de aplicar la regex.
+- **Presupuesto de fichas distintas por red** (`lib/anti-scraping.mjs`, llamado desde `/api/vtubers` y `/api/vtubers/[slug]`): 300 fichas
+  distintas por hora y 600 por día (el catálogo son 785: una red sola no lo completa en 24 h) → 429 `demasiadas_fichas` con `Retry-After`.
+  Repetir una ficha no gasta cupo. La red sale de `X-Real-IP` (nginx lo sobrescribe; el primer valor de `X-Forwarded-For` lo escribe el
+  cliente). `perPage` público topado a 24. Memoria de la instancia: un reinicio lo borra. Si subes el tamaño de página del libro, súbelo.
+- **Sesión de visitante con prueba de trabajo** (`lib/sesion-visitante.mjs`, `app/api/sesion`, cliente en `lib/sesion-cliente.ts`):
+  `/api/vtubers*` responde 401 `sesion_requerida` sin la cookie `vtd_s`. Se obtiene resolviendo un reto (sha256 con 16 bits de ceros,
+  ~1 s en el navegador), dura 5 min y el navegador la RENUEVA sola cada 3 min mientras la pestaña está visible (`POST /api/sesion/renovar`, sin repetir la prueba; tope de 2 h desde el reto) y va atada al hash de la red y del User-Agent (copiarla a otra máquina no sirve). Tope de 30 sesiones
+  nuevas por red y hora. `ClienteStats` la abre al cargar y `request()` de `lib/api.ts` la abre y repite UNA vez ante la primera 401.
+  Secreto por proceso (un reinicio invalida las sesiones; el cliente re-resuelve). Loopback/VPN y desarrollo sin `X-Real-IP` no la exigen.
+  Un navegador real la pasa: lo que frena a ese es el presupuesto de fichas. Probado con `next start` + `X-Real-IP` simulada.
+- **Términos**: la cláusula 18 (`/terminos#seguridad`) prohíbe el scraping, los usos derivados (incluido entrenar IA), la elusión de
+  estas medidas y lo declara con consecuencias; `TERMINOS_VERSION` pasó a `2026-10-20` (los formularios abiertos se rechazan).
+- **Trampa**: enlace invisible en el pie (`/v/archivo-completo`, `<a>` y no `<Link>` para que no se precargue); nginx 403 y el jail
+  `vtuberdex-trampa` banea 24 h al primer toque. robots.txt la prohíbe, así que los buscadores no caen.
+- `robots.txt` pide a los bots de IA/SEO que no pasen (cortesía; la barrera es nginx).
+- Un cliente legítimo nuevo que no sea navegador (monitor, integración) recibirá 403: añade su UA a `$vtd_ua_bueno` o usa loopback.
+
 ## Verificación antes de decir "listo"
 
 1. `npm run lint && npm run typecheck && npm run check:shaders && npm run build` (el build es el gate real).

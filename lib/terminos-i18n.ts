@@ -55,7 +55,7 @@ const TERMINOS: Record<Locale, TerminosTraducidos> = {
     },
   },
   en: {
-    fechaVigencia: "October 6, 2026",
+    fechaVigencia: "October 20, 2026",
     preambulo: PREAMBULO_EN,
     clausulas: CLAUSULAS_EN,
     textosPagina: {
@@ -73,7 +73,7 @@ const TERMINOS: Record<Locale, TerminosTraducidos> = {
     },
   },
   ja: {
-    fechaVigencia: "2026年10月6日",
+    fechaVigencia: "2026年10月20日",
     preambulo: PREAMBULO_JA,
     clausulas: CLAUSULAS_JA,
     textosPagina: {
