@@ -39,6 +39,18 @@ describe("menú lateral", () => {
     ).toHaveAttribute("aria-current", "page");
   });
 
+  it("se pinta en <body>, fuera de la cabecera (su backdrop-filter recortaría un fixed)", async () => {
+    const { container } = render(
+      <header style={{ backdropFilter: "blur(4px)" }}>
+        <SideMenu />
+      </header>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+    const dialogo = screen.getByRole("dialog");
+    expect(container.contains(dialogo)).toBe(false);
+    expect(document.body.contains(dialogo)).toBe(true);
+  });
+
   it("Escape y el fondo lo cierran y el foco vuelve al botón", async () => {
     render(<SideMenu />);
     const boton = screen.getByRole("button", { name: "Abrir menú" });

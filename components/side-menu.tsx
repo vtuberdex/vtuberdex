@@ -9,6 +9,7 @@
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
@@ -105,67 +106,75 @@ export function SideMenu() {
           <path d="M2 4.5h14M2 9h14M2 13.5h14" />
         </svg>
       </button>
-      {abierto && (
-        <div className="fixed inset-0 z-50" data-testid="menu-lateral">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
-            onClick={cerrar}
-            aria-hidden="true"
-          />
-          <aside
-            ref={panel}
-            id={idPanel}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("menu.titulo")}
-            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-dex-line/80 bg-dex-void shadow-2xl"
-          >
-            <div className="flex h-14 shrink-0 items-center justify-between border-b border-dex-line/80 px-4">
-              <span className="font-heading text-sm uppercase tracking-[0.2em] text-dex-ink">
-                {t("menu.titulo")}
-              </span>
-              <button
-                type="button"
-                aria-label={t("menu.cerrar")}
-                onClick={cerrar}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-dex-muted hover:text-dex-ink"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3 3l10 10M13 3L3 13" />
-                </svg>
-              </button>
-            </div>
-            <nav
+      {/*
+        PORTAL a <body>, no hijo de la cabecera: la cabecera lleva `backdrop-blur` (backdrop-filter) y
+        `z-30`, y un backdrop-filter convierte a su caja en el bloque contenedor de todo lo `fixed` de
+        dentro y en un contexto de apilamiento propio. El panel quedaba recortado a los 3,5 rem de la
+        cabecera y por debajo del resto de la página. No lo devuelvas a la cabecera.
+      */}
+      {abierto &&
+        createPortal(
+          <div className="fixed inset-0 z-[100]" data-testid="menu-lateral">
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+              onClick={cerrar}
+              aria-hidden="true"
+            />
+            <aside
+              ref={panel}
+              id={idPanel}
+              role="dialog"
+              aria-modal="true"
               aria-label={t("menu.titulo")}
-              className="flex-1 overflow-y-auto px-2 py-3"
+              className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-dex-line/80 bg-dex-void shadow-2xl"
             >
-              <ul className="flex flex-col gap-0.5">
-                {ENLACES.map(({ href, clave }) => (
-                  <li key={href}>
-                    <Link
-                      href={href}
-                      onClick={cerrar}
-                      aria-current={href === pathname ? "page" : undefined}
-                      className="block rounded-lg px-3 py-2.5 text-sm text-dex-muted hover:bg-dex-accent/10 hover:text-dex-ink aria-[current=page]:text-dex-accent"
-                    >
-                      {t(clave)}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          </aside>
-        </div>
-      )}
+              <div className="flex h-14 shrink-0 items-center justify-between border-b border-dex-line/80 px-4">
+                <span className="font-heading text-sm uppercase tracking-[0.2em] text-dex-ink">
+                  {t("menu.titulo")}
+                </span>
+                <button
+                  type="button"
+                  aria-label={t("menu.cerrar")}
+                  onClick={cerrar}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-dex-muted hover:text-dex-ink"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 3l10 10M13 3L3 13" />
+                  </svg>
+                </button>
+              </div>
+              <nav
+                aria-label={t("menu.titulo")}
+                className="flex-1 overflow-y-auto px-2 py-3"
+              >
+                <ul className="flex flex-col gap-0.5">
+                  {ENLACES.map(({ href, clave }) => (
+                    <li key={href}>
+                      <Link
+                        href={href}
+                        onClick={cerrar}
+                        aria-current={href === pathname ? "page" : undefined}
+                        className="block rounded-lg px-3 py-2.5 text-sm text-dex-muted hover:bg-dex-accent/10 hover:text-dex-ink aria-[current=page]:text-dex-accent"
+                      >
+                        {t(clave)}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            </aside>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
