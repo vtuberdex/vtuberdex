@@ -571,7 +571,7 @@ JAVA_HOME=…/jdk25 ./gradlew build`.
 
 ## Entregas estilo Death Stranding (plugin `vtuberdex-entregas`, XP `entrega`)
 
-Un TERCER plugin, aparte del principal y de las mochilas (`~/projects/vtuberdex-entregas`, paquete `com.vtuberdex.entregas`), que
+Un TERCER plugin, aparte del principal y de las mochilas (`~/.motita/workspace/vtuberdex-entregas`, paquete `com.vtuberdex.entregas`), que
 depende de los dos y solo usa su API pública. Se compila DESPUÉS de ellos (`build.gradle.kts` lee sus jars de `build/libs/`):
 mochilas y principal → entregas. Todo es del mundo principal; los de la sala de espera no llegan.
 - **API que se añadió a los otros dos**: `MochilasPlugin` (`llevaMochila`, `capacidadLibre`, `fraccionDeCarga`, `guardar`, `contar`,
@@ -1379,7 +1379,7 @@ Cada ficha con historia tiene un clip `<slug>.mp3`: una voz femenina española �
   procesarse con el texto viejo de su instantánea: corre `--todas` una vez más al terminar (idempotente). (3) Un slug
   renombrado deja su clip viejo huérfano hasta el siguiente `--limpiar`. (4) El autoplay con sonido lo bloquea el navegador
   sin gesto previo (enlace directo): el botón queda en «Escuchar». Entrando desde el catálogo hay un clic y suena sola.
-- **El servicio** corre desde el CHECKOUT (`~/projects/vtuberdex`, no desde el release): necesita `lib/` y `server/src` en
+- **El servicio** corre desde clones propios del autodeploy (`~/.local/share/vtuberdex-auto/web`, no desde el checkout de trabajo ni desde el release): necesita `lib/` y `server/src` en
   claro, y el `.env` es `/etc/vtuberdex.env` (el mismo del sitio).
 
 ## Estadísticas de visitantes (panel de la IP)
