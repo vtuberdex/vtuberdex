@@ -1471,6 +1471,7 @@ Copias versionadas en `infra/` (la fuente viva está en `/etc/nginx` y `/etc/fai
 - **Trampa**: enlace invisible en el pie (`/v/archivo-completo`, `<a>` y no `<Link>` para que no se precargue); nginx 403 y el jail
   `vtuberdex-trampa` banea 24 h al primer toque. robots.txt la prohíbe, así que los buscadores no caen.
 - `robots.txt` pide a los bots de IA/SEO que no pasen (cortesía; la barrera es nginx).
+- **Host FIJO en nginx** (`proxy_set_header Host vtuberdex.com` en los tres `proxy_pass` de `vtuberdex-locations.conf`): Semgrep marca como vulnerabilidad (`request-host-used`) reenviar la cabecera Host que manda quien llama, y esas 3 alertas hacían fallar el quality gate de Sonar (`security_rating` de código nuevo en C; se exige A). Sonar importa los SARIF de Semgrep y CodeQL, así que **todo `.conf` que se copie a `infra/` también se analiza**. Para ver qué rompe el gate: `GET /api/qualitygates/project_status?projectKey=vtuberdex` y `/api/issues/search?...&inNewCodePeriod=true` en `http://127.0.0.1:9000` (token en `~/.sonar-token`).
 - Un cliente legítimo nuevo que no sea navegador (monitor, integración) recibirá 403: añade su UA a `$vtd_ua_bueno` o usa loopback.
 
 ## Verificación antes de decir "listo"
