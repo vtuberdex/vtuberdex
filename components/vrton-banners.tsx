@@ -15,12 +15,19 @@
 import { useI18n } from "@/lib/i18n";
 import logoImport from "@/components/vrton/logo.webp";
 import teletonImport from "@/components/vrton/teleton.webp";
+import fondoIzqImport from "@/components/vrton/fondo-izq.webp";
+import fondoDerImport from "@/components/vrton/fondo-der.webp";
 
 /** Next entrega `{ src }` y vitest una cadena (ver la trampa de `metalEnvUrl` en `card-material.ts`). */
 const urlDe = (m: unknown): string =>
   typeof m === "string" ? m : (m as { src: string }).src;
 const LOGO = urlDe(logoImport);
 const TELETON = urlDe(teletonImport);
+/** Una franja de `hero-background` (vrton.org) por pendón: cada uno enmarca una torre del paisaje. */
+const FONDO = {
+  izquierdo: urlDe(fondoIzqImport),
+  derecho: urlDe(fondoDerImport),
+};
 
 const VRTON_URL = "https://vrton.org/";
 
@@ -39,31 +46,39 @@ function Pendon({ lado }: { lado: "izquierdo" | "derecho" }) {
           target="_blank"
           rel="noopener"
           className={`pendon pendon-${lado}`}
+          style={
+            { "--pendon-fondo": `url(${FONDO[lado]})` } as React.CSSProperties
+          }
         >
           <span className="pendon-barra" aria-hidden>
             <i />
             <i />
           </span>
           <span className="pendon-tela">
+            {/* Centrado en el alto del pendón (no en el flujo): los bloques de arriba y abajo no lo empujan. */}
+            <img
+              src={LOGO}
+              alt="VRTon"
+              width={596}
+              height={397}
+              className="pendon-logo"
+            />
             <span className="pendon-contenido">
-              <span className="pendon-evento">{t("vrton.evento")}</span>
-              <img
-                src={LOGO}
-                alt="VRTon"
-                width={486}
-                height={243}
-                className="pendon-logo"
-              />
-              <span className="pendon-anio">2026</span>
-              <span className="pendon-fechas">{t("vrton.fechas")}</span>
-              <span className="pendon-horas">{t("vrton.horas")}</span>
-              <span className="pendon-causa">
-                <img src={TELETON} alt="" width={244} height={247} />
-                <span>{t("vrton.apoyo")}</span>
-                <b>{t("vrton.teleton")}</b>
+              <span className="pendon-alto">
+                <span className="pendon-evento">{t("vrton.evento")}</span>
+                <span className="pendon-anio">2026</span>
+                <span className="pendon-fechas">{t("vrton.fechas")}</span>
               </span>
-              <span className="pendon-cta">{t("vrton.cta")}</span>
-              <span className="pendon-url">vrton.org</span>
+              <span className="pendon-bajo">
+                <span className="pendon-horas">{t("vrton.horas")}</span>
+                <span className="pendon-causa">
+                  <img src={TELETON} alt="" width={244} height={247} />
+                  <span>{t("vrton.apoyo")}</span>
+                  <b>{t("vrton.teleton")}</b>
+                </span>
+                <span className="pendon-cta">{t("vrton.cta")}</span>
+                <span className="pendon-url">vrton.org</span>
+              </span>
             </span>
           </span>
         </a>

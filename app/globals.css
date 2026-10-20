@@ -64,7 +64,6 @@ h6 {
   content: "";
   position: fixed;
   inset: 0;
-  pointer-events: none;
   background-image:
     linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
     linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
@@ -174,6 +173,9 @@ h6 {
     repeating-linear-gradient(90deg, rgb(16 24 32 / 0.035) 0 1px, transparent 1px 3px),
     /* sombra de los pliegues */
     linear-gradient(90deg, rgb(0 0 0 / 0.12), transparent 18%, transparent 82%, rgb(0 0 0 / 0.14)),
+    /* velo claro: el paisaje es pastel y el texto oscuro tiene que leerse sobre él */
+    linear-gradient(rgb(255 255 255 / 0.18), rgb(255 255 255 / 0.04)),
+    var(--pendon-fondo) center top / cover no-repeat,
     var(--pendon-crema);
 }
 /* Dobladillo rojo arriba (por donde pasa la barra) y cola de golondrina roja abajo. */
@@ -199,9 +201,15 @@ h6 {
   z-index: 1;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  text-align: center;
+}
+.pendon-alto,
+.pendon-bajo {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 0.35rem;
-  text-align: center;
 }
 .pendon-evento {
   font-size: 0.6rem;
@@ -212,8 +220,14 @@ h6 {
   line-height: 1.15;
 }
 .pendon-logo {
-  width: 100%;
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 0.35rem;
+  width: calc(100% - 0.7rem);
   height: auto;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 3px 4px rgb(16 24 32 / 0.4));
 }
 .pendon-anio {
   font-size: 2.6rem;
@@ -237,7 +251,6 @@ h6 {
   color: var(--pendon-rojo-oscuro);
 }
 .pendon-causa {
-  margin-top: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -284,9 +297,6 @@ h6 {
 @media (max-height: 760px) {
   .pendon-causa {
     display: none;
-  }
-  .pendon-cta {
-    margin-top: auto;
   }
 }
 @media (prefers-reduced-motion: no-preference) {

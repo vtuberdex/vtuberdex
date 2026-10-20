@@ -23,6 +23,6 @@ extraction or reuse. Scraping, copying and AI training are prohibited without wr
 
 ## Assets de VRTon
 
-`components/vrton/` (logo de VRTon y cruz de Teletón, recortados de `VRTon/ASSETS2025`) pertenecen a VRTon y se
+`components/vrton/` (logo «Cielos de Cristal» y fondo `hero-background` de vrton.org, y cruz de Teletón de `VRTon/ASSETS2025`, recortados) pertenecen a VRTon y se
 usan bajo su licencia (no comercial, con enlace visible a https://vrton.org/, que llevan los pendones de
 `components/vrton-banners.tsx`). No se cubren con la licencia de este repositorio.
