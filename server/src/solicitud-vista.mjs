@@ -242,9 +242,13 @@ function vistaModificacion(db, solicitud, base, { fichaSlug }) {
     avisos.push(
       "No cambia nada: los valores propuestos ya coinciden con la ficha.",
     );
-  if (imagenes.imageUrl || imagenes.logoUrl)
+  if (imagenes.imageId || imagenes.logoId)
     avisos.push(
-      "El avatar y el logo vienen como enlace y no se aplican solos: descárgalos y súbelos desde «Imágenes».",
+      "Trae imágenes nuevas (" +
+        [imagenes.imageId && "avatar", imagenes.logoId && "logo"]
+          .filter(Boolean)
+          .join(" y ") +
+        "): al aprobar REEMPLAZAN a las actuales de la ficha. Míralas antes en «Imágenes» de la solicitud.",
     );
   if (ficha.status !== "published")
     avisos.push(

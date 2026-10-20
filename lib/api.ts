@@ -90,7 +90,7 @@ export interface VistaPreviaSolicitud {
     despues: string;
     nuevo: boolean;
   }>;
-  imagenes?: { imageUrl?: string; logoUrl?: string };
+  imagenes?: { imageId?: string; logoId?: string };
   /** Modificación sin ficha resuelta: fichas parecidas para elegir. */
   candidatas?: FichaResumen[];
 }
@@ -122,6 +122,13 @@ export class ApiError extends Error {
     this.issues = issues;
   }
 }
+
+/** Formularios públicos que suben imágenes y su carpeta en `/api`. */
+export type FormularioConImagenes = "inscripcion" | "modificacion";
+const RUTA_DE_FORMULARIO: Record<FormularioConImagenes, string> = {
+  inscripcion: "inscripciones",
+  modificacion: "modificaciones",
+};
 
 async function request<T>(
   path: string,
@@ -539,6 +546,40 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
+  /**
+   * Sube el avatar (`character`) o el logo de un formulario público: un WebP ya normalizado por el navegador.
+   * `credencial` es la `sesion` de la inscripción o el `permiso` de la modificación.
+   */
+  subirImagenDeSolicitud(
+    formulario: FormularioConImagenes,
+    credencial: string,
+    tipo: "character" | "logo",
+    imagen: Blob,
+  ) {
+    return request<{
+      id: string;
+      tipo: string;
+      ancho: number;
+      alto: number;
+      size: number;
+    }>(`/api/${RUTA_DE_FORMULARIO[formulario]}/imagen?tipo=${tipo}`, {
+      method: "POST",
+      headers: { "content-type": "image/webp", "x-credencial": credencial },
+      body: imagen,
+    });
+  },
+  /** La vista previa de una imagen ya subida (para recuperar un borrador), o `null` si ya no está. */
+  async imagenDeSolicitud(
+    formulario: FormularioConImagenes,
+    credencial: string,
+    id: string,
+  ): Promise<Blob | null> {
+    const respuesta = await fetch(
+      `${BASE}/api/${RUTA_DE_FORMULARIO[formulario]}/imagen?id=${encodeURIComponent(id)}`,
+      { headers: { "x-credencial": credencial } },
+    ).catch(() => null);
+    return respuesta?.ok ? respuesta.blob() : null;
+  },
   /** Formulario público para pedir cambios en una ficha ya registrada. Mismos términos y misma cola. */
   enviarModificacion(body: Record<string, unknown>) {
     return request<{ ok: true; estado: "pendiente" | "sin_verificar" }>(
@@ -632,7 +673,14 @@ export const api = {
     nota = "",
     fichaSlug?: string,
   ) {
-    return request<{ solicitud: SolicitudAdmin }>(
+    return request<{
+      solicitud: SolicitudAdmin;
+      /** Solo al aprobar: qué imágenes subidas pasaron a la ficha y cuáles no se pudieron copiar. */
+      imagenes?: {
+        aplicadas: string[];
+        fallidas: Array<{ tipo: string; error: string }>;
+      };
+    }>(
       `/api/admin/solicitudes/${id}/resolver`,
       {
         method: "POST",
@@ -644,6 +692,30 @@ export const api = {
         }),
       },
     );
+  },
+  /** Las imágenes que la persona subió con el formulario (sin bytes). */
+  imagenesDeSolicitud(token: string, id: number) {
+    return request<{
+      imagenes: Array<{
+        id: string;
+        tipo: "character" | "logo";
+        ancho: number;
+        alto: number;
+        size: number;
+      }>;
+    }>(`/api/admin/solicitudes/${id}/imagenes`, { headers: bearer(token) });
+  },
+  /** Los bytes de una de esas imágenes (el `<img>` no puede mandar la cabecera de sesión), o `null`. */
+  async imagenSubidaDeSolicitud(
+    token: string,
+    id: number,
+    tipo: string,
+  ): Promise<Blob | null> {
+    const respuesta = await fetch(
+      `${BASE}/api/admin/solicitudes/${id}/imagen/${tipo}`,
+      { headers: bearer(token) },
+    ).catch(() => null);
+    return respuesta?.ok ? respuesta.blob() : null;
   },
   /** Qué pasaría al aprobar (sin escribir nada). `ficha` elige a mano la ficha de una modificación. */
   vistaPreviaSolicitud(token: string, id: number, ficha?: string) {

@@ -26,8 +26,9 @@ export interface EstadoInscripcion {
   codigo: string;
   languages: string[];
   socials: Array<{ platform: string; url: string }>;
-  imageUrl: string;
-  logoUrl: string;
+  /** Ids de las imágenes ya subidas (avatar y logo). */
+  imageId: string;
+  logoId: string;
   cardText: string;
   perfil: Record<ClavePerfil, string>;
   acepta: boolean;
@@ -55,10 +56,6 @@ const faltasDePerfil = (paso: 2 | 3, perfil: Record<ClavePerfil, string>): Falta
 
 export function faltasDelPaso(paso: 1 | 2 | 3 | 4 | 5, e: EstadoInscripcion): Falta[] {
   const faltas: Falta[] = [];
-  const enlace = (campo: string, etiqueta: string, valor: string) => {
-    if (!lleno(valor)) faltas.push({ campo, etiqueta, motivo: 'vacio' });
-    else if (!esEnlaceHttp(valor)) faltas.push({ campo, etiqueta, motivo: 'invalido' });
-  };
 
   if (paso === 1) {
     if (!lleno(e.name)) faltas.push({ campo: 'name', etiqueta: 'ins.nombreArtistico', motivo: 'vacio' });
@@ -80,8 +77,8 @@ export function faltasDelPaso(paso: 1 | 2 | 3 | 4 | 5, e: EstadoInscripcion): Fa
     }
   }
   if (paso === 4) {
-    enlace('imageUrl', 'ficha.avatar', e.imageUrl);
-    enlace('logoUrl', 'ficha.logo', e.logoUrl);
+    if (!lleno(e.imageId)) faltas.push({ campo: 'imageId', etiqueta: 'ficha.avatar', motivo: 'vacio' });
+    if (!lleno(e.logoId)) faltas.push({ campo: 'logoId', etiqueta: 'ficha.logo', motivo: 'vacio' });
     faltas.push(...faltasDePerfil(2, e.perfil));
     if (!lleno(e.cardText)) faltas.push({ campo: 'cardText', etiqueta: 'ficha.lore', motivo: 'vacio' });
   }

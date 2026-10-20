@@ -4,6 +4,7 @@
  * obligatorios y el pegamento HTTP público. Corre contra SQLite en memoria con el MISMO SQL que
  * Turso (`ejecutorSqlite`): sin red.
  */
+import { SUBIR, conImagenes } from "./test-imagenes";
 import { DatabaseSync } from "node:sqlite";
 
 import { beforeEach, describe, expect, test } from "vitest";
@@ -49,8 +50,8 @@ const inscripcion = (extra: Record<string, unknown> = {}) => ({
   favoriteColor: "Verde",
   modeler: "Riko",
   hashtag: "#LunaArt",
-  imageUrl: "https://imgs.test/avatar.png",
-  logoUrl: "https://imgs.test/logo.png",
+  imageId: SUBIR,
+  logoId: SUBIR,
   socials: [{ platform: "Twitch", url: "https://twitch.tv/luna" }],
   aceptaTerminos: true,
   terminosVersion: TERMINOS_VERSION,
@@ -69,7 +70,11 @@ const enviar = async (
   tipo: "inscripcion" | "baja" = "inscripcion",
   ip = "1.1.1.1",
 ) => {
-  const resultado = await crearSolicitud(ejecutor, entrada, { tipo, ip });
+  const resultado = await crearSolicitud(
+    ejecutor,
+    await conImagenes(ejecutor, entrada as Record<string, unknown>),
+    { tipo, ip },
+  );
   // Entra `sin_verificar`; la cola la ve solo tras confirmar el correo (lo prueban los tests de verificación).
   if (resultado.id) await confirmarSolicitud(ejecutor, resultado.id);
   // `id` es `null` solo en el envío descartado por el campo trampa, que tiene su propia prueba.
@@ -202,8 +207,8 @@ describe("validación", () => {
       inscripcion({ email: "no-es-correo" }),
       inscripcion({ height: "" }),
       inscripcion({ cardText: "" }),
-      inscripcion({ logoUrl: "" }),
-      inscripcion({ imageUrl: "" }),
+      inscripcion({ logoId: "" }),
+      inscripcion({ imageId: "" }),
       inscripcion({ modeler: "  " }),
       inscripcion({ languages: [] }),
       inscripcion({ socials: [] }),

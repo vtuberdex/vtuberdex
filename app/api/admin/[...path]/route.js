@@ -83,6 +83,12 @@ import {
   listarSolicitudes,
   resolverSolicitud,
 } from "../../../../server/src/solicitudes.mjs";
+import {
+  aplicarImagenesDeSolicitud,
+  imagenesDeSolicitud,
+  imagenesParaAplicar,
+  purgarCaducadas,
+} from "../../../../server/src/imagenes-solicitud.mjs";
 import { listarConCorreo } from "../../../../server/src/correo-fichas.mjs";
 import { estadisticasDelMantenedor } from "../../../../server/src/estadisticas-admin.mjs";
 import { prepararModificacion } from "../../../../server/src/modificacion.mjs";
@@ -868,8 +874,11 @@ async function listarSolicitudesRuta(request) {
     return NextResponse.json({ error: "query_invalida" }, { status: 400 });
   }
   try {
+    const ejecutor = await ejecutorDeSolicitudes();
+    // Aprovecha la visita para limpiar las imágenes caducadas (no hay un trabajo programado).
+    await purgarCaducadas(ejecutor).catch(() => {});
     return NextResponse.json(
-      await listarSolicitudes(await ejecutorDeSolicitudes(), { estado, tipo }),
+      await listarSolicitudes(ejecutor, { estado, tipo }),
     );
   } catch (error) {
     console.error("[admin] no se pudo leer la cola de solicitudes", error);
@@ -924,6 +933,46 @@ async function vistaPreviaRuta(request, id) {
     );
   } catch (error) {
     return responderError(error);
+  }
+}
+
+/**
+ * `GET /api/admin/solicitudes/:id/imagenes` — qué imágenes subió la persona con el formulario (sin bytes).
+ * `GET /api/admin/solicitudes/:id/imagen/:tipo` — los bytes de una, para verla antes de aprobar.
+ * Solo el mantenedor: no son públicas.
+ */
+async function imagenesDeSolicitudRuta(id) {
+  try {
+    return NextResponse.json({
+      imagenes: await imagenesDeSolicitud(await ejecutorDeSolicitudes(), id),
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "solicitudes_no_disponibles", detail: error.message },
+      { status: 503 },
+    );
+  }
+}
+
+async function imagenDeSolicitudRuta(id, tipo) {
+  try {
+    const imagen = (
+      await imagenesParaAplicar(await ejecutorDeSolicitudes(), id)
+    ).find((i) => i.tipo === tipo);
+    if (!imagen)
+      return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+    return new NextResponse(imagen.bytes, {
+      headers: {
+        "content-type": "image/webp",
+        "cache-control": "private, no-store",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "solicitudes_no_disponibles", detail: error.message },
+      { status: 503 },
+    );
   }
 }
 
@@ -1039,7 +1088,26 @@ async function resolverSolicitudRuta(request, id, usuario) {
       nota,
       vtuberSlug,
     });
-    return NextResponse.json({ solicitud: resuelta });
+    // Aprobada: las imágenes subidas pasan a ser las de la ficha (fila de Turso con origen `mantenedor`, como
+    // las que sube el mantenedor a mano). Si alguna falla la aprobación sigue en pie y se informa cuál.
+    let imagenes = { aplicadas: [], fallidas: [] };
+    if (estado === "aprobada" && vtuberSlug) {
+      imagenes = await aplicarImagenesDeSolicitud(
+        ejecutor,
+        id,
+        async ({ tipo, bytes, ancho, alto }) => {
+          const guardada = await guardarAssetDelMantenedor(
+            vtuberSlug,
+            tipo,
+            bytes,
+            "image/webp",
+            { width: ancho, height: alto },
+          );
+          if (!guardada) throw new Error("el almacén de imágenes no está disponible");
+        },
+      );
+    }
+    return NextResponse.json({ solicitud: resuelta, imagenes });
   } catch (error) {
     if (error instanceof SolicitudError) {
       return NextResponse.json(
@@ -1085,6 +1153,21 @@ export async function GET(request, context) {
     partes.length === 3
   )
     return vistaPreviaRuta(request, partes[1]);
+  if (
+    partes[0] === "solicitudes" &&
+    partes[1] &&
+    partes[2] === "imagenes" &&
+    partes.length === 3
+  )
+    return imagenesDeSolicitudRuta(partes[1]);
+  if (
+    partes[0] === "solicitudes" &&
+    partes[1] &&
+    partes[2] === "imagen" &&
+    partes[3] &&
+    partes.length === 4
+  )
+    return imagenDeSolicitudRuta(partes[1], partes[3]);
   return noDisponible(
     `ruta del mantenedor no soportada en producción: ${sufijo}`,
   );

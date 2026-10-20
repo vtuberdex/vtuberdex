@@ -12,11 +12,35 @@ import { ModificacionForm } from "@/components/solicitudes/modificacion-form";
 import { ApiError, api } from "@/lib/api";
 import { TERMINOS_VERSION } from "@/lib/terminos";
 
+// El navegador de verdad convierte la imagen en un lienzo; jsdom no tiene ni canvas ni URL de objeto.
+vi.mock("@/lib/imagen-cliente", async (original) => ({
+  ...(await original<typeof import("@/lib/imagen-cliente")>()),
+  normalizarImagenDeSolicitud: vi.fn(
+    async () => new Blob(["webp"], { type: "image/webp" }),
+  ),
+}));
+const ID_AVATAR = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const ID_LOGO = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
 // Teclear ~25 campos en jsdom con la suite entera en paralelo supera los 5 s por defecto sin que haya ningún defecto.
 vi.setConfig({ testTimeout: 30_000 });
 
 beforeEach(() => {
   vi.spyOn(api, "list").mockRejectedValue(new Error("sin red"));
+  URL.createObjectURL = vi.fn(() => "blob:vista");
+  URL.revokeObjectURL = vi.fn();
+  vi.spyOn(api, "subirImagenDeSolicitud").mockImplementation(
+    async (_formulario, _credencial, tipo) => ({
+      id: tipo === "character" ? ID_AVATAR : ID_LOGO,
+      tipo,
+      ancho: 720,
+      alto: 1008,
+      size: 1000,
+    }),
+  );
+  vi.spyOn(api, "imagenDeSolicitud").mockResolvedValue(
+    new Blob(["webp"], { type: "image/webp" }),
+  );
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -26,8 +50,6 @@ const CAMPOS_PASO_2: Array<[RegExp, string]> = [
   [/^modelo/i, "Riko"],
   [/^hashtag de arte/i, "#Luna"],
   [/^lore/i, "Una historia"],
-  [/^avatar/i, "https://example.com/a.png"],
-  [/^logo/i, "https://example.com/l.png"],
 ];
 
 const CAMPOS_PASO_3: Array<[RegExp, string]> = [
@@ -87,8 +109,21 @@ async function llenarPaso3() {
   await userEvent.click(screen.getByRole("button", { name: /siguiente/i }));
 }
 
+/** Elige un archivo en un campo de imagen y espera a que quede subida. */
+async function subirImagen(campo: "imageId" | "logoId") {
+  await userEvent.upload(
+    screen.getByTestId(`archivo-${campo}`),
+    new File(["x"], "arte.png", { type: "image/png" }),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId(`estado-${campo}`)).toHaveTextContent(/lista/i),
+  );
+}
+
 /** Paso 4: imágenes y personaje. */
 async function llenarPaso4() {
+  await subirImagen("imageId");
+  await subirImagen("logoId");
   for (const [etiqueta, valor] of CAMPOS_PASO_2)
     await userEvent.type(screen.getByLabelText(etiqueta), valor);
   await userEvent.click(screen.getByRole("button", { name: /siguiente/i }));
@@ -151,6 +186,10 @@ describe("InscripcionForm", () => {
     expect(screen.getByLabelText(/^signo/i)).not.toBeRequired();
     for (const [etiqueta] of CAMPOS_PASO_2)
       expect(screen.getByLabelText(etiqueta)).toBeRequired();
+    // Avatar y logo se SUBEN (ya no se pegan como enlace): no hay campos de URL.
+    expect(screen.getByTestId("archivo-imageId")).toBeInTheDocument();
+    expect(screen.getByTestId("archivo-logoId")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("https://")).toBeNull();
     await llenarPaso4();
     expect(screen.getByTestId("inscripcion-paso")).toHaveTextContent(
       /paso 5 de 5/i,
@@ -301,13 +340,20 @@ describe("InscripcionForm", () => {
       favoriteAnime: "Frieren",
       modeler: "Riko",
       cardText: "Una historia",
-      imageUrl: "https://example.com/a.png",
-      logoUrl: "https://example.com/l.png",
+      imageId: ID_AVATAR,
+      logoId: ID_LOGO,
       aceptaTerminos: true,
       terminosVersion: TERMINOS_VERSION,
       website: "",
     });
     expect(enviar.mock.calls[0][0]).not.toHaveProperty("email");
+    expect(enviar.mock.calls[0][0]).not.toHaveProperty("imageUrl");
+    expect(api.subirImagenDeSolicitud).toHaveBeenCalledWith(
+      "inscripcion",
+      "SESION".repeat(8),
+      "character",
+      expect.any(Blob),
+    );
     expect(await screen.findByTestId("inscripcion-enviada")).toHaveTextContent(
       /inscripción recibida/i,
     );
@@ -403,8 +449,8 @@ describe("InscripcionForm", () => {
           phrase: "Frase guardada",
           cardText: "Lore guardado",
           themeColor: "#336699",
-          imageUrl: "https://example.com/a.png",
-          logoUrl: "",
+          imageId: ID_AVATAR,
+          logoId: "",
           zodiac: "",
           height: "1,60 m",
           socials: [{ platform: "Twitch", url: "https://twitch.tv/luna" }],
@@ -757,6 +803,36 @@ describe("ModificacionForm", () => {
     expect(await screen.findByTestId("modificacion-enviada")).toHaveTextContent(
       /solicitud recibida/i,
     );
+  });
+
+  it("un avatar nuevo SOLO se sube si se elige (es opcional) y viaja como id con el permiso", async () => {
+    const enviar = vi
+      .spyOn(api, "enviarModificacion")
+      .mockResolvedValue({ ok: true, estado: "pendiente" });
+    render(<ModificacionForm />);
+    await verificarCorreo();
+    // El avatar se SUBE (no hay un campo de enlace con ese nombre).
+    expect(screen.getByTestId("archivo-imageId")).toBeInTheDocument();
+    await subirImagen("imageId");
+    expect(api.subirImagenDeSolicitud).toHaveBeenCalledWith(
+      "modificacion",
+      "PERMISO".repeat(6),
+      "character",
+      expect.any(Blob),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /siguiente/i }));
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /he leído y acepto/i }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /enviar solicitud/i }),
+    );
+    await waitFor(() => expect(enviar).toHaveBeenCalledOnce());
+    expect(enviar.mock.calls[0][0]).toMatchObject({
+      imageId: ID_AVATAR,
+      logoId: "",
+    });
+    expect(api.subirImagenDeSolicitud).toHaveBeenCalledTimes(1);
   });
 
   it("si el permiso caducó, vuelve al paso 1 con el aviso", async () => {

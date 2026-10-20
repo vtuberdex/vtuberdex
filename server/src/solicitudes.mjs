@@ -35,6 +35,12 @@ import { z } from "zod";
 
 import { TERMINOS_VERSION } from "./terminos-version.mjs";
 import { consumirToken, correoDelToken } from "./verificacion.mjs";
+import {
+  adjuntarImagenes,
+  borrarImagenesDeSolicitud,
+  esIdDeImagen,
+  validarImagenesDeFormulario,
+} from "./imagenes-solicitud.mjs";
 import { preparadorDeTablas } from "./db/tablas.mjs";
 
 export { TERMINOS_VERSION };
@@ -146,6 +152,16 @@ const urlHttp = z
     "debe ser una URL http(s)",
   );
 
+/**
+ * El id de una imagen ya subida (`imagenes-solicitud.mjs`). La función se envuelve en una flecha a
+ * propósito: los dos módulos se importan entre sí y una referencia directa se leería antes de existir.
+ */
+const idImagen = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((valor) => esIdDeImagen(valor), "sube la imagen");
+
 const correo = z
   .string()
   .trim()
@@ -233,9 +249,12 @@ export const inscripcionSchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/, "color hexadecimal #rrggbb")
     .optional()
     .or(z.literal("")),
-  /** Dónde está el avatar (arte del personaje) y el logo: el mantenedor los descarga y los sube; el formulario no recibe archivos. */
-  imageUrl: urlHttp,
-  logoUrl: urlHttp,
+  /**
+   * El avatar (arte del personaje) y el logo, YA subidos desde el formulario (`imagenes-solicitud.mjs`): llegan
+   * como id, no como enlace ni como archivo. `crearSolicitud` comprueba que son de este correo.
+   */
+  imageId: idImagen,
+  logoId: idImagen,
   socials: z
     .array(z.object({ platform: texto(40).min(1), url: urlHttp }))
     .min(1, "indica al menos una red o canal donde se te pueda ver")
@@ -263,8 +282,8 @@ const CAMPOS_MODIFICABLES = [
   "themeColor",
   "country",
   "zodiac",
-  "imageUrl",
-  "logoUrl",
+  "imageId",
+  "logoId",
   ...PERFIL_CAMPOS.map(([clave]) => clave),
 ];
 
@@ -291,8 +310,8 @@ export const modificacionSchema = z
     zodiac: textoOpcional(40),
     ...perfilOpcional,
     languages: z.array(texto(8).min(2)).max(6).optional().default([]),
-    imageUrl: urlHttp.optional().or(z.literal("")),
-    logoUrl: urlHttp.optional().or(z.literal("")),
+    imageId: idImagen.optional().or(z.literal("")),
+    logoId: idImagen.optional().or(z.literal("")),
     /** Se SUMAN o actualizan por plataforma; no reemplazan las que ya tiene la ficha. */
     socials: z
       .array(z.object({ platform: texto(40).min(1), url: urlHttp }))
@@ -446,6 +465,18 @@ export async function crearSolicitud(
     );
   }
 
+  // Las imágenes subidas tienen que ser de ESTE correo, del tipo que tocan y no estar en otra solicitud. Se
+  // mira antes de gastar el permiso, como el resto de la validación.
+  const imagenesIds =
+    tipo === "inscripcion" || tipo === "modificacion"
+      ? await validarImagenesDeFormulario(e, {
+          correo: email,
+          imageId: datos.imageId,
+          logoId: datos.logoId,
+          obligatorias: tipo === "inscripcion",
+        })
+      : [];
+
   const contacto = { email };
   const fecha = ahora.toISOString();
   if (correoVerificado) {
@@ -467,8 +498,11 @@ export async function crearSolicitud(
       "SELECT MAX(id) AS id FROM solicitud WHERE red = ?",
       [red],
     );
+    const idDirecta =
+      Number(directa.lastInsertRowid ?? ultima[0]?.id ?? 0) || null;
+    await adjuntarImagenes(e, idDirecta, imagenesIds);
     return {
-      id: Number(directa.lastInsertRowid ?? ultima[0]?.id ?? 0) || null,
+      id: idDirecta,
       descartada: false,
       email,
       tipo,
@@ -505,8 +539,11 @@ export async function crearSolicitud(
     "SELECT MAX(id) AS id FROM solicitud WHERE red = ?",
     [red],
   );
+  const idNueva =
+    Number(insertada.lastInsertRowid ?? ultimo[0]?.id ?? 0) || null;
+  await adjuntarImagenes(e, idNueva, imagenesIds);
   return {
-    id: Number(insertada.lastInsertRowid ?? ultimo[0]?.id ?? 0) || null,
+    id: idNueva,
     descartada: false,
     email,
     tipo,
@@ -847,6 +884,9 @@ export async function resolverSolicitud(
       "ya_resuelta",
       "esta solicitud ya fue resuelta",
     );
+  // Rechazada: lo subido se borra en el acto. Aprobada: quien aprueba las copia a la ficha y las borra
+  // después (si no pudo, caducan solas: `LIMITES.vidaResueltaMs`).
+  if (estado !== "aprobada") await borrarImagenesDeSolicitud(e, id);
   return leerSolicitud(e, id);
 }
 

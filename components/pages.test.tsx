@@ -318,7 +318,6 @@ describe("CatalogPage", () => {
     await waitFor(() => expect(mockedApi.list).toHaveBeenCalled());
     const boton = screen.getByRole("button", { name: /Premium/ });
     expect(boton).toHaveAttribute("aria-pressed", "false");
-    expect(screen.queryByTestId("premium-intro")).not.toBeInTheDocument();
 
     await user.click(boton);
     await waitFor(() =>
@@ -327,18 +326,19 @@ describe("CatalogPage", () => {
     expect(
       screen.getByRole("button", { name: /Premium/, pressed: true }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("premium-intro")).toBeInTheDocument();
+    // Sin chip ni nota: el propio botón es el interruptor.
+    expect(screen.queryByText("★ Premium ✕")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("premium-intro")).not.toBeInTheDocument();
 
-    // Quitar el chip del filtro lo apaga. La página sin filtro ya estaba en la caché de páginas,
-    // así que no hace falta pedirla otra vez: se comprueba el estado de la interfaz.
-    await user.click(screen.getByText("★ Premium ✕"));
+    // Pulsarlo otra vez lo apaga. La página sin filtro ya estaba en la caché de páginas, así que no
+    // hace falta pedirla otra vez: se comprueba el estado de la interfaz.
+    await user.click(screen.getByRole("button", { name: /Premium/ }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /Premium/ })).toHaveAttribute(
         "aria-pressed",
         "false",
       ),
     );
-    expect(screen.queryByTestId("premium-intro")).not.toBeInTheDocument();
   });
 
   it("parte de la sección premium si la URL trae ?premium=1", async () => {

@@ -103,7 +103,7 @@ const igual = (a, b) =>
  * @param {{ datos: Record<string, any> }} solicitud una solicitud de tipo `modificacion`
  * @param {{ ficha?: any }} [opciones] `ficha`: la ficha ya elegida por el mantenedor (cuando lo escrito en el formulario
  *   no se resuelve solo); sin ella se busca la que pidió la solicitud.
- * @returns {{ id: number, slug: string, patch: Record<string, any>, imagenes: { imageUrl?: string, logoUrl?: string } }}
+ * @returns {{ id: number, slug: string, patch: Record<string, any>, imagenes: { imageId?: string, logoId?: string } }}
  */
 export function prepararModificacion(db, solicitud, { ficha = null } = {}) {
   const d = solicitud.datos;
@@ -154,7 +154,8 @@ export function prepararModificacion(db, solicitud, { ficha = null } = {}) {
   }
 
   const imagenes = {};
-  if (d.imageUrl) imagenes.imageUrl = d.imageUrl;
-  if (d.logoUrl) imagenes.logoUrl = d.logoUrl;
+  // Ids de las imágenes ya subidas; se copian a la ficha al aprobar (`imagenes-solicitud.mjs`).
+  if (d.imageId) imagenes.imageId = d.imageId;
+  if (d.logoId) imagenes.logoId = d.logoId;
   return { id: actual.id, slug: actual.slug, patch, imagenes };
 }

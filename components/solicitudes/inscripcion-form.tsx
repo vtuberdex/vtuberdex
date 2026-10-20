@@ -27,6 +27,7 @@ import { BCP47 } from "@/lib/i18n/locales";
 import { ApiError, api, type BorradorDeInscripcion } from "@/lib/api";
 import { TERMINOS_VERSION } from "@/lib/terminos";
 import { useOpcionesFicha } from "@/components/solicitudes/use-opciones-ficha";
+import { SubidaImagen } from "@/components/solicitudes/subida-imagen";
 import { CAMPOS_PERFIL } from "@/components/solicitudes/campos-ficha";
 import {
   AceptaTerminos,
@@ -78,8 +79,9 @@ export function InscripcionForm() {
   const [zodiac, setZodiac] = useState("");
   const [cardText, setCardText] = useState("");
   const [themeColor, setThemeColor] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
+  /** Ids de las imágenes ya subidas (`SubidaImagen`): lo que viaja con el formulario y con el borrador. */
+  const [imageId, setImageId] = useState("");
+  const [logoId, setLogoId] = useState("");
   const [socials, setSocials] = useState<Red[]>([{ platform: "", url: "" }]);
   const [acepta, setAcepta] = useState(false);
   const [website, setWebsite] = useState("");
@@ -97,7 +99,7 @@ export function InscripcionForm() {
 
   const faltas: Falta[] =
     intento === paso
-      ? faltasDelPaso(paso, { name, email, codigo, languages, socials, imageUrl, logoUrl, cardText, perfil, acepta })
+      ? faltasDelPaso(paso, { name, email, codigo, languages, socials, imageId, logoId, cardText, perfil, acepta })
       : [];
   /** `aria-invalid` de un campo: lo pinta de rojo (ver `claseInput`) y avisa a lectores de pantalla. */
   const malo = (campo: string) => (faltas.some((f) => f.campo === campo) ? true : undefined);
@@ -131,8 +133,8 @@ export function InscripcionForm() {
     phrase,
     cardText,
     themeColor,
-    imageUrl,
-    logoUrl,
+    imageId,
+    logoId,
     zodiac,
     ...perfil,
     socials,
@@ -175,8 +177,8 @@ export function InscripcionForm() {
     setPhrase(texto(d.phrase));
     setCardText(texto(d.cardText));
     setThemeColor(texto(d.themeColor));
-    setImageUrl(texto(d.imageUrl));
-    setLogoUrl(texto(d.logoUrl));
+    setImageId(texto(d.imageId));
+    setLogoId(texto(d.logoId));
     setZodiac(texto(d.zodiac));
     setPerfil(
       Object.fromEntries(
@@ -195,7 +197,7 @@ export function InscripcionForm() {
     setError(null);
     // La validación es nuestra (el formulario va `noValidate`): la burbuja nativa señala un solo campo y no
     // cubre idiomas, redes ni términos. Se muestra la lista completa del paso y el foco va al primer faltante.
-    const pendientes = faltasDelPaso(paso, { name, email, codigo, languages, socials, imageUrl, logoUrl, cardText, perfil, acepta });
+    const pendientes = faltasDelPaso(paso, { name, email, codigo, languages, socials, imageId, logoId, cardText, perfil, acepta });
     if (pendientes.length) {
       setIntento(paso);
       requestAnimationFrame(() => irAlCampo(pendientes[0].campo));
@@ -247,8 +249,8 @@ export function InscripcionForm() {
           phrase,
           cardText,
           themeColor,
-          imageUrl,
-          logoUrl,
+          imageId,
+          logoId,
           zodiac,
           ...perfil,
           socials: redesEscritas(socials),
@@ -415,36 +417,29 @@ export function InscripcionForm() {
             </legend>
             <p className="text-xs text-dex-muted">{t("ins.imagenesAyuda")}</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Campo
+              <SubidaImagen
+                formulario="inscripcion"
+                credencial={sesion}
+                tipo="character"
+                campo="imageId"
                 etiqueta={t("ficha.avatar")}
-                obligatorio
                 ayuda={t("ins.avatarAyuda")}
-              >
-                <input
-                  type="url"
-                  className={claseInput}
-                  required
-                  data-campo="imageUrl"
-                  aria-invalid={malo("imageUrl")}
-                  maxLength={500}
-                  placeholder="https://"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                />
-              </Campo>
-              <Campo etiqueta={t("ficha.logo")} obligatorio>
-                <input
-                  type="url"
-                  className={claseInput}
-                  required
-                  data-campo="logoUrl"
-                  aria-invalid={malo("logoUrl")}
-                  maxLength={500}
-                  placeholder="https://"
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                />
-              </Campo>
+                obligatorio
+                id={imageId}
+                onId={setImageId}
+                invalido={hayFalta("imageId")}
+              />
+              <SubidaImagen
+                formulario="inscripcion"
+                credencial={sesion}
+                tipo="logo"
+                campo="logoId"
+                etiqueta={t("ficha.logo")}
+                obligatorio
+                id={logoId}
+                onId={setLogoId}
+                invalido={hayFalta("logoId")}
+              />
             </div>
           </fieldset>
 

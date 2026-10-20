@@ -639,6 +639,26 @@ test("una solicitud de modificación aprobada se aplica a la ficha existente", a
   const cola = new DatabaseSync(
     path.join(path.dirname(dbPath), "solicitudes.db"),
   );
+  // El avatar se sube como en el formulario público: un WebP del lienzo de la carta, de verdad (sharp).
+  const sharp = (await import("sharp")).default;
+  const { guardarImagen } = await import("../src/imagenes-solicitud.mjs");
+  const avatar = await sharp({
+    create: {
+      width: 720,
+      height: 1008,
+      channels: 4,
+      background: { r: 80, g: 160, b: 255, alpha: 0.8 },
+    },
+  })
+    .webp()
+    .toBuffer();
+  const subida = await guardarImagen(ejecutorSqlite(cola), {
+    correo: "drawchii@example.com",
+    tipo: "character",
+    formulario: "modificacion",
+    bytes: avatar,
+    ip: "9.9.9.9",
+  });
   const { id } = await crearSolicitud(
     ejecutorSqlite(cola),
     {
@@ -646,7 +666,7 @@ test("una solicitud de modificación aprobada se aplica a la ficha existente", a
       email: "drawchii@example.com",
       height: "1,70 m",
       favoriteAnime: "Frieren",
-      imageUrl: "https://x.test/avatar.png",
+      imageId: subida.id,
       aceptaTerminos: true,
       terminosVersion: TERMINOS_VERSION,
     },
@@ -677,7 +697,21 @@ test("una solicitud de modificación aprobada se aplica a la ficha existente", a
     },
   );
   assert.equal(resuelta.status, 200);
-  assert.equal((await resuelta.json()).solicitud.vtuberSlug, "drawchii");
+  const cuerpoResuelta = await resuelta.json();
+  assert.equal(cuerpoResuelta.solicitud.vtuberSlug, "drawchii");
+  // La imagen subida pasó a ser el personaje de la ficha y se borró de la cola.
+  assert.deepEqual(cuerpoResuelta.imagenes, {
+    aplicadas: ["character"],
+    fallidas: [],
+  });
+  const colaDespues = new DatabaseSync(
+    path.join(path.dirname(dbPath), "solicitudes.db"),
+  );
+  assert.equal(
+    colaDespues.prepare("SELECT COUNT(*) n FROM imagen_solicitud").get().n,
+    0,
+  );
+  colaDespues.close();
 
   const ficha = await get("/api/vtubers/drawchii");
   assert.equal(ficha.body.height, "1,70 m");

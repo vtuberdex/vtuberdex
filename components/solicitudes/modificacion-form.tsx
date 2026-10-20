@@ -25,6 +25,7 @@ import type { Clave } from "@/lib/i18n/mensajes";
 
 import { ApiError, api } from "@/lib/api";
 import { TERMINOS_VERSION } from "@/lib/terminos";
+import { SubidaImagen } from "@/components/solicitudes/subida-imagen";
 import { useOpcionesFicha } from "@/components/solicitudes/use-opciones-ficha";
 import {
   AceptaTerminos,
@@ -71,8 +72,9 @@ export function ModificacionForm() {
   // El selector de color siempre tiene un valor: sin la casilla no se podría decir «no lo cambies».
   const [cambiaColor, setCambiaColor] = useState(false);
   const [themeColor, setThemeColor] = useState("#5eead4");
-  const [imageUrl, setImageUrl] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
+  // Ids de las imágenes ya subidas (`SubidaImagen`); en blanco = no se cambia.
+  const [imageId, setImageId] = useState("");
+  const [logoId, setLogoId] = useState("");
   const [socials, setSocials] = useState([{ platform: "", url: "" }]);
   const [nota, setNota] = useState("");
   const [acepta, setAcepta] = useState(false);
@@ -92,8 +94,8 @@ export function ModificacionForm() {
       cardText,
       country,
       zodiac,
-      imageUrl,
-      logoUrl,
+      imageId,
+      logoId,
       ...Object.values(perfil),
     ].some((v) => v.trim()) ||
     cambiaColor ||
@@ -149,8 +151,8 @@ export function ModificacionForm() {
           phrase,
           cardText,
           themeColor: cambiaColor ? themeColor : "",
-          imageUrl,
-          logoUrl,
+          imageId,
+          logoId,
           ...perfil,
           socials: redes,
           nota,
@@ -330,26 +332,24 @@ export function ModificacionForm() {
             </legend>
             <p className="text-xs text-dex-muted">{t("mod.imagenesAyuda")}</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Campo etiqueta={t("mod.avatarNuevo")}>
-                <input
-                  type="url"
-                  className={claseInput}
-                  maxLength={500}
-                  placeholder="https://"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                />
-              </Campo>
-              <Campo etiqueta={t("mod.logoNuevo")}>
-                <input
-                  type="url"
-                  className={claseInput}
-                  maxLength={500}
-                  placeholder="https://"
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                />
-              </Campo>
+              <SubidaImagen
+                formulario="modificacion"
+                credencial={permiso}
+                tipo="character"
+                campo="imageId"
+                etiqueta={t("mod.avatarNuevo")}
+                id={imageId}
+                onId={setImageId}
+              />
+              <SubidaImagen
+                formulario="modificacion"
+                credencial={permiso}
+                tipo="logo"
+                campo="logoId"
+                etiqueta={t("mod.logoNuevo")}
+                id={logoId}
+                onId={setLogoId}
+              />
             </div>
             <EditorRedes
               titulo={t("mod.redesTitulo")}

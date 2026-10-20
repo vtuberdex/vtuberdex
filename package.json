@@ -1,6 +1,7 @@
 {
   "name": "vtuberdex",
   "private": true,
+  "license": "UNLICENSED",
   "version": "0.1.0",
   "description": "VTuberDex: catálogo de VTubers hispanohablantes con carta holográfica 3D",
   "engines": {

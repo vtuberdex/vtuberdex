@@ -18,6 +18,17 @@ export const es = {
   "pie.actualizar": "Actualizar mi ficha",
   "pie.baja": "Darme de baja",
   "pie.terminos": "Términos y Condiciones",
+  "pie.derechos":
+    "© VTuberDex · Prohibido el scraping y entrenar IA con este contenido ·",
+  "pie.derechosVer": "Cláusula 18",
+  "menu.abrir": "Abrir menú",
+  "menu.cerrar": "Cerrar menú",
+  "menu.titulo": "Menú",
+  "menu.inicio": "Catálogo",
+  "menu.grupo.explorar": "Explorar",
+  "menu.grupo.fichas": "Mi ficha",
+  "menu.grupo.juego": "Juego y comunidad",
+  "menu.grupo.legal": "Legal",
 
   "abriendo.detalle": "Accediendo al detalle",
 
@@ -55,9 +66,6 @@ export const es = {
   "filtros.verResultados_other": "Ver {n} resultados",
 
   "catalogo.premium": "Premium",
-  "catalogo.premiumIntroTitulo": "Cartas premium.",
-  "catalogo.premiumIntroTexto":
-    "VTubers que apoyan el proyecto: su carta se guarda gradeada en una placa de acrílico y sube de grado (8 → 10 → Black Label) mientras siguen apoyando.",
   "catalogo.error": "No se pudo cargar el catálogo: {error}",
   "catalogo.sinResultados": "Sin resultados",
   "catalogo.sinResultadosAyuda":

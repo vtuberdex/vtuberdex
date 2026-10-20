@@ -13,6 +13,17 @@ export const en: Mensajes = {
   "pie.actualizar": "Update my card",
   "pie.baja": "Remove me",
   "pie.terminos": "Terms and Conditions",
+  "pie.derechos":
+    "© VTuberDex · Scraping and AI training on this content are prohibited ·",
+  "pie.derechosVer": "Clause 18",
+  "menu.abrir": "Open menu",
+  "menu.cerrar": "Close menu",
+  "menu.titulo": "Menu",
+  "menu.inicio": "Catalog",
+  "menu.grupo.explorar": "Explore",
+  "menu.grupo.fichas": "My card",
+  "menu.grupo.juego": "Game and community",
+  "menu.grupo.legal": "Legal",
 
   "abriendo.detalle": "Opening details",
 
@@ -50,9 +61,6 @@ export const en: Mensajes = {
   "filtros.verResultados_other": "Show {n} results",
 
   "catalogo.premium": "Premium",
-  "catalogo.premiumIntroTitulo": "Premium cards.",
-  "catalogo.premiumIntroTexto":
-    "VTubers who support the project: their card is kept graded in an acrylic case and goes up in grade (8 → 10 → Black Label) as long as they keep supporting it.",
   "catalogo.error": "The catalog could not be loaded: {error}",
   "catalogo.sinResultados": "No results",
   "catalogo.sinResultadosAyuda":

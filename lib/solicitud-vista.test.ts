@@ -3,6 +3,7 @@
  * Vista previa de una solicitud: lo que pasaría al aprobar, SIN escribir nada. Se prueba contra la base de ejemplo
  * (la misma que usan las demás pruebas de solicitudes) y, sobre todo, que la simulación NO deja rastro.
  */
+import { SUBIR, conImagenes } from "./test-imagenes";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -102,7 +103,11 @@ const base = { aceptaTerminos: true, terminosVersion: TERMINOS_VERSION };
 const mod = async (extra: Record<string, unknown>) => {
   const { id } = await crearSolicitud(
     ejecutor,
-    { ficha: "/v/gkuro", email: `m${(n += 1)}@example.com`, ...base, ...extra },
+    await conImagenes(
+      ejecutor,
+      { ficha: "/v/gkuro", email: `m${(n += 1)}@example.com`, ...base, ...extra },
+      "modificacion",
+    ),
     { tipo: "modificacion", ip: "1.1.1.1" },
   );
   await confirmarSolicitud(ejecutor, Number(id));
@@ -111,7 +116,7 @@ const mod = async (extra: Record<string, unknown>) => {
 const inscripcion = async (extra: Record<string, unknown> = {}) => {
   const { id } = await crearSolicitud(
     ejecutor,
-    {
+    await conImagenes(ejecutor, {
       name: "Nueva Estrella",
       country: "chile",
       languages: ["es"],
@@ -131,13 +136,13 @@ const inscripcion = async (extra: Record<string, unknown> = {}) => {
       hashtag: "#nueva",
       zodiac: "Aries",
       themeColor: "#336699",
-      imageUrl: "https://x.com/a.png",
-      logoUrl: "https://x.com/b.png",
+      imageId: SUBIR,
+      logoId: SUBIR,
       socials: [{ platform: "twitch", url: "https://twitch.tv/nueva" }],
       email: `i${(n += 1)}@example.com`,
       ...base,
       ...extra,
-    },
+    }),
     { tipo: "inscripcion", ip: "2.2.2.2" },
   );
   await confirmarSolicitud(ejecutor, Number(id));
@@ -236,13 +241,11 @@ describe("modificación: qué cambia", () => {
     expect(v.avisos.join(" ")).toMatch(/No cambia nada/);
   });
 
-  test("avisa de que el avatar y el logo no se aplican solos", async () => {
-    const v = vistaPrevia(
-      db,
-      await mod({ phrase: "x", imageUrl: "https://x.com/a.png" }),
-    );
-    expect(v.avisos.join(" ")).toMatch(/Imágenes/);
-    expect(v.imagenes).toEqual({ imageUrl: "https://x.com/a.png" });
+  test("avisa de que el avatar nuevo REEMPLAZA al actual al aprobar", async () => {
+    const solicitud = await mod({ phrase: "x", imageId: SUBIR });
+    const v = vistaPrevia(db, solicitud);
+    expect(v.avisos.join(" ")).toMatch(/REEMPLAZAN/);
+    expect(v.imagenes).toEqual({ imageId: solicitud.datos.imageId });
   });
 
   test("NO escribe nada: la ficha queda exactamente igual", async () => {

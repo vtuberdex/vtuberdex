@@ -16,6 +16,7 @@
  * sin un trabajo aparte). El correo en un borrador es un dato personal más: ver la cláusula 4 de los
  * términos.
  */
+import { esIdDeImagen } from "./imagenes-solicitud.mjs";
 import { PERFIL_CAMPOS, SolicitudError } from "./solicitudes.mjs";
 import { preparadorDeTablas } from "./db/tablas.mjs";
 
@@ -42,8 +43,6 @@ const TEXTOS = {
   phrase: 600,
   cardText: 4000,
   themeColor: 20,
-  imageUrl: 500,
-  logoUrl: 500,
   zodiac: 40,
   ...Object.fromEntries(PERFIL_CAMPOS.map(([clave, max]) => [clave, max])),
 };
@@ -67,6 +66,12 @@ export function sanearBorrador(entrada) {
   const limpio = {};
   for (const [clave, max] of Object.entries(TEXTOS))
     limpio[clave] = comoTexto(datos[clave], max);
+  // Solo el ID de la imagen subida (nunca bytes): la imagen sin enviar caduca a las 24 h, así que un borrador
+  // viejo puede apuntar a una que ya no existe. El formulario lo comprueba al restaurar y pide subirla de nuevo.
+  for (const clave of ["imageId", "logoId"])
+    limpio[clave] = esIdDeImagen(datos[clave])
+      ? datos[clave].toLowerCase()
+      : "";
   limpio.languages = Array.isArray(datos.languages)
     ? datos.languages
         .filter((c) => typeof c === "string")

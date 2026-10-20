@@ -73,3 +73,81 @@ export async function aPngCuadrado(
   }
   return png;
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * Imágenes de los formularios públicos (inscripción y modificación).
+ *
+ * El servidor de producción no tiene `sharp` y solo ACEPTA un WebP del tamaño exacto (ver
+ * `server/src/imagenes-solicitud.mjs`), así que es aquí donde el archivo de la persona se decodifica y
+ * se reexporta: lo que sube NO es su archivo, sino una imagen nueva y sin metadatos (sin EXIF ni
+ * ubicación). Las medidas y el límite de peso son los mismos del servidor.
+ * ---------------------------------------------------------------------------------------------- */
+
+export type TipoImagenSolicitud = "character" | "logo";
+
+/** Lo mismo que `LIMITES` del servidor. */
+export const IMAGEN_SOLICITUD = {
+  /** Peso máximo del archivo que elige la persona. */
+  entradaMaxBytes: 15 * 1024 * 1024,
+  /** Peso máximo del WebP resultante (nginx corta en 1 MB). */
+  salidaMaxBytes: 900 * 1024,
+  character: { ancho: 720, alto: 1008, minLado: 300 },
+  logo: { maxLado: 900, minLado: 64 },
+} as const;
+
+/** Código del error: la interfaz lo traduce a un texto (`img.error.*`). */
+export class ErrorDeImagen extends Error {
+  constructor(readonly codigo: "tipo" | "peso" | "chica" | "grande" | "navegador") {
+    super(codigo);
+    this.name = "ErrorDeImagen";
+  }
+}
+
+/**
+ * Convierte lo elegido a un WebP del tamaño del tipo. El personaje se encuadra como lo hace el mantenedor
+ * (`cover` anclado arriba, 720x1008); el logo conserva su proporción, topado a 900 px por lado y con
+ * transparencia. Baja la calidad por pasos hasta que cabe en el peso máximo.
+ */
+export async function normalizarImagenDeSolicitud(
+  file: File,
+  tipo: TipoImagenSolicitud,
+): Promise<Blob> {
+  if (file.size > IMAGEN_SOLICITUD.entradaMaxBytes) throw new ErrorDeImagen("peso");
+  if (!file.type.startsWith("image/")) throw new ErrorDeImagen("tipo");
+  const bitmap = await cargarBitmap(file);
+  if (!bitmap) throw new ErrorDeImagen("tipo");
+  const minimo = tipo === "character" ? IMAGEN_SOLICITUD.character.minLado : IMAGEN_SOLICITUD.logo.minLado;
+  if (Math.min(bitmap.width, bitmap.height) < minimo) {
+    bitmap.close?.();
+    throw new ErrorDeImagen("chica");
+  }
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close?.();
+    throw new ErrorDeImagen("navegador");
+  }
+  if (tipo === "character") {
+    const { ancho, alto } = IMAGEN_SOLICITUD.character;
+    canvas.width = ancho;
+    canvas.height = alto;
+    const escala = Math.max(ancho / bitmap.width, alto / bitmap.height);
+    const dw = bitmap.width * escala;
+    const dh = bitmap.height * escala;
+    ctx.drawImage(bitmap, (ancho - dw) / 2, 0, dw, dh);
+  } else {
+    const escala = Math.min(1, IMAGEN_SOLICITUD.logo.maxLado / Math.max(bitmap.width, bitmap.height));
+    canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+    canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  }
+  bitmap.close?.();
+
+  for (const calidad of [0.92, 0.85, 0.75, 0.65, 0.5]) {
+    const webp = await canvasABlob(canvas, "image/webp", calidad);
+    if (!webp || webp.type !== "image/webp") throw new ErrorDeImagen("navegador");
+    if (webp.size <= IMAGEN_SOLICITUD.salidaMaxBytes) return webp;
+  }
+  throw new ErrorDeImagen("grande");
+}
