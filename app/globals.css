@@ -111,12 +111,21 @@ h6 {
    pie es el aviso de derechos (1 línea de 1 rem + 1,25 rem de relleno = 2,25 rem): MISMA altura, y la cabecera
    no cambia (el botón del menú cabe en su fila). En celular (< md) los valores son otros (ver abajo). */
 :root {
+  --estandarte-alto: 7.2rem;
   --binder-chrome: 17.6rem;
   --binder-min-width: 22rem;
 }
+/* Debajo de `xl` el catálogo lleva encima el estandarte de VRTon (components/vrton-banners.tsx):
+   su alto (+ el hueco) se suma aquí para que el libro siga cabiendo en la pantalla. Medido abajo. */
+@media (max-width: 1279px) {
+  :root {
+    --binder-chrome: calc(17.6rem + var(--estandarte-alto));
+  }
+}
 @media (max-width: 767px) {
   :root {
-    --binder-chrome: 26.4rem; /* medido: 26 rem con el pie de enlaces en varias líneas; el pie actual (aviso de 2 líneas + relleno, ~3,3 rem) es MENOR, así que sobra margen */
+    --estandarte-alto: 4.6rem;
+    --binder-chrome: calc(26.4rem + var(--estandarte-alto)); /* medido: 26 rem con el pie de enlaces en varias líneas; el pie actual (aviso de 2 líneas + relleno, ~3,3 rem) es MENOR, así que sobra margen */
     --binder-min-width: 17rem;
   }
 }
@@ -314,5 +323,147 @@ h6 {
   }
   50% {
     transform: rotate(0.9deg);
+  }
+}
+
+/* ---------- Estandarte horizontal de VRTon (tablet y celular) ---------- */
+.pendon-h {
+  --pendon-rojo: #d92f45;
+  --pendon-rojo-oscuro: #a81d33;
+  --pendon-tinta: #101820;
+  display: block;
+  position: relative;
+  padding-inline: 0.35rem;
+  color: var(--pendon-tinta);
+  text-decoration: none;
+  filter: drop-shadow(0 8px 10px rgb(0 0 0 / 0.5));
+}
+.pendon-h .pendon-barra {
+  inset: 0 0 auto;
+}
+.pendon-h-tela {
+  position: relative;
+  margin-top: 0.45rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem 2.4rem 0.7rem 1rem;
+  /* Muesca de cola de golondrina en el extremo derecho. */
+  clip-path: polygon(0 0, 100% 0, calc(100% - 1.5rem) 50%, 100% 100%, 0 100%);
+  background:
+    repeating-linear-gradient(0deg, rgb(16 24 32 / 0.035) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgb(16 24 32 / 0.035) 0 1px, transparent 1px 3px),
+    linear-gradient(rgb(255 255 255 / 0.18), rgb(255 255 255 / 0.04)),
+    var(--pendon-fondo) center / cover no-repeat,
+    #fbfaf8;
+}
+.pendon-h-tela::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1.1rem;
+  background: linear-gradient(var(--pendon-rojo), var(--pendon-rojo-oscuro));
+  border-bottom: 2px dashed rgb(255 255 255 / 0.55);
+}
+.pendon-h-logo {
+  flex: none;
+  width: 7.5rem;
+  height: auto;
+  filter: drop-shadow(0 3px 4px rgb(16 24 32 / 0.4));
+}
+.pendon-h-texto {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.pendon-h-evento {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pendon-rojo-oscuro);
+}
+.pendon-h-fecha {
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.pendon-h-fecha b {
+  font-size: 1.5rem;
+  font-weight: 900;
+  margin-right: 0.25rem;
+}
+.pendon-h-horas {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--pendon-rojo-oscuro);
+}
+.pendon-h-causa {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 10rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+.pendon-h-causa img {
+  width: 2.2rem;
+  height: auto;
+}
+.pendon-h-cta {
+  flex: none;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--pendon-rojo);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+.pendon-h:hover .pendon-h-cta,
+.pendon-h:focus-visible .pendon-h-cta {
+  background: var(--pendon-tinta);
+}
+.pendon-h:focus-visible {
+  outline: 3px solid #5eead4;
+  outline-offset: 4px;
+}
+/* Celular: compacto. Logo, fecha y botón; sin Teletón, evento ni horas. */
+@media (max-width: 767px) {
+  .pendon-h-tela {
+    gap: 0.6rem;
+    padding: 1.3rem 1.7rem 0.4rem 0.6rem;
+    clip-path: polygon(0 0, 100% 0, calc(100% - 1rem) 50%, 100% 100%, 0 100%);
+  }
+  .pendon-h-tela::before {
+    height: 0.9rem;
+  }
+  .pendon-h-logo {
+    width: 4.4rem;
+  }
+  .pendon-h-evento,
+  .pendon-h-horas,
+  .pendon-h-causa {
+    display: none;
+  }
+  .pendon-h-fecha {
+    font-size: 0.75rem;
+  }
+  .pendon-h-fecha b {
+    display: block;
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+  .pendon-h-cta {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.7rem;
+  }
+}
+/* Tablet angosta (768-1023): sin el bloque de Teletón para que el texto no se apriete. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .pendon-h-causa {
+    display: none;
   }
 }

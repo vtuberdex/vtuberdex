@@ -26,4 +26,18 @@ describe("VrtonBanners", () => {
       );
     }
   });
+
+  it("lleva un estandarte horizontal para tablet y celular que también enlaza a vrton.org", () => {
+    render(
+      <VrtonBanners>
+        <main>galería</main>
+      </VrtonBanners>,
+    );
+    const estandarte = screen.getByTestId("estandarte-vrton");
+    expect(estandarte.querySelector("a")?.getAttribute("href")).toBe(
+      "https://vrton.org/",
+    );
+    // Solo se ve debajo de `xl`: arriba lo sustituyen los pendones laterales.
+    expect(estandarte.className).toContain("xl:hidden");
+  });
 });
