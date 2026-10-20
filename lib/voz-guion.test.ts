@@ -5,6 +5,7 @@ import {
   idiomaProbable,
   limpiarTexto,
   MAX_HISTORIA,
+  quitarPreambuloDeIA,
   recortarHistoria,
 } from "./voz-guion.mjs";
 
@@ -108,5 +109,27 @@ describe("limpiarTexto / idiomaProbable / recortarHistoria", () => {
     const r = recortarHistoria("palabra ".repeat(200).trim(), 50);
     expect(r.length).toBeLessThanOrEqual(51);
     expect(r.endsWith("palabra.")).toBe(true);
+  });
+});
+
+describe("quitarPreambuloDeIA", () => {
+  it("quita la cortesía del chatbot pegada al inicio de la historia", () => {
+    const f = {
+      ...FICHA,
+      cardText:
+        "¡Hola, Paima! Aquí tienes la versión corregida y pulida de tu presentación, manteniendo toda la esencia de tu historia: ¡Soy Paima! Un ingeniero autodidacta.",
+    };
+    expect(guionDeFicha(f).texto).toBe(
+      "madKoding. Chile. ¡Soy Paima! Un ingeniero autodidacta.",
+    );
+  });
+
+  it("no toca historias reales que usan frases parecidas", () => {
+    for (const t of [
+      "Pensé que debería grabarlas, así que aquí estamos: a jugar.",
+      "Aquí tienes a un gamer tranquilo. Por supuesto: me gusta dormir.",
+      "Claro, soy un zorro: nada más.",
+    ])
+      expect(quitarPreambuloDeIA(t)).toBe(t);
   });
 });
