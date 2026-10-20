@@ -20,3 +20,9 @@ VTuberDex, all rights reserved. Each VTuber's data, names, images and works belo
 respective holders and are shown for display in the catalog; being public does **not** license
 extraction or reuse. Scraping, copying and AI training are prohibited without written permission
 (clause 18 of the Terms). Text and data mining rights are reserved (see the TDM file above).
+
+## Assets de VRTon
+
+`components/vrton/` (logo de VRTon y cruz de Teletón, recortados de `VRTon/ASSETS2025`) pertenecen a VRTon y se
+usan bajo su licencia (no comercial, con enlace visible a https://vrton.org/, que llevan los pendones de
+`components/vrton-banners.tsx`). No se cubren con la licencia de este repositorio.

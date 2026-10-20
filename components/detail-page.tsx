@@ -8,6 +8,7 @@
  * Router) en vez de por `useParams` de react-router: así el componente no
  * depende del enrutador y los tests pueden montarlo con cualquier slug.
  */
+import { VrtonBanners } from "@/components/vrton-banners";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -158,142 +159,148 @@ export function DetailPage({ slug }: { slug: string }) {
   const primary = data.countries[0] ?? null;
 
   return (
-    <article className="mx-auto max-w-[1400px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
-      {Tuner ? <Tuner /> : null}
+    <article className="mx-auto max-w-[1600px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
+      <VrtonBanners>
+        <div className="mx-auto w-full min-w-0 max-w-[1400px]">
+          {Tuner ? <Tuner /> : null}
 
-      <nav className="mb-5 flex items-center gap-3 text-xs text-dex-muted">
-        <Link
-          href={volverA}
-          className="hover:text-dex-ink"
-          data-testid="volver-catalogo"
-        >
-          {t("detalle.catalogo")}
-        </Link>
-        <span aria-hidden>/</span>
-        <span className="font-mono">
-          #{String(data.dexNumber).padStart(3, "0")}
-        </span>
-      </nav>
+          <nav className="mb-5 flex items-center gap-3 text-xs text-dex-muted">
+            <Link
+              href={volverA}
+              className="hover:text-dex-ink"
+              data-testid="volver-catalogo"
+            >
+              {t("detalle.catalogo")}
+            </Link>
+            <span aria-hidden>/</span>
+            <span className="font-mono">
+              #{String(data.dexNumber).padStart(3, "0")}
+            </span>
+          </nav>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(300px,440px)_1fr]">
-        {/* Carta 3D */}
-        <div className="lg:sticky lg:top-6 lg:self-start">
-          <div
-            className="relative overflow-hidden rounded-3xl border border-dex-line p-3"
-            /**
-             * Fondo del contenedor: derivado del color PRIMARIO del VTuber, en
-             * oscuro pero no negro.
-             *
-             * Se probó en claro y perdía la identidad del personaje: el fondo es
-             * parte de la ficha. El degradado va del primario oscurecido (`deep`) a
-             * un tono un poco más claro y con más presencia del color en la esquina,
-             * de modo que se lee el matiz del VTuber sin competir con la carta.
-             */
-            style={{
-              background: `linear-gradient(160deg, ${palette.deep} 0%, ${mixHex(palette.accent, "#05060a", 0.92)} 42%, ${mixHex(palette.accent, "#080a10", 0.95)} 100%)`,
-            }}
-          >
-            {/* La voz vive sobre el borde de la carta: es de la carta, no un dato más de la ficha. */}
-            <div className="absolute right-3 top-3 z-10">
-              <VoiceButton slug={data.slug} flotante />
-            </div>
-            <HoloCard
-              card={data}
-              holo={INTENSITY.holo.detail}
-              gloss={INTENSITY.gloss.detail}
-              className="aspect-[5/7] w-full"
-            />
-          </div>
+          <div className="grid gap-8 lg:grid-cols-[minmax(300px,440px)_1fr]">
+            {/* Carta 3D */}
+            <div className="lg:sticky lg:top-6 lg:self-start">
+              <div
+                className="relative overflow-hidden rounded-3xl border border-dex-line p-3"
+                /**
+                 * Fondo del contenedor: derivado del color PRIMARIO del VTuber, en
+                 * oscuro pero no negro.
+                 *
+                 * Se probó en claro y perdía la identidad del personaje: el fondo es
+                 * parte de la ficha. El degradado va del primario oscurecido (`deep`) a
+                 * un tono un poco más claro y con más presencia del color en la esquina,
+                 * de modo que se lee el matiz del VTuber sin competir con la carta.
+                 */
+                style={{
+                  background: `linear-gradient(160deg, ${palette.deep} 0%, ${mixHex(palette.accent, "#05060a", 0.92)} 42%, ${mixHex(palette.accent, "#080a10", 0.95)} 100%)`,
+                }}
+              >
+                {/* La voz vive sobre el borde de la carta: es de la carta, no un dato más de la ficha. */}
+                <div className="absolute right-3 top-3 z-10">
+                  <VoiceButton slug={data.slug} flotante />
+                </div>
+                <HoloCard
+                  card={data}
+                  holo={INTENSITY.holo.detail}
+                  gloss={INTENSITY.gloss.detail}
+                  className="aspect-[5/7] w-full"
+                />
+              </div>
 
-          <DonatePayPal
-            premium={data.premium}
-            card={{ dexNumber: data.dexNumber, name: data.name }}
-          />
+              <DonatePayPal
+                premium={data.premium}
+                card={{ dexNumber: data.dexNumber, name: data.name }}
+              />
 
-          {/*
+              {/*
             Aquí estaba el bloque del RADAR de atributos (una imagen raster del
             sitio). Se eliminó junto con su carpeta: `StatBars` dibuja los MISMOS
             datos desde la base, unas líneas más abajo, así que era información
             duplicada — y en formato que no se puede tematizar ni escalar.
           */}
-        </div>
-
-        {/* Datos */}
-        <div className="min-w-0 space-y-6">
-          <header
-            className="rounded-2xl border border-dex-line p-5"
-            style={{
-              background: gradientCss(
-                rgba(palette.accent, 0.12),
-                rgba(palette.secondary, 0.08),
-              ),
-            }}
-          >
-            <div className="flex flex-wrap items-start gap-4">
-              <span className="rounded-lg bg-black/50 px-3 py-1.5 font-mono text-sm font-bold text-white">
-                #{String(data.dexNumber).padStart(3, "0")}
-              </span>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-3xl font-extrabold leading-tight text-dex-ink sm:text-4xl">
-                  {data.name}
-                </h1>
-                <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-dex-muted">
-                  {primary && (
-                    <span className="inline-flex items-center gap-1">
-                      <span aria-hidden>{primary.flag?.trim() || "🏳️"}</span>
-                      {data.countries
-                        .map((country) => nombreDePais(locale, country))
-                        .join(" · ")}
-                    </span>
-                  )}
-                  {!primary && <span>{t("detalle.sinPais")}</span>}
-                  <span aria-hidden>•</span>
-                  <span>
-                    {data.hasDetail
-                      ? t("detalle.fichaCompleta")
-                      : t("detalle.fichaBasica")}
-                  </span>
-                </p>
-                {data.graduado && (
-                  <p
-                    className="mt-3 inline-flex rounded border border-dex-muted/40 bg-black/30 px-2 py-1 text-xs"
-                    data-testid="graduado"
-                  >
-                    <strong>🎓 {t("detalle.graduado")}</strong>
-                  </p>
-                )}
-                {data.sinCorreo && (
-                  <p
-                    className="mt-3 inline-flex flex-wrap items-center gap-x-2 rounded border border-dex-muted/40 bg-black/30 px-2 py-1 text-xs"
-                    data-testid="sin-correo"
-                  >
-                    <strong>{t("detalle.sinCorreoTitulo")}</strong>
-                    <span className="text-dex-muted">
-                      (
-                      {t("detalle.sinCorreoAyuda", {
-                        correo: "madkoding@gmail.com",
-                      })}
-                      )
-                    </span>
-                  </p>
-                )}
-                {data.premium && (
-                  <p
-                    className="mt-3 flex flex-wrap items-center gap-2 text-xs text-dex-muted"
-                    data-testid="premium-info"
-                  >
-                    <PremiumBadge premium={data.premium} />
-                    <span className="font-mono">{data.premium.cert}</span>
-                    <span aria-hidden>•</span>
-                    <span>
-                      {t("detalle.premiumDesde", { fecha: data.premium.since })}
-                    </span>
-                  </p>
-                )}
-              </div>
             </div>
 
-            {/*
+            {/* Datos */}
+            <div className="min-w-0 space-y-6">
+              <header
+                className="rounded-2xl border border-dex-line p-5"
+                style={{
+                  background: gradientCss(
+                    rgba(palette.accent, 0.12),
+                    rgba(palette.secondary, 0.08),
+                  ),
+                }}
+              >
+                <div className="flex flex-wrap items-start gap-4">
+                  <span className="rounded-lg bg-black/50 px-3 py-1.5 font-mono text-sm font-bold text-white">
+                    #{String(data.dexNumber).padStart(3, "0")}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-3xl font-extrabold leading-tight text-dex-ink sm:text-4xl">
+                      {data.name}
+                    </h1>
+                    <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-dex-muted">
+                      {primary && (
+                        <span className="inline-flex items-center gap-1">
+                          <span aria-hidden>
+                            {primary.flag?.trim() || "🏳️"}
+                          </span>
+                          {data.countries
+                            .map((country) => nombreDePais(locale, country))
+                            .join(" · ")}
+                        </span>
+                      )}
+                      {!primary && <span>{t("detalle.sinPais")}</span>}
+                      <span aria-hidden>•</span>
+                      <span>
+                        {data.hasDetail
+                          ? t("detalle.fichaCompleta")
+                          : t("detalle.fichaBasica")}
+                      </span>
+                    </p>
+                    {data.graduado && (
+                      <p
+                        className="mt-3 inline-flex rounded border border-dex-muted/40 bg-black/30 px-2 py-1 text-xs"
+                        data-testid="graduado"
+                      >
+                        <strong>🎓 {t("detalle.graduado")}</strong>
+                      </p>
+                    )}
+                    {data.sinCorreo && (
+                      <p
+                        className="mt-3 inline-flex flex-wrap items-center gap-x-2 rounded border border-dex-muted/40 bg-black/30 px-2 py-1 text-xs"
+                        data-testid="sin-correo"
+                      >
+                        <strong>{t("detalle.sinCorreoTitulo")}</strong>
+                        <span className="text-dex-muted">
+                          (
+                          {t("detalle.sinCorreoAyuda", {
+                            correo: "madkoding@gmail.com",
+                          })}
+                          )
+                        </span>
+                      </p>
+                    )}
+                    {data.premium && (
+                      <p
+                        className="mt-3 flex flex-wrap items-center gap-2 text-xs text-dex-muted"
+                        data-testid="premium-info"
+                      >
+                        <PremiumBadge premium={data.premium} />
+                        <span className="font-mono">{data.premium.cert}</span>
+                        <span aria-hidden>•</span>
+                        <span>
+                          {t("detalle.premiumDesde", {
+                            fecha: data.premium.since,
+                          })}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/*
               Aquí iba el LOGO del header de la ficha, como `<img>` suelto en su propia
               fila centrada. Se retiró: la marca ya se dibuja DENTRO de la carta 3D
               (capa 2 + sticker, con su paralaje, su metal y sus efectos), así que la
@@ -302,135 +309,141 @@ export function DetailPage({ slug }: { slug: string }) {
               acabado de la pieza; este era un duplicado plano sin tratamiento.
             */}
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <LikeButton
-                slug={data.slug}
-                likes={data.likes ?? 0}
-                onChange={aplicarLikes}
-              />
-            </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <LikeButton
+                    slug={data.slug}
+                    likes={data.likes ?? 0}
+                    onChange={aplicarLikes}
+                  />
+                </div>
 
-            {data.phrase && (
-              <div className="mt-4 max-w-3xl">
-                <TextoTraducible
-                  texto={data.phrase}
-                  className="text-sm leading-relaxed text-dex-ink/90"
-                  acento={palette.accent}
-                />
-              </div>
-            )}
+                {data.phrase && (
+                  <div className="mt-4 max-w-3xl">
+                    <TextoTraducible
+                      texto={data.phrase}
+                      className="text-sm leading-relaxed text-dex-ink/90"
+                      acento={palette.accent}
+                    />
+                  </div>
+                )}
 
-            {/* Texto personalizado impreso en la carta (OCR). Suele ser una
+                {/* Texto personalizado impreso en la carta (OCR). Suele ser una
                 historia larga que NO está en el HTML: es el único sitio donde
                 existe para las 574 fichas sin página de detalle. */}
-            {data.cardText && (
-              <section className="mt-5 rounded-2xl border border-dex-line/70 bg-black/25 p-4">
-                <header className="mb-2 flex flex-wrap items-center gap-2">
-                  <h2
-                    className="text-xs font-bold uppercase tracking-[0.16em]"
-                    style={{ color: palette.accent }}
-                  >
-                    {t("detalle.historia")}
-                  </h2>
-                  {data.cardTextConfidence !== null && (
-                    <span
-                      className="rounded-full border border-dex-line px-2 py-0.5 font-mono text-[10px] text-dex-muted"
-                      title={t("detalle.ocrAyuda")}
+                {data.cardText && (
+                  <section className="mt-5 rounded-2xl border border-dex-line/70 bg-black/25 p-4">
+                    <header className="mb-2 flex flex-wrap items-center gap-2">
+                      <h2
+                        className="text-xs font-bold uppercase tracking-[0.16em]"
+                        style={{ color: palette.accent }}
+                      >
+                        {t("detalle.historia")}
+                      </h2>
+                      {data.cardTextConfidence !== null && (
+                        <span
+                          className="rounded-full border border-dex-line px-2 py-0.5 font-mono text-[10px] text-dex-muted"
+                          title={t("detalle.ocrAyuda")}
+                        >
+                          OCR {data.cardTextConfidence}%
+                        </span>
+                      )}
+                    </header>
+                    <TextoTraducible
+                      texto={data.cardText}
+                      className="whitespace-pre-line text-sm leading-relaxed text-dex-ink/85"
+                      acento={palette.accent}
+                    />
+                  </section>
+                )}
+
+                {/* Tipos: facciones + grupos + artistas */}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {data.factions.map((faction) => (
+                    <Link
+                      key={faction}
+                      // El slug real de la facción (`heaven-s-arbiter`): derivarlo de la etiqueta daba
+                      // `heaven's-arbiter` y el filtro no encontraba nada.
+                      href={`/?factions=${encodeURIComponent(
+                        data.factionIcons?.find(
+                          (icon) => icon.label === faction,
+                        )?.slug ?? faction.toLowerCase().replace(/\s+/g, "-"),
+                      )}`}
+                      className="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide text-black/85"
+                      style={{
+                        background: gradientCss(
+                          palette.accent,
+                          palette.secondary,
+                        ),
+                      }}
                     >
-                      OCR {data.cardTextConfidence}%
+                      {faction}
+                    </Link>
+                  ))}
+                  {data.groups.map((group) => (
+                    <Link
+                      key={group}
+                      href={`/?groups=${encodeURIComponent(group.toLowerCase().replace(/\s+/g, "-"))}`}
+                      className="rounded-full border border-dex-line px-3 py-1 text-xs font-semibold text-dex-muted hover:text-dex-ink"
+                    >
+                      {group}
+                    </Link>
+                  ))}
+                  {data.artists.map((artist) => (
+                    <span
+                      key={artist}
+                      className="rounded-full border border-dex-line px-3 py-1 text-xs text-dex-muted"
+                    >
+                      {artist}
                     </span>
-                  )}
-                </header>
-                <TextoTraducible
-                  texto={data.cardText}
-                  className="whitespace-pre-line text-sm leading-relaxed text-dex-ink/85"
-                  acento={palette.accent}
+                  ))}
+                </div>
+              </header>
+
+              <div className="grid gap-6 xl:grid-cols-2">
+                <ProfileGrid profile={data.profile} palette={palette} />
+                <StatBars
+                  stats={data.stats}
+                  palette={palette}
+                  level={data.level}
+                  experience={data.experience}
                 />
-              </section>
-            )}
+              </div>
 
-            {/* Tipos: facciones + grupos + artistas */}
-            <div className="mt-4 flex flex-wrap gap-2">
-              {data.factions.map((faction) => (
-                <Link
-                  key={faction}
-                  // El slug real de la facción (`heaven-s-arbiter`): derivarlo de la etiqueta daba
-                  // `heaven's-arbiter` y el filtro no encontraba nada.
-                  href={`/?factions=${encodeURIComponent(
-                    data.factionIcons?.find((icon) => icon.label === faction)
-                      ?.slug ?? faction.toLowerCase().replace(/\s+/g, "-"),
-                  )}`}
-                  className="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide text-black/85"
-                  style={{
-                    background: gradientCss(palette.accent, palette.secondary),
-                  }}
-                >
-                  {faction}
-                </Link>
-              ))}
-              {data.groups.map((group) => (
-                <Link
-                  key={group}
-                  href={`/?groups=${encodeURIComponent(group.toLowerCase().replace(/\s+/g, "-"))}`}
-                  className="rounded-full border border-dex-line px-3 py-1 text-xs font-semibold text-dex-muted hover:text-dex-ink"
-                >
-                  {group}
-                </Link>
-              ))}
-              {data.artists.map((artist) => (
-                <span
-                  key={artist}
-                  className="rounded-full border border-dex-line px-3 py-1 text-xs text-dex-muted"
-                >
-                  {artist}
-                </span>
-              ))}
+              <SkillList skills={data.skills} palette={palette} />
+
+              {data.socials.length > 0 && (
+                <SocialLinks socials={data.socials} palette={palette} />
+              )}
+
+              {/* Navegación entre vecinos de la dex. */}
+              <nav className="flex items-center justify-between gap-3 border-t border-dex-line pt-5 text-sm">
+                {data.neighbors.prev ? (
+                  <Link
+                    href={`/v/${data.neighbors.prev.slug}`}
+                    className="text-dex-muted hover:text-dex-ink"
+                  >
+                    ← #{String(data.neighbors.prev.dexNumber).padStart(3, "0")}{" "}
+                    {data.neighbors.prev.name}
+                  </Link>
+                ) : (
+                  <span />
+                )}
+                {data.neighbors.next ? (
+                  <Link
+                    href={`/v/${data.neighbors.next.slug}`}
+                    className="text-right text-dex-muted hover:text-dex-ink"
+                  >
+                    #{String(data.neighbors.next.dexNumber).padStart(3, "0")}{" "}
+                    {data.neighbors.next.name} →
+                  </Link>
+                ) : (
+                  <span />
+                )}
+              </nav>
             </div>
-          </header>
-
-          <div className="grid gap-6 xl:grid-cols-2">
-            <ProfileGrid profile={data.profile} palette={palette} />
-            <StatBars
-              stats={data.stats}
-              palette={palette}
-              level={data.level}
-              experience={data.experience}
-            />
           </div>
-
-          <SkillList skills={data.skills} palette={palette} />
-
-          {data.socials.length > 0 && (
-            <SocialLinks socials={data.socials} palette={palette} />
-          )}
-
-          {/* Navegación entre vecinos de la dex. */}
-          <nav className="flex items-center justify-between gap-3 border-t border-dex-line pt-5 text-sm">
-            {data.neighbors.prev ? (
-              <Link
-                href={`/v/${data.neighbors.prev.slug}`}
-                className="text-dex-muted hover:text-dex-ink"
-              >
-                ← #{String(data.neighbors.prev.dexNumber).padStart(3, "0")}{" "}
-                {data.neighbors.prev.name}
-              </Link>
-            ) : (
-              <span />
-            )}
-            {data.neighbors.next ? (
-              <Link
-                href={`/v/${data.neighbors.next.slug}`}
-                className="text-right text-dex-muted hover:text-dex-ink"
-              >
-                #{String(data.neighbors.next.dexNumber).padStart(3, "0")}{" "}
-                {data.neighbors.next.name} →
-              </Link>
-            ) : (
-              <span />
-            )}
-          </nav>
         </div>
-      </div>
+      </VrtonBanners>
     </article>
   );
 }

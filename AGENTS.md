@@ -42,7 +42,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 #   export PATH=/home/madkoding/.nvm/versions/node/v22.23.3/bin:$PATH
 
 # Tests (desde la raíz)
-npm test                   # 926 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 996 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 154 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
 

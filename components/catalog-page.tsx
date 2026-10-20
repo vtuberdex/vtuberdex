@@ -20,6 +20,7 @@ import { FilterPanel } from "@/components/filter-panel";
 import { Pagination } from "@/components/pagination";
 import { SearchBar } from "@/components/search-bar";
 import { SortSelect } from "@/components/sort-select";
+import { VrtonBanners } from "@/components/vrton-banners";
 import { useSingleSheet } from "@/components/use-single-sheet";
 import { useVtuberSearch } from "@/components/use-vtuber-search";
 
@@ -62,7 +63,7 @@ export function CatalogPage() {
       {/* Los filtros no ocupan una columna fija: viven en un panel que se abre a demanda
           (hoja inferior en celular, cajón lateral en escritorio) para que las cartas tengan
           todo el ancho. */}
-      <div className="grid gap-6">
+      <VrtonBanners>
         <main className="min-w-0">
           <div className="mb-4 space-y-3">
             {/* Buscador a la izquierda; filtros, orden y Premium agrupados a la derecha. */}
@@ -207,7 +208,7 @@ export function CatalogPage() {
             />
           )}
         </main>
-      </div>
+      </VrtonBanners>
 
       {/* Panel de filtros: hoja inferior en celular, cajón lateral en escritorio. */}
       {sheetOpen && (

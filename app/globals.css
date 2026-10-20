@@ -121,3 +121,188 @@ h6 {
     --binder-min-width: 17rem;
   }
 }
+
+/* ---------- Pendones de VRTon 2026 (components/vrton-banners.tsx) ----------
+   Un pendón real: barra de la que cuelga (con remates), tela con trama y costura, y el borde
+   inferior en cola de golondrina. La tela se mece desde la barra, que queda quieta. Paleta de
+   vrton.org (rojo #d92f45, tinta #101820, crema #fbfaf8). Alto = el de la pantalla menos la
+   cabecera, con tope: el libro mide parecido y los dos pendones lo flanquean a la par. */
+.pendon {
+  --pendon-rojo: #d92f45;
+  --pendon-rojo-oscuro: #a81d33;
+  --pendon-tinta: #101820;
+  --pendon-crema: #fbfaf8;
+  display: block;
+  position: relative;
+  width: 100%;
+  height: min(44rem, calc(100svh - 7rem));
+  min-height: 30rem;
+  color: var(--pendon-tinta);
+  text-decoration: none;
+  filter: drop-shadow(0 10px 14px rgb(0 0 0 / 0.55));
+}
+.pendon-barra {
+  position: absolute;
+  inset: 0 -0.35rem auto;
+  height: 0.7rem;
+  z-index: 2;
+  border-radius: 999px;
+  background: linear-gradient(#e9c27a, #8a5a22 60%, #5c3a14);
+}
+.pendon-barra i {
+  position: absolute;
+  top: -0.15rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff1c9, #c28a2f 55%, #5c3a14);
+}
+.pendon-barra i:first-child {
+  left: -0.45rem;
+}
+.pendon-barra i:last-child {
+  right: -0.45rem;
+}
+.pendon-tela {
+  position: absolute;
+  inset: 0.45rem 0 0;
+  transform-origin: 50% 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 2.6rem), 0 100%);
+  background:
+    /* trama del tejido */
+    repeating-linear-gradient(0deg, rgb(16 24 32 / 0.035) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgb(16 24 32 / 0.035) 0 1px, transparent 1px 3px),
+    /* sombra de los pliegues */
+    linear-gradient(90deg, rgb(0 0 0 / 0.12), transparent 18%, transparent 82%, rgb(0 0 0 / 0.14)),
+    var(--pendon-crema);
+}
+/* Dobladillo rojo arriba (por donde pasa la barra) y cola de golondrina roja abajo. */
+.pendon-tela::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1.6rem;
+  background: linear-gradient(var(--pendon-rojo), var(--pendon-rojo-oscuro));
+  border-bottom: 2px dashed rgb(255 255 255 / 0.55);
+}
+.pendon-tela::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 8.2rem;
+  background: linear-gradient(rgb(217 47 69 / 0), var(--pendon-rojo) 34%, var(--pendon-rojo-oscuro));
+  z-index: 0;
+}
+.pendon-contenido {
+  position: absolute;
+  inset: 2.1rem 0.7rem 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  text-align: center;
+}
+.pendon-evento {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pendon-rojo-oscuro);
+  line-height: 1.15;
+}
+.pendon-logo {
+  width: 100%;
+  height: auto;
+}
+.pendon-anio {
+  font-size: 2.6rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.pendon-fechas {
+  font-size: 0.85rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-wrap: balance;
+  padding: 0.3rem 0.45rem;
+  border-radius: 0.4rem;
+  background: var(--pendon-tinta);
+  color: #fff;
+}
+.pendon-horas {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--pendon-rojo-oscuro);
+}
+.pendon-causa {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.62rem;
+  line-height: 1.2;
+  color: var(--pendon-tinta);
+  margin-bottom: 0.2rem;
+}
+.pendon-causa img {
+  width: 2.4rem;
+  height: auto;
+  margin-bottom: 0.2rem;
+}
+.pendon-causa b {
+  font-size: 0.75rem;
+}
+/* Sobre la cola roja: texto claro. */
+.pendon-cta {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--pendon-rojo-oscuro);
+}
+.pendon-url {
+  margin-bottom: 3.1rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fff;
+}
+.pendon:hover .pendon-cta,
+.pendon:focus-visible .pendon-cta {
+  background: var(--pendon-tinta);
+  color: #fff;
+}
+.pendon:focus-visible {
+  outline: 3px solid #5eead4;
+  outline-offset: 4px;
+}
+/* En pantallas bajas el bloque de Teletón sobra: gana el espacio del logo y la fecha. */
+@media (max-height: 760px) {
+  .pendon-causa {
+    display: none;
+  }
+  .pendon-cta {
+    margin-top: auto;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pendon-tela {
+    animation: pendon-mecer 7s ease-in-out infinite;
+  }
+  .pendon-derecho .pendon-tela {
+    animation-delay: -3.5s;
+  }
+}
+@keyframes pendon-mecer {
+  0%,
+  100% {
+    transform: rotate(-0.9deg);
+  }
+  50% {
+    transform: rotate(0.9deg);
+  }
+}

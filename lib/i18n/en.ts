@@ -16,6 +16,13 @@ export const en: Mensajes = {
   "pie.derechos":
     "© VTuberDex · Scraping and AI training on this content are prohibited ·",
   "pie.derechosVer": "Clause 18",
+  "vrton.aria": "Invitation to VRTon 2026",
+  "vrton.evento": "Charity event in virtual reality",
+  "vrton.fechas": "November 6 & 7",
+  "vrton.horas": "24+ hours of love",
+  "vrton.apoyo": "Supporting",
+  "vrton.teleton": "Teletón Chile",
+  "vrton.cta": "I want to join",
   "menu.abrir": "Open menu",
   "menu.cerrar": "Close menu",
   "menu.titulo": "Menu",

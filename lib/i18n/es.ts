@@ -21,6 +21,13 @@ export const es = {
   "pie.derechos":
     "© VTuberDex · Prohibido el scraping y entrenar IA con este contenido ·",
   "pie.derechosVer": "Cláusula 18",
+  "vrton.aria": "Invitación a VRTon 2026",
+  "vrton.evento": "Evento solidario en realidad virtual",
+  "vrton.fechas": "6 y 7 de noviembre",
+  "vrton.horas": "24+ horas de amor",
+  "vrton.apoyo": "En apoyo a",
+  "vrton.teleton": "Teletón Chile",
+  "vrton.cta": "Quiero asistir",
   "menu.abrir": "Abrir menú",
   "menu.cerrar": "Cerrar menú",
   "menu.titulo": "Menú",
