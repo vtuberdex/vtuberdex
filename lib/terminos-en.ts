@@ -65,6 +65,7 @@ export const CLAUSULAS_EN: Clausula[] = [
       "4.9. Despite the reasonable measures adopted, no system is infallible. The Maintainer does not guarantee the absolute inviolability of its systems and is not liable for unauthorized access resulting from third-party attacks that could not be avoided with reasonable diligence, undertaking to report relevant breaches where appropriate.",
       "4.10. While the registration is being filled in, what is written is automatically saved as a draft tied to the confirmed email address, so that the Holder can close the page and resume later with that same email. The draft is seen only by the Maintainer when reviewing the already-submitted Request, is deleted when the registration is submitted and, if not submitted, after sixty (60) days without changes.",
       "4.11. Public Data, unlike Personal Data, are meant for display. A Holder who includes personal data in a public field (for example, in the description or in a link) does so under their sole responsibility and authorizes its publication.",
+      "4.12. The images (avatar and logo) that the Holder uploads with the form are stored temporarily on the server, linked to their confirmed email by an irreversible fingerprint, and are NOT public: only the Maintainer, when reviewing the Request, and the person who uploaded them can see them. If the Request is rejected they are deleted immediately; if it is approved, they become the Card’s images and are treated as Public Data. The browser re-encodes the image before uploading it, so the original file’s metadata (such as location) is not sent.",
     ],
   },
   {
@@ -239,6 +240,7 @@ export const CLAUSULAS_EN: Clausula[] = [
       "19.1. The site uses an anonymous technical cookie to recognize the visitor who gives a like and limit it to one per day. It contains no personal data and is not used for advertising.",
       "19.2. The maintainer uses the browser’s local storage to keep their session. This storage is not used in the public forms.",
       "19.3. By browsing the site, the user accepts the use of these technologies, which they may block from their browser, with the resulting loss of functions.",
+      "19.4. To protect the Catalog from automated extraction, the site creates a technical session cookie (five minutes long, renewed while browsing and tied to the network and browser) that only proves a computational challenge was solved. It contains no personal data and is not used for advertising.",
     ],
   },
   {
@@ -249,6 +251,7 @@ export const CLAUSULAS_EN: Clausula[] = [
       "20.2. The record of acceptance of the Terms (version, date and time) is kept for as long as it may be needed to prove the relationship.",
       "20.3. The Catalog’s Public Data are kept for as long as the Project exists, even after removal, in the degraded form provided for in the exit clause.",
       "20.4. Backups are renewed according to the provider’s technical policy and may retain data for additional periods, until their natural rotation.",
+      "20.5. Images uploaded with the forms are not kept indefinitely: they are deleted after twenty-four (24) hours if the form is not submitted, after thirty (30) days if the Request is still pending, immediately if it is rejected, and seven (7) days after it is resolved if they could not be applied to the Card.",
     ],
   },
   {

@@ -232,7 +232,7 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   del plugin (`/vtd email`, `/vtd codigo`, puertos), actualiza ese texto.
 - **La inscripción es un formulario de 5 pasos** (`inscripcion-form.tsx`; el estado vive en el padre, así que «Volver» no pierde nada y la
   validación nativa `required` de cada paso corre antes de avanzar): 1) nombre artístico y correo, 2) código del correo, 3) tu ficha
-  (color, idiomas, frase, redes), 4) tu personaje (avatar y logo como ENLACE, modelo, hashtag, estatura, cumpleaños, país, signo, lore), 5) gustos + términos. Obligatorios todos salvo país y signo. Los textos cortos
+  (color, idiomas, frase, redes), 4) tu personaje (avatar y logo SUBIDOS, modelo, hashtag, estatura, cumpleaños, país, signo, lore), 5) gustos + términos. Obligatorios todos salvo país y signo. Los textos cortos
   salen de `CAMPOS_PERFIL` (cliente) y `perfilObligatorio` (`solicitudes.mjs`): al añadir uno, tócalos a la vez (y `sanearBorrador` los toma de
   `PERFIL_CAMPOS`, así que el borrador los sigue solo). `fichaDesdeInscripcion`
   mapea estatura/cumpleaños/hashtag/color a sus columnas, el modelador a `artists` y el resto a filas de `profile`.
@@ -243,7 +243,7 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   (`server/src/modificacion.mjs`, `prepararModificacion`: lo comparten Express y Next; local escribe con `aplicarParche`, producción
   con `vtuber.editar` del diario, leyendo la ficha del diario ya reproducido): las redes se SUMAN o actualizan por plataforma, los
   gustos actualizan su fila de `profile` sin tocar las demás, el modelador pasa al frente de `artists` sin quitar a nadie. El nombre
-  no se cambia por aquí. **Avatar y logo (enlaces) NO se aplican solos**: el mantenedor los sube por «Imágenes» y la cola lo avisa. Si la
+  no se cambia por aquí. **Avatar y logo (subidos) se aplican al aprobar** y REEMPLAZAN a los actuales (ver «Imágenes subidas desde los formularios»). Si la
   ficha no se resuelve (nombre ambiguo o inexistente) la solicitud sigue pendiente con `ficha_no_encontrada`.
 - **La cola del mantenedor** (`admin/solicitudes-manager.tsx`) es lista + detalle, no una tarjeta por solicitud con 30 campos en
   un muro de texto. La lista es una línea por solicitud (tipo, nombre, «hace 5 min»), la más antigua primero (la cola se atiende en
@@ -257,8 +257,29 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
 - **La ficha de una modificación se escribe a mano** (campo libre) y la gente copia `#486 NOMBRE` del catálogo: `fichaDeLaSolicitud`
   acepta ese formato (el número desempata, nunca manda sobre un nombre que coincide con otra ficha). Antes quedaba atascada con
   `ficha_no_encontrada`.
-- **Antispam**: campo trampa `website`, un solo pendiente por correo y tipo, tope de 5 envíos por red y día. El arte del
-  personaje se pide como ENLACE: un formulario público que recibe archivos es una puerta a subir basura.
+- **Antispam**: campo trampa `website`, un solo pendiente por correo y tipo, tope de 5 envíos por red y día.
+- **Imágenes subidas desde los formularios** (`server/src/imagenes-solicitud.mjs`, `components/solicitudes/subida-imagen.tsx`,
+  `POST/GET /api/{inscripciones,modificaciones}/imagen`). Antes el avatar y el logo eran ENLACES porque un formulario público que recibe
+  archivos es una puerta a subir basura; se cambió a subida con estas defensas, TODAS en el servidor:
+  · **Solo WebP y solo bytes que el servidor pueda verificar**: en producción no hay `sharp`, así que el navegador decodifica y reexporta la
+    imagen a un lienzo (`normalizarImagenDeSolicitud` en `lib/imagen-cliente.ts`: personaje 720x1008 `cover` anclado arriba, logo ≤ 900 px con
+    alfa) y el servidor recorre el contenedor RIFF (`validarWebp`): tamaño declarado = real (nada pegado al final), solo trozos
+    `VP8 `/`VP8L`/`VP8X`/`ALPH`/`ICCP`, una sola imagen, sin animación, EXIF ni XMP. Medidas EXACTAS (personaje) o 64-900 px (logo), ≤ 900 KB
+    (nginx corta en 1 MB). Validado también contra un WebP real de `sharp` (`server/test/api.test.mjs`).
+  · **Se exige la credencial del formulario** (`x-credencial`: la `sesion` o el `permiso`, MIRADA sin gastarla): sin correo verificado no se
+    sube. El correo sale de la credencial y en la tabla solo queda una huella (`huellaDeCorreo`). Una imagen por tipo y correo (subir otra
+    reemplaza), 12 subidas por correo y 30 por red al día. La vista previa solo la ve quien la subió (404 igual si es de otra persona).
+  · **El formulario lleva IDs** (`imageId`/`logoId`), no bytes; `crearSolicitud` comprueba que son de ese correo, del tipo y sin usar.
+    Inscripción: obligatorias; modificación: opcionales. El borrador guarda solo el id (`sanearBorrador`); si la imagen caducó, el
+    componente lo detecta y pide subirla de nuevo.
+  · **Nada se queda si no se aprueba** (`LIMITES`, `purgarCaducadas`, sin trabajo programado: se llama al subir y al listar la cola): 24 h
+    sin enviar, 30 días en una solicitud pendiente, 7 días en una ya resuelta, y se borran de inmediato al RECHAZAR.
+  · **Aprobar las aplica**: `aplicarImagenesDeSolicitud` las copia a la ficha (producción: `guardarAssetDelMantenedor`, origen
+    `mantenedor`; Express local: `saveUploadedImage` con `sharp` + `registrarAsset`) y borra las copiadas. Si una falla NO se rompe la
+    aprobación: `imagenes.fallidas` en la respuesta, el mantenedor la sube a mano desde «Imágenes». En una MODIFICACIÓN reemplazan a las
+    actuales (la vista previa lo avisa). El mantenedor las ve antes (`ImagenesSubidas`, `GET /api/admin/solicitudes/:id/imagenes[|imagen/:tipo]`).
+  · Las solicitudes antiguas con enlaces (`imageUrl`/`logoUrl`) siguen mostrándose en la cola; el esquema nuevo ya no los acepta.
+  · Términos 4.12, 19.4 y 20.5 (`TERMINOS_VERSION` 2026-10-20b).
 - `/api/admin/solicitudes*` sale 404 sin Turso ni proxy local, como el resto del mantenedor.
 - **Registro de rechazos** (`server/src/rechazos.mjs`, tabla `rechazo` en el MISMO ejecutor que `solicitud`): una validación que
   falla responde 400/409/410 y antes no dejaba rastro (solo los 503 se imprimían), así que nadie sabía dónde se atascaba la gente.

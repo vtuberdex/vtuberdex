@@ -46,6 +46,12 @@ import {
   listarSolicitudes,
   resolverSolicitud,
 } from "./solicitudes.mjs";
+import {
+  aplicarImagenesDeSolicitud,
+  imagenesDeSolicitud,
+  imagenesParaAplicar,
+  purgarCaducadas,
+} from "./imagenes-solicitud.mjs";
 import { listarConCorreo } from "./correo-fichas.mjs";
 import { estadisticasDelMantenedor } from "./estadisticas-admin.mjs";
 import { resumenDeRechazos } from "./rechazos.mjs";
@@ -58,6 +64,36 @@ import {
   saveFactionEmblem,
   removeUploadedImage,
 } from "./uploads.mjs";
+
+/**
+ * Deja la fila `asset` de un VTuber al día tras guardar su imagen en disco. La ruta es canónica
+ * (`data/images/<carpeta>/<slug>.webp`), así que se actualiza la fila existente o se crea. La usan la
+ * subida del mantenedor y la copia de las imágenes de una solicitud aprobada.
+ * @returns {boolean} si ya existía (la imagen se reemplazó)
+ */
+function registrarAsset(db, vtuberId, kind, saved) {
+  const existing = db
+    .prepare("SELECT id FROM asset WHERE vtuber_id = ? AND kind = ?")
+    .get(vtuberId, kind);
+  if (existing) {
+    db.prepare(
+      "UPDATE asset SET path = ?, width = ?, height = ?, bytes = ? WHERE id = ?",
+    ).run(saved.path, saved.width, saved.height, saved.bytes, existing.id);
+  } else {
+    db.prepare(
+      "INSERT INTO asset (vtuber_id, kind, path, source_url, width, height, bytes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    ).run(
+      vtuberId,
+      kind,
+      saved.path,
+      null,
+      saved.width,
+      saved.height,
+      saved.bytes,
+    );
+  }
+  return Boolean(existing);
+}
 
 const splitCsv = (value) =>
   String(value ?? "")
@@ -360,6 +396,8 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
       return;
     }
     try {
+      // Aprovecha la visita para limpiar las imágenes caducadas (no hay un trabajo programado).
+      await purgarCaducadas(solicitudes).catch(() => {});
       res.json(await listarSolicitudes(solicitudes, { estado, tipo }));
     } catch (error) {
       res
@@ -378,6 +416,51 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
         .json({ error: "solicitudes_no_disponibles", detail: error.message });
     }
   });
+
+  // Las imágenes que la persona subió con el formulario: la lista y los bytes de cada una, para verlas
+  // antes de aprobar. Solo el mantenedor.
+  router.get(
+    "/admin/solicitudes/:id/imagenes",
+    requireAdmin,
+    async (req, res) => {
+      try {
+        res.json({
+          imagenes: await imagenesDeSolicitud(solicitudes, req.params.id),
+        });
+      } catch (error) {
+        res
+          .status(503)
+          .json({ error: "solicitudes_no_disponibles", detail: error.message });
+      }
+    },
+  );
+
+  router.get(
+    "/admin/solicitudes/:id/imagen/:tipo",
+    requireAdmin,
+    async (req, res) => {
+      try {
+        const imagen = (
+          await imagenesParaAplicar(solicitudes, req.params.id)
+        ).find((i) => i.tipo === req.params.tipo);
+        if (!imagen) {
+          res.status(404).json({ error: "no_encontrado" });
+          return;
+        }
+        res
+          .set({
+            "content-type": "image/webp",
+            "cache-control": "private, no-store",
+            "x-content-type-options": "nosniff",
+          })
+          .send(imagen.bytes);
+      } catch (error) {
+        res
+          .status(503)
+          .json({ error: "solicitudes_no_disponibles", detail: error.message });
+      }
+    },
+  );
 
   router.post(
     "/admin/solicitudes/:id/resolver",
@@ -410,9 +493,11 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
           return;
         }
         let vtuberSlug = null;
+        let fichaId = null;
         if (accion === "aprobar" && solicitud.tipo === "modificacion") {
-          // Se aplica el parche a la ficha EXISTENTE; avatar y logo (enlaces) los sube el mantenedor aparte.
+          // Se aplica el parche a la ficha EXISTENTE; avatar y logo se copian de lo subido tras resolver.
           const { id, slug, patch } = prepararModificacion(db, solicitud);
+          fichaId = id;
           const datos = vtuberUpdateSchema.safeParse(patch);
           if (!datos.success) {
             res
@@ -466,6 +551,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
             return resultado;
           });
           vtuberSlug = creada.slug;
+          fichaId = creada.id;
         }
         const estado =
           accion === "aprobar"
@@ -473,14 +559,41 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
             : accion === "procesar"
               ? "procesada"
               : "rechazada";
-        res.json({
-          solicitud: await resolverSolicitud(solicitudes, req.params.id, {
-            estado,
-            actor: req.user.username,
-            nota,
-            vtuberSlug,
-          }),
+        const resuelta = await resolverSolicitud(solicitudes, req.params.id, {
+          estado,
+          actor: req.user.username,
+          nota,
+          vtuberSlug,
         });
+        // Aprobada: las imágenes subidas pasan a ser las de la ficha (con `sharp`, como la subida del
+        // mantenedor). Si alguna falla la aprobación sigue en pie y se informa cuál.
+        let imagenes = { aplicadas: [], fallidas: [] };
+        if (estado === "aprobada" && fichaId) {
+          const sharp = await import("sharp").then((m) => m.default);
+          imagenes = await aplicarImagenesDeSolicitud(
+            solicitudes,
+            req.params.id,
+            async ({ tipo, bytes }) => {
+              const saved = await saveUploadedImage({
+                buffer: bytes,
+                kind: tipo,
+                slug: vtuberSlug,
+                imageRoot,
+                sharp,
+              });
+              registrarAsset(db, fichaId, tipo, saved);
+              audit(
+                db,
+                req.user.username,
+                "vtuber",
+                fichaId,
+                `upload-${tipo}`,
+                { path: saved.path, desde: `solicitud ${req.params.id}` },
+              );
+            },
+          );
+        }
+        res.json({ solicitud: resuelta, imagenes });
       } catch (error) {
         if (error instanceof SolicitudError) {
           res
@@ -739,40 +852,13 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
           imageRoot,
           sharp: await import("sharp").then((m) => m.default),
         });
-        // La ruta es canónica (data/images/<carpeta>/<slug>.webp), así que se
-        // actualiza la fila existente o se crea si el VTuber no tenía ese asset.
-        const existing = db
-          .prepare("SELECT id FROM asset WHERE vtuber_id = ? AND kind = ?")
-          .get(id, kind);
-        if (existing) {
-          db.prepare(
-            "UPDATE asset SET path = ?, width = ?, height = ?, bytes = ? WHERE id = ?",
-          ).run(
-            saved.path,
-            saved.width,
-            saved.height,
-            saved.bytes,
-            existing.id,
-          );
-        } else {
-          db.prepare(
-            "INSERT INTO asset (vtuber_id, kind, path, source_url, width, height, bytes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          ).run(
-            id,
-            kind,
-            saved.path,
-            null,
-            saved.width,
-            saved.height,
-            saved.bytes,
-          );
-        }
+        const replaced = registrarAsset(db, id, kind, saved);
         audit(db, req.user.username, "vtuber", id, `upload-${kind}`, {
           path: saved.path,
           width: saved.width,
           height: saved.height,
           bytes: saved.bytes,
-          replaced: Boolean(existing),
+          replaced,
         });
         const updated = getVtuberBySlug(db, row.slug, { includeHidden: true });
         res.json({ ok: true, kind, asset: saved, vtuber: updated });

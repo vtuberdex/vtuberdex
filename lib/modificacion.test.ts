@@ -4,6 +4,7 @@
  * cambio) y el parche que sale al aprobar, aplicado de verdad con las reglas del mantenedor sobre una
  * base sembrada. Sin red: la cola es SQLite en memoria y el catálogo, una base temporal.
  */
+import { SUBIR, conImagenes } from "./test-imagenes";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -119,10 +120,14 @@ const pedido = (extra: Record<string, unknown> = {}) => ({
 });
 
 const enviar = async (entrada: object, ip = "1.1.1.1") => {
-  const { id } = await crearSolicitud(ejecutor, entrada, {
-    tipo: "modificacion",
-    ip,
-  });
+  const { id } = await crearSolicitud(
+    ejecutor,
+    await conImagenes(ejecutor, entrada as Record<string, unknown>, "modificacion"),
+    {
+      tipo: "modificacion",
+      ip,
+    },
+  );
   await confirmarSolicitud(ejecutor, Number(id));
   return (await leerSolicitud(ejecutor, Number(id)))!;
 };
@@ -155,10 +160,8 @@ describe("la solicitud de modificación", () => {
     ["sin ningún cambio", { phrase: "" }],
     ["sin ficha", { ficha: "  " }],
     ["con correo inválido", { email: "no-es-correo" }],
-    [
-      "con una imagen que no es URL http(s)",
-      { imageUrl: "javascript:alert(1)" },
-    ],
+    ["con un id de imagen que no es un id", { imageId: "javascript:alert(1)" }],
+    ["con una imagen que nunca se subió", { imageId: "11111111-1111-4111-8111-111111111111" }],
   ])("se rechaza %s", async (_nombre, extra) => {
     expect((await rechazo(enviar(pedido(extra)))).status).toBe(400);
   });
@@ -348,16 +351,14 @@ describe("prepararModificacion", () => {
     expect(igual.patch.artists).toBeUndefined();
   });
 
-  test("avatar y logo no entran al parche: van aparte, para subirlos a mano", async () => {
+  test("avatar y logo no entran al parche: van aparte, se copian a la ficha al aprobar", async () => {
     const { patch, imagenes } = await parche({
-      imageUrl: "https://x.test/a.png",
-      logoUrl: "https://x.test/l.png",
+      imageId: SUBIR,
+      logoId: SUBIR,
     });
     expect(patch).toEqual({});
-    expect(imagenes).toEqual({
-      imageUrl: "https://x.test/a.png",
-      logoUrl: "https://x.test/l.png",
-    });
+    expect(Object.keys(imagenes).sort()).toEqual(["imageId", "logoId"]);
+    expect(imagenes.imageId).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   test("el parche pasa el esquema de edición y, aplicado, deja la ficha como se pidió", async () => {

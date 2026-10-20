@@ -83,6 +83,7 @@ export const CLAUSULAS: Clausula[] = [
       "4.9. Sin perjuicio de las medidas razonables adoptadas, ningún sistema es infalible. El Mantenedor no garantiza la inviolabilidad absoluta de los sistemas y no responde por accesos no autorizados derivados de ataques de terceros que no pudieron evitarse con diligencia razonable, comprometiéndose a informar las brechas relevantes cuando corresponda.",
       "4.10. Mientras se rellena la inscripción, lo escrito se guarda automáticamente como borrador asociado al correo electrónico confirmado, para que el Titular pueda cerrar la página y retomarlo después con ese mismo correo. El borrador solo lo ve el Mantenedor al revisar la Solicitud ya enviada, se elimina al enviar la inscripción y, si no se envía, a los sesenta (60) días sin cambios.",
       "4.11. Los Datos Públicos, a diferencia de los Datos Personales, están destinados a la exhibición. El Titular que incluya datos personales en un campo público (por ejemplo, en la descripción o en un enlace) lo hace bajo su exclusiva responsabilidad y autoriza su publicación.",
+      "4.12. Las imágenes (avatar y logo) que el Titular sube con el formulario se guardan temporalmente en el servidor, asociadas a su correo confirmado mediante una huella irreversible, y NO son públicas: solo las ve el Mantenedor al revisar la Solicitud y quien las subió. Si la Solicitud se rechaza se eliminan de inmediato; si se aprueba, pasan a ser las imágenes de la Ficha y se tratan como Datos Públicos. El navegador reconvierte la imagen antes de subirla, de modo que no se envían los metadatos del archivo original (como la ubicación).",
     ],
   },
   {
@@ -257,6 +258,7 @@ export const CLAUSULAS: Clausula[] = [
       "19.1. El sitio utiliza una cookie técnica anónima para reconocer al visitante que da un like y limitar uno por día. No contiene datos personales ni se utiliza con fines publicitarios.",
       "19.2. El mantenedor utiliza almacenamiento local del navegador para mantener su sesión. Este almacenamiento no se utiliza en los formularios públicos.",
       "19.3. Al navegar por el sitio, la persona usuaria acepta el uso de estas tecnologías, que puede bloquear desde su navegador, con la consecuente pérdida de funciones.",
+      "19.4. Para proteger el Catálogo de la extracción automatizada, el sitio crea una cookie técnica de sesión (de cinco minutos, que se renueva mientras se navega y queda atada a la red y al navegador) que solo acredita que se superó una prueba de cómputo. No contiene datos personales ni se utiliza con fines publicitarios.",
     ],
   },
   {
@@ -267,6 +269,7 @@ export const CLAUSULAS: Clausula[] = [
       "20.2. La constancia de aceptación de los Términos (versión, fecha y hora) se conserva mientras pueda ser necesaria para acreditar la relación.",
       "20.3. Los Datos Públicos del Catálogo se conservan mientras el Proyecto exista, incluso después de la baja, en la forma degradada prevista en la cláusula de salida.",
       "20.4. Las copias de seguridad se renuevan según la política técnica del proveedor y pueden conservar datos por períodos adicionales, hasta su rotación natural.",
+      "20.5. Las imágenes subidas con los formularios no se conservan indefinidamente: se eliminan a las veinticuatro (24) horas si no se envía el formulario, a los treinta (30) días si la Solicitud sigue pendiente, de inmediato si se rechaza, y a los siete (7) días de resuelta si no pudieron aplicarse a la Ficha.",
     ],
   },
   {

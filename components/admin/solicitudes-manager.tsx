@@ -251,6 +251,141 @@ function ElegirFicha({
   );
 }
 
+/**
+ * Las imágenes que la persona SUBIÓ con el formulario (avatar y logo), para verlas antes de aprobar. Al
+ * aprobar pasan solas a la ficha; si la solicitud es antigua (enlaces) o las imágenes ya caducaron
+ * (`LIMITES.vidaPendienteMs`: 30 días sin aprobar) lo dice.
+ */
+function ImagenesSubidas({
+  token,
+  solicitud,
+}: {
+  token: string;
+  solicitud: SolicitudAdmin;
+}) {
+  const [imagenes, setImagenes] = useState<
+    Array<{
+      tipo: string;
+      ancho: number;
+      alto: number;
+      size: number;
+      url: string;
+    }>
+  >([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    let vigente = true;
+    const urls: string[] = [];
+    setCargando(true);
+    void (async () => {
+      try {
+        const { imagenes: lista } = await api.imagenesDeSolicitud(
+          token,
+          solicitud.id,
+        );
+        const listas = await Promise.all(
+          lista.map(async (i) => {
+            const blob = await api.imagenSubidaDeSolicitud(
+              token,
+              solicitud.id,
+              i.tipo,
+            );
+            if (!blob) return null;
+            const url = URL.createObjectURL(blob);
+            urls.push(url);
+            return { ...i, url };
+          }),
+        );
+        if (vigente)
+          setImagenes(
+            listas.filter((i): i is NonNullable<typeof i> => i !== null),
+          );
+      } catch {
+        if (vigente) setImagenes([]);
+      } finally {
+        if (vigente) setCargando(false);
+      }
+    })();
+    return () => {
+      vigente = false;
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [token, solicitud.id]);
+
+  const etiqueta = (tipo: string) => (tipo === "character" ? "Avatar" : "Logo");
+  const antiguas =
+    texto(solicitud.datos.imageUrl) || texto(solicitud.datos.logoUrl);
+
+  return (
+    <div data-testid="solicitud-imagenes">
+      {cargando ? (
+        <p className="text-xs text-dex-muted">Cargando imágenes…</p>
+      ) : imagenes.length > 0 ? (
+        <ul className="flex flex-wrap gap-4">
+          {imagenes.map((i) => (
+            <li key={i.tipo} className="space-y-1 text-xs text-dex-muted">
+              <div
+                className="flex items-center justify-center overflow-hidden rounded-md border border-dex-line"
+                style={{
+                  width: i.tipo === "character" ? 140 : 180,
+                  height: i.tipo === "character" ? 196 : 140,
+                  backgroundImage:
+                    "conic-gradient(#2a3140 25%, #1b212d 0 50%, #2a3140 0 75%, #1b212d 0)",
+                  backgroundSize: "12px 12px",
+                }}
+              >
+                <img
+                  src={i.url}
+                  alt={etiqueta(i.tipo)}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <p>
+                <span className="font-bold text-dex-ink">
+                  {etiqueta(i.tipo)}
+                </span>{" "}
+                · {i.ancho}×{i.alto} · {Math.round(i.size / 1024)} KB
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-dex-muted">
+          {antiguas
+            ? "Esta solicitud llegó con enlaces (formulario anterior): descarga y sube las imágenes desde «Imágenes»."
+            : "No hay imágenes guardadas: pudieron caducar (30 días sin aprobar) o ya se aplicaron."}
+        </p>
+      )}
+      {antiguas && (
+        <dl className="mt-3 grid gap-2">
+          <Dato
+            k="Avatar (enlace)"
+            v={texto(solicitud.datos.imageUrl)}
+            ancho
+            enlace
+          />
+          <Dato
+            k="Logo (enlace)"
+            v={texto(solicitud.datos.logoUrl)}
+            ancho
+            enlace
+          />
+        </dl>
+      )}
+      {!antiguas && imagenes.length > 0 && (
+        <p className="mt-2 text-xs text-dex-muted">
+          Al aprobar pasan solas a la ficha{" "}
+          {solicitud.tipo === "modificacion"
+            ? "y REEMPLAZAN a las actuales"
+            : "(la ficha nace en borrador)"}
+          . Si rechazas, se borran.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Seccion({
   titulo,
   children,
@@ -553,7 +688,7 @@ export function SolicitudesManager({
   const resolver = async (s: SolicitudAdmin, accion: Accion) => {
     setOcupada(s.id);
     try {
-      await api.resolverSolicitud(
+      const { imagenes } = await api.resolverSolicitud(
         token,
         s.id,
         accion,
@@ -562,16 +697,25 @@ export function SolicitudesManager({
           ? (fichaElegida ?? undefined)
           : undefined,
       );
-      notify?.(
-        "ok",
-        accion === "aprobar"
-          ? s.tipo === "modificacion"
-            ? "Cambios aplicados a la ficha"
-            : "Ficha creada en borrador"
-          : accion === "procesar"
-            ? "Baja marcada como procesada"
-            : "Solicitud rechazada",
-      );
+      const fallidas = imagenes?.fallidas ?? [];
+      if (fallidas.length)
+        notify?.(
+          "error",
+          `La solicitud se aprobó, pero no se pudo copiar: ${fallidas
+            .map((f) => (f.tipo === "character" ? "el avatar" : "el logo"))
+            .join(" y ")}. Súbelo desde «Imágenes» de la ficha.`,
+        );
+      else
+        notify?.(
+          "ok",
+          accion === "aprobar"
+            ? s.tipo === "modificacion"
+              ? "Cambios aplicados a la ficha"
+              : "Ficha creada en borrador"
+            : accion === "procesar"
+              ? "Baja marcada como procesada"
+              : "Solicitud rechazada",
+        );
       await cargar();
       if (accion === "aprobar") onChanged?.();
     } catch (causa) {
@@ -914,31 +1058,25 @@ export function SolicitudesManager({
                     <Seccion titulo="Redes y canales">
                       <Redes s={seleccionada} />
                     </Seccion>
-                    <Seccion titulo="Imágenes (enlaces)">
-                      <dl className="grid gap-2">
-                        <Dato
-                          k="Avatar"
-                          v={texto(seleccionada.datos.imageUrl)}
-                          ancho
-                          enlace
-                        />
-                        <Dato
-                          k="Logo"
-                          v={texto(seleccionada.datos.logoUrl)}
-                          ancho
-                          enlace
-                        />
-                      </dl>
-                      <p className="mt-2 text-xs text-dex-muted">
-                        Llegan como enlace: se descargan y suben desde
-                        «Imágenes» (no se aplican solos).
-                      </p>
+                    <Seccion titulo="Imágenes subidas">
+                      <ImagenesSubidas token={token} solicitud={seleccionada} />
                     </Seccion>
                   </>
                 )}
 
                 {seleccionada.tipo === "modificacion" && (
                   <>
+                    {(texto(seleccionada.datos.imageId) ||
+                      texto(seleccionada.datos.logoId) ||
+                      texto(seleccionada.datos.imageUrl) ||
+                      texto(seleccionada.datos.logoUrl)) && (
+                      <Seccion titulo="Imágenes subidas">
+                        <ImagenesSubidas
+                          token={token}
+                          solicitud={seleccionada}
+                        />
+                      </Seccion>
+                    )}
                     <Seccion
                       titulo={
                         vista?.cambios

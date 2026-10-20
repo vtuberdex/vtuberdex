@@ -6,6 +6,7 @@
  * UNA vez, que una baja solo se aplica sola con el correo del titular y que el enlace del mantenedor
  * no revela quién es admin.
  */
+import { SUBIR, conImagenes } from "./test-imagenes";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -192,13 +193,24 @@ const inscripcion = (extra: Record<string, unknown> = {}) => ({
   favoriteColor: "h",
   modeler: "Riko",
   hashtag: "#x",
-  imageUrl: "https://i.test/a.png",
-  logoUrl: "https://i.test/b.png",
+  imageId: SUBIR,
+  logoId: SUBIR,
   socials: [{ platform: "Twitch", url: "https://twitch.tv/luna" }],
   aceptaTerminos: true,
   terminosVersion: TERMINOS_VERSION,
   ...extra,
 });
+
+/** El formulario de inscripción con sus imágenes YA subidas por el correo de la sesión (luna@example.com). */
+const peticionIns = async (extra: Record<string, unknown> = {}) =>
+  peticion(
+    await conImagenes(
+      await sol.ejecutorDeSolicitudes(),
+      inscripcion(extra),
+      "inscripcion",
+      "luna@example.com",
+    ),
+  );
 
 const tokenDe = (texto: string, clave: "t" | "entrar") =>
   texto.match(new RegExp(`#${clave}=([\\w-]+)`))![1];
@@ -775,7 +787,7 @@ describe("inscripción: código, sesión y borrador", () => {
     const { sesion } = await entrar();
     await guardar(sesion, { name: "Luna", paso: 4 });
     const respuesta = await sol.recibirSolicitud(
-      peticion(inscripcion({ sesion, email: "suplantado@example.com" })),
+      await peticionIns({ sesion, email: "suplantado@example.com" }),
       "inscripcion",
     );
     expect(respuesta.status).toBe(201);
@@ -796,7 +808,7 @@ describe("inscripción: código, sesión y borrador", () => {
     expect(
       (
         await sol.recibirSolicitud(
-          peticion(inscripcion({ sesion })),
+          await peticionIns({ sesion }),
           "inscripcion",
         )
       ).status,
@@ -806,19 +818,19 @@ describe("inscripción: código, sesión y borrador", () => {
   test("un envío inválido NO gasta la sesión: se corrige y se vuelve a enviar", async () => {
     const { sesion } = await entrar();
     const mala = await sol.recibirSolicitud(
-      peticion(inscripcion({ sesion, cardText: "" })),
+      await peticionIns({ sesion, cardText: "" }),
       "inscripcion",
     );
     expect(mala.status).toBe(400);
     const sinTerminos = await sol.recibirSolicitud(
-      peticion(inscripcion({ sesion, aceptaTerminos: false })),
+      await peticionIns({ sesion, aceptaTerminos: false }),
       "inscripcion",
     );
     expect(sinTerminos.status).toBe(400);
     expect(
       (
         await sol.recibirSolicitud(
-          peticion(inscripcion({ sesion })),
+          await peticionIns({ sesion }),
           "inscripcion",
         )
       ).status,
@@ -827,13 +839,13 @@ describe("inscripción: código, sesión y borrador", () => {
 
   test("sin sesión, con una caducada o con otra credencial, no entra nada a la cola", async () => {
     expect(
-      (await sol.recibirSolicitud(peticion(inscripcion()), "inscripcion"))
+      (await sol.recibirSolicitud(await peticionIns(), "inscripcion"))
         .status,
     ).toBe(400);
     expect(
       (
         await sol.recibirSolicitud(
-          peticion(inscripcion({ sesion: "z".repeat(43) })),
+          await peticionIns({ sesion: "z".repeat(43) }),
           "inscripcion",
         )
       ).status,
@@ -846,7 +858,7 @@ describe("inscripción: código, sesión y borrador", () => {
     expect(
       (
         await sol.recibirSolicitud(
-          peticion(inscripcion({ sesion: permiso })),
+          await peticionIns({ sesion: permiso }),
           "inscripcion",
         )
       ).status,
@@ -857,13 +869,13 @@ describe("inscripción: código, sesión y borrador", () => {
   test("un solo pendiente por correo: la segunda inscripción con el mismo correo se rechaza", async () => {
     const { sesion } = await entrar();
     await sol.recibirSolicitud(
-      peticion(inscripcion({ sesion })),
+      await peticionIns({ sesion }),
       "inscripcion",
     );
     turso.exec("UPDATE token_correo SET creado = creado - 120000");
     const otra = await entrar();
     const repetida = await sol.recibirSolicitud(
-      peticion(inscripcion({ sesion: otra.sesion })),
+      await peticionIns({ sesion: otra.sesion }),
       "inscripcion",
     );
     expect(repetida.status).toBe(409);
