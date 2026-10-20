@@ -260,13 +260,16 @@ h6 {
   color: var(--pendon-rojo-oscuro);
 }
 .pendon-causa {
+  /* Subido sobre la cola: el texto es oscuro y el degradado rojo empieza ~8 rem sobre el borde
+     inferior, donde ya no se lee. El halo claro cubre el tramo en que el fondo se oscurece. */
+  margin-bottom: 2.9rem;
+  text-shadow: 0 0 4px rgb(255 255 255 / 0.9), 0 0 8px rgb(255 255 255 / 0.7);
   display: flex;
   flex-direction: column;
   align-items: center;
   font-size: 0.62rem;
   line-height: 1.2;
   color: var(--pendon-tinta);
-  margin-bottom: 0.2rem;
 }
 .pendon-causa img {
   width: 2.4rem;
