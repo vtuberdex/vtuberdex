@@ -77,16 +77,8 @@ sarif/
 # Plugin de Paper: vive en su propio repo (vtuberdex/vtuberdex-minecraft)
 /minecraft/
 
-# Config local de Claude Code
-.claude/
->>>>>>> 99ead1e (chore(gitignore): ignorar la config local de Claude Code)
-=======
 # Caché incremental de tsc: la regenera typecheck
 tsconfig.tsbuildinfo
 
 # Config local de Claude Code
 .claude/
-=======
-# Config local de Claude Code
-.claude/
->>>>>>> 99ead1e (chore(gitignore): ignorar la config local de Claude Code)
