@@ -6,7 +6,7 @@
  *   node scripts/premiar-directos.mjs --vigilar  servicio: una pasada cada VTUBERDEX_DIRECTOS_CADA_MIN (10) minutos
  *   node scripts/premiar-directos.mjs --seco     informa quién está en directo, sin pagar nada
  *
- * Entorno: TWITCH_CLIENT_ID/SECRET y KICK_CLIENT_ID/SECRET (sin ellas la plataforma se salta), TURSO_DATABASE_URL (o la
+ * Entorno: VTUBERDEX_TWITCH_ID_CLIENT/VTUBERDEX_TWITCH_SECRET y VTUBERDEX_KICK_ID_CLIENT/VTUBERDEX_KICK_SECRET (sin ellas la plataforma se salta), TURSO_DATABASE_URL (o la
  * base local de `lib/solicitudes.mjs`, donde vive la XP), VTUBERDEX_DB como el resto de scripts.
  */
 import { dbConDiario } from "../lib/diario.mjs";
@@ -33,7 +33,7 @@ async function pasada() {
   const db = await dbConDiario();
   // El listado no trae las redes: salen del detalle de cada ficha (SQLite síncrono, milisegundos para todas).
   const fichas = fichasPublicadas(db).map((f) => ({ id: f.id, slug: f.slug, socials: getVtuberBySlug(db, f.slug)?.socials ?? [] }));
-  if (!process.env.TWITCH_CLIENT_ID && !process.env.KICK_CLIENT_ID)
+  if (!process.env.VTUBERDEX_TWITCH_ID_CLIENT && !process.env.VTUBERDEX_KICK_ID_CLIENT)
     console.warn("[premiar-directos] sin credenciales de Twitch ni Kick: no hay nada que revisar");
   const resumen = await premiarDirectos(fichas, {
     ejecutor: seco ? { execute: async () => ({ rows: [], rowsAffected: 0 }), exec: async () => {} } : await ejecutorDeSolicitudes(),
