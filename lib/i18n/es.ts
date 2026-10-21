@@ -162,6 +162,15 @@ export const es = {
   "habilidad.tipo.activo": "Activo",
   "habilidad.tipo.ultimate": "Ultimate",
 
+  "directo.titulo": "Directo y contenido",
+  "directo.envivo": "EN DIRECTO",
+  "directo.espectadores": "{n} espectadores",
+  "directo.ver": "Ver en {plataforma}",
+  "directo.sinDirecto": "{plataforma}: sin directo ahora",
+  "directo.suscriptores": "{n} suscriptores",
+  "directo.vistas": "{n} vistas",
+  "directo.videos": "{n} vídeos",
+  "directo.ultimos": "Últimos vídeos de YouTube",
   "redes.titulo": "Redes",
 
   "like.dar": "Dar like",

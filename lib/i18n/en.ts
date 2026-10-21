@@ -157,6 +157,15 @@ export const en: Mensajes = {
   "habilidad.tipo.activo": "Active",
   "habilidad.tipo.ultimate": "Ultimate",
 
+  "directo.titulo": "Live & content",
+  "directo.envivo": "LIVE",
+  "directo.espectadores": "{n} viewers",
+  "directo.ver": "Watch on {plataforma}",
+  "directo.sinDirecto": "{plataforma}: not live right now",
+  "directo.suscriptores": "{n} subscribers",
+  "directo.vistas": "{n} views",
+  "directo.videos": "{n} videos",
+  "directo.ultimos": "Latest YouTube videos",
   "redes.titulo": "Socials",
 
   "like.dar": "Like",

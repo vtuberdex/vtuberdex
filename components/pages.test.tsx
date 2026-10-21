@@ -80,6 +80,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
       detail: vi.fn(),
       likeEstado: vi.fn(),
       darLike: vi.fn(),
+      directo: vi.fn().mockResolvedValue({ canales: [] }),
     },
   };
 });

@@ -274,6 +274,33 @@ export interface ResumenRechazos {
   ultimo: string | null;
 }
 
+/** Estado de un canal de directo (ver `app/api/vtubers/[slug]/directo` y `lib/directos.mjs`). Solo llegan los que respondieron. */
+export interface CanalDirecto {
+  plataforma: "twitch" | "youtube" | "kick";
+  url: string;
+  enVivo: boolean;
+  titulo?: string;
+  espectadores?: number | null;
+  categoria?: string | null;
+  inicio?: string | null;
+  miniatura?: string | null;
+  /** Enlace al directo en curso (YouTube); en las otras es el canal. */
+  enlace?: string;
+  estadisticas?: {
+    suscriptores: number | null;
+    vistas: number | null;
+    videos: number | null;
+  };
+  videos?: Array<{
+    id: string;
+    titulo: string;
+    publicado: string | null;
+    miniatura: string | null;
+    vistas: number | null;
+    url: string;
+  }>;
+}
+
 export const api = {
   list(params: SearchParams, signal?: AbortSignal): Promise<ApiListResponse> {
     return request<ApiListResponse>(
@@ -286,6 +313,11 @@ export const api = {
     signal?: AbortSignal,
   ): Promise<VtuberDetail & { neighbors: Neighbors }> {
     return request(`/api/vtubers/${encodeURIComponent(slug)}`, { signal });
+  },
+  directo(slug: string, signal?: AbortSignal): Promise<{ canales: CanalDirecto[] }> {
+    return request(`/api/vtubers/${encodeURIComponent(slug)}/directo`, {
+      signal,
+    });
   },
   likeEstado(slug: string, signal?: AbortSignal): Promise<LikeResumen> {
     return request<LikeResumen>(

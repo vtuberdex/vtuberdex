@@ -155,6 +155,15 @@ export const ja: Mensajes = {
   "habilidad.tipo.activo": "アクティブ",
   "habilidad.tipo.ultimate": "アルティメット",
 
+  "directo.titulo": "配信とコンテンツ",
+  "directo.envivo": "配信中",
+  "directo.espectadores": "視聴者 {n} 人",
+  "directo.ver": "{plataforma}で見る",
+  "directo.sinDirecto": "{plataforma}:現在配信なし",
+  "directo.suscriptores": "登録者 {n} 人",
+  "directo.vistas": "{n} 回視聴",
+  "directo.videos": "動画 {n} 本",
+  "directo.ultimos": "YouTube の最新動画",
   "redes.titulo": "SNS",
 
   "like.dar": "いいね",
