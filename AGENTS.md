@@ -457,6 +457,24 @@ calcula ni «procesar» una baja los aplica solo**.
 - Para ver el resultado sin WebGL ni base de datos: bundlear `drawCardFront` con `esbuild --alias:@=.` y dibujar los grados en
   Chromium (`/opt/pw-browsers`); es lo que se hizo para calibrar `DETERIORO`.
 
+## Directo en Twitch / YouTube / Kick y XP por transmitir
+
+- **Ficha**: `components/directo-en-vivo.tsx` pide `GET /api/vtubers/:slug/directo` (mismas defensas que el detalle) y muestra «EN DIRECTO» con
+  título y espectadores, estadísticas públicas y últimos vídeos de YouTube. **El navegador nunca habla con las plataformas**: `lib/directos.mjs`
+  consulta desde el servidor con credenciales de APLICACIÓN (`TWITCH_CLIENT_ID/SECRET`, `KICK_CLIENT_ID/SECRET`, `YOUTUBE_API_KEY`), con caché en
+  memoria (60 s Twitch/Kick, 5 min YouTube, 30 s los fallos) y peticiones en vuelo compartidas. **Sin credenciales la plataforma no se pinta**
+  (local y CI no necesitan nada). El canal sale del DOMINIO del enlace de la red, no del nombre escrito.
+- **Límites reales**: Twitch sin token del streamer no da seguidores; Kick no publica seguidores; YouTube detecta el directo entre las últimas 10
+  subidas (3 unidades de cuota por canal; `search.list` cuesta 100 y no se usa) y no resuelve URLs `/c/Nombre`. **Probado solo con respuestas
+  simuladas**: falta una pasada con credenciales reales por plataforma.
+- **XP por transmitir**: `scripts/premiar-directos.mjs` (`npm run premiar:directos`, `--vigilar` para servicio, `--seco` para ver quién está en
+  directo sin pagar). Cada 10 min revisa Twitch y Kick de todas las fichas y `premiarDirecto` (`server/src/minecraft.mjs`) paga 5 XP por tramo
+  de 30 min, tope 50 al día, **idempotente por `directo:<ficha>:<tramo>`** y con el tope aplicado en la misma sentencia. Tabla `xp_directo`, aparte de
+  `xp_juego`: **no gasta el tope de Minecraft**; la suma `xpDeJuego`/`xpDeJuegoVarias` incluye las dos, así que nivel y puntos salen solos.
+  Una ficha con varios canales cobra una vez por tramo. **YouTube NO paga**: revisar ~800 fichas gastaría las 10.000 unidades diarias en horas.
+  Falta instalar el servicio en la VPS (como `vtuberdex-voces`) y definir las credenciales en `/etc/vtuberdex.env`. Perillas: `XP_DIRECTO_*` en
+  `server/src/experiencia.mjs`.
+
 ## Experiencia, niveles y puntos de habilidad («Mi ficha»)
 
 - **La experiencia es función de los likes** (`server/src/experiencia.mjs`, `experienciaConLikes`): la barra (`current/max`) se

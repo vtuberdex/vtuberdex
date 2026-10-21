@@ -71,6 +71,14 @@ export const XP_JUEGO_MAX_DIA = 300;
  */
 export const XP_ENTREGA_MAX_DIA = 600;
 /**
+ * XP que gana una ficha por cada tramo (`DIRECTO_TRAMO_MIN`) en que se la ve EN DIRECTO (Twitch o Kick) y su tope diario,
+ * aparte de `XP_JUEGO_MAX_DIA`: premiar transmitir no debe gastar el cupo de Minecraft ni al revés. 5 XP cada 30 min y
+ * 50 al día = 5 horas de directo; un like vale 10, así que transmitir ayuda pero no sustituye a la comunidad.
+ */
+export const XP_DIRECTO_POR_TRAMO = 5;
+export const XP_DIRECTO_MAX_DIA = 50;
+export const DIRECTO_TRAMO_MIN = 30;
+/**
  * LA EXPERIENCIA DE UNA FICHA (la fórmula única, sin ajustes a mano)
  * ------------------------------------------------------------------
  * `experienciaDeFicha` IGNORA el nivel y la barra que traiga la ficha (scrape o mantenedor): esos números eran
