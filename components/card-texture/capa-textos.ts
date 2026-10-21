@@ -1,6 +1,7 @@
 /**
  * CAPA 4 — textos: chips de estado, frase y pie.
  */
+import { chipDeNivel } from "./chip-nivel";
 import type { VtuberCard } from "@/lib/types";
 import { FONT } from "./dimensiones";
 import type { CardLayers } from "./tipos";
@@ -27,7 +28,7 @@ export function drawTextsLayer({
   // Chips de estado. SIN placa opaca: el texto lee por la SOMBRA NEGRA, y así el fondo
   // subido se ve a través de la cabecera en vez de quedar tapado por un rectángulo.
   const stateChips = [
-    card.level !== null ? `NIV ${card.level}` : null,
+    chipDeNivel(card.level),
     card.powerScore ? `PODER ${card.powerScore}` : null,
     card.hasDetail ? "FICHA COMPLETA" : "SOLO FICHA BÁSICA",
   ].filter(Boolean) as string[];

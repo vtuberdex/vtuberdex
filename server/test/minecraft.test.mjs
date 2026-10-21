@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
 import {
+  DIRECTO_TRAMO_MIN, XP_DIRECTO_MAX_DIA, XP_DIRECTO_POR_TRAMO,
   XP_ENTREGA_MAX_DIA, XP_JUEGO_MAX_DIA,
   XP_POR_LIKE,
   experienciaConLikes,
@@ -16,6 +17,7 @@ import {
   XP_POR_LOTE_MAX,
   crearCodigoDeVinculo,
   desvincular,
+  premiarDirecto,
   envioDeCodigoPermitido,
   requiereSesion,
   sesionVigente,
@@ -25,6 +27,7 @@ import {
   vinculoDeFicha,
   vinculoDeJugador,
   xpDeJuego,
+  xpDeJuegoVarias,
 } from "../src/minecraft.mjs";
 import { ejecutorSqlite } from "../src/solicitudes.mjs";
 
@@ -477,4 +480,34 @@ test("una sola red por cuenta: confirmar desde otra red cierra la sesión de la 
     await sesionVigente(e, { uuid: OFFLINE, red: RED_A, ahora: t0 + 2000 }),
     false,
   );
+});
+
+test("premiar un directo: una vez por tramo, con tope propio y sumado a la XP de la ficha", async () => {
+  const e = nuevo();
+  const t0 = Date.UTC(2026, 9, 7, 12, 0, 0);
+  const tramo = DIRECTO_TRAMO_MIN * 60_000;
+  const pagar = (ahora, vtuberId = 7) => premiarDirecto(e, { vtuberId, plataforma: "twitch", dia: DIA, ahora });
+
+  assert.equal(await pagar(t0), XP_DIRECTO_POR_TRAMO);
+  assert.equal(await pagar(t0 + 60_000), 0, "mirar el mismo tramo otra vez no paga de nuevo");
+  assert.equal(await pagar(t0 + tramo), XP_DIRECTO_POR_TRAMO);
+  assert.equal(await xpDeJuego(e, 7), XP_DIRECTO_POR_TRAMO * 2);
+  assert.deepEqual([...(await xpDeJuegoVarias(e, [7, 8]))], [[7, XP_DIRECTO_POR_TRAMO * 2]]);
+
+  // El tope diario recorta el último pago y después no paga más.
+  let total = XP_DIRECTO_POR_TRAMO * 2;
+  for (let i = 2; i < 40; i += 1) total += await pagar(t0 + tramo * i);
+  assert.equal(total, XP_DIRECTO_MAX_DIA);
+  assert.equal(await xpDeJuego(e, 7), XP_DIRECTO_MAX_DIA);
+  // Otra ficha no gasta el cupo de la primera.
+  assert.equal(await pagar(t0, 8), XP_DIRECTO_POR_TRAMO);
+});
+
+test("la XP por directo NO gasta el tope diario de Minecraft", async () => {
+  const e = nuevo();
+  await vinculado(e);
+  await premiarDirecto(e, { vtuberId: 7, plataforma: "kick", dia: DIA, ahora: Date.UTC(2026, 9, 7, 12) });
+  const r = await sumarXp(e, lote({ mob: 100 }));
+  assert.equal(r.sumado, 100);
+  assert.equal(r.hoy, 100);
 });

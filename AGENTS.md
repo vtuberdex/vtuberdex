@@ -457,6 +457,61 @@ calcula ni «procesar» una baja los aplica solo**.
 - Para ver el resultado sin WebGL ni base de datos: bundlear `drawCardFront` con `esbuild --alias:@=.` y dibujar los grados en
   Chromium (`/opt/pw-browsers`); es lo que se hizo para calibrar `DETERIORO`.
 
+## Directo en Twitch / YouTube / Kick y XP por transmitir
+
+- **Ficha**: `components/directo-en-vivo.tsx` pide `GET /api/vtubers/:slug/directo` (mismas defensas que el detalle) y muestra «EN DIRECTO» con
+  título y espectadores, estadísticas públicas y últimos vídeos de YouTube. **El navegador nunca habla con las plataformas**: `lib/directos.mjs`
+  consulta desde el servidor con credenciales de APLICACIÓN (`TWITCH_CLIENT_ID/SECRET`, `KICK_CLIENT_ID/SECRET`, `YOUTUBE_API_KEY`), con caché en
+  memoria (60 s Twitch/Kick, 5 min YouTube, 30 s los fallos) y peticiones en vuelo compartidas. **Sin credenciales la plataforma no se pinta**
+  (local y CI no necesitan nada). El canal sale del DOMINIO del enlace de la red, no del nombre escrito.
+- **Límites reales**: Twitch sin token del streamer no da seguidores; Kick no publica seguidores; YouTube detecta el directo entre las últimas 10
+  subidas (3 unidades de cuota por canal; `search.list` cuesta 100 y no se usa) y no resuelve URLs `/c/Nombre`. **Probado solo con respuestas
+  simuladas**: falta una pasada con credenciales reales por plataforma.
+- **XP por transmitir**: `scripts/premiar-directos.mjs` (`npm run premiar:directos`, `--vigilar` para servicio, `--seco` para ver quién está en
+  directo sin pagar). Cada 10 min revisa Twitch y Kick de todas las fichas y `premiarDirecto` (`server/src/minecraft.mjs`) paga 5 XP por tramo
+  de 30 min, tope 50 al día, **idempotente por `directo:<ficha>:<tramo>`** y con el tope aplicado en la misma sentencia. Tabla `xp_directo`, aparte de
+  `xp_juego`: **no gasta el tope de Minecraft**; la suma `xpDeJuego`/`xpDeJuegoVarias` incluye las dos, así que nivel y puntos salen solos.
+  Una ficha con varios canales cobra una vez por tramo. **YouTube NO paga**: revisar ~800 fichas gastaría las 10.000 unidades diarias en horas.
+  Falta instalar el servicio en la VPS (como `vtuberdex-voces`) y definir las credenciales en `/etc/vtuberdex.env`. Perillas: `XP_DIRECTO_*` en
+  `server/src/experiencia.mjs`.
+
+## Rangos y misiones de Minecraft (XP y grado de carta)
+
+- **Rangos por nivel** (`server/src/rangos.mjs`, UNA tabla: Novato 1 · Aprendiz 5 · Veterano 10 · Élite 20 · Maestro 35 · Leyenda 50;
+  `lib/rangos.ts` la reexporta). Se calculan del nivel en el cliente (insignia en `StatBars`; títulos en `rango.<id>`, es/en/ja) y salen en
+  `GET /api/minecraft/reglas` (`rangos`) para el plugin. Los umbrales salen de la curva real (`umbralDeNivel`); ajustarlos = tocar `RANGOS`.
+- **Misiones** (`server/src/misiones.mjs`, catálogo `MISIONES`): el plugin solo REPORTA contadores (`mobs`, `jefes`, `mineria`, `pesca`,
+  `cosecha`, `cria`, `entregas`, `distancia`) y la web decide qué se completó. Una misión pide uno o varios contadores y se completa al llegar
+  todos a su meta; las diarias cuentan por día de Chile. **Idempotente**: el lote (`idLote`, UUID) es clave primaria, completar es un
+  `INSERT … ON CONFLICT DO NOTHING` (solo el que gana paga) y la XP es otra fila (`xp_mision`, clave `ficha:mision:periodo`) que se suma en
+  `xpDeJuego`/`xpDeJuegoVarias` junto a `xp_juego` y `xp_directo`: **no gasta el tope diario de Minecraft** (las diarias suman 70 XP/día como mucho).
+  Rutas del plugin (con `X-Minecraft-Token`): `POST /api/minecraft/misiones` `{ uuid, idLote, avances }` y `GET /api/minecraft/misiones/:uuid`.
+- **Grado por misiones (opcional)**: las 5 misiones de grado (`grado-6` … `grado-8`) son DIFÍCILES (miles de mobs, jefes, 250 entregas…) y no dan
+  XP: dan el derecho a reclamar el grado desde «Mi ficha» (`POST /api/mi-ficha/misiones`, con confirmación). **Tope 8** (`GRADO_MAXIMO_POR_MISIONES`):
+  del 8,5 a la Black Label queda solo para donación. Reclamar nunca baja un grado, no toca una carta deteriorada y se aplica por el diario
+  (`vtuber.editar`, actor `mision`); la marca de «reclamada» va primero (UPDATE condicional) y se suelta si el diario falla. Los textos de las
+  misiones (nombre/descripcion) están en español en el catálogo: fuera del i18n de momento.
+- **Semanales**: `repetible: 'semanal'` cuenta de lunes a domingo (`periodo = semana:<lunes>`, `lunesDe`); hay 2 («Cazador de la semana» 80 XP, «Repartidor
+  de la semana» 120 XP). Se pagan una vez por semana y arrancan de cero el lunes.
+- **Panel del juego y avisos**: `progreso.rango` (nombre en español) sale en `GET /api/minecraft/jugador/:uuid` y el panel lo muestra junto al nivel; al entrar,
+  `MisionesService.avisarGradoListo` recuerda (una vez por conexión) los grados de misión completados y sin reclamar.
+- **Twitch en lotes**: `precalentarTwitch` (`lib/directos.mjs`) pregunta a Helix de a 100 logins y llena la caché; `premiarDirectos` lo llama antes de revisar
+  (~8 llamadas en vez de ~800 por pasada). Si el lote falla, los canales quedan en error un rato corto en lugar de caer a llamadas sueltas.
+- **Traducción**: nombre y descripción de cada misión y la etiqueta de cada contador están en `lib/i18n/textos/mificha.ts` (`mision.<id>.nombre|descripcion`,
+  `contador.<c>`, es/en/ja); `lib/misiones-textos.test.ts` falla si se añade una misión o contador al catálogo sin sus textos. Si el servidor trae una
+  misión que el cliente no conoce, sale el texto en español del catálogo.
+- **Mantenedor**: pestaña «Premium» → «Grados reclamados con misiones» (`components/admin/reclamos-misiones.tsx`, `GET /api/admin/misiones/reclamos`,
+  `POST …/reclamos/:ficha/:mision/revocar`). Cada reclamo guarda el grado ANTERIOR (`mision_reclamo`); revocar devuelve la carta a él, pero solo si la carta
+  todavía lleva el grado reclamado (si una donación la subió, no se toca) y la misión sigue marcada como reclamada, así que no se puede repetir. Solo en la
+  ruta de Next (el Express local no la tiene).
+- **Ajustar la dificultad con datos**: `npm run informe:misiones` (`resumenDeMisiones`) muestra cuántas fichas completaron cada misión y el avance medio/máximo
+  de quienes van en camino. Las metas del catálogo son una propuesta sin jugar: ajustarlas con ese informe tras unas semanas.
+- **Rango en la carta 3D**: el chip de nivel de la carta dice «NIV 12 · VETERANO» (`card-texture/chip-nivel.ts`, compartido por `capa-textos.ts` y
+  `componer.ts`). Solo sale donde la carta trae nivel (la ficha; el listado y el libro no aplican likes ni XP y no pintan chip). **Sin mirar renderizada**:
+  cabe de sobra por cuenta (≈ 726 de 916 px útiles), pero falta verlo en un navegador con GPU.
+- **Plugin** (repo `vtuberdex/vtuberdex-minecraft`): `MisionesService` acumula los contadores y los manda cada ~30 s; `/vtd misiones` las lista.
+  Ver el README del plugin para qué evento cuenta para cada contador.
+
 ## Experiencia, niveles y puntos de habilidad («Mi ficha»)
 
 - **La experiencia es función de los likes** (`server/src/experiencia.mjs`, `experienciaConLikes`): la barra (`current/max`) se

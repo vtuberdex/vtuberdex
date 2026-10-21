@@ -24,6 +24,7 @@ import { GettingStarted } from "@/components/admin/getting-started";
 import { PanelEstadisticas } from "@/components/admin/panel-estadisticas";
 import { PremiumRates } from "@/components/admin/premium-rates";
 import { PremiumManager } from "@/components/admin/premium-manager";
+import { ReclamosMisiones } from "@/components/admin/reclamos-misiones";
 import { SolicitudesManager } from "@/components/admin/solicitudes-manager";
 import { VtuberList } from "@/components/admin/vtuber-list";
 import type { ChipOption } from "@/components/admin/chip-picker";
@@ -435,6 +436,9 @@ export function AdminPage() {
       >
         {token && section === "premium" && (
           <PremiumManager token={token} notify={notify} onChanged={changed} />
+        )}
+        {token && section === "premium" && (
+          <ReclamosMisiones token={token} notify={notify} onChanged={changed} />
         )}
       </div>
 

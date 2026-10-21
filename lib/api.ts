@@ -245,6 +245,42 @@ export interface VistaMiFicha {
   statsPuntos?: EstadoDeStats;
   /** Cuenta de Minecraft vinculada y XP traída del juego. Opcional: la maqueta de /niveles no lo trae. */
   minecraft?: EstadoMinecraft;
+  /** Misiones de Minecraft con su progreso. `null` si el almacén falló; ausente en la maqueta de /niveles. */
+  misiones?: MisionesDeFicha | null;
+}
+
+export interface MisionVista {
+  id: string;
+  tipo: "secundaria" | "grado";
+  nombre: string;
+  descripcion: string;
+  xp: number;
+  repetible: "diaria" | "semanal" | null;
+  requisitos: Array<{ contador: string; etiqueta: string; meta: number; progreso: number }>;
+  completada: boolean;
+  /** Solo en las misiones de grado. */
+  grado?: string;
+  reclamada?: boolean;
+  reclamable?: boolean;
+  motivo?: "ya_tiene_igual_o_mayor" | "ficha_deteriorada" | "grado_no_ganable" | null;
+}
+
+export interface ReclamoDeMision {
+  vtuberId: number;
+  misionId: string;
+  mision: string;
+  slug: string | null;
+  name: string;
+  grado: string;
+  gradoPrevio: string | null;
+  gradoActual: string | null;
+  reclamado: string;
+  revocado: string | null;
+}
+
+export interface MisionesDeFicha {
+  secundarias: MisionVista[];
+  grado: MisionVista[];
 }
 
 /** «Mi ficha»: el vínculo con Minecraft (el UUID no se muestra; basta el nombre de jugador). */
@@ -274,6 +310,33 @@ export interface ResumenRechazos {
   ultimo: string | null;
 }
 
+/** Estado de un canal de directo (ver `app/api/vtubers/[slug]/directo` y `lib/directos.mjs`). Solo llegan los que respondieron. */
+export interface CanalDirecto {
+  plataforma: "twitch" | "youtube" | "kick";
+  url: string;
+  enVivo: boolean;
+  titulo?: string;
+  espectadores?: number | null;
+  categoria?: string | null;
+  inicio?: string | null;
+  miniatura?: string | null;
+  /** Enlace al directo en curso (YouTube); en las otras es el canal. */
+  enlace?: string;
+  estadisticas?: {
+    suscriptores: number | null;
+    vistas: number | null;
+    videos: number | null;
+  };
+  videos?: Array<{
+    id: string;
+    titulo: string;
+    publicado: string | null;
+    miniatura: string | null;
+    vistas: number | null;
+    url: string;
+  }>;
+}
+
 export const api = {
   list(params: SearchParams, signal?: AbortSignal): Promise<ApiListResponse> {
     return request<ApiListResponse>(
@@ -286,6 +349,11 @@ export const api = {
     signal?: AbortSignal,
   ): Promise<VtuberDetail & { neighbors: Neighbors }> {
     return request(`/api/vtubers/${encodeURIComponent(slug)}`, { signal });
+  },
+  directo(slug: string, signal?: AbortSignal): Promise<{ canales: CanalDirecto[] }> {
+    return request(`/api/vtubers/${encodeURIComponent(slug)}/directo`, {
+      signal,
+    });
   },
   likeEstado(slug: string, signal?: AbortSignal): Promise<LikeResumen> {
     return request<LikeResumen>(
@@ -639,12 +707,35 @@ export const api = {
       body: JSON.stringify({ token, slug, accion }),
     });
   },
+  /** Reclama el grado de carta de una misión de grado completada (opcional: la persona decide). */
+  reclamarGradoDeMision(token: string, slug: string, mision: string) {
+    return request<{ ok: true; grado: string; ficha: VistaMiFicha }>(
+      "/api/mi-ficha/misiones",
+      {
+        method: "POST",
+        body: JSON.stringify({ token, slug, accion: "reclamar-grado", mision }),
+      },
+    );
+  },
   /** Manda el enlace mágico a ese correo si tiene fichas; responde igual para cualquiera. */
   pedirEnlaceDeMiFicha(email: string) {
     return request<{ ok: true }>("/api/mi-ficha/enlace", {
       method: "POST",
       body: JSON.stringify({ email }),
     });
+  },
+  /** Mantenedor: los grados reclamados con misiones de Minecraft (para revisarlos o revocarlos). */
+  reclamosDeMisiones(token: string) {
+    return request<{ items: ReclamoDeMision[] }>("/api/admin/misiones/reclamos", {
+      headers: bearer(token),
+    });
+  },
+  /** Mantenedor: revoca un reclamo y devuelve la carta al grado anterior (si aún lleva el reclamado). */
+  revocarReclamoDeMision(token: string, vtuberId: number, mision: string) {
+    return request<{ ok: true; cartaModificada: boolean }>(
+      `/api/admin/misiones/reclamos/${vtuberId}/${encodeURIComponent(mision)}/revocar`,
+      { method: "POST", headers: bearer(token) },
+    );
   },
   /** Rechazos de los formularios públicos en los últimos días (sin correos ni contenido). */
   rechazosDeSolicitudes(token: string, dias = 7) {

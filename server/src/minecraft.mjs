@@ -51,7 +51,13 @@
  */
 import crypto from "node:crypto";
 
-import { XP_ENTREGA_MAX_DIA, XP_JUEGO_MAX_DIA } from "./experiencia.mjs";
+import {
+  DIRECTO_TRAMO_MIN,
+  XP_DIRECTO_MAX_DIA,
+  XP_DIRECTO_POR_TRAMO,
+  XP_ENTREGA_MAX_DIA,
+  XP_JUEGO_MAX_DIA,
+} from "./experiencia.mjs";
 import { preparadorDeTablas } from "./db/tablas.mjs";
 
 /** Vida del código de vínculo. */
@@ -107,6 +113,23 @@ const DDL = `
     creado     TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_xp_juego_dia ON xp_juego (vtuber_id, dia);
+  CREATE TABLE IF NOT EXISTS xp_directo (
+    id_tramo   TEXT PRIMARY KEY,
+    vtuber_id  INTEGER NOT NULL,
+    plataforma TEXT NOT NULL,
+    cantidad   INTEGER NOT NULL,
+    dia        TEXT NOT NULL,
+    creado     TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_xp_directo_dia ON xp_directo (vtuber_id, dia);
+  CREATE TABLE IF NOT EXISTS xp_mision (
+    id_mision  TEXT PRIMARY KEY,
+    vtuber_id  INTEGER NOT NULL,
+    cantidad   INTEGER NOT NULL,
+    dia        TEXT NOT NULL,
+    creado     TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_xp_mision_ficha ON xp_mision (vtuber_id);
   CREATE TABLE IF NOT EXISTS sesion_minecraft (
     uuid       TEXT NOT NULL,
     red        TEXT NOT NULL,
@@ -126,6 +149,8 @@ export class MinecraftError extends Error {
 }
 
 const conTablas = preparadorDeTablas(DDL);
+/** Las tablas de XP las comparten las misiones (`misiones.mjs`): crean aquí `xp_mision` antes de escribir. */
+export const prepararTablasMinecraft = conTablas;
 
 const hash = (codigo) =>
   crypto.createHash("sha256").update(codigo).digest("hex");
@@ -556,9 +581,16 @@ export async function xpDeJuegoVarias(ejecutor, ids) {
   const lista = [...new Set(ids.map(Number).filter(Number.isInteger))];
   if (!lista.length) return new Map();
   const e = await conTablas(ejecutor);
+  const marcas = lista.map(() => "?").join(",");
   const { rows } = await e.execute(
-    `SELECT vtuber_id AS id, SUM(cantidad) AS n FROM xp_juego WHERE vtuber_id IN (${lista.map(() => "?").join(",")}) GROUP BY vtuber_id`,
-    lista,
+    `SELECT id, SUM(n) AS n FROM (
+       SELECT vtuber_id AS id, cantidad AS n FROM xp_juego WHERE vtuber_id IN (${marcas})
+       UNION ALL
+       SELECT vtuber_id AS id, cantidad AS n FROM xp_directo WHERE vtuber_id IN (${marcas})
+       UNION ALL
+       SELECT vtuber_id AS id, cantidad AS n FROM xp_mision WHERE vtuber_id IN (${marcas})
+     ) GROUP BY id`,
+    [...lista, ...lista, ...lista],
   );
   return new Map(rows.map((r) => [Number(r.id), Number(r.n)]));
 }
@@ -567,8 +599,56 @@ export async function xpDeJuegoVarias(ejecutor, ids) {
 export async function xpDeJuego(ejecutor, vtuberId) {
   const e = await conTablas(ejecutor);
   const { rows } = await e.execute(
-    "SELECT COALESCE(SUM(cantidad), 0) AS n FROM xp_juego WHERE vtuber_id = ?",
-    [Number(vtuberId)],
+    `SELECT (SELECT COALESCE(SUM(cantidad), 0) FROM xp_juego WHERE vtuber_id = ?)
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_directo WHERE vtuber_id = ?)
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_mision WHERE vtuber_id = ?) AS n`,
+    [Number(vtuberId), Number(vtuberId), Number(vtuberId)],
   );
   return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * Premia con XP a una ficha que está EN DIRECTO. Idempotente por tramo: el id es `ficha:tramo` (el tramo es el
+ * `DIRECTO_TRAMO_MIN` en que cae `ahora`), así que mirar la misma transmisión cada minuto suma UNA vez por tramo, y dos
+ * procesos a la vez tampoco duplican (la clave primaria lo rechaza). El tope del día se aplica en la MISMA sentencia,
+ * como en `sumarXp`. `dia` lo decide quien llama (Chile). Devuelve lo que de verdad se sumó (0 si el tramo ya estaba
+ * pagado o el día ya llegó al tope). La XP entra a la barra por `xpDeJuego`, igual que la del juego.
+ * @param {{ vtuberId: number, plataforma: string, dia: string, ahora?: number }} entrada
+ */
+export async function premiarDirecto(
+  ejecutor,
+  { vtuberId, plataforma, dia, ahora = Date.now() },
+) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dia)))
+    throw new Error(`día inválido: ${dia}`);
+  const id = Number(vtuberId);
+  if (!Number.isInteger(id)) throw new Error(`ficha inválida: ${vtuberId}`);
+  const tramo = Math.floor(ahora / (DIRECTO_TRAMO_MIN * 60_000));
+  const clave = `directo:${id}:${tramo}`;
+  const e = await conTablas(ejecutor);
+  const r = await e.execute(
+    `INSERT INTO xp_directo (id_tramo, vtuber_id, plataforma, cantidad, dia, creado)
+     SELECT ?, ?, ?, MIN(?, ? - hoy), ?, ?
+       FROM (SELECT COALESCE(SUM(cantidad), 0) AS hoy FROM xp_directo WHERE vtuber_id = ? AND dia = ?)
+      WHERE hoy < ?
+     ON CONFLICT (id_tramo) DO NOTHING`,
+    [
+      clave,
+      id,
+      String(plataforma).slice(0, 20),
+      XP_DIRECTO_POR_TRAMO,
+      XP_DIRECTO_MAX_DIA,
+      dia,
+      new Date(ahora).toISOString(),
+      id,
+      dia,
+      XP_DIRECTO_MAX_DIA,
+    ],
+  );
+  if (!Number(r.rowsAffected ?? 0)) return 0;
+  const escrito = await e.execute(
+    "SELECT cantidad FROM xp_directo WHERE id_tramo = ?",
+    [clave],
+  );
+  return Number(escrito.rows[0]?.cantidad ?? 0);
 }

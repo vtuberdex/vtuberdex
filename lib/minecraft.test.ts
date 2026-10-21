@@ -25,7 +25,11 @@ vi.mock("@/server/src/search.mjs", () => ({
   getVtuberBySlug: (_db: unknown, slug: string) =>
     (FICHAS as Record<string, unknown>)[slug] ?? null,
 }));
-vi.mock("@/lib/diario.mjs", () => ({ dbConDiario: async () => DB }));
+const APLICAR = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/diario.mjs", () => ({
+  dbConDiario: async () => DB,
+  aplicarYAnotar: APLICAR,
+}));
 vi.mock("@/lib/likes.mjs", async (original) => ({
   ...(await original<typeof import("@/lib/likes.mjs")>()),
   contarLikes: async () => 0,
@@ -298,6 +302,7 @@ describe("vínculo y XP de punta a punta", () => {
         topeDia: XP_JUEGO_MAX_DIA,
         puntosHabilidad: 0,
         puntosStats: 0,
+        rango: "Novato",
       },
     });
 
@@ -623,6 +628,104 @@ describe("cuenta Java no premium (servidor offline)", () => {
   });
 });
 
+describe("misiones", () => {
+  async function vinculada() {
+    const enlace = await enlaceDeMiFicha();
+    const codigo = await codigoDeMiFicha(enlace);
+    await mc.vincularDesdeElJuego(
+      pedir("/api/minecraft/vincular", { cuerpo: { codigo, uuid: JUGADOR } }),
+      { ejecutor: e, db: DB, env: ENV },
+    );
+    return enlace;
+  }
+  const reportar = (avances: unknown, idLote = randomUUID(), token: string | null = TOKEN) =>
+    mc.registrarMisiones(
+      pedir("/api/minecraft/misiones", { cuerpo: { uuid: JUGADOR, idLote, avances }, token }),
+      { ejecutor: e, db: DB, env: ENV, avisar: async () => true },
+    );
+
+  beforeEach(() => APLICAR.mockReset());
+
+  test("sin token no existen y sin vínculo el avance da 404", async () => {
+    expect((await reportar({ mobs: 1 }, randomUUID(), null)).status).toBe(404);
+    expect((await reportar({ mobs: 1 })).status).toBe(404);
+  });
+
+  test("el plugin reporta, se completa una misión y su XP llega a la experiencia de la ficha", async () => {
+    await vinculada();
+    const r = await reportar({ jefes: 1 });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ ok: true, duplicado: false, completadas: [{ id: "primer-jefe", xp: 100 }] });
+    const lista = await mc.misionesDelJugador(
+      pedir(`/api/minecraft/misiones/${JUGADOR}`, { metodo: "GET" }),
+      JUGADOR,
+      { ejecutor: e, db: DB, env: ENV },
+    );
+    const cuerpo = await lista.json();
+    expect(cuerpo.vinculado).toBe(true);
+    expect(cuerpo.secundarias.find((m: { id: string }) => m.id === "primer-jefe").completada).toBe(true);
+    expect((await mc.misionesDelJugador(pedir("/x", { metodo: "GET", token: null }), JUGADOR, { ejecutor: e, db: DB, env: ENV })).status).toBe(404);
+  });
+
+  test("datos inválidos dan 400", async () => {
+    await vinculada();
+    expect((await reportar({ volar: 3 })).status).toBe(400);
+    expect((await reportar({ mobs: 99999 })).status).toBe(400);
+  });
+
+  test("«Mi ficha» lista las misiones y reclama un grado solo si está completa, aplicándolo por el diario", async () => {
+    const enlace = await vinculada();
+    const reclamar = () =>
+      miFicha.misionesDeMiFicha(
+        pedir("/api/mi-ficha/misiones", {
+          cuerpo: { token: enlace, slug: "luna", accion: "reclamar-grado", mision: "grado-6" },
+          token: null,
+        }),
+        { ejecutor: e, db: DB },
+      );
+    const antes = await reclamar();
+    expect(antes.status).toBe(409);
+    expect((await antes.json()).error).toBe("mision_incompleta");
+    expect(APLICAR).not.toHaveBeenCalled();
+
+    for (const [contador, meta] of [["mobs", 1000], ["mineria", 1000], ["mineria", 500], ["entregas", 10]] as const)
+      expect((await reportar({ [contador]: meta })).status).toBe(200);
+    const ok = await reclamar();
+    expect(ok.status).toBe(200);
+    const cuerpo = await ok.json();
+    expect(cuerpo.grado).toBe("6");
+    expect(APLICAR).toHaveBeenCalledWith(
+      { tipo: "vtuber.editar", id: 7, patch: { premium: { grade: "6" } } },
+      "mision",
+    );
+    expect(cuerpo.ficha.misiones.grado.find((m: { id: string }) => m.id === "grado-6").reclamada).toBe(true);
+    expect((await reclamar()).status).toBe(409);
+  });
+
+  test("si el diario falla, el reclamo se suelta y se puede reintentar", async () => {
+    const enlace = await vinculada();
+    for (const [contador, meta] of [["mobs", 1000], ["mineria", 1000], ["mineria", 500], ["entregas", 10]] as const)
+      await reportar({ [contador]: meta });
+    const reclamar = () =>
+      miFicha.misionesDeMiFicha(
+        pedir("/api/mi-ficha/misiones", { cuerpo: { token: enlace, slug: "luna", accion: "reclamar-grado", mision: "grado-6" }, token: null }),
+        { ejecutor: e, db: DB },
+      );
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    APLICAR.mockRejectedValueOnce(new Error("turso caído"));
+    expect((await reclamar()).status).toBe(503);
+    expect((await reclamar()).status).toBe(200);
+  });
+
+  test("acciones o fichas ajenas se rechazan", async () => {
+    const enlace = await vinculada();
+    const hacer = (cuerpo: object) =>
+      miFicha.misionesDeMiFicha(pedir("/api/mi-ficha/misiones", { cuerpo: { token: enlace, ...cuerpo }, token: null }), { ejecutor: e, db: DB });
+    expect((await hacer({ slug: "otra", accion: "reclamar-grado", mision: "grado-6" })).status).toBe(404);
+    expect((await hacer({ slug: "luna", accion: "borrar", mision: "grado-6" })).status).toBe(400);
+  });
+});
+
 test("las reglas públicas salen de los mismos módulos que la web", () => {
   const r = mc.reglas();
   expect(r.xpJuego.maxDia).toBe(XP_JUEGO_MAX_DIA);
@@ -632,4 +735,6 @@ test("las reglas públicas salen de los mismos módulos que la web", () => {
     r.estados.find((x: { nombre: string }) => x.nombre === "Fortissimo"),
   ).toMatchObject({ color: "#d03e00", polaridad: "positivo" });
   expect(Object.keys(r.stats.mejorables)).toContain("hp");
+  expect(r.rangos.map((x: { id: string }) => x.id)).toContain("leyenda");
+  expect(r.misiones.contadores).toContain("mobs");
 });

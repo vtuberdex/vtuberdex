@@ -27,6 +27,7 @@ import { SkillList } from "@/components/skill-list";
 import { StatBars } from "@/components/stat-bars";
 import { ProfileGrid } from "@/components/profile-grid";
 import { SocialLinks } from "@/components/social-links";
+import { DirectoEnVivo } from "@/components/directo-en-vivo";
 import { PremiumBadge } from "@/components/premium-badge";
 import { DonatePayPal } from "@/components/donate-paypal";
 import { LikeButton } from "@/components/like-button";
@@ -410,6 +411,10 @@ export function DetailPage({ slug }: { slug: string }) {
               </div>
 
               <SkillList skills={data.skills} palette={palette} />
+
+              {data.socials.length > 0 && (
+                <DirectoEnVivo slug={data.slug} palette={palette} />
+              )}
 
               {data.socials.length > 0 && (
                 <SocialLinks socials={data.socials} palette={palette} />

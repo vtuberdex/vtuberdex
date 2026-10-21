@@ -1,6 +1,7 @@
 /**
  * Ensambla las 7 capas y publica la info de layout medida.
  */
+import { chipDeNivel } from "./chip-nivel";
 import {
   CARD_TEXTURE_WIDTH,
   CARD_TEXTURE_HEIGHT,
@@ -85,7 +86,7 @@ export function drawCardLayers({
 
   // Extremo de los chips de estado (se necesita para posicionar otras capas).
   const stateChips = [
-    card.level !== null ? `NIV ${card.level}` : null,
+    chipDeNivel(card.level),
     card.powerScore ? `PODER ${card.powerScore}` : null,
     card.hasDetail ? "FICHA COMPLETA" : "SOLO FICHA BÁSICA",
   ].filter(Boolean) as string[];
