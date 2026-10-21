@@ -1,0 +1,19 @@
+[Unit]
+Description=VTuberDex: paga XP a las fichas que transmiten en Twitch / Kick
+After=network.target
+
+[Service]
+User=madkoding
+WorkingDirectory=/home/madkoding/projects/vtuberdex
+EnvironmentFile=/etc/vtuberdex.env
+Environment=NODE_ENV=production
+ExecStart=/bin/bash -lc '. /home/madkoding/.nvm/nvm.sh && exec node --no-warnings scripts/premiar-directos.mjs --vigilar'
+Restart=on-failure
+RestartSec=30
+# Solo consulta APIs: que nunca desplace a la web ni al juego.
+Nice=10
+CPUWeight=20
+MemoryMax=400M
+
+[Install]
+WantedBy=multi-user.target
