@@ -71,6 +71,12 @@ import {
   listarFacciones,
   ultimoDex,
 } from "../../../../server/src/mutations.mjs";
+import {
+  MisionError,
+  listarReclamos,
+  misionPorId,
+  revocarReclamo,
+} from "../../../../server/src/misiones.mjs";
 import { resumenDeRechazos } from "../../../../server/src/rechazos.mjs";
 import { ejecutorDeSolicitudes } from "../../../../lib/solicitudes.mjs";
 import { correoDeBienvenida, enviarCorreo } from "../../../../lib/correo.mjs";
@@ -911,6 +917,62 @@ async function rechazosRuta(request) {
   }
 }
 
+/**
+ * `GET /api/admin/misiones/reclamos` — los grados que la gente reclamó con misiones de Minecraft: quién, cuál, el grado
+ * que tenía antes y el que lleva hoy (por si una donación lo subió después). Es lo que permite revisar abusos.
+ */
+async function reclamosDeMisionesRuta() {
+  try {
+    const db = await dbConDiario();
+    const filas = await listarReclamos(await ejecutorDeSolicitudes());
+    const items = filas.map((f) => {
+      const ficha = db.prepare("SELECT slug, name FROM vtuber WHERE id = ?").get(f.vtuberId);
+      let actual = null;
+      try {
+        actual = db.prepare("SELECT grade FROM premium WHERE vtuber_id = ?").get(f.vtuberId)?.grade ?? null;
+      } catch {
+        /* una base anterior al premium no tiene la tabla */
+      }
+      return { ...f, mision: misionPorId(f.misionId)?.nombre ?? f.misionId, slug: ficha?.slug ?? null, name: ficha?.name ?? `#${f.vtuberId}`, gradoActual: actual };
+    });
+    return NextResponse.json({ items }, { headers: { "cache-control": "no-store" } });
+  } catch (error) {
+    console.error("[admin] no se pudieron leer los reclamos de misiones", error);
+    return NextResponse.json({ error: "misiones_no_disponibles", detail: error.message }, { status: 503 });
+  }
+}
+
+/**
+ * `POST /api/admin/misiones/reclamos/:vtuberId/:mision/revocar` — quita un grado reclamado con misiones y devuelve la carta
+ * al grado que tenía antes (o a carta normal). Si la carta ya no lleva ese grado (una donación la subió) NO se toca: solo
+ * queda revocado el reclamo. La misión sigue reclamada, así que no se puede volver a reclamar.
+ */
+async function revocarReclamoRuta(vtuberId, misionId, usuario) {
+  const id = Number(vtuberId);
+  if (!Number.isInteger(id) || !misionPorId(misionId))
+    return NextResponse.json({ error: "query_invalida" }, { status: 400 });
+  try {
+    const { grado, gradoPrevio } = await revocarReclamo(await ejecutorDeSolicitudes(), { vtuberId: id, misionId });
+    let actual = null;
+    try {
+      actual = (await dbConDiario()).prepare("SELECT grade FROM premium WHERE vtuber_id = ?").get(id)?.grade ?? null;
+    } catch {
+      /* sin tabla premium */
+    }
+    const quitada = actual === grado;
+    if (quitada)
+      await aplicarYAnotar(
+        { tipo: "vtuber.editar", id, patch: { premium: gradoPrevio === null ? null : { grade: gradoPrevio } } },
+        usuario,
+      );
+    return NextResponse.json({ ok: true, grado, gradoPrevio, cartaModificada: quitada });
+  } catch (error) {
+    if (error instanceof MisionError)
+      return NextResponse.json({ error: error.code, detail: error.detail }, { status: error.status });
+    return responderError(error);
+  }
+}
+
 /** Lo que el mantenedor puede escribir como dirección de una ficha: letras, números y guiones. */
 const SLUG_DE_FICHA = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -1146,6 +1208,7 @@ export async function GET(request, context) {
   if (sufijo === "factions") return listaDeFacciones();
   if (sufijo === "solicitudes") return listarSolicitudesRuta(request);
   if (sufijo === "solicitudes/rechazos") return rechazosRuta(request);
+  if (sufijo === "misiones/reclamos") return reclamosDeMisionesRuta();
   if (
     partes[0] === "solicitudes" &&
     partes[1] &&
@@ -1233,6 +1296,15 @@ export async function POST(request, context) {
   }
   if (partes[0] === "solicitudes" && partes[1] && partes[2] === "resolver")
     return resolverSolicitudRuta(request, partes[1], usuario);
+  if (
+    partes[0] === "misiones" &&
+    partes[1] === "reclamos" &&
+    partes[2] &&
+    partes[3] &&
+    partes[4] === "revocar" &&
+    partes.length === 5
+  )
+    return revocarReclamoRuta(partes[2], partes[3], usuario);
   if (partes[0] === "factions" && partes.length === 1)
     return crearFaccionRuta(request, usuario);
   if (partes[0] === "factions" && partes[1] && partes[2] === "image")

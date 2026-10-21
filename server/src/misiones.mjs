@@ -90,6 +90,15 @@ const DDL = `
     progreso  INTEGER NOT NULL,
     PRIMARY KEY (vtuber_id, mision_id, periodo, contador)
   );
+  CREATE TABLE IF NOT EXISTS mision_reclamo (
+    vtuber_id    INTEGER NOT NULL,
+    mision_id    TEXT NOT NULL,
+    grado        TEXT NOT NULL,
+    grado_previo TEXT,
+    reclamado    TEXT NOT NULL,
+    revocado     TEXT,
+    PRIMARY KEY (vtuber_id, mision_id)
+  );
   CREATE TABLE IF NOT EXISTS mision_estado (
     vtuber_id  INTEGER NOT NULL,
     mision_id  TEXT NOT NULL,
@@ -271,7 +280,46 @@ export async function reclamarGrado(ejecutor, { vtuberId, misionId, gradoActual 
     if (!hecha.rows.length) throw new MisionError(409, 'mision_incompleta', 'Aún no completas esta misión.');
     throw new MisionError(409, 'ya_reclamada', 'Este grado ya se reclamó.');
   }
+  // El rastro del reclamo (con el grado que tenía antes) es lo que permite al mantenedor revisarlo y revocarlo.
+  await e.execute(
+    `INSERT INTO mision_reclamo (vtuber_id, mision_id, grado, grado_previo, reclamado) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (vtuber_id, mision_id) DO UPDATE SET grado = excluded.grado, grado_previo = excluded.grado_previo, reclamado = excluded.reclamado, revocado = NULL`,
+    [Number(vtuberId), mision.id, mision.grado, gradoActual == null || gradoActual === '' ? null : String(gradoActual), new Date(ahora).toISOString()],
+  );
   return { grado: mision.grado, mision: mision.id };
+}
+
+/** Todos los reclamos de grado, el más reciente primero (para el mantenedor). */
+export async function listarReclamos(ejecutor) {
+  const e = await conTablas(ejecutor);
+  const { rows } = await e.execute(
+    'SELECT vtuber_id, mision_id, grado, grado_previo, reclamado, revocado FROM mision_reclamo ORDER BY reclamado DESC',
+  );
+  return rows.map((r) => ({
+    vtuberId: Number(r.vtuber_id),
+    misionId: String(r.mision_id),
+    grado: String(r.grado),
+    gradoPrevio: r.grado_previo == null ? null : String(r.grado_previo),
+    reclamado: String(r.reclamado),
+    revocado: r.revocado == null ? null : String(r.revocado),
+  }));
+}
+
+/**
+ * Revoca un reclamo: lo marca (UPDATE condicional, una sola vez) y devuelve qué grado quitar y a cuál volver. La misión
+ * sigue completada y reclamada: quien abusó no puede volver a reclamarla. Aplicar el cambio a la carta lo hace quien llama,
+ * y solo si la carta todavía lleva ese grado (si una donación la subió después, no se toca).
+ * @returns {Promise<{ grado: string, gradoPrevio: string | null }>}
+ */
+export async function revocarReclamo(ejecutor, { vtuberId, misionId, ahora = Date.now() }) {
+  const e = await conTablas(ejecutor);
+  const r = await e.execute(
+    'UPDATE mision_reclamo SET revocado = ? WHERE vtuber_id = ? AND mision_id = ? AND revocado IS NULL',
+    [new Date(ahora).toISOString(), Number(vtuberId), String(misionId)],
+  );
+  if (!Number(r.rowsAffected ?? 0)) throw new MisionError(404, 'reclamo_no_encontrado', 'No hay un reclamo vigente de esa misión.');
+  const { rows } = await e.execute('SELECT grado, grado_previo FROM mision_reclamo WHERE vtuber_id = ? AND mision_id = ?', [Number(vtuberId), String(misionId)]);
+  return { grado: String(rows[0].grado), gradoPrevio: rows[0].grado_previo == null ? null : String(rows[0].grado_previo) };
 }
 
 /** Deshace la marca de `reclamarGrado` (el grado no se pudo aplicar a la carta). */
@@ -281,4 +329,41 @@ export async function soltarReclamo(ejecutor, { vtuberId, misionId }) {
     `UPDATE mision_estado SET reclamada = NULL WHERE vtuber_id = ? AND mision_id = ? AND periodo = 'unica'`,
     [Number(vtuberId), String(misionId)],
   );
+  await e.execute('DELETE FROM mision_reclamo WHERE vtuber_id = ? AND mision_id = ?', [Number(vtuberId), String(misionId)]);
+}
+
+/**
+ * Cómo van las misiones en la práctica, para AJUSTAR la dificultad con datos y no a ojo: por misión, cuántas fichas la
+ * completaron y, de las que están en camino (misiones únicas), el avance medio y el mejor. Si una misión de grado nadie la
+ * toca después de semanas de juego, sus metas están altas; si la completan en un día, bajas.
+ * @returns {Promise<Array<{ id: string, tipo: string, completaron: number, veces: number, enCamino: number, avanceMedio: number, avanceMaximo: number }>>}
+ */
+export async function resumenDeMisiones(ejecutor) {
+  const e = await conTablas(ejecutor);
+  const [estados, progresos] = await Promise.all([
+    e.execute('SELECT mision_id, COUNT(DISTINCT vtuber_id) AS fichas, COUNT(*) AS veces FROM mision_estado GROUP BY mision_id'),
+    e.execute("SELECT vtuber_id, mision_id, contador, progreso FROM mision_progreso WHERE periodo = 'unica'"),
+  ]);
+  const hechas = new Set(
+    (await e.execute("SELECT vtuber_id, mision_id FROM mision_estado WHERE periodo = 'unica'")).rows.map((r) => `${r.vtuber_id}:${r.mision_id}`),
+  );
+  return MISIONES.map((m) => {
+    const fila = estados.rows.find((r) => r.mision_id === m.id);
+    const avances = new Map();
+    for (const r of progresos.rows) {
+      if (r.mision_id !== m.id || hechas.has(`${r.vtuber_id}:${m.id}`)) continue;
+      const meta = m.requisitos[r.contador];
+      if (meta) avances.set(Number(r.vtuber_id), (avances.get(Number(r.vtuber_id)) ?? 0) + Math.min(1, Number(r.progreso) / meta));
+    }
+    const porcentajes = [...avances.values()].map((suma) => Math.round((100 * suma) / Object.keys(m.requisitos).length));
+    return {
+      id: m.id,
+      tipo: m.tipo,
+      completaron: Number(fila?.fichas ?? 0),
+      veces: Number(fila?.veces ?? 0),
+      enCamino: porcentajes.length,
+      avanceMedio: porcentajes.length ? Math.round(porcentajes.reduce((a, b) => a + b, 0) / porcentajes.length) : 0,
+      avanceMaximo: porcentajes.length ? Math.max(...porcentajes) : 0,
+    };
+  });
 }

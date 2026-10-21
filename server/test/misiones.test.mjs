@@ -11,6 +11,9 @@ import {
   MISIONES,
   MisionError,
   elegibilidadDeGrado,
+  listarReclamos,
+  resumenDeMisiones,
+  revocarReclamo,
   misionesDeFicha,
   reclamarGrado,
   registrarAvances,
@@ -138,4 +141,47 @@ test('el grado se reclama una sola vez, solo si la misión está completa, y se 
 test('una misión secundaria no se puede reclamar como grado', async () => {
   const e = nuevo();
   assert.equal((await error(reclamarGrado(e, { vtuberId: 7, misionId: 'primer-jefe' }))).code, 'mision_no_encontrada');
+});
+
+test('un reclamo deja rastro con el grado anterior, se puede revocar una vez y no se puede volver a reclamar', async () => {
+  const e = nuevo();
+  const g7 = MISIONES.find((m) => m.id === 'grado-7');
+  for (const [contador, meta] of Object.entries(g7.requisitos))
+    for (let hecho = 0; hecho < meta; hecho += AVANCE_POR_LOTE_MAX)
+      await registrarAvances(e, lote({ [contador]: Math.min(AVANCE_POR_LOTE_MAX, meta - hecho) }));
+  await reclamarGrado(e, { vtuberId: 7, misionId: 'grado-7', gradoActual: '6' });
+  const [reclamo] = await listarReclamos(e);
+  assert.deepEqual({ ...reclamo, reclamado: undefined }, { vtuberId: 7, misionId: 'grado-7', grado: '7', gradoPrevio: '6', reclamado: undefined, revocado: null });
+
+  assert.deepEqual(await revocarReclamo(e, { vtuberId: 7, misionId: 'grado-7' }), { grado: '7', gradoPrevio: '6' });
+  assert.equal((await error(revocarReclamo(e, { vtuberId: 7, misionId: 'grado-7' }))).code, 'reclamo_no_encontrado');
+  assert.ok((await listarReclamos(e))[0].revocado);
+  // Revocado, la misión sigue reclamada: no hay forma de volver a pedir el grado.
+  assert.equal((await error(reclamarGrado(e, { vtuberId: 7, misionId: 'grado-7' }))).code, 'ya_reclamada');
+});
+
+test('una carta sin grado previo guarda null; soltar un reclamo que falló borra su rastro', async () => {
+  const e = nuevo();
+  const g6 = MISIONES.find((m) => m.id === 'grado-6');
+  for (const [contador, meta] of Object.entries(g6.requisitos))
+    for (let hecho = 0; hecho < meta; hecho += AVANCE_POR_LOTE_MAX)
+      await registrarAvances(e, lote({ [contador]: Math.min(AVANCE_POR_LOTE_MAX, meta - hecho) }));
+  await reclamarGrado(e, { vtuberId: 7, misionId: 'grado-6' });
+  assert.equal((await listarReclamos(e))[0].gradoPrevio, null);
+  await soltarReclamo(e, { vtuberId: 7, misionId: 'grado-6' });
+  assert.deepEqual(await listarReclamos(e), []);
+});
+
+test('el resumen cuenta quién completó cada misión y el avance de quienes van en camino', async () => {
+  const e = nuevo();
+  await registrarAvances(e, lote({ jefes: 1 })); // completa «primer-jefe» (ficha 7)
+  for (let i = 0; i < 5; i += 1) await registrarAvances(e, lote({ distancia: 1000 }, { vtuberId: 8 })); // «gran-explorador» al 50 %
+  await registrarAvances(e, lote({ distancia: 1000 }, { vtuberId: 9 })); // al 10 %
+  const r = Object.fromEntries((await resumenDeMisiones(e)).map((m) => [m.id, m]));
+  assert.equal(r['primer-jefe'].completaron, 1);
+  assert.equal(r['gran-explorador'].completaron, 0);
+  assert.equal(r['gran-explorador'].enCamino, 2);
+  assert.equal(r['gran-explorador'].avanceMedio, 30);
+  assert.equal(r['gran-explorador'].avanceMaximo, 50);
+  assert.equal(r['grado-8'].enCamino, 3, 'los contadores comunes también avanzan las misiones de grado');
 });

@@ -491,6 +491,18 @@ calcula ni «procesar» una baja los aplica solo**.
   del 8,5 a la Black Label queda solo para donación. Reclamar nunca baja un grado, no toca una carta deteriorada y se aplica por el diario
   (`vtuber.editar`, actor `mision`); la marca de «reclamada» va primero (UPDATE condicional) y se suelta si el diario falla. Los textos de las
   misiones (nombre/descripcion) están en español en el catálogo: fuera del i18n de momento.
+- **Traducción**: nombre y descripción de cada misión y la etiqueta de cada contador están en `lib/i18n/textos/mificha.ts` (`mision.<id>.nombre|descripcion`,
+  `contador.<c>`, es/en/ja); `lib/misiones-textos.test.ts` falla si se añade una misión o contador al catálogo sin sus textos. Si el servidor trae una
+  misión que el cliente no conoce, sale el texto en español del catálogo.
+- **Mantenedor**: pestaña «Premium» → «Grados reclamados con misiones» (`components/admin/reclamos-misiones.tsx`, `GET /api/admin/misiones/reclamos`,
+  `POST …/reclamos/:ficha/:mision/revocar`). Cada reclamo guarda el grado ANTERIOR (`mision_reclamo`); revocar devuelve la carta a él, pero solo si la carta
+  todavía lleva el grado reclamado (si una donación la subió, no se toca) y la misión sigue marcada como reclamada, así que no se puede repetir. Solo en la
+  ruta de Next (el Express local no la tiene).
+- **Ajustar la dificultad con datos**: `npm run informe:misiones` (`resumenDeMisiones`) muestra cuántas fichas completaron cada misión y el avance medio/máximo
+  de quienes van en camino. Las metas del catálogo son una propuesta sin jugar: ajustarlas con ese informe tras unas semanas.
+- **Rango en la carta 3D**: el chip de nivel de la carta dice «NIV 12 · VETERANO» (`card-texture/chip-nivel.ts`, compartido por `capa-textos.ts` y
+  `componer.ts`). Solo sale donde la carta trae nivel (la ficha; el listado y el libro no aplican likes ni XP y no pintan chip). **Sin mirar renderizada**:
+  cabe de sobra por cuenta (≈ 726 de 916 px útiles), pero falta verlo en un navegador con GPU.
 - **Plugin** (repo `vtuberdex/vtuberdex-minecraft`): `MisionesService` acumula los contadores y los manda cada ~30 s; `/vtd misiones` las lista.
   Ver el README del plugin para qué evento cuenta para cada contador.
 

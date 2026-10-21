@@ -265,6 +265,19 @@ export interface MisionVista {
   motivo?: "ya_tiene_igual_o_mayor" | "ficha_deteriorada" | "grado_no_ganable" | null;
 }
 
+export interface ReclamoDeMision {
+  vtuberId: number;
+  misionId: string;
+  mision: string;
+  slug: string | null;
+  name: string;
+  grado: string;
+  gradoPrevio: string | null;
+  gradoActual: string | null;
+  reclamado: string;
+  revocado: string | null;
+}
+
 export interface MisionesDeFicha {
   secundarias: MisionVista[];
   grado: MisionVista[];
@@ -710,6 +723,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email }),
     });
+  },
+  /** Mantenedor: los grados reclamados con misiones de Minecraft (para revisarlos o revocarlos). */
+  reclamosDeMisiones(token: string) {
+    return request<{ items: ReclamoDeMision[] }>("/api/admin/misiones/reclamos", {
+      headers: bearer(token),
+    });
+  },
+  /** Mantenedor: revoca un reclamo y devuelve la carta al grado anterior (si aún lleva el reclamado). */
+  revocarReclamoDeMision(token: string, vtuberId: number, mision: string) {
+    return request<{ ok: true; cartaModificada: boolean }>(
+      `/api/admin/misiones/reclamos/${vtuberId}/${encodeURIComponent(mision)}/revocar`,
+      { method: "POST", headers: bearer(token) },
+    );
   },
   /** Rechazos de los formularios públicos en los últimos días (sin correos ni contenido). */
   rechazosDeSolicitudes(token: string, dias = 7) {

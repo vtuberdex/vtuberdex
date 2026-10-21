@@ -33,6 +33,7 @@ import {
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import type { Clave } from "@/lib/i18n/mensajes";
+import { miFichaEs } from "@/lib/i18n/textos/mificha";
 import { XP_JUEGO_MAX_DIA } from "@/server/src/experiencia.mjs";
 
 const CATEGORIAS: Array<HabilidadMejorable["category"]> = [
@@ -342,6 +343,11 @@ function SeccionStats({
  * derecho a reclamar un grado de carta (la placa de acrílico). Reclamar pide confirmación: cambia la carta pública.
  * Los nombres y descripciones vienen del catálogo del servidor (español).
  */
+/** Las claves de misiones y contadores que existen en los textos (es es la fuente de claves). */
+const TEXTOS_MISION = new Set<string>(
+  Object.keys(miFichaEs).filter((k) => k.startsWith("mision.") || k.startsWith("contador.")),
+);
+
 function SeccionMisiones({
   misiones,
   ocupada,
@@ -354,12 +360,15 @@ function SeccionMisiones({
   const { t } = useI18n();
   const [confirmar, setConfirmar] = useState<string | null>(null);
   const n = (v: number) => v.toLocaleString();
+  // Nombre, descripción y etiquetas se traducen por id; si el servidor trae una misión que esta versión no conoce, sale su texto en español.
+  const texto = (clave: string, respaldo: string) =>
+    TEXTOS_MISION.has(clave) ? t(clave as Clave) : respaldo;
   const barra = (m: MisionVista) => (
     <ul className="mt-2 space-y-1.5">
       {m.requisitos.map((r) => (
         <li key={r.contador}>
           <div className="flex justify-between text-[11px] text-dex-muted">
-            <span>{r.etiqueta}</span>
+            <span>{texto(`contador.${r.contador}`, r.etiqueta)}</span>
             <span className="font-mono">
               {n(r.progreso)} / {n(r.meta)}
             </span>
@@ -397,7 +406,7 @@ function SeccionMisiones({
             >
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span className="font-semibold text-dex-ink">
-                  {m.nombre}
+                  {texto(`mision.${m.id}.nombre`, m.nombre)}
                   {m.repetible === "diaria" && (
                     <span className="ml-2 text-[11px] font-normal text-dex-muted">
                       {t("mificha.misionesDiaria")}
@@ -410,7 +419,9 @@ function SeccionMisiones({
                     : t("mificha.misionesXp", { n: m.xp })}
                 </span>
               </div>
-              <p className="text-xs text-dex-muted">{m.descripcion}</p>
+              <p className="text-xs text-dex-muted">
+                {texto(`mision.${m.id}.descripcion`, m.descripcion)}
+              </p>
               {!m.completada && barra(m)}
             </li>
           ))}
@@ -429,14 +440,18 @@ function SeccionMisiones({
               data-testid={`mision-${m.id}`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span className="font-semibold text-dex-ink">{m.nombre}</span>
+                <span className="font-semibold text-dex-ink">
+                  {texto(`mision.${m.id}.nombre`, m.nombre)}
+                </span>
                 {m.reclamada && (
                   <span className="font-mono text-xs text-dex-accent">
                     {t("mificha.misionesReclamada", { grado: m.grado ?? "" })}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-dex-muted">{m.descripcion}</p>
+              <p className="text-xs text-dex-muted">
+                {texto(`mision.${m.id}.descripcion`, m.descripcion)}
+              </p>
               {!m.completada && barra(m)}
               {m.completada && !m.reclamada && m.reclamable && (
                 <div className="mt-2 space-y-2">
