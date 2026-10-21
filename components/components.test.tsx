@@ -351,3 +351,21 @@ describe("SocialLinks", () => {
     expect(link.getAttribute("rel")).toContain("noopener");
   });
 });
+
+describe("rango por nivel", () => {
+  it("StatBars muestra el rango que corresponde al nivel", () => {
+    render(
+      <StatBars
+        stats={[]}
+        palette={{ accent: "#f0a", secondary: "#0af" }}
+        level={12}
+        experience={null}
+      />,
+    );
+    expect(screen.getByTestId("rango")).toHaveTextContent("Veterano");
+    expect(screen.getByTestId("rango")).toHaveAttribute(
+      "title",
+      "Siguiente rango: Élite en el nivel 20",
+    );
+  });
+});

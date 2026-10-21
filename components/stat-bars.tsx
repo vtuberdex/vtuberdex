@@ -1,5 +1,6 @@
 "use client";
 /** Stats del VTuber en barras normalizadas + nivel y EXP. */
+import { rangoDelNivel } from "@/lib/rangos";
 import { useI18n } from "@/lib/i18n";
 import { etiquetaDeStat } from "@/lib/i18n/nombres";
 import { StatRadar } from "@/components/stat-radar";
@@ -21,6 +22,7 @@ export interface StatBarsProps {
 const REFERENCE_MAX = 400;
 
 export function StatBars({ stats, palette, level, experience }: StatBarsProps) {
+  const rango = level !== null ? rangoDelNivel(level) : null;
   const { t, locale } = useI18n();
   const numeric = stats.filter((stat) => typeof stat.value === "number");
 
@@ -52,8 +54,24 @@ export function StatBars({ stats, palette, level, experience }: StatBarsProps) {
           {t("atributos.titulo")}
         </h2>
         {level !== null && (
-          <span className="rounded-lg border border-dex-line px-2 py-0.5 font-mono text-xs text-dex-ink">
-            {t("atributos.nivel", { n: level })}
+          <span className="flex items-center gap-2">
+            <span
+              className="rounded-lg border border-dex-accent/50 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.1em] text-dex-accent"
+              data-testid="rango"
+              title={
+                rango?.siguiente
+                  ? t("rango.sig", {
+                      rango: t(`rango.${rango.siguiente.id}`),
+                      n: rango.siguiente.desde,
+                    })
+                  : t("rango.max")
+              }
+            >
+              {rango ? t(`rango.${rango.id}`) : ""}
+            </span>
+            <span className="rounded-lg border border-dex-line px-2 py-0.5 font-mono text-xs text-dex-ink">
+              {t("atributos.nivel", { n: level })}
+            </span>
           </span>
         )}
       </div>
