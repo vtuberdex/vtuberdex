@@ -8,6 +8,7 @@ import {
   estadoDeCanal,
   estadoDeRedes,
   plataformaConfigurada,
+  precalentarTwitch,
 } from "./directos.mjs";
 
 const ENV: Record<string, string | undefined> = {
@@ -229,5 +230,53 @@ describe("estadoDeRedes", () => {
     );
     expect(r).toHaveLength(1);
     expect(r[0].plataforma).toBe("twitch");
+  });
+});
+
+describe("precalentarTwitch", () => {
+  const canales = (n: number) =>
+    Array.from({ length: n }, (_, i) => canalDeUrl(`https://twitch.tv/canal_${String(i).padStart(3, "0")}`)!);
+
+  test("pregunta de a 100 logins y deja la caché lista: estadoDeCanal ya no llama", async () => {
+    const f = vi.fn(async (url: string) => {
+      if (url.includes("oauth2/token")) return json({ access_token: "T", expires_in: 3600 });
+      const pedidos = new URL(url).searchParams.getAll("user_login");
+      // Solo el 5 y el 150 están en vivo.
+      return json({ data: pedidos.filter((l) => l === "canal_005" || l === "canal_150").map((l) => ({ type: "live", user_login: l, title: l, viewer_count: 3 })) });
+    });
+    const todos = canales(250);
+    await precalentarTwitch(todos, { fetch: f as never, env: ENV as never });
+    const llamadas = f.mock.calls.filter(([u]) => String(u).includes("helix/streams"));
+    expect(llamadas).toHaveLength(3); // 100 + 100 + 50
+    for (const [u] of llamadas) expect(new URL(String(u)).searchParams.getAll("user_login").length).toBeLessThanOrEqual(100);
+
+    const antes = f.mock.calls.length;
+    const vivo = await estadoDeCanal(todos[5], { fetch: f as never, env: ENV as never });
+    const fuera = await estadoDeCanal(todos[6], { fetch: f as never, env: ENV as never });
+    expect(vivo).toMatchObject({ estado: "ok", enVivo: true, titulo: "canal_005", espectadores: 3 });
+    expect(fuera).toMatchObject({ estado: "ok", enVivo: false });
+    expect(f.mock.calls.length).toBe(antes);
+    // Una segunda pasada con todo vigente no vuelve a preguntar.
+    await precalentarTwitch(todos, { fetch: f as never, env: ENV as never });
+    expect(f.mock.calls.length).toBe(antes);
+  });
+
+  test("si el lote falla, los canales quedan en error (poco tiempo) y no cae a una llamada por canal", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const f = vi.fn(async (url: string) => {
+      if (url.includes("oauth2/token")) return json({ access_token: "T", expires_in: 3600 });
+      return json({}, 500);
+    });
+    const todos = canales(3);
+    await precalentarTwitch(todos, { fetch: f as never, env: ENV as never });
+    const antes = f.mock.calls.length;
+    expect((await estadoDeCanal(todos[0], { fetch: f as never, env: ENV as never })).estado).toBe("error");
+    expect(f.mock.calls.length).toBe(antes);
+  });
+
+  test("sin credenciales de Twitch no hace nada", async () => {
+    const f = vi.fn();
+    await precalentarTwitch(canales(3), { fetch: f as never, env: {} as never });
+    expect(f).not.toHaveBeenCalled();
   });
 });

@@ -7,7 +7,7 @@
  * ------------------------------
  * El plugin junta lo que pasó unos segundos y manda `{ mobs: 12, mineria: 40 }` con un `idLote` (UUID). Cada misión pide
  * uno o varios contadores (`requisitos`) y se completa cuando TODOS llegan a su meta. Un mismo contador alimenta a todas
- * las misiones que lo piden. Las diarias cuentan por día de Chile (`periodo` = el día), las únicas para siempre.
+ * las misiones que lo piden. Las diarias cuentan por día de Chile (`periodo` = el día), las semanales de lunes a domingo (`semana:<lunes>`), las únicas para siempre.
  *
  * IDEMPOTENCIA
  * ------------
@@ -44,6 +44,7 @@ export const CONTADORES = Object.freeze({
 
 const unica = (m) => Object.freeze({ repetible: null, xp: 0, ...m });
 const diaria = (m) => Object.freeze({ repetible: 'diaria', xp: 0, ...m });
+const semanal = (m) => Object.freeze({ repetible: 'semanal', xp: 0, ...m });
 
 /** Catálogo. Para ajustar dificultad o recompensas se toca SOLO esto. */
 export const MISIONES = Object.freeze([
@@ -52,6 +53,8 @@ export const MISIONES = Object.freeze([
   diaria({ id: 'minero-del-dia', tipo: 'secundaria', nombre: 'Minero del día', descripcion: 'Extrae 64 minerales hoy.', requisitos: { mineria: 64 }, xp: 20 }),
   diaria({ id: 'pescador-del-dia', tipo: 'secundaria', nombre: 'Pescador del día', descripcion: 'Pesca 10 peces hoy.', requisitos: { pesca: 10 }, xp: 15 }),
   diaria({ id: 'granjero-del-dia', tipo: 'secundaria', nombre: 'Granjero del día', descripcion: 'Cosecha 64 cultivos hoy.', requisitos: { cosecha: 64 }, xp: 15 }),
+  semanal({ id: 'cazador-semanal', tipo: 'secundaria', nombre: 'Cazador de la semana', descripcion: 'Derrota 500 monstruos esta semana.', requisitos: { mobs: 500 }, xp: 80 }),
+  semanal({ id: 'repartidor-semanal', tipo: 'secundaria', nombre: 'Repartidor de la semana', descripcion: 'Completa 10 entregas esta semana.', requisitos: { entregas: 10 }, xp: 120 }),
   unica({ id: 'primer-jefe', tipo: 'secundaria', nombre: 'Primer jefe', descripcion: 'Derrota a tu primer jefe.', requisitos: { jefes: 1 }, xp: 100 }),
   unica({ id: 'repartidor-novato', tipo: 'secundaria', nombre: 'Repartidor novato', descripcion: 'Completa 5 entregas.', requisitos: { entregas: 5 }, xp: 60 }),
   unica({ id: 'gran-explorador', tipo: 'secundaria', nombre: 'Gran explorador', descripcion: 'Recorre 10.000 metros.', requisitos: { distancia: 10000 }, xp: 80 }),
@@ -115,8 +118,19 @@ async function conTablas(ejecutor) {
 
 const DIA = /^\d{4}-\d{2}-\d{2}$/;
 const UN_DIA_MS = 24 * 60 * 60 * 1000;
-/** Las diarias cuentan por día; las únicas, siempre en el mismo periodo. */
-const periodoDe = (mision, dia) => (mision.repetible === 'diaria' ? dia : 'unica');
+/**
+ * El lunes de la semana de un día (YYYY-MM-DD): las semanales cuentan de lunes a domingo, con el día de Chile que decide quien
+ * llama. Se calcula en UTC sobre la fecha ya resuelta, así que no depende del huso del servidor.
+ */
+export function lunesDe(dia) {
+  const [a, m, d] = String(dia).split('-').map(Number);
+  const fecha = new Date(Date.UTC(a, m - 1, d));
+  fecha.setUTCDate(fecha.getUTCDate() - ((fecha.getUTCDay() + 6) % 7));
+  return fecha.toISOString().slice(0, 10);
+}
+
+/** Las diarias cuentan por día, las semanales por semana y las únicas, siempre en el mismo periodo. */
+const periodoDe = (mision, dia) => (mision.repetible === 'diaria' ? dia : mision.repetible === 'semanal' ? `semana:${lunesDe(dia)}` : 'unica');
 
 /** Avances válidos: solo contadores conocidos, enteros 1…`AVANCE_POR_LOTE_MAX`. Lanza si no cuadra. */
 function avancesValidos(avances) {

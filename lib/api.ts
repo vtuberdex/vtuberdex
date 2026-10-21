@@ -255,7 +255,7 @@ export interface MisionVista {
   nombre: string;
   descripcion: string;
   xp: number;
-  repetible: "diaria" | null;
+  repetible: "diaria" | "semanal" | null;
   requisitos: Array<{ contador: string; etiqueta: string; meta: number; progreso: number }>;
   completada: boolean;
   /** Solo en las misiones de grado. */

@@ -407,9 +407,11 @@ function SeccionMisiones({
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span className="font-semibold text-dex-ink">
                   {texto(`mision.${m.id}.nombre`, m.nombre)}
-                  {m.repetible === "diaria" && (
+                  {m.repetible && (
                     <span className="ml-2 text-[11px] font-normal text-dex-muted">
-                      {t("mificha.misionesDiaria")}
+                      {m.repetible === "semanal"
+                        ? t("mificha.misionesSemanal")
+                        : t("mificha.misionesDiaria")}
                     </span>
                   )}
                 </span>

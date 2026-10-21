@@ -15,7 +15,11 @@ const json = (c: unknown) => new Response(JSON.stringify(c));
 const red = vi.fn(async (url: string) => {
   const u = String(url);
   if (u.includes("/token")) return json({ access_token: "T", expires_in: 3600 });
-  if (u.includes("helix/streams")) return json({ data: u.includes("user_login=ana_vt") ? [{ type: "live", title: "x", viewer_count: 1 }] : [] });
+  if (u.includes("helix/streams")) {
+    // Como Helix: responde solo los que están en vivo, con su `user_login`.
+    const pedidos = new URL(u).searchParams.getAll("user_login");
+    return json({ data: pedidos.includes("ana_vt") ? [{ type: "live", user_login: "ana_vt", title: "x", viewer_count: 1 }] : [] });
+  }
   if (u.includes("api.kick.com")) return json({ data: [{ stream_title: "k", stream: { is_live: true, viewer_count: 2 } }] });
   throw new Error(`inesperada ${u}`);
 });
@@ -37,6 +41,8 @@ describe("premiarDirectos", () => {
     const ctx = { ejecutor, dia: "2026-10-21", opciones: { fetch: red as never, env: ENV as never }, ahora: Date.UTC(2026, 9, 21, 12) };
     const r = await premiarDirectos(fichas, ctx);
     expect(r).toMatchObject({ revisadas: 2, enDirecto: 1, pagadas: 1, xp: 5, errores: 0 });
+    // Twitch se pregunta en UN lote para todos sus canales (ana_vt y fuera_vt), no uno por uno.
+    expect(red.mock.calls.filter(([u]) => String(u).includes("helix/streams"))).toHaveLength(1);
     expect(await xpDeJuego(ejecutor, 1)).toBe(5);
     expect(await xpDeJuego(ejecutor, 2)).toBe(0);
 

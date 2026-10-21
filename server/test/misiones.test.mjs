@@ -12,6 +12,7 @@ import {
   MisionError,
   elegibilidadDeGrado,
   listarReclamos,
+  lunesDe,
   resumenDeMisiones,
   revocarReclamo,
   misionesDeFicha,
@@ -184,4 +185,31 @@ test('el resumen cuenta quién completó cada misión y el avance de quienes van
   assert.equal(r['gran-explorador'].avanceMedio, 30);
   assert.equal(r['gran-explorador'].avanceMaximo, 50);
   assert.equal(r['grado-8'].enCamino, 3, 'los contadores comunes también avanzan las misiones de grado');
+});
+
+test('lunesDe devuelve el lunes de la semana (también en domingo y en cambio de mes/año)', () => {
+  assert.equal(lunesDe('2026-10-19'), '2026-10-19'); // lunes
+  assert.equal(lunesDe('2026-10-21'), '2026-10-19'); // miércoles
+  assert.equal(lunesDe('2026-10-25'), '2026-10-19'); // domingo
+  assert.equal(lunesDe('2026-10-26'), '2026-10-26');
+  assert.equal(lunesDe('2027-01-01'), '2026-12-28'); // viernes, semana que cruza el año
+});
+
+test('las semanales acumulan de lunes a domingo, pagan una vez por semana y se reinician el lunes', async () => {
+  const e = nuevo();
+  // Lunes a viernes de la misma semana: 100 monstruos por día completan «cazador-semanal» (500).
+  let completadas = [];
+  for (const dia of ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'])
+    completadas.push(...(await registrarAvances(e, lote({ mobs: 100 }, { dia }))).completadas);
+  assert.equal(completadas.filter((m) => m.id === 'cazador-semanal').length, 1);
+  // 5 días × 20 de «cazador del día» (100 monstruos > 50) + 80 de la semanal.
+  assert.equal(await xpDeJuego(e, 7), 5 * 20 + 80);
+  // Más monstruos el domingo de la misma semana no pagan otra vez...
+  await registrarAvances(e, lote({ mobs: 500 }, { dia: '2026-10-25' }));
+  assert.equal(await xpDeJuego(e, 7), 6 * 20 + 80, 'el domingo solo paga la diaria nueva');
+  // ...y el lunes siguiente vuelve a empezar desde cero.
+  const vista = await misionesDeFicha(e, { vtuberId: 7, dia: '2026-10-26' });
+  assert.equal(vista.secundarias.find((m) => m.id === 'cazador-semanal').requisitos[0].progreso, 0);
+  const otra = await registrarAvances(e, lote({ mobs: 500 }, { dia: '2026-10-26' }));
+  assert.ok(otra.completadas.some((m) => m.id === 'cazador-semanal'));
 });

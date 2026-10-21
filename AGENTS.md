@@ -491,6 +491,12 @@ calcula ni «procesar» una baja los aplica solo**.
   del 8,5 a la Black Label queda solo para donación. Reclamar nunca baja un grado, no toca una carta deteriorada y se aplica por el diario
   (`vtuber.editar`, actor `mision`); la marca de «reclamada» va primero (UPDATE condicional) y se suelta si el diario falla. Los textos de las
   misiones (nombre/descripcion) están en español en el catálogo: fuera del i18n de momento.
+- **Semanales**: `repetible: 'semanal'` cuenta de lunes a domingo (`periodo = semana:<lunes>`, `lunesDe`); hay 2 («Cazador de la semana» 80 XP, «Repartidor
+  de la semana» 120 XP). Se pagan una vez por semana y arrancan de cero el lunes.
+- **Panel del juego y avisos**: `progreso.rango` (nombre en español) sale en `GET /api/minecraft/jugador/:uuid` y el panel lo muestra junto al nivel; al entrar,
+  `MisionesService.avisarGradoListo` recuerda (una vez por conexión) los grados de misión completados y sin reclamar.
+- **Twitch en lotes**: `precalentarTwitch` (`lib/directos.mjs`) pregunta a Helix de a 100 logins y llena la caché; `premiarDirectos` lo llama antes de revisar
+  (~8 llamadas en vez de ~800 por pasada). Si el lote falla, los canales quedan en error un rato corto en lugar de caer a llamadas sueltas.
 - **Traducción**: nombre y descripción de cada misión y la etiqueta de cada contador están en `lib/i18n/textos/mificha.ts` (`mision.<id>.nombre|descripcion`,
   `contador.<c>`, es/en/ja); `lib/misiones-textos.test.ts` falla si se añade una misión o contador al catálogo sin sus textos. Si el servidor trae una
   misión que el cliente no conoce, sale el texto en español del catálogo.

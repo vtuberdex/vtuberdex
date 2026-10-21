@@ -302,6 +302,7 @@ describe("vínculo y XP de punta a punta", () => {
         topeDia: XP_JUEGO_MAX_DIA,
         puntosHabilidad: 0,
         puntosStats: 0,
+        rango: "Novato",
       },
     });
 
