@@ -475,6 +475,25 @@ calcula ni «procesar» una baja los aplica solo**.
   Falta instalar el servicio en la VPS (como `vtuberdex-voces`) y definir las credenciales en `/etc/vtuberdex.env`. Perillas: `XP_DIRECTO_*` en
   `server/src/experiencia.mjs`.
 
+## Rangos y misiones de Minecraft (XP y grado de carta)
+
+- **Rangos por nivel** (`server/src/rangos.mjs`, UNA tabla: Novato 1 · Aprendiz 5 · Veterano 10 · Élite 20 · Maestro 35 · Leyenda 50;
+  `lib/rangos.ts` la reexporta). Se calculan del nivel en el cliente (insignia en `StatBars`; títulos en `rango.<id>`, es/en/ja) y salen en
+  `GET /api/minecraft/reglas` (`rangos`) para el plugin. Los umbrales salen de la curva real (`umbralDeNivel`); ajustarlos = tocar `RANGOS`.
+- **Misiones** (`server/src/misiones.mjs`, catálogo `MISIONES`): el plugin solo REPORTA contadores (`mobs`, `jefes`, `mineria`, `pesca`,
+  `cosecha`, `cria`, `entregas`, `distancia`) y la web decide qué se completó. Una misión pide uno o varios contadores y se completa al llegar
+  todos a su meta; las diarias cuentan por día de Chile. **Idempotente**: el lote (`idLote`, UUID) es clave primaria, completar es un
+  `INSERT … ON CONFLICT DO NOTHING` (solo el que gana paga) y la XP es otra fila (`xp_mision`, clave `ficha:mision:periodo`) que se suma en
+  `xpDeJuego`/`xpDeJuegoVarias` junto a `xp_juego` y `xp_directo`: **no gasta el tope diario de Minecraft** (las diarias suman 70 XP/día como mucho).
+  Rutas del plugin (con `X-Minecraft-Token`): `POST /api/minecraft/misiones` `{ uuid, idLote, avances }` y `GET /api/minecraft/misiones/:uuid`.
+- **Grado por misiones (opcional)**: las 5 misiones de grado (`grado-6` … `grado-8`) son DIFÍCILES (miles de mobs, jefes, 250 entregas…) y no dan
+  XP: dan el derecho a reclamar el grado desde «Mi ficha» (`POST /api/mi-ficha/misiones`, con confirmación). **Tope 8** (`GRADO_MAXIMO_POR_MISIONES`):
+  del 8,5 a la Black Label queda solo para donación. Reclamar nunca baja un grado, no toca una carta deteriorada y se aplica por el diario
+  (`vtuber.editar`, actor `mision`); la marca de «reclamada» va primero (UPDATE condicional) y se suelta si el diario falla. Los textos de las
+  misiones (nombre/descripcion) están en español en el catálogo: fuera del i18n de momento.
+- **Plugin** (repo `vtuberdex/vtuberdex-minecraft`): `MisionesService` acumula los contadores y los manda cada ~30 s; `/vtd misiones` las lista.
+  Ver el README del plugin para qué evento cuenta para cada contador.
+
 ## Experiencia, niveles y puntos de habilidad («Mi ficha»)
 
 - **La experiencia es función de los likes** (`server/src/experiencia.mjs`, `experienciaConLikes`): la barra (`current/max`) se

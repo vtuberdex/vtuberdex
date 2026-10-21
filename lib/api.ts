@@ -245,6 +245,29 @@ export interface VistaMiFicha {
   statsPuntos?: EstadoDeStats;
   /** Cuenta de Minecraft vinculada y XP traída del juego. Opcional: la maqueta de /niveles no lo trae. */
   minecraft?: EstadoMinecraft;
+  /** Misiones de Minecraft con su progreso. `null` si el almacén falló; ausente en la maqueta de /niveles. */
+  misiones?: MisionesDeFicha | null;
+}
+
+export interface MisionVista {
+  id: string;
+  tipo: "secundaria" | "grado";
+  nombre: string;
+  descripcion: string;
+  xp: number;
+  repetible: "diaria" | null;
+  requisitos: Array<{ contador: string; etiqueta: string; meta: number; progreso: number }>;
+  completada: boolean;
+  /** Solo en las misiones de grado. */
+  grado?: string;
+  reclamada?: boolean;
+  reclamable?: boolean;
+  motivo?: "ya_tiene_igual_o_mayor" | "ficha_deteriorada" | "grado_no_ganable" | null;
+}
+
+export interface MisionesDeFicha {
+  secundarias: MisionVista[];
+  grado: MisionVista[];
 }
 
 /** «Mi ficha»: el vínculo con Minecraft (el UUID no se muestra; basta el nombre de jugador). */
@@ -670,6 +693,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ token, slug, accion }),
     });
+  },
+  /** Reclama el grado de carta de una misión de grado completada (opcional: la persona decide). */
+  reclamarGradoDeMision(token: string, slug: string, mision: string) {
+    return request<{ ok: true; grado: string; ficha: VistaMiFicha }>(
+      "/api/mi-ficha/misiones",
+      {
+        method: "POST",
+        body: JSON.stringify({ token, slug, accion: "reclamar-grado", mision }),
+      },
+    );
   },
   /** Manda el enlace mágico a ese correo si tiene fichas; responde igual para cualquiera. */
   pedirEnlaceDeMiFicha(email: string) {

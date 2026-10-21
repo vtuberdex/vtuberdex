@@ -25,6 +25,8 @@ import {
   api,
   type EstadoDeStats,
   type EstadoMinecraft,
+  type MisionesDeFicha,
+  type MisionVista,
   type HabilidadMejorable,
   type RespuestaMiFicha,
   type VistaMiFicha,
@@ -336,6 +338,162 @@ function SeccionStats({
 }
 
 /**
+ * Misiones de Minecraft: las secundarias dan experiencia; las de grado son difíciles y OPCIONALES, y completarlas da el
+ * derecho a reclamar un grado de carta (la placa de acrílico). Reclamar pide confirmación: cambia la carta pública.
+ * Los nombres y descripciones vienen del catálogo del servidor (español).
+ */
+function SeccionMisiones({
+  misiones,
+  ocupada,
+  alReclamar,
+}: {
+  misiones: MisionesDeFicha;
+  ocupada: string | null;
+  alReclamar: (mision: string, grado: string) => void;
+}) {
+  const { t } = useI18n();
+  const [confirmar, setConfirmar] = useState<string | null>(null);
+  const n = (v: number) => v.toLocaleString();
+  const barra = (m: MisionVista) => (
+    <ul className="mt-2 space-y-1.5">
+      {m.requisitos.map((r) => (
+        <li key={r.contador}>
+          <div className="flex justify-between text-[11px] text-dex-muted">
+            <span>{r.etiqueta}</span>
+            <span className="font-mono">
+              {n(r.progreso)} / {n(r.meta)}
+            </span>
+          </div>
+          <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-dex-accent"
+              style={{ width: `${Math.min(100, (r.progreso / r.meta) * 100)}%` }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+  return (
+    <section
+      className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/60 p-5"
+      data-testid="mificha-misiones"
+    >
+      <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">
+        {t("mificha.misionesTitulo")}
+      </h3>
+      <p className="text-sm text-dex-ink/85">{t("mificha.misionesTexto")}</p>
+
+      <div>
+        <h4 className="text-xs font-bold uppercase tracking-[0.14em] text-dex-muted">
+          {t("mificha.misionesSecundarias")}
+        </h4>
+        <ul className="mt-2 space-y-2">
+          {misiones.secundarias.map((m) => (
+            <li
+              key={m.id}
+              className="rounded-xl border border-dex-line p-3"
+              data-testid={`mision-${m.id}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="font-semibold text-dex-ink">
+                  {m.nombre}
+                  {m.repetible === "diaria" && (
+                    <span className="ml-2 text-[11px] font-normal text-dex-muted">
+                      {t("mificha.misionesDiaria")}
+                    </span>
+                  )}
+                </span>
+                <span className="font-mono text-xs text-dex-accent">
+                  {m.completada
+                    ? t("mificha.misionesCompletada")
+                    : t("mificha.misionesXp", { n: m.xp })}
+                </span>
+              </div>
+              <p className="text-xs text-dex-muted">{m.descripcion}</p>
+              {!m.completada && barra(m)}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h4 className="text-xs font-bold uppercase tracking-[0.14em] text-dex-muted">
+          {t("mificha.misionesGrado")}
+        </h4>
+        <ul className="mt-2 space-y-2">
+          {misiones.grado.map((m) => (
+            <li
+              key={m.id}
+              className="rounded-xl border border-dex-line p-3"
+              data-testid={`mision-${m.id}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="font-semibold text-dex-ink">{m.nombre}</span>
+                {m.reclamada && (
+                  <span className="font-mono text-xs text-dex-accent">
+                    {t("mificha.misionesReclamada", { grado: m.grado ?? "" })}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-dex-muted">{m.descripcion}</p>
+              {!m.completada && barra(m)}
+              {m.completada && !m.reclamada && m.reclamable && (
+                <div className="mt-2 space-y-2">
+                  {confirmar === m.id ? (
+                    <>
+                      <p className="text-xs text-dex-ink/85">
+                        {t("mificha.misionesConfirmar", { grado: m.grado ?? "" })}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={ocupada !== null}
+                          onClick={() => {
+                            setConfirmar(null);
+                            alReclamar(m.id, m.grado ?? "");
+                          }}
+                          className={claseBoton}
+                        >
+                          {ocupada === m.id
+                            ? t("mificha.misionesReclamando")
+                            : t("mificha.misionesSi")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmar(null)}
+                          className="rounded-xl border border-dex-line px-4 py-2 text-sm text-dex-muted hover:text-dex-ink"
+                        >
+                          {t("mificha.misionesNo")}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={ocupada !== null}
+                      onClick={() => setConfirmar(m.id)}
+                      className={claseBoton}
+                    >
+                      {t("mificha.misionesReclamar", { grado: m.grado ?? "" })}
+                    </button>
+                  )}
+                </div>
+              )}
+              {m.completada && !m.reclamada && !m.reclamable && m.motivo && (
+                <p className="mt-2 text-xs text-dex-muted">
+                  {t(`mificha.misionesMotivo.${m.motivo}`)}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+/**
  * Vincular la cuenta de Minecraft: un código de un uso que se escribe en el chat del juego. El código se muestra UNA
  * vez (solo se guarda su hash) y caduca en 10 minutos; pedir otro invalida el anterior.
  */
@@ -530,6 +688,21 @@ export function MiFicha() {
     }
   };
 
+  const reclamarGrado = async (mision: string, grado: string, ficha: VistaMiFicha) => {
+    if (!token) return;
+    setOcupada(mision);
+    setAviso(null);
+    try {
+      const r = await api.reclamarGradoDeMision(token, ficha.slug, mision);
+      setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
+      setAviso({ tipo: "ok", texto: t("mificha.misionesReclamado", { grado }) });
+    } catch (causa) {
+      avisarFallo(causa);
+    } finally {
+      setOcupada(null);
+    }
+  };
+
   if (!listo)
     return <p className="text-sm text-dex-muted">{t("mificha.cargando")}</p>;
   if (!token) return <PedirEnlace />;
@@ -560,6 +733,9 @@ export function MiFicha() {
       codigoMinecraft={codigoMinecraft}
       alPedirCodigo={() => void minecraft("codigo", datos.ficha)}
       alDesvincular={() => void minecraft("desvincular", datos.ficha)}
+      alReclamarGrado={(mision, grado) =>
+        void reclamarGrado(mision, grado, datos.ficha)
+      }
       alElegirFicha={(slug) => {
         setCodigoMinecraft(null);
         if (token) void cargar(token, slug);
@@ -589,6 +765,7 @@ export function MiFichaVista({
   codigoMinecraft = null,
   alPedirCodigo = () => {},
   alDesvincular = () => {},
+  alReclamarGrado = () => {},
   alElegirFicha = () => {},
   alSubir = () => {},
   alReiniciar = () => {},
@@ -605,6 +782,7 @@ export function MiFichaVista({
   codigoMinecraft?: string | null;
   alPedirCodigo?: () => void;
   alDesvincular?: () => void;
+  alReclamarGrado?: (mision: string, grado: string) => void;
   alElegirFicha?: (slug: string) => void;
   alSubir?: (clave: string, nombre: string) => void;
   alReiniciar?: () => void;
@@ -798,6 +976,14 @@ export function MiFichaVista({
           ocupada={ocupada}
           alPedirCodigo={alPedirCodigo}
           alDesvincular={alDesvincular}
+        />
+      )}
+
+      {ficha.misiones && (
+        <SeccionMisiones
+          misiones={ficha.misiones}
+          ocupada={ocupada}
+          alReclamar={alReclamarGrado}
         />
       )}
 

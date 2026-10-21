@@ -122,6 +122,14 @@ const DDL = `
     creado     TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_xp_directo_dia ON xp_directo (vtuber_id, dia);
+  CREATE TABLE IF NOT EXISTS xp_mision (
+    id_mision  TEXT PRIMARY KEY,
+    vtuber_id  INTEGER NOT NULL,
+    cantidad   INTEGER NOT NULL,
+    dia        TEXT NOT NULL,
+    creado     TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_xp_mision_ficha ON xp_mision (vtuber_id);
   CREATE TABLE IF NOT EXISTS sesion_minecraft (
     uuid       TEXT NOT NULL,
     red        TEXT NOT NULL,
@@ -141,6 +149,8 @@ export class MinecraftError extends Error {
 }
 
 const conTablas = preparadorDeTablas(DDL);
+/** Las tablas de XP las comparten las misiones (`misiones.mjs`): crean aquí `xp_mision` antes de escribir. */
+export const prepararTablasMinecraft = conTablas;
 
 const hash = (codigo) =>
   crypto.createHash("sha256").update(codigo).digest("hex");
@@ -577,8 +587,10 @@ export async function xpDeJuegoVarias(ejecutor, ids) {
        SELECT vtuber_id AS id, cantidad AS n FROM xp_juego WHERE vtuber_id IN (${marcas})
        UNION ALL
        SELECT vtuber_id AS id, cantidad AS n FROM xp_directo WHERE vtuber_id IN (${marcas})
+       UNION ALL
+       SELECT vtuber_id AS id, cantidad AS n FROM xp_mision WHERE vtuber_id IN (${marcas})
      ) GROUP BY id`,
-    [...lista, ...lista],
+    [...lista, ...lista, ...lista],
   );
   return new Map(rows.map((r) => [Number(r.id), Number(r.n)]));
 }
@@ -588,8 +600,9 @@ export async function xpDeJuego(ejecutor, vtuberId) {
   const e = await conTablas(ejecutor);
   const { rows } = await e.execute(
     `SELECT (SELECT COALESCE(SUM(cantidad), 0) FROM xp_juego WHERE vtuber_id = ?)
-          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_directo WHERE vtuber_id = ?) AS n`,
-    [Number(vtuberId), Number(vtuberId)],
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_directo WHERE vtuber_id = ?)
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_mision WHERE vtuber_id = ?) AS n`,
+    [Number(vtuberId), Number(vtuberId), Number(vtuberId)],
   );
   return Number(rows[0]?.n ?? 0);
 }

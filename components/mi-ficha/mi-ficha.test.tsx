@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   repartirPuntos: vi.fn(),
   pedirEnlaceDeMiFicha: vi.fn(),
   minecraftDeMiFicha: vi.fn(),
+  reclamarGradoDeMision: vi.fn(),
 }));
 vi.mock("@/lib/api", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/api")>();
@@ -236,5 +237,62 @@ describe("MiFicha", () => {
       "luna",
       "desvincular",
     );
+  });
+
+  describe("misiones", () => {
+    const mision = (extra: object) => ({
+      id: "grado-6",
+      tipo: "grado" as const,
+      nombre: "Carta gradeada · 6",
+      descripcion: "x",
+      xp: 0,
+      repetible: null,
+      requisitos: [{ contador: "mobs", etiqueta: "monstruos derrotados", meta: 1000, progreso: 1000 }],
+      completada: true,
+      grado: "6",
+      reclamada: false,
+      reclamable: true,
+      motivo: null,
+      ...extra,
+    });
+    const conMisiones = (grado: object[]) => ({
+      ...vista(0),
+      misiones: {
+        secundarias: [
+          { ...mision({ id: "primer-jefe", tipo: "secundaria", nombre: "Primer jefe", xp: 100, completada: false, grado: undefined, reclamable: undefined }) },
+        ],
+        grado,
+      },
+    });
+
+    test("lista las secundarias con su XP y pide confirmar antes de reclamar un grado", async () => {
+      mocks.miFicha.mockResolvedValue({ ok: true, fichas: [{ slug: "luna", name: "Luna" }], ficha: conMisiones([mision({})]) });
+      mocks.reclamarGradoDeMision.mockResolvedValue({
+        ok: true,
+        grado: "6",
+        ficha: conMisiones([mision({ reclamada: true, reclamable: false })]),
+      });
+      render(<MiFicha />);
+      expect(await screen.findByTestId("mificha-misiones")).toBeTruthy();
+      expect(screen.getByTestId("mision-primer-jefe").textContent).toContain("+100 XP");
+
+      fireEvent.click(screen.getByRole("button", { name: "Reclamar grado 6" }));
+      expect(mocks.reclamarGradoDeMision).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Sí, reclamar" }));
+      await waitFor(() => expect(mocks.reclamarGradoDeMision).toHaveBeenCalledWith("abc", "luna", "grado-6"));
+      expect(await screen.findByText("¡Listo! Tu carta ahora tiene el grado 6.")).toBeTruthy();
+      expect(screen.getByTestId("mision-grado-6").textContent).toContain("Grado 6 reclamado");
+    });
+
+    test("si la carta ya tiene ese grado o más, explica por qué no se puede reclamar", async () => {
+      mocks.miFicha.mockResolvedValue({
+        ok: true,
+        fichas: [{ slug: "luna", name: "Luna" }],
+        ficha: conMisiones([mision({ reclamable: false, motivo: "ya_tiene_igual_o_mayor" })]),
+      });
+      render(<MiFicha />);
+      expect(await screen.findByText("Tu carta ya tiene este grado o uno mayor.")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /Reclamar grado/ })).toBeNull();
+    });
   });
 });
