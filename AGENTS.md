@@ -461,7 +461,7 @@ calcula ni «procesar» una baja los aplica solo**.
 
 - **Ficha**: `components/directo-en-vivo.tsx` pide `GET /api/vtubers/:slug/directo` (mismas defensas que el detalle) y muestra «EN DIRECTO» con
   título y espectadores, estadísticas públicas y últimos vídeos de YouTube. **El navegador nunca habla con las plataformas**: `lib/directos.mjs`
-  consulta desde el servidor con credenciales de APLICACIÓN (`TWITCH_CLIENT_ID/SECRET`, `KICK_CLIENT_ID/SECRET`, `YOUTUBE_API_KEY`), con caché en
+  consulta desde el servidor con credenciales de APLICACIÓN (`VTUBERDEX_TWITCH_ID_CLIENT/VTUBERDEX_TWITCH_SECRET`, `VTUBERDEX_KICK_ID_CLIENT/VTUBERDEX_KICK_SECRET`, `VTUBERDEX_YOUTUBE_API_KEY`), con caché en
   memoria (60 s Twitch/Kick, 5 min YouTube, 30 s los fallos) y peticiones en vuelo compartidas. **Sin credenciales la plataforma no se pinta**
   (local y CI no necesitan nada). El canal sale del DOMINIO del enlace de la red, no del nombre escrito.
 - **Límites reales**: Twitch sin token del streamer no da seguidores; Kick no publica seguidores; YouTube detecta el directo entre las últimas 10

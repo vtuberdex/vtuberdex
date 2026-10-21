@@ -8,7 +8,7 @@ import { premiarDirectos } from "./premiar-directos.mjs";
 import { xpDeJuego } from "../server/src/minecraft.mjs";
 import { ejecutorSqlite } from "../server/src/solicitudes.mjs";
 
-const ENV = { TWITCH_CLIENT_ID: "a", TWITCH_CLIENT_SECRET: "b", KICK_CLIENT_ID: "c", KICK_CLIENT_SECRET: "d" };
+const ENV = { VTUBERDEX_TWITCH_ID_CLIENT: "a", VTUBERDEX_TWITCH_SECRET: "b", VTUBERDEX_KICK_ID_CLIENT: "c", VTUBERDEX_KICK_SECRET: "d" };
 const json = (c: unknown) => new Response(JSON.stringify(c));
 
 /** Twitch: solo `ana_vt` está en vivo. Kick: `bea_k` y `ana_k` lo están. */

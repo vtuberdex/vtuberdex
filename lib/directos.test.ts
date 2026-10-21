@@ -12,11 +12,11 @@ import {
 } from "./directos.mjs";
 
 const ENV: Record<string, string | undefined> = {
-  TWITCH_CLIENT_ID: "tid",
-  TWITCH_CLIENT_SECRET: "tsec",
-  KICK_CLIENT_ID: "kid",
-  KICK_CLIENT_SECRET: "ksec",
-  YOUTUBE_API_KEY: "yk",
+  VTUBERDEX_TWITCH_ID_CLIENT: "tid",
+  VTUBERDEX_TWITCH_SECRET: "tsec",
+  VTUBERDEX_KICK_ID_CLIENT: "kid",
+  VTUBERDEX_KICK_SECRET: "ksec",
+  VTUBERDEX_YOUTUBE_API_KEY: "yk",
 };
 
 type Opciones = NonNullable<Parameters<typeof estadoDeCanal>[1]>;
