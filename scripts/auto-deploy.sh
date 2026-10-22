@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
-# Publica solo lo que llega a `master` de los dos repos (web y plugin de Minecraft).
+# Publica solo lo que llega a `master` de los CUATRO repos de la organización.
 #
-#   web  : clon propio -> npm ci -> scripts/release.sh -> comprueba que responde -> si no, vuelve al release anterior
-#   java : clon propio -> gradlew build -> el jar queda EN ESPERA hasta que el servidor esté VACÍO -> instala y reinicia
+#   web      : clon propio -> npm ci -> scripts/release.sh -> comprueba que responde -> si no, vuelve al release anterior
+#   java     : plugin principal (vtuberdex-minecraft)  -> gradlew build ┐
+#   mochilas : plugin de mochilas (vtuberdex-mochilas) -> gradlew build ├ los jars quedan EN ESPERA hasta que el servidor
+#   entregas : plugin de entregas (vtuberdex-entregas) -> gradlew build ┘ esté VACÍO -> se instalan TODOS juntos y un solo reinicio
+#
+# POR QUÉ entregas se recompila cuando cambia java o mochilas: compila contra los jars de los otros dos (`compileOnly`),
+# así que un cambio de API en ellos lo rompe aunque su propio código no se haya tocado. Su build.gradle.kts los busca en
+# `../vtuberdex-mochilas/` y `../vtuberdex/minecraft/`: por eso los clones de los plugins viven en `$ESTADO/arbol/` con esos
+# nombres (la carpeta `vtuberdex/minecraft` es un enlace al clon `java`; Gradle resuelve `..` desde la ruta REAL del cwd,
+# así que entregas y mochilas tienen que ser carpetas de verdad y no enlaces).
 #
 # POR QUÉ clones propios y no el checkout de desarrollo: ahí vive vps-base-local con cambios a medias y
 # `next dev` comparte .next/ con el build (ver AGENTS.md). Aquí nunca se toca el árbol de trabajo de nadie.
@@ -21,7 +29,9 @@ REPO_WEB="${REPO_WEB:-git@github.com:vtuberdex/vtuberdex.git}"
 REPO_JAVA="${REPO_JAVA:-git@github.com:vtuberdex/vtuberdex-minecraft.git}"
 RAMA="${RAMA:-master}"
 BUILD="$HOME/.local/share/vtuberdex-build"
-JAR_DESTINO="/srv/minecraft/plugins/VTuberDex.jar"
+REPO_MOCHILAS="${REPO_MOCHILAS:-git@github.com:vtuberdex/vtuberdex-mochilas.git}"
+REPO_ENTREGAS="${REPO_ENTREGAS:-git@github.com:vtuberdex/vtuberdex-entregas.git}"
+PLUGINS_DIR="/srv/minecraft/plugins"
 SERVICIO_MC="vtuberdex-minecraft"
 PUERTO_MC="${PUERTO_MC:-25565}"
 SALUD_WEB="${SALUD_WEB:-http://127.0.0.1:3100/api/vtubers?perPage=1}"
@@ -36,14 +46,31 @@ log() { echo "[$(date '+%F %T')] $*"; }
 leer() { [ -f "$ESTADO/$1" ] && cat "$ESTADO/$1" || true; }
 anotar() { printf '%s' "$2" > "$ESTADO/$1"; }
 
+# Dónde vive el clon de cada repo (ver la cabecera: los plugins van en `arbol/` con el nombre que espera Gradle).
+dir_de() {
+  case "$1" in
+    mochilas) echo "$ESTADO/arbol/vtuberdex-mochilas" ;;
+    entregas) echo "$ESTADO/arbol/vtuberdex-entregas" ;;
+    *) echo "$ESTADO/$1" ;;
+  esac
+}
+# Nombre del jar instalado en el servidor y archivo de espera. java conserva los nombres de siempre (hay estado en disco).
+jar_instalado() {
+  case "$1" in
+    java) echo "$PLUGINS_DIR/VTuberDex.jar" ;;
+    *) echo "$PLUGINS_DIR/vtuberdex-$1-0.1.0.jar" ;;
+  esac
+}
+jar_espera() { if [ "$1" = java ]; then echo "$ESTADO/pendiente.jar"; else echo "$ESTADO/pendiente-$1.jar"; fi; }
+
 # Clona la primera vez, trae la rama y deja el clon en el commit remoto. Imprime el SHA.
 sincronizar() { # $1 nombre, $2 url
-  local d="$ESTADO/$1"
-  [ -d "$d/.git" ] || git clone --quiet "$2" "$d" || return 1
+  local d; d="$(dir_de "$1")"
+  [ -d "$d/.git" ] || { mkdir -p "$(dirname "$d")" && git clone --quiet "$2" "$d"; } || return 1
   git -C "$d" fetch --quiet origin "$RAMA" || return 1
   git -C "$d" rev-parse "origin/$RAMA"
 }
-llevar_a() { git -C "$ESTADO/$1" checkout --quiet -f --detach "$2" && git -C "$ESTADO/$1" clean -fdq; }
+llevar_a() { local d; d="$(dir_de "$1")"; git -C "$d" checkout --quiet -f --detach "$2" && git -C "$d" clean -fdq; }
 
 # Jugadores conectados por el ping de estado de Minecraft. 0 en stdout = vacío; "?" = no se pudo saber.
 jugadores() {
@@ -88,28 +115,38 @@ desplegar_web() {
   return 1
 }
 
-# ---------- java ----------
-construir_java() {
-  local sha="$1" d="$ESTADO/java"
-  log "java: compilando ${sha:0:7}"
-  llevar_a java "$sha" || return 1
+# ---------- plugins (java, mochilas, entregas) ----------
+construir_plugin() { # $1 nombre, $2 sha
+  local n="$1" sha="$2" d; d="$(dir_de "$1")"
+  log "$n: compilando ${sha:0:7}"
+  llevar_a "$n" "$sha" || return 1
+  if [ "$n" = entregas ]; then
+    # Sus dependencias se leen de ../vtuberdex/minecraft/build/libs (ver la cabecera).
+    mkdir -p "$ESTADO/arbol/vtuberdex" && ln -sfn "$ESTADO/java" "$ESTADO/arbol/vtuberdex/minecraft" || return 1
+  fi
   ( cd "$d" && GRADLE_USER_HOME="$BUILD/gradle-home" JAVA_HOME="$BUILD/jdk25" nice ./gradlew build --no-daemon -q ) || return 1
-  local jar; jar="$(ls -t "$d"/build/libs/vtuberdex-mc-*.jar 2>/dev/null | grep -v -- '-plain' | head -1)"
+  local jar; jar="$(ls -t "$d"/build/libs/*.jar 2>/dev/null | grep -v -- '-plain' | head -1)"
   [ -n "$jar" ] || return 1
-  cp "$jar" "$ESTADO/pendiente.jar" && anotar java.pendiente "$sha"
+  cp "$jar" "$(jar_espera "$n")" && anotar "$n.pendiente" "$sha"
 }
 
-instalar_java() {
-  local sha; sha="$(leer java.pendiente)"
-  [ -n "$sha" ] && [ -f "$ESTADO/pendiente.jar" ] || return 0
-  local n; n="$(jugadores)"
-  if [ "$n" != "0" ]; then
-    systemctl is-active --quiet "$SERVICIO_MC" && { log "java: ${sha:0:7} en espera ($n jugando, o sin saberlo)"; return 0; }
+# Instala TODOS los jars en espera con un solo reinicio, cuando el servidor está vacío. Si no levanta, restaura todos.
+instalar_plugins() {
+  local n lista=()
+  for n in java mochilas entregas; do
+    [ -n "$(leer "$n.pendiente")" ] && [ -f "$(jar_espera "$n")" ] && lista+=("$n")
+  done
+  [ "${#lista[@]}" -gt 0 ] || return 0
+  local jugando; jugando="$(jugadores)"
+  if [ "$jugando" != "0" ]; then
+    systemctl is-active --quiet "$SERVICIO_MC" && { log "plugins: ${lista[*]} en espera ($jugando jugando, o sin saberlo)"; return 0; }
   fi
-  log "java: instalando ${sha:0:7}"
-  local resp; resp="$JAR_DESTINO.bak-auto-$(date +%Y%m%d-%H%M%S)"
-  sudo cp -a "$JAR_DESTINO" "$resp" 2>/dev/null
-  sudo install -o minecraft -g minecraft -m 640 "$ESTADO/pendiente.jar" "$JAR_DESTINO" || return 1
+  log "plugins: instalando ${lista[*]}"
+  local marca; marca="$(date +%Y%m%d-%H%M%S)"
+  for n in "${lista[@]}"; do
+    sudo cp -a "$(jar_instalado "$n")" "$(jar_instalado "$n").bak-auto-$marca" 2>/dev/null
+    sudo install -o minecraft -g minecraft -m 640 "$(jar_espera "$n")" "$(jar_instalado "$n")" || return 1
+  done
   sudo systemctl restart "$SERVICIO_MC"
   # POR QUÉ se sondea y no se mira una vez a los 45 s: este servidor (Paper + BlueMap + Chunky + Geyser, mundo grande)
   # tarda más en aceptar conexiones. Con un único chequeo fijo, el 17-oct-2026 DOS despliegues seguidos se dieron
@@ -120,12 +157,17 @@ instalar_java() {
     if systemctl is-active --quiet "$SERVICIO_MC" && [ "$(jugadores)" != "?" ]; then vivo=1; break; fi
   done
   if [ "$vivo" = 1 ]; then
-    anotar java.desplegado "$sha"; rm -f "$ESTADO/java.pendiente" "$ESTADO/pendiente.jar"
-    log "java: ${sha:0:7} instalado y el servidor responde"
+    for n in "${lista[@]}"; do
+      anotar "$n.desplegado" "$(leer "$n.pendiente")"; rm -f "$ESTADO/$n.pendiente" "$(jar_espera "$n")"
+    done
+    log "plugins: ${lista[*]} instalados y el servidor responde"
   else
-    log "java: el servidor no levantó con ${sha:0:7}; restauro el jar anterior"
-    [ -f "$resp" ] && sudo cp -a "$resp" "$JAR_DESTINO" && sudo systemctl restart "$SERVICIO_MC"
-    anotar java.fallido "$sha"; rm -f "$ESTADO/java.pendiente" "$ESTADO/pendiente.jar"
+    log "plugins: el servidor no levantó con ${lista[*]}; restauro los jars anteriores"
+    for n in "${lista[@]}"; do
+      [ -f "$(jar_instalado "$n").bak-auto-$marca" ] && sudo cp -a "$(jar_instalado "$n").bak-auto-$marca" "$(jar_instalado "$n")"
+      anotar "$n.fallido" "$(leer "$n.pendiente")"; rm -f "$ESTADO/$n.pendiente" "$(jar_espera "$n")"
+    done
+    sudo systemctl restart "$SERVICIO_MC"
     return 1
   fi
 }
@@ -140,17 +182,26 @@ vuelta_web() {
   if desplegar_web "$sha"; then anotar web.desplegado "$sha"; else anotar web.fallido "$sha"; fi
 }
 
-vuelta_java() {
-  local sha; sha="$(sincronizar java "$REPO_JAVA")" || { log "java: no pude consultar GitHub"; return; }
-  local hecho; hecho="$(leer java.desplegado)"
-  if [ -z "$hecho" ]; then anotar java.desplegado "$sha"; log "java: punto de partida ${sha:0:7} (no se instala)"; return; fi
-  if [ "$sha" != "$hecho" ] && [ "$sha" != "$(leer java.fallido)" ] && [ "$sha" != "$(leer java.pendiente)" ]; then
-    if [ "$DRY" = 1 ]; then log "java: [dry] compilaría ${sha:0:7} (hoy ${hecho:0:7})"; return; fi
-    construir_java "$sha" || { log "java: la compilación falló"; anotar java.fallido "$sha"; return; }
+# Devuelve por stdout "1" si compiló algo nuevo en esta vuelta. $3 = 1 fuerza recompilar (cambió una dependencia).
+vuelta_plugin() { # $1 nombre, $2 url, $3 forzar
+  local n="$1" forzar="${3:-0}"
+  local sha; sha="$(sincronizar "$n" "$2")" || { log "$n: no pude consultar GitHub" >&2; return; }
+  local hecho; hecho="$(leer "$n.desplegado")"
+  if [ -z "$hecho" ]; then anotar "$n.desplegado" "$sha"; log "$n: punto de partida ${sha:0:7} (no se instala)" >&2; return; fi
+  local nuevo=0
+  [ "$sha" != "$hecho" ] && [ "$sha" != "$(leer "$n.fallido")" ] && [ "$sha" != "$(leer "$n.pendiente")" ] && nuevo=1
+  # Una dependencia nueva obliga a recompilar aunque el código propio no cambie (solo si ya hay algo instalado que probar).
+  if [ "$nuevo" = 1 ] || { [ "$forzar" = 1 ] && [ "$sha" != "$(leer "$n.fallido")" ]; }; then
+    if [ "$DRY" = 1 ]; then log "$n: [dry] compilaría ${sha:0:7} (hoy ${hecho:0:7})" >&2; return; fi
+    if construir_plugin "$n" "$sha" >&2; then echo 1; else log "$n: la compilación falló" >&2; anotar "$n.fallido" "$sha"; fi
   fi
-  [ "$DRY" = 1 ] || instalar_java
 }
 
 vuelta_web
-vuelta_java
+# Orden obligado: entregas compila contra los jars de java y mochilas.
+cambio_java="$(vuelta_plugin java "$REPO_JAVA")"
+cambio_mochilas="$(vuelta_plugin mochilas "$REPO_MOCHILAS")"
+dep=0; [ -n "$cambio_java$cambio_mochilas" ] && dep=1
+vuelta_plugin entregas "$REPO_ENTREGAS" "$dep" >/dev/null
+[ "$DRY" = 1 ] || instalar_plugins
 exit 0
