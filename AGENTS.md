@@ -540,6 +540,8 @@ calcula ni «procesar» una baja los aplica solo**.
 
 ## Minecraft: servidor para VTubers con ficha (`minecraft/`, `server/src/minecraft.mjs`)
 
+Versión de Minecraft del servidor: NO VERIFICADA (pendiente de leer de /srv/minecraft; el directorio es de `minecraft` con permisos drwx--x--- y el usuario de trabajo no puede leerlo). Es el único sitio donde se anota; no escribir una cifra sin comprobarla.
+
 Un plugin de Paper **26.2** (Java 25, `minecraft/`; `./gradlew build` → `build/libs/vtuberdex-mc-*.jar`, el wrapper es Gradle
 9.8.1 porque Gradle 8 no corre en Java 25; compila contra `paper-api:26.2.build.*-stable` con `api-version: '26.2'`: Paper NO carga un
 plugin con `api-version` más nueva que el servidor) hace del servidor uno **solo para VTubers con ficha**: se juega con los stats de la ficha
