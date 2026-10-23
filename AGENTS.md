@@ -542,8 +542,8 @@ calcula ni «procesar» una baja los aplica solo**.
 
 Versión de Minecraft del servidor: NO VERIFICADA (pendiente de leer de /srv/minecraft; el directorio es de `minecraft` con permisos drwx--x--- y el usuario de trabajo no puede leerlo). Es el único sitio donde se anota; no escribir una cifra sin comprobarla.
 
-Un plugin de Paper **26.2** (Java 25, `minecraft/`; `./gradlew build` → `build/libs/vtuberdex-mc-*.jar`, el wrapper es Gradle
-9.8.1 porque Gradle 8 no corre en Java 25; compila contra `paper-api:26.2.build.*-stable` con `api-version: '26.2'`: Paper NO carga un
+Un plugin de Paper (`paperApiVersion` de `vtuberdex-minecraft/build.gradle.kts`, pendiente de verificar; Java 25, `minecraft/`; `./gradlew build` → `build/libs/vtuberdex-mc-*.jar`, el wrapper es Gradle
+9.8.1 porque Gradle 8 no corre en Java 25; compila contra `paper-api:$paperApiVersion` (`paperApiVersion` en `vtuberdex-minecraft/build.gradle.kts`, la fuente única de la versión) con el `api-version` de `vtuberdex-minecraft/src/main/resources/plugin.yml` (debe coincidir con `paperApiVersion`): Paper NO carga un
 plugin con `api-version` más nueva que el servidor) hace del servidor uno **solo para VTubers con ficha**: se juega con los stats de la ficha
 PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verdad**: el plugin no calcula niveles, topes ni dueños.
 
@@ -600,7 +600,7 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
   de nivel → título, sonido y aviso a todo el servidor; más EXP → barra de acción «+N EXP · ✔ vtuberdex.com»; stats distintos →
   chat «Tus stats se actualizaron desde la web: ATQ 215 → 220». Llegar al tope diario se avisa una vez al día. `/vtd ficha` lista
   todos los stats en el chat.
-- **Java y Bedrock en el mismo servidor**: Paper **26.2** (estable) + **ViaVersion** (deja entrar a clientes Java 26.3, protocolo
+- **Java y Bedrock en el mismo servidor**: Paper (la versión del encabezado de este bloque, estable) + **ViaVersion** (deja entrar a clientes Java 26.3, protocolo
   777; el servidor es 776) + **Geyser** (traduce Bedrock: Android, iOS, Windows de la tienda; UDP **19132**) + **Floodgate** (Bedrock
   entra con su cuenta Xbox sin comprar Java; `auth-type: floodgate` en `plugins/Geyser-Spigot/config.yml`, que nace en `online` y
   hay que cambiarlo). Se bajó de 26.3 a 26.2 porque Geyser solo soportaba Java 26.2; el mundo 26.3 (sin jugar) quedó en
@@ -690,15 +690,15 @@ mochilas y principal → entregas. Todo es del mundo principal; los de la sala d
   · La caja del caballo es menor que el modelo: hay una `Interaction` de 1,8×1,1 que sigue al caballo (no como pasajera: se anclaría
     a 1,18 de alto) y se encoge a 0 montado (si no, se tragaría los clics del conductor).
   · Aparece en el primer hueco libre con suelo firme por delante (antes, a ciegas, podía quedar dentro de un bloque).
-- **Probar con un cliente REAL (lo que de verdad funcionó)**: Paper 26.2 de prueba + `portablemc` (cliente 26.2 offline, instalado en
+- **Probar con un cliente REAL (lo que de verdad funcionó)**: Paper de prueba (la versión del encabezado) + `portablemc` (cliente 26.2 offline, instalado en
   `~/.local/share/vtuberdex-build/mc-cliente`, NO en /tmp que es RAM) en `Xvfb` con `LIBGL_ALWAYS_SOFTWARE=1`, control por XTest
   (`python-xlib`), capturas con `ffmpeg -f x11grab`, y una web falsa que vincule a todos (con HTTP/1.0: con keep-alive el cliente HTTP
   de Java daba timeouts). Para ver al propio jugador montado hace falta un SEGUNDO cliente observador en espectador (otro Xvfb). No
   hay bot posible: `minecraft-data` llega a 26.1. Al matar procesos, por PID: `pkill -f <patrón>` mata la propia shell si el patrón
   aparece en el comando.
 - **Mapa** (`Mapa`): UN mapa compartido (escala 1:16) con una capa contextual que pinta puestos, zonas y el destino del encargo.
-- **Qué NO está probado**: en vivo, la IA de los varados, su visibilidad y el mapa (la moto sí, ver arriba). Lo comprobado: compila contra Paper 26.2, 22 pruebas de lógica pura (geometría, sigilo,
-  recompensa, contratos, zonas), y un Paper 26.2 de prueba carga los tres plugins, construye los 6 puestos y crea las 9 zonas sin errores.
+- **Qué NO está probado**: en vivo, la IA de los varados, su visibilidad y el mapa (la moto sí, ver arriba). Lo comprobado: compila contra la versión de Paper del encabezado, 22 pruebas de lógica pura (geometría, sigilo,
+  recompensa, contratos, zonas), y un Paper de prueba (misma versión del encabezado) carga los tres plugins, construye los 6 puestos y crea las 9 zonas sin errores.
   Falta jugarlo con un cliente real; las perillas para afinarlo están en `config.yml` del plugin.
 
 ## Habilidades del RPG: catálogo de estados y validador
