@@ -9,6 +9,12 @@
  */
 import { correosDeFichas, listarSolicitudes } from "./solicitudes.mjs";
 import { getVtuberBySlug, tienePremium } from "./search.mjs";
+import { expDePerfil } from "./exp-diario.mjs";
+
+/** EXP del perfil del mantenedor (suma del libro `exp_evento`). */
+export async function expDelMantenedor(ejecutor, actor = "admin") {
+  return { actor, total: await expDePerfil(ejecutor, actor) };
+}
 
 const TOP = 10;
 
@@ -125,7 +131,13 @@ export async function estadisticasDelMantenedor(db, ejecutor) {
   const catalogo = estadisticasDelCatalogo(db);
   let correo = null;
   let solicitudes = null;
+  let exp = null;
   if (ejecutor) {
+    try {
+      exp = await expDelMantenedor(ejecutor);
+    } catch (error) {
+      console.error("[admin] estadísticas sin EXP del perfil", error);
+    }
     try {
       const correos = await correosDeFichas(ejecutor, {
         resolverFicha: (slug) =>
@@ -146,5 +158,5 @@ export async function estadisticasDelMantenedor(db, ejecutor) {
       );
     }
   }
-  return { ...catalogo, correo, solicitudes };
+  return { ...catalogo, correo, solicitudes, exp };
 }

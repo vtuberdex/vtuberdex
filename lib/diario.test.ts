@@ -565,3 +565,18 @@ describe("copias huérfanas en /tmp", () => {
     }
   });
 });
+
+describe("el hook de EXP en aplicarYAnotar", () => {
+  test("una edición crea el evento en exp_evento con el seq del cambio", async () => {
+    turso.exec("DROP TABLE IF EXISTS exp_evento;");
+    const id = await idDe("gkuro");
+    await diario.aplicarYAnotar({ tipo: "vtuber.editar", id, patch: { name: "GKuro EXP" } });
+    const cambio = turso.prepare("SELECT seq FROM cambio ORDER BY seq DESC LIMIT 1").get() as { seq: number };
+    const evento = turso.prepare("SELECT cambio_id, actor, tipo, cantidad FROM exp_evento").all() as Array<Record<string, unknown>>;
+    expect(evento).toHaveLength(1);
+    expect(Number(evento[0].cambio_id)).toBe(Number(cambio.seq));
+    expect(evento[0].actor).toBe("admin");
+    expect(evento[0].tipo).toBe("vtuber.editar");
+    expect(Number(evento[0].cantidad)).toBe(10);
+  });
+});

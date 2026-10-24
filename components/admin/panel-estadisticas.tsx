@@ -374,6 +374,7 @@ export function PanelEstadisticas({
           nota="grados 6 a Black Label"
         />
         <Indicador label="Colores de marca" value={fmt(stats.themes)} />
+        <Indicador label="EXP" value={fmt(stats.exp?.total ?? 0)} />
         <div className="rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
           <p className="text-xs uppercase tracking-[0.14em] text-dex-muted">
             Solicitudes pendientes
