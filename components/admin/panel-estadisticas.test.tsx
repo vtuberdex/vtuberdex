@@ -16,15 +16,21 @@ const base: AdminStats = {
   solicitudes: null,
 };
 
-describe("PanelEstadisticas · EXP", () => {
-  test("pinta el valor de exp que devuelve la API", () => {
-    render(<PanelEstadisticas stats={{ ...base, exp: { total: 120 } }} />);
-    const etiqueta = screen.getByText("EXP");
+describe("PanelEstadisticas · EXP de editor", () => {
+  test("pinta el valor de expEditor que devuelve la API", () => {
+    render(
+      <PanelEstadisticas
+        stats={{ ...base, expEditor: { actor: "admin", total: 120 } }}
+      />,
+    );
+    const etiqueta = screen.getByText("EXP de editor");
     expect(etiqueta.parentElement).toHaveTextContent("120");
   });
 
-  test("sin exp muestra 0 y no se rompe", () => {
+  test("sin expEditor muestra 0 y no se rompe", () => {
     render(<PanelEstadisticas stats={base} />);
-    expect(screen.getByText("EXP").parentElement).toHaveTextContent("0");
+    expect(screen.getByText("EXP de editor").parentElement).toHaveTextContent(
+      "0",
+    );
   });
 });

@@ -131,10 +131,10 @@ export async function estadisticasDelMantenedor(db, ejecutor) {
   const catalogo = estadisticasDelCatalogo(db);
   let correo = null;
   let solicitudes = null;
-  let exp = null;
+  let expEditor = null;
   if (ejecutor) {
     try {
-      exp = await expDelMantenedor(ejecutor);
+      expEditor = await expDelMantenedor(ejecutor);
     } catch (error) {
       console.error("[admin] estadísticas sin EXP del perfil", error);
     }
@@ -158,5 +158,5 @@ export async function estadisticasDelMantenedor(db, ejecutor) {
       );
     }
   }
-  return { ...catalogo, correo, solicitudes, exp };
+  return { ...catalogo, correo, solicitudes, expEditor };
 }

@@ -273,8 +273,8 @@ export interface AdminStats {
   solicitudes: {
     pendientes: { inscripcion: number; baja: number; modificacion: number };
   } | null;
-  /** EXP del perfil; ausente en versiones antiguas de la API o si falló la consulta. */
-  exp?: { actor?: string; total: number } | null;
+  /** EXP de editor del perfil (diario, +10 por acción); no es la EXP de las fichas. Ausente si falló la consulta. */
+  expEditor?: { actor?: string; total: number } | null;
 }
 
 /** Fila del catálogo cerrado de facciones, con su uso (`total` = fichas, `publicadas` = visibles). */
