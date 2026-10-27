@@ -27,10 +27,13 @@ import {
 const turso = new DatabaseSync(":memory:");
 /** Cuántas veces se preguntó la clave del diario (la consulta con `MAX(seq)`). */
 let consultasDeClave = 0;
+let fallarInsertCambio = false;
 const clienteFalso = {
   execute: async (arg: string | { sql: string; args?: unknown[] }) => {
     const sql = typeof arg === "string" ? arg : arg.sql;
     if (/MAX\(seq\)/i.test(sql)) consultasDeClave += 1;
+    if (fallarInsertCambio && /INSERT INTO cambio/i.test(sql))
+      throw new Error("SQLITE_IOERR simulado");
     const args = (typeof arg === "string" ? [] : (arg.args ?? [])) as never[];
     const sentencia = turso.prepare(sql);
     if (/^\s*(select|pragma)/i.test(sql)) {
@@ -578,5 +581,33 @@ describe("el hook de EXP en aplicarYAnotar", () => {
     expect(evento[0].actor).toBe("admin");
     expect(evento[0].tipo).toBe("vtuber.editar");
     expect(Number(evento[0].cantidad)).toBe(10);
+  });
+});
+
+describe("un INSERT fallido en el diario", () => {
+  afterEach(() => {
+    fallarInsertCambio = false;
+  });
+
+  test("no deja fila en cambio y la copia local no conserva el cambio perdido", async () => {
+    const id = await idDe("gkuro");
+    fallarInsertCambio = true;
+    await expect(
+      diario.aplicarYAnotar({
+        tipo: "vtuber.editar",
+        id,
+        patch: { cardText: "Perdido." },
+      }),
+    ).rejects.toThrow("SQLITE_IOERR simulado");
+    fallarInsertCambio = false;
+    expect(turso.prepare("SELECT COUNT(*) AS n FROM cambio").get()).toEqual({
+      n: 0,
+    });
+    const detalle = buscar.getVtuberBySlug(
+      await diario.dbConDiario(),
+      "gkuro",
+      { includeHidden: true },
+    );
+    expect(JSON.stringify(detalle)).not.toContain("Perdido.");
   });
 });
