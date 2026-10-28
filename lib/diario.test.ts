@@ -11,6 +11,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { otorgarExp } from "../server/src/exp-diario.mjs";
 
 import {
   afterAll,
@@ -53,6 +54,10 @@ const clienteFalso = {
   batch: async () => ({}),
 };
 vi.mock("@libsql/client/node", () => ({ createClient: () => clienteFalso }));
+vi.mock("../server/src/exp-diario.mjs", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../server/src/exp-diario.mjs")>();
+  return { ...real, otorgarExp: vi.fn(real.otorgarExp) };
+});
 
 const DATASET = {
   generatedAt: "2026-01-01T00:00:00.000Z",
@@ -609,5 +614,20 @@ describe("un INSERT fallido en el diario", () => {
       { includeHidden: true },
     );
     expect(JSON.stringify(detalle)).not.toContain("Perdido.");
+  });
+
+  test("si el INSERT falla, no se otorga EXP", async () => {
+    const id = await idDe("gkuro");
+    vi.mocked(otorgarExp).mockClear();
+    fallarInsertCambio = true;
+    await expect(
+      diario.aplicarYAnotar({
+        tipo: "vtuber.editar",
+        id,
+        patch: { cardText: "Sin EXP." },
+      }),
+    ).rejects.toThrow("SQLITE_IOERR simulado");
+    fallarInsertCambio = false;
+    expect(otorgarExp).not.toHaveBeenCalled();
   });
 });
