@@ -1020,7 +1020,7 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
   `scripts/` otra vez busca `scripts/scripts/x.mjs` y Node lo reporta como
   `MODULE_NOT_FOUND` con una ruta que parece un archivo perdido (el archivo existe).
   Lánzalos con `npm run <tarea>` —npm sube solo hasta el `package.json`, así que da
-  igual en qué subcarpeta estés— o desde la raíz del repo. `npm run admin:hash`
+  igual en qué subcarpeta estés— o desde la raíz del repo. `node scripts/admin-hash.mjs`
   (`scripts/admin-hash.mjs`) es el que produce `VTUBERDEX_ADMIN_PASSWORD_HASH` para
   Vercel: sin TTY lee la clave de una línea de stdin en vez de colgarse en un `await`
   que nunca resuelve (que Node reportaba como "unsettled top-level await").
@@ -1030,7 +1030,7 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
   pero el despliegue que ya estaba sirviendo sigue comparando contra el ANTERIOR, y el login
   responde el mismo `401 credenciales_invalidas` de una contraseña equivocada. Hay que
   **redeployar** (`vercel redeploy --target production`, o un `vercel deploy` nuevo) para que
-  la función reciba el valor actualizado. `npm run admin:verificar` comprueba el resultado
+  la función reciba el valor actualizado. `node scripts/verificar-admin-prod.mjs` comprueba el resultado
   (login real + sesión en Turso) y, si hay 401, distingue "hash mal pegado" de "contraseña
   equivocada" leyendo el diagnóstico de FORMA que ahora devuelve el 401.
 - **El mantenedor escribe en TURSO, y por eso hay contenido que SOLO existe ahí.** Las
@@ -1200,7 +1200,7 @@ npx vercel deploy --prod         # (HISTÓRICO) ya no se despliega en Vercel: ve
 idempotente y reanudable. **`npm run download:images` es el sentido contrario** y existe
 porque la mitad del contenido del mantenedor NO está en el disco de nadie más que en Turso
 (ver «El mantenedor escribe en Turso»). Para el mantenedor en producción están
-`admin:publicar` (alta del usuario admin) y `admin:verificar` (login real de punta a punta).
+`node scripts/publicar-admin-prod.mjs` (alta del usuario admin) y `node scripts/verificar-admin-prod.mjs` (login real de punta a punta).
 
 ### Las reglas del deploy
 
@@ -1408,7 +1408,7 @@ se retiró: ya no hay nada con ese nombre en nginx, systemd ni `/var/www`.)
   `SITE_URL`, `VTUBERDEX_VOCES_DIR`.
 - **Base**: `/var/lib/vtuberdex/data/turso-local.db` (WAL; propiedad de `vtuberdex`, grupo con escritura; `~/data/vtuberdex`
   es un enlace simbólico a ese directorio, así que respaldo y scripts siguen funcionando; el original quedó en
-  `~/data/vtuberdex.old-20261010-135103`, borrar cuando se dé por bueno). `npm run copiar:turso` la rellena desde Turso (una vez; lotes
+  `~/data/vtuberdex.old-20261010-135103`, borrar cuando se dé por bueno). `node scripts/copiar-turso.mjs` la rellena desde Turso (una vez; lotes
   de 5 filas en `asset_remoto`, porque Turso cortaba la conexión con lotes grandes de BLOB). `lib/ediciones.mjs`
   aplica pragmas (WAL, `busy_timeout`, `mmap`) solo para URLs `file:`. **Es la única copia de las ediciones** desde que se
   dejó Turso: producción en Vercel ya no recibe visitas, pero sus cambios previos al corte solo están en la copia de ese día.

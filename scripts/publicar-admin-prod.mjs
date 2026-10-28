@@ -18,9 +18,9 @@
  * comprueba el resultado con el login real, no con la intención.
  *
  * Uso:
- *   npm run admin:publicar                       # pide la contraseña sin mostrarla
- *   npm run admin:publicar -- --sin-redeploy     # solo sube la variable
- *   npm run admin:publicar -- --env-name OTRA    # para pruebas
+ *   node scripts/publicar-admin-prod.mjs                       # pide la contraseña sin mostrarla
+ *   node scripts/publicar-admin-prod.mjs --sin-redeploy     # solo sube la variable
+ *   node scripts/publicar-admin-prod.mjs --env-name OTRA    # para pruebas
  *
  * La contraseña se pide por TTY (oculta) y, sin TTY, por stdin —igual que `admin-hash.mjs`—:
  * nunca aparece en el historial, en la pantalla ni en un archivo.
