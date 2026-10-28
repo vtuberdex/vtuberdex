@@ -12,8 +12,8 @@
  *   node scripts/admin-hash.mjs "mi contraseña"      # atajo (queda en el historial)
  *   printf '%s' "mi contraseña" | node scripts/admin-hash.mjs   # por stdin, sin historial
  *
- * Desde la raíz también vale `npm run admin:hash` (y desde cualquier subcarpeta: npm
- * sube solo hasta el package.json, así que no hay que contar `cd`s).
+ * Desde la raíz del repo, la misma orden: `node scripts/admin-hash.mjs` (desde una
+ * subcarpeta, usa la ruta relativa hasta scripts/).
  *
  * NO guarda nada: imprime el hash y el comando de Vercel para pegarlo.
  */
@@ -35,7 +35,7 @@ if (!password) {
         '  Pásala como argumento (node scripts/admin-hash.mjs "<clave>")',
       );
       console.error(
-        "  o por stdin (printf '%s' \"<clave>\" | npm run admin:hash).",
+        "  o por stdin (printf '%s' \"<clave>\" | node scripts/admin-hash.mjs).",
       );
       process.exit(1);
     }

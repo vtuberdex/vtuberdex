@@ -118,7 +118,7 @@ if (!okLogin) {
           "  despliegue que sirve es anterior al cambio, o la clave escrita no es la",
         );
         console.log(
-          "  que generó el hash. Vuelve a publicarla: npm run admin:publicar",
+          "  que generó el hash. Vuelve a publicarla: node scripts/publicar-admin-prod.mjs",
         );
       } else {
         for (const p of d.hash?.problemas ?? [
@@ -139,7 +139,7 @@ if (!okLogin) {
   console.log(
     "  La forma correcta de publicarla (sin copiar/pegar el hash a mano):",
   );
-  console.log("    npm run admin:publicar");
+  console.log("    node scripts/publicar-admin-prod.mjs");
   console.log(
     "  Ese comando sube el hash por stdin, redeploya —Vercel hornea las variables por",
   );
