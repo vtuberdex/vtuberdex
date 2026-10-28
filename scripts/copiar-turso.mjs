@@ -1,6 +1,6 @@
 // Copia TODAS las tablas de Turso a un archivo SQLite local (libsql `file:`), para
 // dejar de depender del servicio. Uso:
-//   TURSO_DATABASE_URL=libsql://... TURSO_AUTH_TOKEN=... npm run copiar:turso [-- --salida data/turso-local.db]
+//   TURSO_DATABASE_URL=libsql://... TURSO_AUTH_TOKEN=... node scripts/copiar-turso.mjs [-- --salida data/turso-local.db]
 // El token solo se lee del entorno: no se escribe en ningún archivo.
 import { createClient } from "@libsql/client/node";
 import { mkdirSync, rmSync } from "node:fs";

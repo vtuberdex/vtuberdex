@@ -81,7 +81,7 @@ export function preguntarOculto(prompt) {
  * Sin TTY (redirección, CI, pipe) no se puede ocultar el eco NI leer una respuesta:
  * `rl.question` no recibe `line` nunca y el `await` quedaba colgado, con Node saliendo por
  * el aviso "unsettled top-level await" en lugar de un error útil. Se lee una línea cruda de
- * stdin, que es lo que espera quien hace `printf '%s' "$CLAVE" | npm run admin:hash`.
+ * stdin, que es lo que espera quien hace `printf '%s' "$CLAVE" | node scripts/admin-hash.mjs`.
  */
 export function leerLineaDeStdin() {
   return new Promise((resolve) => {
