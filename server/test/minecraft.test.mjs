@@ -5,7 +5,8 @@ import crypto from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
 import {
-  DIRECTO_TRAMO_MIN, XP_DIRECTO_MAX_DIA, XP_DIRECTO_POR_TRAMO,
+  DIRECTO_TRAMO_MIN, XP_DIRECTO_MAX_DIA, XP_DIRECTO_MINIMO, XP_DIRECTO_POR_TRAMO,
+  xpDirectoDelTramo,
   XP_ENTREGA_MAX_DIA, XP_JUEGO_MAX_DIA,
   XP_POR_LIKE,
   experienciaConLikes,
@@ -482,24 +483,46 @@ test("una sola red por cuenta: confirmar desde otra red cierra la sesión de la 
   );
 });
 
-test("premiar un directo: una vez por tramo, con tope propio y sumado a la XP de la ficha", async () => {
+test("XP por directo: sin tope diario (-1) y con retorno decreciente por tramo", () => {
+  assert.equal(XP_DIRECTO_MAX_DIA, -1);
+  assert.equal(xpDirectoDelTramo(0), XP_DIRECTO_POR_TRAMO);
+  assert.equal(xpDirectoDelTramo(1), 4);
+  let anterior = xpDirectoDelTramo(0);
+  for (let n = 1; n < 200; n += 1) {
+    const xp = xpDirectoDelTramo(n);
+    assert.ok(xp <= anterior, `el tramo ${n} no puede valer más que el anterior`);
+    assert.ok(xp >= XP_DIRECTO_MINIMO, "nunca baja del mínimo");
+    anterior = xp;
+  }
+  assert.ok(xpDirectoDelTramo(0) > xpDirectoDelTramo(10), "decrece de verdad");
+  assert.equal(xpDirectoDelTramo(200), XP_DIRECTO_MINIMO);
+});
+
+test("premiar un directo: una vez por tramo, sin tope y sumado a la XP de la ficha", async () => {
   const e = nuevo();
   const t0 = Date.UTC(2026, 9, 7, 12, 0, 0);
   const tramo = DIRECTO_TRAMO_MIN * 60_000;
   const pagar = (ahora, vtuberId = 7) => premiarDirecto(e, { vtuberId, plataforma: "twitch", dia: DIA, ahora });
 
-  assert.equal(await pagar(t0), XP_DIRECTO_POR_TRAMO);
+  assert.equal(await pagar(t0), xpDirectoDelTramo(0));
   assert.equal(await pagar(t0 + 60_000), 0, "mirar el mismo tramo otra vez no paga de nuevo");
-  assert.equal(await pagar(t0 + tramo), XP_DIRECTO_POR_TRAMO);
-  assert.equal(await xpDeJuego(e, 7), XP_DIRECTO_POR_TRAMO * 2);
-  assert.deepEqual([...(await xpDeJuegoVarias(e, [7, 8]))], [[7, XP_DIRECTO_POR_TRAMO * 2]]);
+  assert.equal(await pagar(t0 + tramo), xpDirectoDelTramo(1));
+  let total = xpDirectoDelTramo(0) + xpDirectoDelTramo(1);
+  assert.equal(await xpDeJuego(e, 7), total);
+  assert.deepEqual([...(await xpDeJuegoVarias(e, [7, 8]))], [[7, total]]);
 
-  // El tope diario recorta el último pago y después no paga más.
-  let total = XP_DIRECTO_POR_TRAMO * 2;
-  for (let i = 2; i < 40; i += 1) total += await pagar(t0 + tramo * i);
-  assert.equal(total, XP_DIRECTO_MAX_DIA);
-  assert.equal(await xpDeJuego(e, 7), XP_DIRECTO_MAX_DIA);
-  // Otra ficha no gasta el cupo de la primera.
+  // Sin tope diario: cada tramo sigue pagando, cada vez menos, y nunca menos del mínimo.
+  let anterior = xpDirectoDelTramo(1);
+  for (let i = 2; i < 40; i += 1) {
+    const pago = await pagar(t0 + tramo * i);
+    assert.equal(pago, xpDirectoDelTramo(i));
+    assert.ok(pago >= XP_DIRECTO_MINIMO && pago <= anterior);
+    anterior = pago;
+    total += pago;
+  }
+  assert.equal(await xpDeJuego(e, 7), total);
+  assert.ok(total > 50, "pasa del antiguo tope diario de 50");
+  // Otra ficha tiene su propia cuenta de tramos.
   assert.equal(await pagar(t0, 8), XP_DIRECTO_POR_TRAMO);
 });
 

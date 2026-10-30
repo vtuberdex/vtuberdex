@@ -76,7 +76,22 @@ export const XP_ENTREGA_MAX_DIA = 600;
  * 50 al día = 5 horas de directo; un like vale 10, así que transmitir ayuda pero no sustituye a la comunidad.
  */
 export const XP_DIRECTO_POR_TRAMO = 5;
-export const XP_DIRECTO_MAX_DIA = 50;
+export const XP_DIRECTO_MAX_DIA = -1;
+/** Cada tramo pagado en el día vale este factor del anterior (retorno decreciente), sin bajar de `XP_DIRECTO_MINIMO`. */
+export const XP_DIRECTO_DECAIMIENTO = 0.9;
+export const XP_DIRECTO_MINIMO = 1;
+/**
+ * XP del tramo número `pagados` (0 = el primero del día): `XP_DIRECTO_POR_TRAMO` x `XP_DIRECTO_DECAIMIENTO`^pagados,
+ * redondeado hacia abajo y nunca menos de `XP_DIRECTO_MINIMO`. Sin tope diario (`XP_DIRECTO_MAX_DIA` = -1): transmitir
+ * más siempre suma algo, pero cada vez menos.
+ */
+export function xpDirectoDelTramo(pagados) {
+  const n = Math.max(0, Math.floor(Number(pagados) || 0));
+  return Math.max(
+    XP_DIRECTO_MINIMO,
+    Math.floor(XP_DIRECTO_POR_TRAMO * XP_DIRECTO_DECAIMIENTO ** n),
+  );
+}
 export const DIRECTO_TRAMO_MIN = 30;
 /**
  * LA EXPERIENCIA DE UNA FICHA (la fórmula única, sin ajustes a mano)
