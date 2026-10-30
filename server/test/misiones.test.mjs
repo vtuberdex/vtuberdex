@@ -70,13 +70,13 @@ test('el progreso se acumula entre lotes y las diarias se reinician cada día', 
   assert.equal(cazador.completada, false);
   const r = await registrarAvances(e, lote({ mobs: 40 }));
   assert.ok(r.completadas.some((m) => m.id === 'cazador-del-dia'));
-  assert.equal(await xpDeJuego(e, 7), 20);
+  assert.equal(await xpDeJuego(e, 7), 25);
   // Al día siguiente vuelve a empezar y paga de nuevo.
   vista = await misionesDeFicha(e, { vtuberId: 7, dia: '2026-10-22' });
   assert.equal(vista.secundarias.find((m) => m.id === 'cazador-del-dia').requisitos[0].progreso, 0);
   const manana = await registrarAvances(e, lote({ mobs: 50 }, { dia: '2026-10-22' }));
   assert.ok(manana.completadas.some((m) => m.id === 'cazador-del-dia'));
-  assert.equal(await xpDeJuego(e, 7), 40);
+  assert.equal(await xpDeJuego(e, 7), 50);
 });
 
 test('otra ficha no comparte progreso', async () => {
@@ -202,11 +202,11 @@ test('las semanales acumulan de lunes a domingo, pagan una vez por semana y se r
   for (const dia of ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'])
     completadas.push(...(await registrarAvances(e, lote({ mobs: 100 }, { dia }))).completadas);
   assert.equal(completadas.filter((m) => m.id === 'cazador-semanal').length, 1);
-  // 5 días × 20 de «cazador del día» (100 monstruos > 50) + 80 de la semanal.
-  assert.equal(await xpDeJuego(e, 7), 5 * 20 + 80);
+  // 5 días × 25 de «cazador del día» (100 monstruos > 50) + 80 de la semanal.
+  assert.equal(await xpDeJuego(e, 7), 5 * 25 + 80);
   // Más monstruos el domingo de la misma semana no pagan otra vez...
   await registrarAvances(e, lote({ mobs: 500 }, { dia: '2026-10-25' }));
-  assert.equal(await xpDeJuego(e, 7), 6 * 20 + 80, 'el domingo solo paga la diaria nueva');
+  assert.equal(await xpDeJuego(e, 7), 6 * 25 + 80, 'el domingo solo paga la diaria nueva');
   // ...y el lunes siguiente vuelve a empezar desde cero.
   const vista = await misionesDeFicha(e, { vtuberId: 7, dia: '2026-10-26' });
   assert.equal(vista.secundarias.find((m) => m.id === 'cazador-semanal').requisitos[0].progreso, 0);

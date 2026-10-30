@@ -80,6 +80,16 @@ npm run verify               # 32 comprobaciones sobre un escenario de producci�
 las reales son **25/94/451** (medidas; el CI corre las tres) y las imágenes viven en
 Turso. Si añades tests, actualiza **los dos** archivos.
 
+## Etiquetas, autodeploy y carga del token (información de la sesión)
+
+- **Etiqueta de release actual: `v1.0.0`** en los repositorios de VtuberDex. Para listar las etiquetas de origin: `git ls-remote --tags origin 'refs/tags/v*'`, que requiere cargar el token (ver abajo).
+- **Autodeploy**: `vtuberdex-autodeploy` (`/usr/local/sbin/vtuberdex-autodeploy`) vive FUERA del repositorio y no se versiona aquí. Sigue la etiqueta más alta de origin ordenando con `sort -V`. Modo seco: `VTD_AUTO_DRY=1` con `VTD_ESTADO` apuntando a un directorio temporal.
+- **Carga del token** (`GITHUB_TOKEN`) antes de `git` contra GitHub o `gh`: `eval "$(grep -m1 '^export GITHUB_TOKEN=' /home/madkoding/.profile)"`. Nunca imprimir su valor.
+- **Remotos (específico de esta sesión)**: en este entorno `vtuberdex` usa HTTPS y funciona. Los remotos `vtuberdex-*` deben usar HTTPS con `GITHUB_TOKEN`; SSH falla con publickey aquí.
+- **Rama principal: `main`** en vtuberdex y en los demás repositorios. `master` no existe en origin.
+- **Pushes**: el push directo falla y los cambios entran solo por PR.
+- **Tiempos medidos**: `npm test` tarda unos 50 a 70 s (91 ficheros, 1045 tests); `npm run lint` es rápido. En `vtuberdex-minecraft`, `./gradlew build --rerun-tasks` tarda unos 10 a 14 s y ejecuta 45 tests en 12 XML bajo `build/test-results/test`; con las tareas UP-TO-DATE tarda unos 1 a 2 s.
+
 ## Publicación de cambios (regla operativa)
 
 Este proyecto está clonado en la **misma máquina donde se ejecuta**, así que lo que
