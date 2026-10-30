@@ -97,6 +97,17 @@ s.on("data", (d) => {
 ' "$PUERTO_MC" 2>/dev/null || echo "?"
 }
 
+# Health check con reintentos: justo tras reiniciar, el primer curl puede agotar su timeout aunque el servicio levante enseguida.
+# SALUD_INTENTOS (6 por defecto) y SALUD_PAUSA (5 s por defecto) acotan el tiempo antes de declarar el fallo.
+esperar_salud() { # $1 url
+  local i
+  for ((i = 1; i <= ${SALUD_INTENTOS:-6}; i++)); do
+    sleep "${SALUD_PAUSA:-5}"
+    curl -fsS -o /dev/null --max-time 10 "$1" && return 0
+  done
+  return 1
+}
+
 # ---------- web ----------
 desplegar_web() {
   local sha="$1" d="$ESTADO/web"
@@ -105,11 +116,7 @@ desplegar_web() {
   ( cd "$d" && npm ci --no-audit --no-fund && (cd server && npm ci --no-audit --no-fund) && npm test ) || { log "web: tests/instalación fallaron"; return 1; }
   local previo; previo="$(readlink /var/www/vtuberdex.com || true)"
   ( cd "$d" && nice ./scripts/release.sh ) || { log "web: release.sh falló"; return 1; }
-  local i
-  for i in 1 2 3 4 5 6; do
-    sleep 5
-    curl -fsS -o /dev/null --max-time 10 "$SALUD_WEB" && { log "web: ${sha:0:7} publicado y respondiendo"; return 0; }
-  done
+  esperar_salud "$SALUD_WEB" && { log "web: ${sha:0:7} publicado y respondiendo"; return 0; }
   log "web: no responde tras publicar; vuelvo a $previo"
   if [ -n "$previo" ]; then sudo ln -sfn "$previo" /var/www/vtuberdex.com && sudo systemctl restart vtuberdex; fi
   return 1
