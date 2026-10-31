@@ -54,7 +54,7 @@ import crypto from "node:crypto";
 import {
   DIRECTO_TRAMO_MIN,
   XP_DIRECTO_MAX_DIA,
-  XP_DIRECTO_POR_TRAMO,
+  xpDirectoDelTramo,
   XP_ENTREGA_MAX_DIA,
   XP_JUEGO_MAX_DIA,
 } from "./experiencia.mjs";
@@ -626,29 +626,27 @@ export async function premiarDirecto(
   const tramo = Math.floor(ahora / (DIRECTO_TRAMO_MIN * 60_000));
   const clave = `directo:${id}:${tramo}`;
   const e = await conTablas(ejecutor);
+  const previo = await e.execute(
+    "SELECT COUNT(*) AS n, COALESCE(SUM(cantidad), 0) AS hoy FROM xp_directo WHERE vtuber_id = ? AND dia = ?",
+    [id, dia],
+  );
+  let cantidad = xpDirectoDelTramo(Number(previo.rows[0]?.n ?? 0));
+  if (XP_DIRECTO_MAX_DIA >= 0) {
+    cantidad = Math.min(cantidad, XP_DIRECTO_MAX_DIA - Number(previo.rows[0]?.hoy ?? 0));
+  }
+  if (cantidad <= 0) return 0;
   const r = await e.execute(
     `INSERT INTO xp_directo (id_tramo, vtuber_id, plataforma, cantidad, dia, creado)
-     SELECT ?, ?, ?, MIN(?, ? - hoy), ?, ?
-       FROM (SELECT COALESCE(SUM(cantidad), 0) AS hoy FROM xp_directo WHERE vtuber_id = ? AND dia = ?)
-      WHERE hoy < ?
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT (id_tramo) DO NOTHING`,
     [
       clave,
       id,
       String(plataforma).slice(0, 20),
-      XP_DIRECTO_POR_TRAMO,
-      XP_DIRECTO_MAX_DIA,
+      cantidad,
       dia,
       new Date(ahora).toISOString(),
-      id,
-      dia,
-      XP_DIRECTO_MAX_DIA,
     ],
   );
-  if (!Number(r.rowsAffected ?? 0)) return 0;
-  const escrito = await e.execute(
-    "SELECT cantidad FROM xp_directo WHERE id_tramo = ?",
-    [clave],
-  );
-  return Number(escrito.rows[0]?.cantidad ?? 0);
+  return Number(r.rowsAffected ?? 0) ? cantidad : 0;
 }
