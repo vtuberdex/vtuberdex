@@ -64,7 +64,7 @@ export const MISIONES = Object.freeze([
   unica({ id: 'grado-6.5', tipo: 'grado', grado: '6.5', nombre: 'Carta gradeada · 6,5', descripcion: 'Un paso más allá del oficio.', requisitos: { mobs: 2500, jefes: 2, entregas: 25, pesca: 200 } }),
   unica({ id: 'grado-7', tipo: 'grado', grado: '7', nombre: 'Carta gradeada · 7', descripcion: 'Veterano de todos los frentes.', requisitos: { mobs: 5000, jefes: 5, entregas: 50, distancia: 100000, cosecha: 1000 } }),
   unica({ id: 'grado-7.5', tipo: 'grado', grado: '7.5', nombre: 'Carta gradeada · 7,5', descripcion: 'Casi una leyenda del servidor.', requisitos: { mobs: 10000, jefes: 10, entregas: 100, cria: 200 } }),
-  unica({ id: 'grado-8', tipo: 'grado', grado: '8', nombre: 'Carta gradeada · 8', descripcion: 'La cima de lo que se gana jugando.', requisitos: { mobs: 20000, jefes: 25, entregas: 250, mineria: 20000, distancia: 500000 } }),
+  unica({ id: 'grado-8', tipo: 'grado', grado: '8', nombre: 'Carta gradeada · 8', descripcion: 'La cima de lo que se gana jugando.', requisitos: { mobs: 20000, jefes: 25, entregas: 250, mineria: 6000, distancia: 100000 } }),
 ]);
 
 const porId = new Map(MISIONES.map((m) => [m.id, m]));
