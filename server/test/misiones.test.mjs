@@ -213,3 +213,12 @@ test('las semanales acumulan de lunes a domingo, pagan una vez por semana y se r
   const otra = await registrarAvances(e, lote({ mobs: 500 }, { dia: '2026-10-26' }));
   assert.ok(otra.completadas.some((m) => m.id === 'cazador-semanal'));
 });
+
+test('grado-8: exige 6000 de minería y 100000 de distancia, alcanzables con el borde de 20000 x 20000', () => {
+  const g8 = MISIONES.find((m) => m.id === 'grado-8');
+  assert.equal(g8.requisitos.mineria, 6000);
+  assert.equal(g8.requisitos.distancia, 100000);
+  assert.ok(g8.requisitos.distancia < 500000);
+  const g7 = MISIONES.find((m) => m.id === 'grado-7');
+  assert.ok(g8.requisitos.distancia >= g7.requisitos.distancia, 'el 8 no pide menos distancia que el 7');
+});
