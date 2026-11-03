@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
       - name: Semgrep OSS
@@ -50,7 +50,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v3
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v3
         with:
           languages: javascript-typescript
           queries: security-extended
@@ -58,7 +58,7 @@ jobs:
           config: |
             paths-ignore:
               - '**/*.test.*'
-      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v3
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v3
         with:
           output: codeql-sarif
       # El SARIF queda en codeql-sarif/javascript.sarif; se renombra para Sonar.
@@ -71,6 +71,13 @@ jobs:
   sonar:
     needs: [semgrep, codeql]
     runs-on: ubuntu-latest
+    # El contexto `secrets` no está permitido en `jobs.<job_id>.if` (solo github,
+    # needs, vars e inputs). Se leen aquí, en `env`, y la condición va en los pasos,
+    # que sí evalúan `env`: el check se publica igualmente y pasa con los pasos
+    # saltados cuando el repo no tiene los secretos (p. ej. runs de Dependabot).
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     permissions:
       contents: read
       checks: write # decoración del PR (Sonar)
@@ -91,12 +98,14 @@ jobs:
           pattern: sarif-*
           path: sarif
           merge-multiple: true
-      - uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+      - uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
       # Falla el job si el quality gate no pasa.
       - uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1
+        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
