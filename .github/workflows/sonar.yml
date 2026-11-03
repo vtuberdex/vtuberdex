@@ -72,9 +72,9 @@ jobs:
     needs: [semgrep, codeql]
     runs-on: ubuntu-latest
     # El contexto `secrets` no está permitido en `jobs.<job_id>.if` (solo github,
-    # needs, vars e inputs). Se leen aquí, en `env`, y la condición va en los pasos,
-    # que sí evalúan `env`: el check se publica igualmente y pasa con los pasos
-    # saltados cuando el repo no tiene los secretos (p. ej. runs de Dependabot).
+    # needs, vars e inputs). Se leen aquí, en `env`, y el paso de guarda
+    # (scripts/check-sonar-secrets.sh) decide: falla si faltan en un run que sí
+    # puede recibirlos y solo los omite en PR desde forks, que no los reciben.
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -98,14 +98,24 @@ jobs:
           pattern: sarif-*
           path: sarif
           merge-multiple: true
+      # La guarda falla si faltan los secretos en un run que sí puede recibirlos
+      # (push, PR del mismo repositorio, incluidos los que abre Dependabot) y solo
+      # deja pasar el skip en PR desde forks, que no reciben los del repo base.
+      - name: Comprobar secretos de Sonar
+        id: guarda-sonar
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          GITHUB_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: bash scripts/check-sonar-secrets.sh
       - uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
-        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
+        if: steps.guarda-sonar.outputs.skip != 'true'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
       # Falla el job si el quality gate no pasa.
       - uses: SonarSource/sonarqube-quality-gate-action@7a5fffe8e523c40e0c740b6bc2712ab503e52efa # v1
-        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
+        if: steps.guarda-sonar.outputs.skip != 'true'
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
