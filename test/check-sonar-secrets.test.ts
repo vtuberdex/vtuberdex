@@ -36,15 +36,27 @@ function ejecutarGuarda(entorno: Record<string, string>) {
   salidaTemporal = carpeta;
   const ficheroSalida = path.join(carpeta, "output");
 
+  // `spawnSync` pide un `NodeJS.ProcessEnv` completo (aquí NODE_ENV es
+  // obligatorio), así que se parte de `process.env` y se fijan de forma
+  // explícita TODAS las variables que lee la guarda: los secretos arrancan
+  // vacíos para que el entorno del desarrollador no decida el resultado de los
+  // casos "sin secretos", y el caso de prueba los sobrescribe si los aporta.
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    PATH: process.env.PATH ?? "/usr/bin:/bin",
+    GITHUB_OUTPUT: ficheroSalida,
+    GITHUB_REPOSITORY: "vtuberdex/vtuberdex",
+    GITHUB_EVENT_NAME: "",
+    GITHUB_HEAD_REPO: "",
+    SONAR_TOKEN: "",
+    SONAR_HOST_URL: "",
+    ...entorno,
+  };
+
   const resultado = spawnSync("bash", [GUARDA], {
     cwd: RAIZ,
     encoding: "utf8",
-    env: {
-      PATH: process.env.PATH ?? "/usr/bin:/bin",
-      GITHUB_OUTPUT: ficheroSalida,
-      GITHUB_REPOSITORY: "vtuberdex/vtuberdex",
-      ...entorno,
-    },
+    env,
   });
 
   let output = "";
