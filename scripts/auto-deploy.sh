@@ -8,8 +8,8 @@
 #
 # POR QUÉ entregas se recompila cuando cambia java o mochilas: compila contra los jars de los otros dos (`compileOnly`),
 # así que un cambio de API en ellos lo rompe aunque su propio código no se haya tocado. Su build.gradle.kts los busca en
-# `../vtuberdex-mochilas/` y `../vtuberdex/minecraft/`: por eso los clones de los plugins viven en `$ESTADO/arbol/` con esos
-# nombres (la carpeta `vtuberdex/minecraft` es un enlace al clon `java`; Gradle resuelve `..` desde la ruta REAL del cwd,
+# `../vtuberdex-mochilas/` y `../vtuberdex-minecraft/`: por eso los clones de los plugins viven en `$ESTADO/arbol/` con esos
+# nombres (la carpeta `vtuberdex-minecraft` es un enlace al clon `java`; Gradle resuelve `..` desde la ruta REAL del cwd,
 # así que entregas y mochilas tienen que ser carpetas de verdad y no enlaces).
 #
 # POR QUÉ clones propios y no el checkout de desarrollo: ahí vive vps-base-local con cambios a medias y
@@ -128,8 +128,8 @@ construir_plugin() { # $1 nombre, $2 sha
   log "$n: compilando ${sha:0:7}"
   llevar_a "$n" "$sha" || return 1
   if [ "$n" = entregas ]; then
-    # Sus dependencias se leen de ../vtuberdex/minecraft/build/libs (ver la cabecera).
-    mkdir -p "$ESTADO/arbol/vtuberdex" && ln -sfn "$ESTADO/java" "$ESTADO/arbol/vtuberdex/minecraft" || return 1
+    # Sus dependencias se leen de ../vtuberdex-minecraft/build/libs (ver la cabecera).
+    mkdir -p "$ESTADO/arbol" && ln -sfn "$ESTADO/java" "$ESTADO/arbol/vtuberdex-minecraft" || return 1
   fi
   ( cd "$d" && GRADLE_USER_HOME="$BUILD/gradle-home" JAVA_HOME="$BUILD/jdk25" nice ./gradlew build --no-daemon -q ) || return 1
   local jar; jar="$(ls -t "$d"/build/libs/*.jar 2>/dev/null | grep -v -- '-plain' | head -1)"
