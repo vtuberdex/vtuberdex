@@ -1,3 +1,11 @@
+/**
+ * Escritura de ficheros del scraper CONFINADA a un directorio base.
+ *
+ * `writeInside(base, target, data)` resuelve las dos rutas y lanza si el destino, ya resuelto, cae
+ * fuera de `base`: un slug con `..` o una ruta absoluta no pueden sacar lo descargado del árbol del
+ * scraper. Es la guarda que permite que escribir lo que llega de la red sea seguro al bajar una
+ * página (probado en `scraper/test/ocr-write.test.mjs`).
+ */
 import path from "node:path";
 import { writeFile } from "node:fs/promises";
 
