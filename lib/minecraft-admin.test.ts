@@ -1,0 +1,321 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+// El módulo es `.mjs` y no declara tipos: la prueba comprueba cada campo a mano, así que
+// aquí se tipa de forma laxa para que `tsc --noEmit` (job `validar` de CI) no se queje de
+// las uniones de resultado.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const admin = (await import("@/lib/minecraft-admin.mjs")) as any;
+const correo = await import("@/lib/correo.mjs");
+
+let enviados: Array<Record<string, unknown>> = [];
+let dir: string;
+
+beforeEach(async () => {
+  admin.__reiniciarEnlaces();
+  enviados = [];
+  correo.__usarTransporte({
+    sendMail: async (mensaje: Record<string, unknown>) => {
+      enviados.push(mensaje);
+      return { messageId: "prueba" };
+    },
+  });
+  dir = await fs.mkdtemp(path.join(os.tmpdir(), "minecraft-admin-"));
+});
+
+afterEach(async () => {
+  correo.__usarTransporte(null);
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
+describe("listado del panel de Minecraft", () => {
+  it("ordena los nombres alfabéticamente, sin que la mayúscula mande", async () => {
+    await fs.mkdir(path.join(dir, "plugins"), { recursive: true });
+    for (const nombre of ["chatty.jar", "EssentialsX.jar", "AntiJar.jar"]) {
+      await fs.writeFile(path.join(dir, "plugins", nombre), "x");
+    }
+    const listado = await admin.listarMinecraft({ dir });
+    // Con el comparador por defecto (códigos UTF-16) "EssentialsX.jar" quedaría antes que
+    // "chatty.jar" porque la mayúscula pesa menos que la minúscula; el panel ordena como
+    // una lista de verdad (localeCompare), así que la "c" va antes que la "E".
+    expect(listado.plugins).toEqual(["AntiJar.jar", "chatty.jar", "EssentialsX.jar"]);
+  });
+
+  it("separa jars, configuraciones y el server.properties", async () => {
+    await fs.mkdir(path.join(dir, "plugins"), { recursive: true });
+    await fs.writeFile(path.join(dir, "plugins", "plugin.jar"), "x");
+    await fs.writeFile(path.join(dir, "plugins", "plugin.yml"), "a: 1");
+    await fs.writeFile(path.join(dir, "plugins", "notas.txt"), "x");
+    await fs.writeFile(path.join(dir, "server.properties"), "motd=hola");
+    const listado = await admin.listarMinecraft({ dir });
+    expect(listado.plugins).toEqual(["plugin.jar"]);
+    expect(listado.configuraciones).toEqual(["plugin.yml"]);
+    expect(listado.servidor).toBe(true);
+    expect(listado.directorio).toBe(dir);
+  });
+
+  it("un directorio que no existe deja el listado vacío", async () => {
+    const listado = await admin.listarMinecraft({ dir: path.join(dir, "no-existe") });
+    expect(listado.plugins).toEqual([]);
+    expect(listado.configuraciones).toEqual([]);
+    expect(listado.servidor).toBe(false);
+  });
+});
+
+describe("rol mantenedor y acceso a /minecraft-admin", () => {
+  it("deja pasar a quien tiene el rol mantenedor", () => {
+    expect(admin.ROL_MANTENEDOR).toBe("mantenedor");
+    expect(admin.autorizar({ username: "a@a.cl", role: "mantenedor" })).toEqual({ ok: true });
+    expect(admin.autorizar({ user: { role: "mantenedor" } })).toEqual({ ok: true });
+  });
+
+  it("responde 403 a cualquier otro rol", () => {
+    const respuesta = admin.autorizar({ username: "a@a.cl", role: "usuario" });
+    expect(respuesta.ok).toBe(false);
+    expect(respuesta.status).toBe(403);
+    expect(respuesta.cuerpo.error).toBe("prohibido");
+  });
+
+  it("responde 401 sin sesión", () => {
+    expect(admin.autorizar(null).status).toBe(401);
+  });
+});
+
+describe("enlace mágico del mantenedor", () => {
+  it("envía el correo con el enlace y canjearlo crea una sesión de mantenedor", async () => {
+    const alta = await admin.enviarEnlaceMantenedor({ email: "Mantenedor@Example.com" });
+    expect(alta.ok).toBe(true);
+    expect(enviados).toHaveLength(1);
+    expect(String(enviados[0].to)).toBe("mantenedor@example.com");
+
+    const cuerpo = String(enviados[0].text);
+    const encontrado = cuerpo.match(/\/minecraft-admin#t=([A-Za-z0-9_-]+)/);
+    expect(encontrado).not.toBeNull();
+    const token = encontrado![1];
+
+    const canje = admin.canjearEnlace(token);
+    expect(canje.ok).toBe(true);
+    expect(canje.sesion.role).toBe("mantenedor");
+    expect(canje.sesion.email).toBe("mantenedor@example.com");
+    // El enlace recién creado da acceso al mantenedor de verdad.
+    expect(admin.autorizar(canje.sesion)).toEqual({ ok: true });
+  });
+
+  it("rechaza el enlace usado por segunda vez y el caducado", async () => {
+    await admin.enviarEnlaceMantenedor({ email: "a@example.com" });
+    expect(enviados).toHaveLength(1);
+    const token = String(enviados[0].text).match(/#t=([A-Za-z0-9_-]+)/)![1];
+    expect(admin.canjearEnlace(token).ok).toBe(true);
+    expect(admin.canjearEnlace(token).cuerpo.error).toBe("enlace_invalido");
+
+    const caduco = admin.emitirEnlace({ email: "b@example.com", ahora: 1_000 }) as {
+      ok: true;
+      token: string;
+    };
+    const tarde = admin.canjearEnlace(caduco.token, {
+      ahora: 1_000 + admin.VIGENCIA_ENLACE_MS + 1,
+    });
+    expect(tarde.ok).toBe(false);
+    expect(tarde.cuerpo.error).toBe("enlace_caducado");
+  });
+
+  it("no manda correo si la dirección no es válida", async () => {
+    const alta = await admin.enviarEnlaceMantenedor({ email: "no-es-un-correo" });
+    expect(alta.ok).toBe(false);
+    expect(alta.status).toBe(400);
+    expect(enviados).toHaveLength(0);
+  });
+});
+
+describe("subida de plugins", () => {
+  it("acepta un .jar y devuelve sus metadatos", async () => {
+    const contenido = new Uint8Array([80, 75, 3, 4, 1, 2, 3]);
+    const guardado = await admin.guardarJar({ nombre: "mi-plugin.jar", contenido, dir });
+    expect(guardado.ok).toBe(true);
+    expect(guardado.metadatos.nombre).toBe("mi-plugin.jar");
+    expect(guardado.metadatos.tamano).toBe(contenido.byteLength);
+    const enDisco = await fs.readFile(path.join(dir, "plugins", "mi-plugin.jar"));
+    expect(enDisco.byteLength).toBe(contenido.byteLength);
+  });
+
+  it("rechaza una extensión que no sea .jar", async () => {
+    const revision = admin.validarJar({ nombre: "plugin.zip", tamano: 10 });
+    expect(revision.ok).toBe(false);
+    expect(revision.status).toBe(415);
+    expect(revision.cuerpo.error).toBe("extension_no_permitida");
+  });
+
+  it("rechaza un archivo por encima del límite y un nombre con rutas", () => {
+    const grande = admin.validarJar({ nombre: "grande.jar", tamano: admin.LIMITE_JAR_BYTES + 1 });
+    expect(grande.ok).toBe(false);
+    expect(grande.status).toBe(413);
+
+    const ruta = admin.validarJar({ nombre: "../../etc/passwd.jar", tamano: 10 });
+    expect(ruta.ok).toBe(false);
+    expect(ruta.status).toBe(400);
+  });
+});
+
+describe("configuración del servidor y del plugin", () => {
+  it("guarda server.properties con los valores enviados", async () => {
+    const texto = "motd=Hola VTuberDex\nmax-players=20\nonline-mode=true\n";
+    const guardado = await admin.guardarConfiguracion({ tipo: "servidor", contenido: texto, dir });
+    expect(guardado.ok).toBe(true);
+    const escrito = await fs.readFile(path.join(dir, "server.properties"), "utf8");
+    expect(escrito).toBe(texto);
+    expect(admin.analizarServerProperties(escrito).valores["max-players"]).toBe("20");
+  });
+
+  it("no escribe nada si el server.properties tiene una línea rota", async () => {
+    const guardado = await admin.guardarConfiguracion({
+      tipo: "servidor",
+      contenido: "motd=Hola\nesto no tiene igual\n",
+      dir,
+    });
+    expect(guardado.ok).toBe(false);
+    expect(guardado.status).toBe(400);
+    await expect(fs.readFile(path.join(dir, "server.properties"), "utf8")).rejects.toThrow();
+  });
+
+  it("guarda el yml del plugin y rechaza tabuladores de indentación", async () => {
+    const yml = "mensaje: hola\ncolor: rojo\n";
+    const guardado = await admin.guardarConfiguracion({
+      tipo: "plugin",
+      contenido: yml,
+      archivo: "mi-plugin.yml",
+      dir,
+    });
+    expect(guardado.ok).toBe(true);
+    expect(await fs.readFile(path.join(dir, "plugins", "mi-plugin.yml"), "utf8")).toBe(yml);
+
+    const roto = await admin.guardarConfiguracion({
+      tipo: "plugin",
+      contenido: "\tmensaje: hola\n",
+      archivo: "otro.yml",
+      dir,
+    });
+    expect(roto.ok).toBe(false);
+    expect(roto.status).toBe(400);
+  });
+
+  it("rechaza un archivo de configuración con rutas", async () => {
+    const guardado = await admin.guardarConfiguracion({
+      tipo: "plugin",
+      contenido: "a: b\n",
+      archivo: "../fuera.yml",
+      dir,
+    });
+    expect(guardado.ok).toBe(false);
+    expect(guardado.status).toBe(400);
+  });
+});
+
+describe("saneado de rutas antes de escribir en disco", () => {
+  const rechazados: Array<[string, string]> = [
+    ["", "vacío"],
+    ["   ", "solo espacios"],
+    [".", "un punto"],
+    ["..", "dos puntos"],
+    ["../fuera.jar", "con ../"],
+    ["../../etc/passwd", "../ anidados"],
+    ["plugins/../../fuera.jar", "subida con .."],
+    ["..\\fuera.jar", "separador de Windows"],
+    ["sub/dir.jar", "un subdirectorio"],
+    ["/etc/passwd", "ruta absoluta"],
+    ["C:\\Windows\\System32\\evil.jar", "ruta absoluta de Windows"],
+    ["evil.jar\u0000.txt", "byte nulo"],
+    ["-rf.jar", "empieza por guion"],
+  ];
+
+  it.each(rechazados)("rechaza el nombre %j (%s)", (nombre) => {
+    const destino = admin.resolverRutaEnBase(nombre, { base: dir, carpeta: "plugins" });
+    expect(destino.ok).toBe(false);
+    expect(destino.status).toBe(400);
+    expect(destino.ruta).toBeUndefined();
+  });
+
+  it("acepta un nombre simple y lo resuelve dentro del directorio base", () => {
+    const destino = admin.resolverRutaEnBase("EssentialsX-2.20.1.jar", {
+      base: dir,
+      carpeta: "plugins",
+    });
+    expect(destino.ok).toBe(true);
+    expect(destino.nombre).toBe("EssentialsX-2.20.1.jar");
+    expect(destino.ruta).toBe(path.join(dir, "plugins", "EssentialsX-2.20.1.jar"));
+    const relativa = path.relative(dir, destino.ruta);
+    expect(relativa.startsWith("..")).toBe(false);
+    expect(path.isAbsolute(relativa)).toBe(false);
+  });
+
+  it("no rompe con nombres reales de plugin (acentos, espacios, paréntesis)", () => {
+    const nombres = ["Configuración-Ñandú_1.0.jar", "Mi Plugin (copia).jar", "geyser+floodgate.jar"];
+    for (const nombre of nombres) {
+      const destino = admin.resolverRutaEnBase(nombre, { base: dir, carpeta: "plugins" });
+      expect(destino.ok, nombre).toBe(true);
+      expect(path.dirname(destino.ruta)).toBe(path.join(dir, "plugins"));
+    }
+  });
+
+  it("ninguna ruta resultante se sale del directorio base", () => {
+    const nombres = ["a.jar", "a..b.jar", "a.b.c.jar", "ñ.jar", "a b.jar", "x_y-z+1.jar", "....jar"];
+    for (const nombre of nombres) {
+      const destino = admin.resolverRutaEnBase(nombre, { base: dir, carpeta: "plugins" });
+      if (!destino.ok) continue;
+      expect(path.dirname(destino.ruta)).toBe(path.join(dir, "plugins"));
+      expect(path.relative(dir, destino.ruta).startsWith("..")).toBe(false);
+    }
+  });
+
+  it("la subida de un jar usa la ruta saneada y rechaza la que se sale", async () => {
+    const contenido = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
+    const guardado = await admin.guardarJar({ nombre: "Prueba-1.0.jar", contenido, dir });
+    expect(guardado.ok).toBe(true);
+    expect(guardado.metadatos.ruta).toBe(path.join(dir, "plugins", "Prueba-1.0.jar"));
+    expect(await fs.readFile(guardado.metadatos.ruta)).toEqual(Buffer.from(contenido));
+
+    const fuera = await fs.mkdtemp(path.join(os.tmpdir(), "minecraft-fuera-"));
+    try {
+      const malo = await admin.guardarJar({
+        nombre: `../${path.basename(fuera)}/evil.jar`,
+        contenido,
+        dir,
+      });
+      expect(malo.ok).toBe(false);
+      expect(malo.status).toBe(400);
+      expect(await fs.readdir(fuera)).toEqual([]);
+    } finally {
+      await fs.rm(fuera, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ramas de error del mantenedor", () => {
+  it("el alta responde 502 si el correo no sale", async () => {
+    correo.__usarTransporte({
+      sendMail: async () => {
+        throw new Error("smtp caido");
+      },
+    });
+    const alta = await admin.enviarEnlaceMantenedor({ email: "mantenedor@example.com" });
+    expect(alta.ok).toBe(false);
+    expect(alta.status).toBe(502);
+    expect(alta.cuerpo.error).toBe("correo_no_enviado");
+    expect(String(alta.cuerpo.detail)).toContain("smtp caido");
+  });
+
+  it("rechaza un server.properties con bytes nulos", () => {
+    const r = admin.analizarServerProperties("motd=hola\u0000mundo");
+    expect(r.ok).toBe(false);
+    expect(r.status).toBe(400);
+    expect(r.cuerpo.error).toBe("contenido_invalido");
+  });
+
+  it("rechaza una configuración de plugin con bytes nulos", () => {
+    const r = admin.validarConfiguracionDePlugin("motd: hola\u0000mundo");
+    expect(r.ok).toBe(false);
+    expect(r.status).toBe(400);
+    expect(r.cuerpo.error).toBe("contenido_invalido");
+  });
+});
