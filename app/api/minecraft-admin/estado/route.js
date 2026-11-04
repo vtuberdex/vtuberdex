@@ -11,5 +11,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
-  return conMantenedor(request, async () => respuestaJson(await listarMinecraft()));
+  return conMantenedor(request, async () =>
+    respuestaJson(await listarMinecraft()),
+  );
 }

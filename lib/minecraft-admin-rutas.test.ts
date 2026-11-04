@@ -8,7 +8,11 @@ const enviados: Array<{ para: string; asunto: string; texto: string }> = [];
 
 vi.mock("./correo.mjs", () => ({
   urlDelSitio: () => "https://vtuberdex.com",
-  enviarCorreo: async (mensaje: { para: string; asunto: string; texto: string }) => {
+  enviarCorreo: async (mensaje: {
+    para: string;
+    asunto: string;
+    texto: string;
+  }) => {
     enviados.push(mensaje);
     return { ok: true };
   },
@@ -32,6 +36,10 @@ import {
   crearSesionMantenedor,
 } from "./minecraft-admin.mjs";
 
+// Lista cerrada de accesos: el rol sale del correo, no de la cookie (ver `rolDeCorreo`).
+process.env.VTUBERDEX_ADMIN_EMAILS = "admin@example.com";
+process.env.VTUBERDEX_MINECRAFT_MANTENEDORES = "mantenedor@example.com";
+
 let base = "";
 
 // El módulo es `.mjs` y no declara tipos: `crearSesionMantenedor` devuelve null sin un correo
@@ -41,8 +49,14 @@ const crearSesion = crearSesionMantenedor as unknown as (opciones: {
   role?: string;
 }) => string | null;
 
+const CORREO_DE_ROL: Record<string, string> = {
+  admin: "admin@example.com",
+  mantenedor: "mantenedor@example.com",
+  usuario: "intruso@example.com",
+};
+
 const cookieDe = (role: string) => {
-  const token = crearSesion({ email: "mantenedor@example.com", role }) ?? "";
+  const token = crearSesion({ email: CORREO_DE_ROL[role] ?? role, role }) ?? "";
   return `${COOKIE_MANTENEDOR}=${encodeURIComponent(token)}`;
 };
 
@@ -77,17 +91,33 @@ describe("rol mantenedor", () => {
     expect((await r.json()).error).toBe("sin_sesion");
   });
 
-  it("otro rol recibe 403", async () => {
+  it("un correo fuera de la lista no entra aunque la cookie esté bien firmada", async () => {
     const r = await estadoGET(
-      pedir("http://x/api/minecraft-admin/estado", { cookie: cookieDe("admin") }),
+      pedir("http://x/api/minecraft-admin/estado", {
+        cookie: cookieDe("usuario"),
+      }),
     );
-    expect(r.status).toBe(403);
-    expect((await r.json()).error).toBe("prohibido");
+    expect(r.status).toBe(401);
+    expect((await r.json()).error).toBe("sin_sesion");
+  });
+
+  it("un correo fuera de la lista no recibe enlace, y la respuesta es la misma", async () => {
+    const r = await enlacePOST(
+      pedir("http://x/api/minecraft-admin/enlace", {
+        method: "POST",
+        body: JSON.stringify({ email: "cualquiera@example.com" }),
+      }),
+    );
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ ok: true });
+    expect(enviados).toHaveLength(0);
   });
 
   it("el rol mantenedor ve el estado", async () => {
     const r = await estadoGET(
-      pedir("http://x/api/minecraft-admin/estado", { cookie: cookieDe("mantenedor") }),
+      pedir("http://x/api/minecraft-admin/estado", {
+        cookie: cookieDe("mantenedor"),
+      }),
     );
     expect(r.status).toBe(200);
     const cuerpo = await r.json();
@@ -155,40 +185,53 @@ describe("enlace mágico", () => {
 describe("subida de plugins", () => {
   const subir = (nombre: string, bytes: Uint8Array, cookie: string) =>
     pluginsPOST(
-      pedir(`http://x/api/minecraft-admin/plugins?nombre=${encodeURIComponent(nombre)}`, {
-        method: "POST",
-        body: bytes.slice().buffer as ArrayBuffer,
-        cookie,
-      }),
+      pedir(
+        `http://x/api/minecraft-admin/plugins?nombre=${encodeURIComponent(nombre)}`,
+        {
+          method: "POST",
+          body: bytes.slice().buffer as ArrayBuffer,
+          cookie,
+        },
+      ),
     );
 
   it("guarda un .jar y devuelve sus metadatos", async () => {
     const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00]);
-    const r = await subir("mi-plugin.jar", bytes, cookieDe("mantenedor"));
+    const r = await subir("mi-plugin.jar", bytes, cookieDe("admin"));
     expect(r.status).toBe(201);
     const meta = await r.json();
     expect(meta.nombre).toBe("mi-plugin.jar");
     expect(meta.tamano).toBe(bytes.byteLength);
-    const escrito = await fs.readFile(path.join(base, "plugins", "mi-plugin.jar"));
+    const escrito = await fs.readFile(
+      path.join(base, "plugins", "mi-plugin.jar"),
+    );
     expect(escrito.byteLength).toBe(bytes.byteLength);
   });
 
   it("rechaza con 415 una extensión que no es .jar", async () => {
-    const r = await subir("notas.txt", new Uint8Array([1, 2, 3]), cookieDe("mantenedor"));
+    const r = await subir(
+      "notas.txt",
+      new Uint8Array([1, 2, 3]),
+      cookieDe("admin"),
+    );
     expect(r.status).toBe(415);
     expect((await r.json()).error).toBe("extension_no_permitida");
   });
 
   it("rechaza con 413 un archivo por encima del límite", async () => {
     const grande = new Uint8Array(9 * 1024 * 1024);
-    const r = await subir("enorme.jar", grande, cookieDe("mantenedor"));
+    const r = await subir("enorme.jar", grande, cookieDe("admin"));
     expect(r.status).toBe(413);
     expect((await r.json()).error).toBe("archivo_demasiado_grande");
   });
 
   it("sin rol mantenedor no escribe nada", async () => {
-    const r = await subir("intruso.jar", new Uint8Array([1]), cookieDe("usuario"));
-    expect(r.status).toBe(403);
+    const r = await subir(
+      "intruso.jar",
+      new Uint8Array([1]),
+      cookieDe("usuario"),
+    );
+    expect(r.status).toBe(401);
     await expect(
       fs.access(path.join(base, "plugins", "intruso.jar")),
     ).rejects.toThrow();
@@ -208,35 +251,48 @@ describe("configuración", () => {
 
   it("escribe el server.properties con los valores enviados", async () => {
     const contenido = "motd=VTuberDex\nmax-players=20\n";
-    const r = await guardar({ tipo: "servidor", contenido }, cookieDe("mantenedor"));
+    const r = await guardar({ tipo: "servidor", contenido }, cookieDe("admin"));
     expect(r.status).toBe(200);
-    const escrito = await fs.readFile(path.join(base, "server.properties"), "utf8");
+    const escrito = await fs.readFile(
+      path.join(base, "server.properties"),
+      "utf8",
+    );
     expect(escrito).toContain("motd=VTuberDex");
     expect(escrito).toContain("max-players=20");
   });
 
   it("escribe el yml de un plugin", async () => {
     const r = await guardar(
-      { tipo: "plugin", archivo: "mi-plugin.yml", contenido: "precio: 10\nmoneda: euros\n" },
-      cookieDe("mantenedor"),
+      {
+        tipo: "plugin",
+        archivo: "mi-plugin.yml",
+        contenido: "precio: 10\nmoneda: euros\n",
+      },
+      cookieDe("admin"),
     );
     expect(r.status).toBe(200);
-    const escrito = await fs.readFile(path.join(base, "plugins", "mi-plugin.yml"), "utf8");
+    const escrito = await fs.readFile(
+      path.join(base, "plugins", "mi-plugin.yml"),
+      "utf8",
+    );
     expect(escrito).toContain("moneda: euros");
   });
 
   it("rechaza un server.properties con una línea rota", async () => {
     const r = await guardar(
       { tipo: "servidor", contenido: "motd=ok\nesto-no-tiene-igual\n" },
-      cookieDe("mantenedor"),
+      cookieDe("admin"),
     );
     expect(r.status).toBe(400);
     expect((await r.json()).error).toBe("linea_invalida");
   });
 
   it("un rol distinto no puede guardar", async () => {
-    const r = await guardar({ tipo: "servidor", contenido: "motd=x\n" }, cookieDe("admin"));
-    expect(r.status).toBe(403);
+    const r = await guardar(
+      { tipo: "servidor", contenido: "motd=x\n" },
+      cookieDe("usuario"),
+    );
+    expect(r.status).toBe(401);
   });
 
   it("sin sesión la configuración no se lee", async () => {
@@ -247,10 +303,14 @@ describe("configuración", () => {
   });
 
   it("con sesión de mantenedor se lee el server.properties", async () => {
-    await fs.writeFile(path.join(base, "server.properties"), "motd=VTuberDex\n", "utf8");
+    await fs.writeFile(
+      path.join(base, "server.properties"),
+      "motd=VTuberDex\n",
+      "utf8",
+    );
     const r = await configGET(
       pedir("http://x/api/minecraft-admin/configuracion?tipo=servidor", {
-        cookie: cookieDe("mantenedor"),
+        cookie: cookieDe("admin"),
       }),
     );
     expect(r.status).toBe(200);
@@ -263,7 +323,7 @@ describe("configuración", () => {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: "no-es-json",
-        cookie: cookieDe("mantenedor"),
+        cookie: cookieDe("admin"),
       }),
     );
     expect(r.status).toBe(400);
@@ -283,7 +343,11 @@ describe("plugins", () => {
       datos.byteOffset + datos.byteLength,
     ) as ArrayBuffer;
     return pluginsPOST(
-      pedir(url, { method: "POST", body: cuerpo, ...(cookie ? { cookie } : {}) }),
+      pedir(url, {
+        method: "POST",
+        body: cuerpo,
+        ...(cookie ? { cookie } : {}),
+      }),
     );
   };
 
@@ -293,20 +357,28 @@ describe("plugins", () => {
   });
 
   it("sin nombre de archivo responde 400", async () => {
-    const r = await subir(null, new Uint8Array([1, 2, 3]), cookieDe("mantenedor"));
+    const r = await subir(null, new Uint8Array([1, 2, 3]), cookieDe("admin"));
     expect(r.status).toBe(400);
     expect((await r.json()).error).toBe("falta_nombre");
   });
 
   it("rechaza una extensión que no es .jar", async () => {
-    const r = await subir("plugin.zip", new Uint8Array([1, 2, 3]), cookieDe("mantenedor"));
+    const r = await subir(
+      "plugin.zip",
+      new Uint8Array([1, 2, 3]),
+      cookieDe("admin"),
+    );
     expect(r.status).toBeGreaterThanOrEqual(400);
     expect((await r.json()).ok).not.toBe(true);
   });
 
-  it("un rol distinto no puede subir plugins", async () => {
-    const r = await subir("mi-plugin.jar", new Uint8Array([1, 2, 3]), cookieDe("admin"));
-    expect(r.status).toBe(403);
+  it("un mantenedor autorizado también puede subir plugins", async () => {
+    const r = await subir(
+      "mi-plugin.jar",
+      new Uint8Array([1, 2, 3]),
+      cookieDe("mantenedor"),
+    );
+    expect(r.status).toBe(201);
   });
 });
 
@@ -330,7 +402,9 @@ describe("sesión", () => {
 
   it("con sesión devuelve el correo y el rol", async () => {
     const r = await sesionGET(
-      pedir("http://x/api/minecraft-admin/sesion", { cookie: cookieDe("mantenedor") }),
+      pedir("http://x/api/minecraft-admin/sesion", {
+        cookie: cookieDe("mantenedor"),
+      }),
     );
     expect(r.status).toBe(200);
     const cuerpo = await r.json();
@@ -342,5 +416,63 @@ describe("sesión", () => {
     const r = sesionDELETE();
     expect(r.status).toBe(204);
     expect(r.headers.get("set-cookie")).toContain("Max-Age=0");
+  });
+});
+
+describe("roles: admin y mantenedor", () => {
+  const subirComo = (nombre: string, bytes: Uint8Array, cookie: string) =>
+    pluginsPOST(
+      pedir(
+        `http://x/api/minecraft-admin/plugins?nombre=${encodeURIComponent(nombre)}`,
+        {
+          method: "POST",
+          body: bytes.slice().buffer as ArrayBuffer,
+          cookie,
+        },
+      ),
+    );
+  const guardarComo = (cuerpo: unknown, cookie: string) =>
+    configPUT(
+      pedir("http://x/api/minecraft-admin/configuracion", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(cuerpo),
+        cookie,
+      }),
+    );
+
+  it("el rol sale de la lista, no de la cookie: un mantenedor con role «admin» sigue sin serlo", async () => {
+    const token =
+      crearSesion({ email: "mantenedor@example.com", role: "admin" }) ?? "";
+    const r = await configGET(
+      pedir("http://x/api/minecraft-admin/configuracion?tipo=servidor", {
+        cookie: `${COOKIE_MANTENEDOR}=${encodeURIComponent(token)}`,
+      }),
+    );
+    // Sin rol admin la clave RCON no se entrega: aquí no hay archivo, pero nunca un 403.
+    expect([200, 404]).toContain(r.status);
+    expect(await r.text()).not.toContain("secretisima");
+  });
+
+  it("un mantenedor que no es admin sube jars y guarda la configuración, pero no ve ni cambia la clave RCON", async () => {
+    const jar = await subirComo(
+      "plugin.jar",
+      new Uint8Array([1, 2, 3]),
+      cookieDe("mantenedor"),
+    );
+    expect(jar.status).toBe(201);
+    const guardado = await guardarComo(
+      { tipo: "servidor", contenido: "motd=x\nrcon.password=hackeada\n" },
+      cookieDe("mantenedor"),
+    );
+    expect(guardado.status).toBe(200);
+    const leido = await configGET(
+      pedir("http://x/api/minecraft-admin/configuracion?tipo=servidor", {
+        cookie: cookieDe("mantenedor"),
+      }),
+    );
+    const texto = (await leido.json()).contenido as string;
+    expect(texto).toContain("motd=x");
+    expect(texto).not.toContain("hackeada");
   });
 });

@@ -10,6 +10,11 @@ import path from "node:path";
 const admin = (await import("@/lib/minecraft-admin.mjs")) as any;
 const correo = await import("@/lib/correo.mjs");
 
+// Lista cerrada de accesos: el enlace solo se manda a estos correos.
+process.env.VTUBERDEX_ADMIN_EMAILS = "admin@example.com";
+process.env.VTUBERDEX_MINECRAFT_MANTENEDORES =
+  "mantenedor@example.com,a@example.com";
+
 let enviados: Array<Record<string, unknown>> = [];
 let dir: string;
 
@@ -40,7 +45,11 @@ describe("listado del panel de Minecraft", () => {
     // Con el comparador por defecto (códigos UTF-16) "EssentialsX.jar" quedaría antes que
     // "chatty.jar" porque la mayúscula pesa menos que la minúscula; el panel ordena como
     // una lista de verdad (localeCompare), así que la "c" va antes que la "E".
-    expect(listado.plugins).toEqual(["AntiJar.jar", "chatty.jar", "EssentialsX.jar"]);
+    expect(listado.plugins).toEqual([
+      "AntiJar.jar",
+      "chatty.jar",
+      "EssentialsX.jar",
+    ]);
   });
 
   it("separa jars, configuraciones y el server.properties", async () => {
@@ -57,7 +66,9 @@ describe("listado del panel de Minecraft", () => {
   });
 
   it("un directorio que no existe deja el listado vacío", async () => {
-    const listado = await admin.listarMinecraft({ dir: path.join(dir, "no-existe") });
+    const listado = await admin.listarMinecraft({
+      dir: path.join(dir, "no-existe"),
+    });
     expect(listado.plugins).toEqual([]);
     expect(listado.configuraciones).toEqual([]);
     expect(listado.servidor).toBe(false);
@@ -67,8 +78,12 @@ describe("listado del panel de Minecraft", () => {
 describe("rol mantenedor y acceso a /minecraft-admin", () => {
   it("deja pasar a quien tiene el rol mantenedor", () => {
     expect(admin.ROL_MANTENEDOR).toBe("mantenedor");
-    expect(admin.autorizar({ username: "a@a.cl", role: "mantenedor" })).toEqual({ ok: true });
-    expect(admin.autorizar({ user: { role: "mantenedor" } })).toEqual({ ok: true });
+    expect(admin.autorizar({ username: "a@a.cl", role: "mantenedor" })).toEqual(
+      { ok: true },
+    );
+    expect(admin.autorizar({ user: { role: "mantenedor" } })).toEqual({
+      ok: true,
+    });
   });
 
   it("responde 403 a cualquier otro rol", () => {
@@ -85,7 +100,9 @@ describe("rol mantenedor y acceso a /minecraft-admin", () => {
 
 describe("enlace mágico del mantenedor", () => {
   it("envía el correo con el enlace y canjearlo crea una sesión de mantenedor", async () => {
-    const alta = await admin.enviarEnlaceMantenedor({ email: "Mantenedor@Example.com" });
+    const alta = await admin.enviarEnlaceMantenedor({
+      email: "Mantenedor@Example.com",
+    });
     expect(alta.ok).toBe(true);
     expect(enviados).toHaveLength(1);
     expect(String(enviados[0].to)).toBe("mantenedor@example.com");
@@ -110,7 +127,10 @@ describe("enlace mágico del mantenedor", () => {
     expect(admin.canjearEnlace(token).ok).toBe(true);
     expect(admin.canjearEnlace(token).cuerpo.error).toBe("enlace_invalido");
 
-    const caduco = admin.emitirEnlace({ email: "b@example.com", ahora: 1_000 }) as {
+    const caduco = admin.emitirEnlace({
+      email: "b@example.com",
+      ahora: 1_000,
+    }) as {
       ok: true;
       token: string;
     };
@@ -122,7 +142,9 @@ describe("enlace mágico del mantenedor", () => {
   });
 
   it("no manda correo si la dirección no es válida", async () => {
-    const alta = await admin.enviarEnlaceMantenedor({ email: "no-es-un-correo" });
+    const alta = await admin.enviarEnlaceMantenedor({
+      email: "no-es-un-correo",
+    });
     expect(alta.ok).toBe(false);
     expect(alta.status).toBe(400);
     expect(enviados).toHaveLength(0);
@@ -132,11 +154,17 @@ describe("enlace mágico del mantenedor", () => {
 describe("subida de plugins", () => {
   it("acepta un .jar y devuelve sus metadatos", async () => {
     const contenido = new Uint8Array([80, 75, 3, 4, 1, 2, 3]);
-    const guardado = await admin.guardarJar({ nombre: "mi-plugin.jar", contenido, dir });
+    const guardado = await admin.guardarJar({
+      nombre: "mi-plugin.jar",
+      contenido,
+      dir,
+    });
     expect(guardado.ok).toBe(true);
     expect(guardado.metadatos.nombre).toBe("mi-plugin.jar");
     expect(guardado.metadatos.tamano).toBe(contenido.byteLength);
-    const enDisco = await fs.readFile(path.join(dir, "plugins", "mi-plugin.jar"));
+    const enDisco = await fs.readFile(
+      path.join(dir, "plugins", "mi-plugin.jar"),
+    );
     expect(enDisco.byteLength).toBe(contenido.byteLength);
   });
 
@@ -148,11 +176,17 @@ describe("subida de plugins", () => {
   });
 
   it("rechaza un archivo por encima del límite y un nombre con rutas", () => {
-    const grande = admin.validarJar({ nombre: "grande.jar", tamano: admin.LIMITE_JAR_BYTES + 1 });
+    const grande = admin.validarJar({
+      nombre: "grande.jar",
+      tamano: admin.LIMITE_JAR_BYTES + 1,
+    });
     expect(grande.ok).toBe(false);
     expect(grande.status).toBe(413);
 
-    const ruta = admin.validarJar({ nombre: "../../etc/passwd.jar", tamano: 10 });
+    const ruta = admin.validarJar({
+      nombre: "../../etc/passwd.jar",
+      tamano: 10,
+    });
     expect(ruta.ok).toBe(false);
     expect(ruta.status).toBe(400);
   });
@@ -161,11 +195,20 @@ describe("subida de plugins", () => {
 describe("configuración del servidor y del plugin", () => {
   it("guarda server.properties con los valores enviados", async () => {
     const texto = "motd=Hola VTuberDex\nmax-players=20\nonline-mode=true\n";
-    const guardado = await admin.guardarConfiguracion({ tipo: "servidor", contenido: texto, dir });
+    const guardado = await admin.guardarConfiguracion({
+      tipo: "servidor",
+      contenido: texto,
+      dir,
+    });
     expect(guardado.ok).toBe(true);
-    const escrito = await fs.readFile(path.join(dir, "server.properties"), "utf8");
+    const escrito = await fs.readFile(
+      path.join(dir, "server.properties"),
+      "utf8",
+    );
     expect(escrito).toBe(texto);
-    expect(admin.analizarServerProperties(escrito).valores["max-players"]).toBe("20");
+    expect(admin.analizarServerProperties(escrito).valores["max-players"]).toBe(
+      "20",
+    );
   });
 
   it("no escribe nada si el server.properties tiene una línea rota", async () => {
@@ -176,7 +219,9 @@ describe("configuración del servidor y del plugin", () => {
     });
     expect(guardado.ok).toBe(false);
     expect(guardado.status).toBe(400);
-    await expect(fs.readFile(path.join(dir, "server.properties"), "utf8")).rejects.toThrow();
+    await expect(
+      fs.readFile(path.join(dir, "server.properties"), "utf8"),
+    ).rejects.toThrow();
   });
 
   it("guarda el yml del plugin y rechaza tabuladores de indentación", async () => {
@@ -188,7 +233,9 @@ describe("configuración del servidor y del plugin", () => {
       dir,
     });
     expect(guardado.ok).toBe(true);
-    expect(await fs.readFile(path.join(dir, "plugins", "mi-plugin.yml"), "utf8")).toBe(yml);
+    expect(
+      await fs.readFile(path.join(dir, "plugins", "mi-plugin.yml"), "utf8"),
+    ).toBe(yml);
 
     const roto = await admin.guardarConfiguracion({
       tipo: "plugin",
@@ -230,7 +277,10 @@ describe("saneado de rutas antes de escribir en disco", () => {
   ];
 
   it.each(rechazados)("rechaza el nombre %j (%s)", (nombre) => {
-    const destino = admin.resolverRutaEnBase(nombre, { base: dir, carpeta: "plugins" });
+    const destino = admin.resolverRutaEnBase(nombre, {
+      base: dir,
+      carpeta: "plugins",
+    });
     expect(destino.ok).toBe(false);
     expect(destino.status).toBe(400);
     expect(destino.ruta).toBeUndefined();
@@ -243,25 +293,45 @@ describe("saneado de rutas antes de escribir en disco", () => {
     });
     expect(destino.ok).toBe(true);
     expect(destino.nombre).toBe("EssentialsX-2.20.1.jar");
-    expect(destino.ruta).toBe(path.join(dir, "plugins", "EssentialsX-2.20.1.jar"));
+    expect(destino.ruta).toBe(
+      path.join(dir, "plugins", "EssentialsX-2.20.1.jar"),
+    );
     const relativa = path.relative(dir, destino.ruta);
     expect(relativa.startsWith("..")).toBe(false);
     expect(path.isAbsolute(relativa)).toBe(false);
   });
 
   it("no rompe con nombres reales de plugin (acentos, espacios, paréntesis)", () => {
-    const nombres = ["Configuración-Ñandú_1.0.jar", "Mi Plugin (copia).jar", "geyser+floodgate.jar"];
+    const nombres = [
+      "Configuración-Ñandú_1.0.jar",
+      "Mi Plugin (copia).jar",
+      "geyser+floodgate.jar",
+    ];
     for (const nombre of nombres) {
-      const destino = admin.resolverRutaEnBase(nombre, { base: dir, carpeta: "plugins" });
+      const destino = admin.resolverRutaEnBase(nombre, {
+        base: dir,
+        carpeta: "plugins",
+      });
       expect(destino.ok, nombre).toBe(true);
       expect(path.dirname(destino.ruta)).toBe(path.join(dir, "plugins"));
     }
   });
 
   it("ninguna ruta resultante se sale del directorio base", () => {
-    const nombres = ["a.jar", "a..b.jar", "a.b.c.jar", "ñ.jar", "a b.jar", "x_y-z+1.jar", "....jar"];
+    const nombres = [
+      "a.jar",
+      "a..b.jar",
+      "a.b.c.jar",
+      "ñ.jar",
+      "a b.jar",
+      "x_y-z+1.jar",
+      "....jar",
+    ];
     for (const nombre of nombres) {
-      const destino = admin.resolverRutaEnBase(nombre, { base: dir, carpeta: "plugins" });
+      const destino = admin.resolverRutaEnBase(nombre, {
+        base: dir,
+        carpeta: "plugins",
+      });
       if (!destino.ok) continue;
       expect(path.dirname(destino.ruta)).toBe(path.join(dir, "plugins"));
       expect(path.relative(dir, destino.ruta).startsWith("..")).toBe(false);
@@ -270,10 +340,18 @@ describe("saneado de rutas antes de escribir en disco", () => {
 
   it("la subida de un jar usa la ruta saneada y rechaza la que se sale", async () => {
     const contenido = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
-    const guardado = await admin.guardarJar({ nombre: "Prueba-1.0.jar", contenido, dir });
+    const guardado = await admin.guardarJar({
+      nombre: "Prueba-1.0.jar",
+      contenido,
+      dir,
+    });
     expect(guardado.ok).toBe(true);
-    expect(guardado.metadatos.ruta).toBe(path.join(dir, "plugins", "Prueba-1.0.jar"));
-    expect(await fs.readFile(guardado.metadatos.ruta)).toEqual(Buffer.from(contenido));
+    expect(guardado.metadatos.ruta).toBe(
+      path.join(dir, "plugins", "Prueba-1.0.jar"),
+    );
+    expect(await fs.readFile(guardado.metadatos.ruta)).toEqual(
+      Buffer.from(contenido),
+    );
 
     const fuera = await fs.mkdtemp(path.join(os.tmpdir(), "minecraft-fuera-"));
     try {
@@ -298,7 +376,9 @@ describe("ramas de error del mantenedor", () => {
         throw new Error("smtp caido");
       },
     });
-    const alta = await admin.enviarEnlaceMantenedor({ email: "mantenedor@example.com" });
+    const alta = await admin.enviarEnlaceMantenedor({
+      email: "mantenedor@example.com",
+    });
     expect(alta.ok).toBe(false);
     expect(alta.status).toBe(502);
     expect(alta.cuerpo.error).toBe("correo_no_enviado");

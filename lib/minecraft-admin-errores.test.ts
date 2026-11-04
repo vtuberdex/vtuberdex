@@ -26,7 +26,11 @@ describe("ramas de rechazo de server.properties y de la configuración del plugi
   // no se copia en cada prueba.
   const comprobarRechazoLegible = (revision: unknown) => {
     expect(revision).toBeTypeOf("object");
-    const r = revision as { ok: boolean; status?: number; cuerpo?: { error?: unknown } };
+    const r = revision as {
+      ok: boolean;
+      status?: number;
+      cuerpo?: { error?: unknown };
+    };
     if (!r.ok) {
       expect(r.status).toBeGreaterThanOrEqual(400);
       expect(typeof r.cuerpo?.error).toBe("string");
