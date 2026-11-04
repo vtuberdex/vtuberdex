@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 
 import { POST as pluginsPOST } from "../app/api/minecraft-admin/plugins/route.js";

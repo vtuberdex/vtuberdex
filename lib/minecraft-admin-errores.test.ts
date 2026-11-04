@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 
 // El módulo es `.mjs` y no declara tipos: se importa de forma laxa para que

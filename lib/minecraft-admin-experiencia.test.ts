@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 
 process.env.VTUBERDEX_ADMIN_EMAILS = "admin@example.com";
