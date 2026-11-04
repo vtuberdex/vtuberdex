@@ -138,8 +138,41 @@ export function slugDeStat(label) {
   return STAT_SLUGS[normalizeText(label)] ?? slugOCodigo(label, "stat");
 }
 
+/**
+ * Mientras es > 0, `refreshFacetCounters` solo anota que hay que recalcular. Ver `conContadoresDiferidos`.
+ */
+let contadoresDiferidos = 0;
+let contadoresPendientes = false;
+
+/**
+ * Ejecuta `fn` recalculando los contadores de facetas UNA vez al final, no tras cada operación.
+ *
+ * POR QUÉ: reconstruir la copia del diario reproduce miles de operaciones y cada una recalculaba
+ * los tres contadores enteros (tres UPDATE con subconsulta sobre todo el catálogo). Medido con el
+ * diario real de producción (2.671 cambios + 2.384 ediciones antiguas): 22 s de bloqueo del hilo,
+ * 19 de ellos en este recálculo. Mientras duraba, la web no contestaba y el plugin de Minecraft
+ * (timeout de 10 s) registraba «request timed out» tras cada reinicio y cada edición. Ninguna
+ * mutación LEE `vtuber_count`, así que el resultado final es idéntico.
+ */
+export function conContadoresDiferidos(db, fn) {
+  contadoresDiferidos += 1;
+  try {
+    return fn();
+  } finally {
+    contadoresDiferidos -= 1;
+    if (contadoresDiferidos === 0 && contadoresPendientes) {
+      contadoresPendientes = false;
+      refreshFacetCounters(db);
+    }
+  }
+}
+
 /** Recalcula los contadores desnormalizados de las facetas. */
 export function refreshFacetCounters(db) {
+  if (contadoresDiferidos > 0) {
+    contadoresPendientes = true;
+    return;
+  }
   db.exec(`
     UPDATE country SET vtuber_count = (
       SELECT COUNT(*) FROM vtuber_country vc JOIN vtuber v ON v.id = vc.vtuber_id

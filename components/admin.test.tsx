@@ -445,7 +445,9 @@ describe("Asistente de carta: alta", () => {
       status: "published",
     });
     expect(await screen.findByTestId("wizard-done")).toHaveTextContent(/lista/);
-  });
+    // Con la instrumentación de v8 sobre jsdom este alta tarda más de los 5 s
+    // por defecto; el resto de la suite mantiene el límite normal.
+  }, 15_000);
 
   test("«Guardar y salir» crea el borrador y cierra sin perder nada", async () => {
     mocks.createVtuber.mockResolvedValue(draft());

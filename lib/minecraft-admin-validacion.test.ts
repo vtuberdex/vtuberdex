@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 
 import { analizarServerProperties } from "./minecraft-admin.mjs";
@@ -32,7 +33,10 @@ describe("analizarServerProperties: rechazos de configuración", () => {
     expect(analizarServerProperties("motd\nonline-mode=false")).toMatchObject({
       ok: false,
       status: 400,
-      cuerpo: { error: "linea_invalida", detail: expect.stringContaining("línea 1") },
+      cuerpo: {
+        error: "linea_invalida",
+        detail: expect.stringContaining("línea 1"),
+      },
     });
   });
 
@@ -40,7 +44,10 @@ describe("analizarServerProperties: rechazos de configuración", () => {
     expect(analizarServerProperties("clave rara=valor")).toMatchObject({
       ok: false,
       status: 400,
-      cuerpo: { error: "clave_invalida", detail: expect.stringContaining("línea 1") },
+      cuerpo: {
+        error: "clave_invalida",
+        detail: expect.stringContaining("línea 1"),
+      },
     });
   });
 
@@ -53,7 +60,9 @@ describe("analizarServerProperties: rechazos de configuración", () => {
   });
 
   it("acepta un contenido con claves válidas", () => {
-    expect(analizarServerProperties("motd=hola\nonline-mode=false\r\n")).toEqual({
+    expect(
+      analizarServerProperties("motd=hola\nonline-mode=false\r\n"),
+    ).toEqual({
       ok: true,
       valores: { motd: "hola", "online-mode": "false" },
     });

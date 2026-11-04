@@ -130,6 +130,15 @@ const DDL = `
     creado     TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_xp_mision_ficha ON xp_mision (vtuber_id);
+  CREATE TABLE IF NOT EXISTS xp_manual (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    vtuber_id  INTEGER NOT NULL,
+    cantidad   INTEGER NOT NULL,
+    motivo     TEXT NOT NULL,
+    actor      TEXT NOT NULL,
+    creado     TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_xp_manual_ficha ON xp_manual (vtuber_id);
   CREATE TABLE IF NOT EXISTS sesion_minecraft (
     uuid       TEXT NOT NULL,
     red        TEXT NOT NULL,
@@ -589,8 +598,10 @@ export async function xpDeJuegoVarias(ejecutor, ids) {
        SELECT vtuber_id AS id, cantidad AS n FROM xp_directo WHERE vtuber_id IN (${marcas})
        UNION ALL
        SELECT vtuber_id AS id, cantidad AS n FROM xp_mision WHERE vtuber_id IN (${marcas})
+       UNION ALL
+       SELECT vtuber_id AS id, cantidad AS n FROM xp_manual WHERE vtuber_id IN (${marcas})
      ) GROUP BY id`,
-    [...lista, ...lista, ...lista],
+    [...lista, ...lista, ...lista, ...lista],
   );
   return new Map(rows.map((r) => [Number(r.id), Number(r.n)]));
 }
@@ -601,10 +612,77 @@ export async function xpDeJuego(ejecutor, vtuberId) {
   const { rows } = await e.execute(
     `SELECT (SELECT COALESCE(SUM(cantidad), 0) FROM xp_juego WHERE vtuber_id = ?)
           + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_directo WHERE vtuber_id = ?)
-          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_mision WHERE vtuber_id = ?) AS n`,
-    [Number(vtuberId), Number(vtuberId), Number(vtuberId)],
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_mision WHERE vtuber_id = ?)
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_manual WHERE vtuber_id = ?) AS n`,
+    [Number(vtuberId), Number(vtuberId), Number(vtuberId), Number(vtuberId)],
   );
   return Number(rows[0]?.n ?? 0);
+}
+
+/** Tope de un ajuste manual (en positivo o negativo): lo suficiente para premiar un evento, no para fabricar niveles de un golpe. */
+export const XP_MANUAL_MAX = 10000;
+
+/**
+ * XP dada A MANO por un administrador (o quitada, con una cantidad negativa para corregir un error).
+ * Va en su propia tabla, con quién la dio y por qué: no gasta ningún tope diario y no se mezcla con la
+ * XP ganada jugando, así que se puede auditar y revertir. Entra a la barra por `xpDeJuego`, igual que el resto.
+ * @param {{ vtuberId: number, cantidad: number, motivo: string, actor: string, ahora?: number }} entrada
+ */
+export async function darXpManual(
+  ejecutor,
+  { vtuberId, cantidad, motivo, actor, ahora = Date.now() },
+) {
+  const id = Number(vtuberId);
+  const n = Number(cantidad);
+  const razon = String(motivo ?? "").trim();
+  const quien = String(actor ?? "").trim();
+  if (!Number.isInteger(id) || id <= 0)
+    return { ok: false, status: 400, cuerpo: { error: "ficha_invalida" } };
+  if (!Number.isInteger(n) || n === 0 || Math.abs(n) > XP_MANUAL_MAX)
+    return {
+      ok: false,
+      status: 400,
+      cuerpo: {
+        error: "cantidad_invalida",
+        detail: `un entero distinto de 0, de hasta ${XP_MANUAL_MAX} en positivo o negativo`,
+      },
+    };
+  if (razon.length < 3 || razon.length > 200 || /\p{Cc}/u.test(razon))
+    return {
+      ok: false,
+      status: 400,
+      cuerpo: {
+        error: "motivo_invalido",
+        detail: "entre 3 y 200 caracteres, en una línea",
+      },
+    };
+  if (!quien)
+    return { ok: false, status: 400, cuerpo: { error: "actor_invalido" } };
+  const e = await conTablas(ejecutor);
+  await e.execute(
+    "INSERT INTO xp_manual (vtuber_id, cantidad, motivo, actor, creado) VALUES (?, ?, ?, ?, ?)",
+    [id, n, razon, quien, new Date(ahora).toISOString()],
+  );
+  return { ok: true, cantidad: n, xpTotal: await xpDeJuego(e, id) };
+}
+
+/** Los últimos ajustes manuales de una ficha, del más reciente al más antiguo. */
+export async function historialXpManual(ejecutor, vtuberId, limite = 20) {
+  const e = await conTablas(ejecutor);
+  const { rows } = await e.execute(
+    "SELECT id, cantidad, motivo, actor, creado FROM xp_manual WHERE vtuber_id = ? ORDER BY id DESC LIMIT ?",
+    [
+      Number(vtuberId),
+      Math.min(Math.max(Math.trunc(Number(limite)) || 20, 1), 100),
+    ],
+  );
+  return rows.map((r) => ({
+    id: Number(r.id),
+    cantidad: Number(r.cantidad),
+    motivo: String(r.motivo),
+    actor: String(r.actor),
+    creado: String(r.creado),
+  }));
 }
 
 /**
@@ -632,7 +710,10 @@ export async function premiarDirecto(
   );
   let cantidad = xpDirectoDelTramo(Number(previo.rows[0]?.n ?? 0));
   if (XP_DIRECTO_MAX_DIA >= 0) {
-    cantidad = Math.min(cantidad, XP_DIRECTO_MAX_DIA - Number(previo.rows[0]?.hoy ?? 0));
+    cantidad = Math.min(
+      cantidad,
+      XP_DIRECTO_MAX_DIA - Number(previo.rows[0]?.hoy ?? 0),
+    );
   }
   if (cantidad <= 0) return 0;
   const r = await e.execute(

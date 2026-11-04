@@ -24,7 +24,9 @@ describe("panel: lectura del estado", () => {
   it.each([401, 403])("con %i muestra el acceso por correo", async (status) => {
     fetchCon(status);
     render(<MinecraftAdminPage />);
-    expect(await screen.findByPlaceholderText("correo@example.com")).toBeTruthy();
+    expect(
+      await screen.findByPlaceholderText("correo@example.com"),
+    ).toBeTruthy();
   });
 
   it("con un error del servidor muestra el aviso", async () => {

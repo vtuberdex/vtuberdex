@@ -51,6 +51,9 @@ export default defineConfig([
    * `scraper/cache/` son datos crudos del scrape (HTML y dataset), no código.
    */
   globalIgnores([
+    // La carpeta de cobertura la genera `vitest --coverage`: no es código del
+    // repo y su lcov-report trae directivas eslint que el linter marcaría.
+    "coverage/**",
     ".next/**",
     "out/**",
     "build/**",

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 
 import { POST as pluginsPOST } from "../app/api/minecraft-admin/plugins/route.js";
@@ -12,9 +13,12 @@ const crearSesion = crearSesionMantenedor as unknown as (opciones: {
   role?: string;
 }) => string | null;
 
+process.env.VTUBERDEX_ADMIN_EMAILS = "admin@example.com";
+
 describe("plugins: tamaño anunciado", () => {
   it("corta con 413 si content-length supera el límite, sin leer el cuerpo", async () => {
-    const token = crearSesion({ email: "mantenedor@example.com", role: "mantenedor" }) ?? "";
+    const token =
+      crearSesion({ email: "admin@example.com", role: "admin" }) ?? "";
     const r = await pluginsPOST(
       new Request("http://x/api/minecraft-admin/plugins?nombre=Grande.jar", {
         method: "POST",

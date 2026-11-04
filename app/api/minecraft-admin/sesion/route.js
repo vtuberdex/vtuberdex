@@ -32,7 +32,12 @@ export async function POST(request) {
   const seguro = request.headers.get("x-forwarded-proto") === "https";
   return Response.json(
     { ok: true, email: canje.sesion.email, role: canje.sesion.role },
-    { headers: { ...SIN_CACHE, "set-cookie": cookieDeSesion(token, { seguro }) } },
+    {
+      headers: {
+        ...SIN_CACHE,
+        "set-cookie": cookieDeSesion(token, { seguro }),
+      },
+    },
   );
 }
 
