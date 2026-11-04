@@ -256,3 +256,32 @@ describe("saneado de rutas antes de escribir en disco", () => {
     }
   });
 });
+
+describe("ramas de error del mantenedor", () => {
+  it("el alta responde 502 si el correo no sale", async () => {
+    correo.__usarTransporte({
+      sendMail: async () => {
+        throw new Error("smtp caido");
+      },
+    });
+    const alta = await admin.enviarEnlaceMantenedor({ email: "mantenedor@example.com" });
+    expect(alta.ok).toBe(false);
+    expect(alta.status).toBe(502);
+    expect(alta.cuerpo.error).toBe("correo_no_enviado");
+    expect(String(alta.cuerpo.detail)).toContain("smtp caido");
+  });
+
+  it("rechaza un server.properties con bytes nulos", () => {
+    const r = admin.analizarServerProperties("motd=hola\u0000mundo");
+    expect(r.ok).toBe(false);
+    expect(r.status).toBe(400);
+    expect(r.cuerpo.error).toBe("contenido_invalido");
+  });
+
+  it("rechaza una configuración de plugin con bytes nulos", () => {
+    const r = admin.validarConfiguracionDePlugin("motd: hola\u0000mundo");
+    expect(r.ok).toBe(false);
+    expect(r.status).toBe(400);
+    expect(r.cuerpo.error).toBe("contenido_invalido");
+  });
+});

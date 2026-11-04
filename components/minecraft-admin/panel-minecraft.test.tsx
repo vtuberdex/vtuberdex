@@ -151,4 +151,84 @@ describe("/minecraft-admin", () => {
     fireEvent.click(screen.getByRole("button", { name: "Subir .jar" }));
     expect(await screen.findByRole("alert")).toBeTruthy();
   });
+
+  it("avisa cuando el enlace del fragmento ya no se puede canjear", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (entrada: unknown) => {
+        const url = String(entrada);
+        llamadas.push({ url });
+        if (url.includes("/sesion")) return respuesta({ error: "enlace_invalido" }, false);
+        return respuesta({ plugins: [] });
+      }),
+    );
+    window.location.hash = "#t=token-caducado";
+    render(<MinecraftAdminPage />);
+    expect(await screen.findByText("el enlace caducó o ya se usó: pide otro")).toBeTruthy();
+    expect(window.location.hash).toBe("");
+  });
+
+  it("muestra el mensaje del error cuando la petición del enlace revienta", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (entrada: unknown) => {
+        const url = String(entrada);
+        llamadas.push({ url });
+        if (url.includes("/estado")) return respuesta({ plugins: [] });
+        throw new Error("sin red");
+      }),
+    );
+    render(<MinecraftAdminPage />);
+    fireEvent.change(screen.getByPlaceholderText("correo@example.com"), {
+      target: { value: "mantenedor@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviarme el enlace" }));
+    expect(await screen.findByText("sin red")).toBeTruthy();
+  });
+
+  it("no intenta subir nada si no hay archivo elegido", async () => {
+    montarFetch();
+    render(<MinecraftAdminPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Subir .jar" }));
+    expect(await screen.findByText("elige un archivo .jar")).toBeTruthy();
+    expect(llamadas.some((l) => l.url.includes("/plugins?nombre="))).toBe(false);
+  });
+
+  it("muestra el error de la api al abrir la configuración", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (entrada: unknown) => {
+        const url = String(entrada);
+        llamadas.push({ url });
+        if (url.includes("/configuracion")) return respuesta({ error: "no_existe" }, false);
+        return respuesta({ plugins: [] });
+      }),
+    );
+    render(<MinecraftAdminPage />);
+    fireEvent.click(screen.getByRole("radio", { name: /server\.properties/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    expect(await screen.findByText("no_existe")).toBeTruthy();
+  });
+
+  it("muestra el error cuando el guardado de la configuración revienta", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (entrada: unknown, init?: RequestInit) => {
+        const url = String(entrada);
+        llamadas.push({ url, init });
+        if (url.includes("/configuracion")) {
+          if (init?.method === "PUT") throw new Error("se cayó el guardado");
+          return respuesta({ contenido: "motd=Hola\n" });
+        }
+        return respuesta({ plugins: [] });
+      }),
+    );
+    render(<MinecraftAdminPage />);
+    fireEvent.click(screen.getByRole("radio", { name: /server\.properties/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
+    const area = screen.getByLabelText("Contenido de la configuración") as HTMLTextAreaElement;
+    await waitFor(() => expect(area.value).toContain("motd=Hola"));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar configuración" }));
+    expect(await screen.findByText("se cayó el guardado")).toBeTruthy();
+  });
 });
