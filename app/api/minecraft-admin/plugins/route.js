@@ -10,9 +10,9 @@
  */
 import {
   LIMITE_JAR_BYTES,
-  autorizar,
+  accesoDeMantenedor,
   guardarJar,
-  sesionDeLaPeticion,
+  respuestaJson,
   validarJar,
 } from "../../../../lib/minecraft-admin.mjs";
 
@@ -20,23 +20,18 @@ export const dynamic = "force-dynamic";
 
 export const config = { api: { bodyParser: false } };
 
-const sinCache = { "cache-control": "no-store" };
-
-const rechazo = (cuerpo, status) =>
-  Response.json(cuerpo, { status, headers: sinCache });
-
 export async function POST(request) {
-  const permiso = autorizar(sesionDeLaPeticion(request));
-  if (!permiso.ok) return rechazo(permiso.cuerpo, permiso.status);
+  const acceso = accesoDeMantenedor(request);
+  if (acceso.rechazo) return acceso.rechazo;
 
   const url = new URL(request.url);
   const nombre = url.searchParams.get("nombre") ?? request.headers.get("x-nombre-archivo");
-  if (!nombre) return rechazo({ error: "falta_nombre" }, 400);
+  if (!nombre) return respuestaJson({ error: "falta_nombre" }, 400);
 
   // Si el navegador anuncia el tamaño, se corta aquí: no se leen 9 MB para nada.
   const anunciado = Number(request.headers.get("content-length"));
   if (Number.isFinite(anunciado) && anunciado > LIMITE_JAR_BYTES) {
-    return rechazo(
+    return respuestaJson(
       {
         error: "archivo_demasiado_grande",
         detail: `el máximo son ${LIMITE_JAR_BYTES} bytes`,
@@ -48,9 +43,9 @@ export async function POST(request) {
 
   const datos = new Uint8Array(await request.arrayBuffer());
   const comprobacion = validarJar({ nombre, tamano: datos.byteLength });
-  if (!comprobacion.ok) return rechazo(comprobacion.cuerpo, comprobacion.status);
+  if (!comprobacion.ok) return respuestaJson(comprobacion.cuerpo, comprobacion.status);
 
   const resultado = await guardarJar({ nombre, contenido: datos });
-  if (!resultado.ok) return rechazo(resultado.cuerpo, resultado.status);
-  return Response.json(resultado.metadatos, { status: 201, headers: sinCache });
+  if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+  return respuestaJson(resultado.metadatos, 201);
 }

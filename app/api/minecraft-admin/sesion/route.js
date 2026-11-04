@@ -6,44 +6,33 @@
  */
 import {
   COOKIE_MANTENEDOR,
-  autorizar,
+  SIN_CACHE,
+  accesoDeMantenedor,
   canjearEnlace,
   cookieDeSesion,
   crearSesionMantenedor,
+  respuestaJson,
   rolDe,
-  sesionDeLaPeticion,
 } from "../../../../lib/minecraft-admin.mjs";
 
 export const dynamic = "force-dynamic";
 
-const sinCache = { "cache-control": "no-store" };
-
 export async function GET(request) {
-  const sesion = sesionDeLaPeticion(request);
-  const permiso = autorizar(sesion);
-  if (!permiso.ok) {
-    return Response.json(permiso.cuerpo, { status: permiso.status, headers: sinCache });
-  }
-  return Response.json(
-    { email: sesion.email, role: rolDe(sesion) },
-    { headers: sinCache },
-  );
+  const acceso = accesoDeMantenedor(request);
+  if (acceso.rechazo) return acceso.rechazo;
+  return respuestaJson({ email: acceso.sesion.email, role: rolDe(acceso.sesion) });
 }
 
 export async function POST(request) {
   const cuerpo = await request.json().catch(() => null);
   const canje = canjearEnlace(cuerpo?.token);
-  if (!canje.ok) {
-    return Response.json(canje.cuerpo, { status: canje.status, headers: sinCache });
-  }
+  if (!canje.ok) return respuestaJson(canje.cuerpo, canje.status);
   const token = crearSesionMantenedor({ email: canje.sesion.email });
-  if (!token) {
-    return Response.json({ error: "sesion_no_creada" }, { status: 500, headers: sinCache });
-  }
+  if (!token) return respuestaJson({ error: "sesion_no_creada" }, 500);
   const seguro = request.headers.get("x-forwarded-proto") === "https";
   return Response.json(
     { ok: true, email: canje.sesion.email, role: canje.sesion.role },
-    { headers: { ...sinCache, "set-cookie": cookieDeSesion(token, { seguro }) } },
+    { headers: { ...SIN_CACHE, "set-cookie": cookieDeSesion(token, { seguro }) } },
   );
 }
 
@@ -51,7 +40,7 @@ export function DELETE() {
   return new Response(null, {
     status: 204,
     headers: {
-      ...sinCache,
+      ...SIN_CACHE,
       "set-cookie": `${COOKIE_MANTENEDOR}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`,
     },
   });
