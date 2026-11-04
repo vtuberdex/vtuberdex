@@ -30,6 +30,40 @@ afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true });
 });
 
+describe("listado del panel de Minecraft", () => {
+  it("ordena los nombres alfabéticamente, sin que la mayúscula mande", async () => {
+    await fs.mkdir(path.join(dir, "plugins"), { recursive: true });
+    for (const nombre of ["chatty.jar", "EssentialsX.jar", "AntiJar.jar"]) {
+      await fs.writeFile(path.join(dir, "plugins", nombre), "x");
+    }
+    const listado = await admin.listarMinecraft({ dir });
+    // Con el comparador por defecto (códigos UTF-16) "EssentialsX.jar" quedaría antes que
+    // "chatty.jar" porque la mayúscula pesa menos que la minúscula; el panel ordena como
+    // una lista de verdad (localeCompare), así que la "c" va antes que la "E".
+    expect(listado.plugins).toEqual(["AntiJar.jar", "chatty.jar", "EssentialsX.jar"]);
+  });
+
+  it("separa jars, configuraciones y el server.properties", async () => {
+    await fs.mkdir(path.join(dir, "plugins"), { recursive: true });
+    await fs.writeFile(path.join(dir, "plugins", "plugin.jar"), "x");
+    await fs.writeFile(path.join(dir, "plugins", "plugin.yml"), "a: 1");
+    await fs.writeFile(path.join(dir, "plugins", "notas.txt"), "x");
+    await fs.writeFile(path.join(dir, "server.properties"), "motd=hola");
+    const listado = await admin.listarMinecraft({ dir });
+    expect(listado.plugins).toEqual(["plugin.jar"]);
+    expect(listado.configuraciones).toEqual(["plugin.yml"]);
+    expect(listado.servidor).toBe(true);
+    expect(listado.directorio).toBe(dir);
+  });
+
+  it("un directorio que no existe deja el listado vacío", async () => {
+    const listado = await admin.listarMinecraft({ dir: path.join(dir, "no-existe") });
+    expect(listado.plugins).toEqual([]);
+    expect(listado.configuraciones).toEqual([]);
+    expect(listado.servidor).toBe(false);
+  });
+});
+
 describe("rol mantenedor y acceso a /minecraft-admin", () => {
   it("deja pasar a quien tiene el rol mantenedor", () => {
     expect(admin.ROL_MANTENEDOR).toBe("mantenedor");
