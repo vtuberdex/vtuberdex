@@ -22,25 +22,26 @@ const ENTRADAS = [
 ];
 
 describe("ramas de rechazo de server.properties y de la configuración del plugin", () => {
+  // La misma comprobación sirve para los dos validadores, así el bloque de aserciones
+  // no se copia en cada prueba.
+  const comprobarRechazoLegible = (revision: unknown) => {
+    expect(revision).toBeTypeOf("object");
+    const r = revision as { ok: boolean; status?: number; cuerpo?: { error?: unknown } };
+    if (!r.ok) {
+      expect(r.status).toBeGreaterThanOrEqual(400);
+      expect(typeof r.cuerpo?.error).toBe("string");
+    }
+  };
+
   it("analizarServerProperties nunca lanza y rechaza con un error legible", () => {
     for (const texto of ENTRADAS) {
-      const revision = admin.analizarServerProperties(texto);
-      expect(revision).toBeTypeOf("object");
-      if (!revision.ok) {
-        expect(revision.status).toBeGreaterThanOrEqual(400);
-        expect(typeof revision.cuerpo.error).toBe("string");
-      }
+      comprobarRechazoLegible(admin.analizarServerProperties(texto));
     }
   });
 
   it("validarConfiguracionDePlugin nunca lanza y rechaza con un error legible", () => {
     for (const texto of ENTRADAS) {
-      const revision = admin.validarConfiguracionDePlugin(texto);
-      expect(revision).toBeTypeOf("object");
-      if (!revision.ok) {
-        expect(revision.status).toBeGreaterThanOrEqual(400);
-        expect(typeof revision.cuerpo.error).toBe("string");
-      }
+      comprobarRechazoLegible(admin.validarConfiguracionDePlugin(texto));
     }
   });
 

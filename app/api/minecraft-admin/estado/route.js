@@ -3,7 +3,7 @@
  * Exige el rol `mantenedor` en la propia ruta: la página escondida no protege nada.
  */
 import {
-  accesoDeMantenedor,
+  conMantenedor,
   listarMinecraft,
   respuestaJson,
 } from "../../../../lib/minecraft-admin.mjs";
@@ -11,7 +11,5 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
-  const acceso = accesoDeMantenedor(request);
-  if (acceso.rechazo) return acceso.rechazo;
-  return respuestaJson(await listarMinecraft());
+  return conMantenedor(request, async () => respuestaJson(await listarMinecraft()));
 }

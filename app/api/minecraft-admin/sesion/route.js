@@ -7,8 +7,8 @@
 import {
   COOKIE_MANTENEDOR,
   SIN_CACHE,
-  accesoDeMantenedor,
   canjearEnlace,
+  conMantenedor,
   cookieDeSesion,
   crearSesionMantenedor,
   respuestaJson,
@@ -18,9 +18,9 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
-  const acceso = accesoDeMantenedor(request);
-  if (acceso.rechazo) return acceso.rechazo;
-  return respuestaJson({ email: acceso.sesion.email, role: rolDe(acceso.sesion) });
+  return conMantenedor(request, async (acceso) =>
+    respuestaJson({ email: acceso.sesion.email, role: rolDe(acceso.sesion) }),
+  );
 }
 
 export async function POST(request) {

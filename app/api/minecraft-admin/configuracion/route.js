@@ -6,7 +6,7 @@
  * comprueba en cada método, no solo en la página.
  */
 import {
-  accesoDeMantenedor,
+  conMantenedor,
   guardarConfiguracion,
   leerConfiguracion,
   respuestaJson,
@@ -15,29 +15,29 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
-  const acceso = accesoDeMantenedor(request);
-  if (acceso.rechazo) return acceso.rechazo;
-  const url = new URL(request.url);
-  const resultado = await leerConfiguracion({
-    tipo: url.searchParams.get("tipo") ?? "servidor",
-    archivo: url.searchParams.get("archivo") ?? undefined,
+  return conMantenedor(request, async () => {
+    const url = new URL(request.url);
+    const resultado = await leerConfiguracion({
+      tipo: url.searchParams.get("tipo") ?? "servidor",
+      archivo: url.searchParams.get("archivo") ?? undefined,
+    });
+    if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+    return respuestaJson(resultado);
   });
-  if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
-  return respuestaJson(resultado);
 }
 
 export async function PUT(request) {
-  const acceso = accesoDeMantenedor(request);
-  if (acceso.rechazo) return acceso.rechazo;
-  const cuerpo = await request.json().catch(() => null);
-  if (!cuerpo || typeof cuerpo !== "object") {
-    return respuestaJson({ error: "cuerpo_invalido" }, 400);
-  }
-  const resultado = await guardarConfiguracion({
-    tipo: cuerpo.tipo,
-    archivo: cuerpo.archivo,
-    contenido: cuerpo.contenido,
+  return conMantenedor(request, async () => {
+    const cuerpo = await request.json().catch(() => null);
+    if (!cuerpo || typeof cuerpo !== "object") {
+      return respuestaJson({ error: "cuerpo_invalido" }, 400);
+    }
+    const resultado = await guardarConfiguracion({
+      tipo: cuerpo.tipo,
+      archivo: cuerpo.archivo,
+      contenido: cuerpo.contenido,
+    });
+    if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+    return respuestaJson({ ok: true, ruta: resultado.ruta });
   });
-  if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
-  return respuestaJson({ ok: true, ruta: resultado.ruta });
 }
