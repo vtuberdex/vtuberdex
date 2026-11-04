@@ -25,5 +25,12 @@ export default defineConfig({
       "test/**/*.test.{ts,tsx}",
     ],
     coverage: { provider: "v8", reporter: ["text", "lcov"] },
+    // La instrumentación de cobertura (v8 sobre jsdom) alarga cada test: el
+    // alta del asistente de carta (`components/admin.test.tsx`) ronda los
+    // 5,5 s y fallaba de forma intermitente con "Test timed out in 5000ms"
+    // solo al correr `vitest run --coverage`. Se eleva el límite global en
+    // vez de tocar, saltar o borrar el test.
+    testTimeout: 15_000,
+    hookTimeout: 15_000,
   },
 });
