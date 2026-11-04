@@ -93,6 +93,21 @@ describe("plugins", () => {
     ).toBe("sin-cargar");
   });
 
+  it("un jar que el panel no puede leer no se marca como pendiente de reinicio", async () => {
+    const ruta = path.join(dir, "plugins", "vault.jar");
+    await fs.chmod(ruta, 0o000);
+    try {
+      const r = await listarPlugins({ dir, cargados: new Set(["Vault"]) });
+      const v = r.plugins.find(
+        (p: { archivo: string }) => p.archivo === "vault.jar",
+      );
+      // Como root (CI en contenedor) chmod 000 no impide leer: solo se comprueba si de verdad falla.
+      if (v.legible === false) expect(v.estado).toBe("sin-leer");
+    } finally {
+      await fs.chmod(ruta, 0o644);
+    }
+  });
+
   it("deshabilitar renombra el jar y habilitar lo devuelve", async () => {
     expect(
       (

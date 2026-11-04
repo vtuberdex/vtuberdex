@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
+import { SeccionExperiencia } from "./seccion-experiencia";
 import { SeccionPlugins } from "./seccion-plugins";
 import {
   CLASE_BOTON,
@@ -43,12 +44,13 @@ type Estado = {
 };
 
 type Sesion = "comprobando" | "dentro" | "fuera";
-type Pestana = "servidor" | "plugins" | "configuracion";
+type Pestana = "servidor" | "plugins" | "configuracion" | "experiencia";
 
 const PESTANAS: { id: Pestana; titulo: string }[] = [
   { id: "servidor", titulo: "Servidor" },
   { id: "plugins", titulo: "Plugins" },
   { id: "configuracion", titulo: "Configuración" },
+  { id: "experiencia", titulo: "Experiencia" },
 ];
 
 /**
@@ -520,22 +522,24 @@ export function PanelMinecraftAdmin() {
               aria-orientation="vertical"
               className="flex gap-1 overflow-x-auto rounded-2xl border border-dex-line bg-dex-panel/60 p-1.5 lg:flex-col lg:overflow-visible"
             >
-              {PESTANAS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={pestana === p.id}
-                  onClick={() => setPestana(p.id)}
-                  className={`flex-1 whitespace-nowrap rounded-xl px-4 py-2 text-left text-sm transition lg:flex-none ${
-                    pestana === p.id
-                      ? "bg-dex-accent/15 text-dex-accent"
-                      : "text-dex-muted hover:bg-dex-panel-soft hover:text-dex-ink"
-                  }`}
-                >
-                  {p.titulo}
-                </button>
-              ))}
+              {PESTANAS.filter((p) => esAdmin || p.id !== "experiencia").map(
+                (p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={pestana === p.id}
+                    onClick={() => setPestana(p.id)}
+                    className={`flex-1 whitespace-nowrap rounded-xl px-4 py-2 text-left text-sm transition lg:flex-none ${
+                      pestana === p.id
+                        ? "bg-dex-accent/15 text-dex-accent"
+                        : "text-dex-muted hover:bg-dex-panel-soft hover:text-dex-ink"
+                    }`}
+                  >
+                    {p.titulo}
+                  </button>
+                ),
+              )}
             </div>
             <div className="mt-4 space-y-2 rounded-2xl border border-dex-line bg-dex-panel/60 p-3">
               <p className="text-xs text-dex-muted">
@@ -854,6 +858,10 @@ export function PanelMinecraftAdmin() {
                   </form>
                 </Seccion>
               </SeccionPlugins>
+            ) : null}
+
+            {pestana === "experiencia" && esAdmin ? (
+              <SeccionExperiencia />
             ) : null}
 
             {pestana === "configuracion" ? (

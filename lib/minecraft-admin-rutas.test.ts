@@ -122,6 +122,16 @@ describe("rol mantenedor", () => {
     expect(r.status).toBe(200);
     const cuerpo = await r.json();
     expect(Array.isArray(cuerpo.plugins)).toBe(true);
+    expect(cuerpo.rol).toBe("mantenedor");
+  });
+
+  it("el estado dice el rol real: el panel decide con él qué pestañas muestra", async () => {
+    const r = await estadoGET(
+      pedir("http://x/api/minecraft-admin/estado", {
+        cookie: cookieDe("admin"),
+      }),
+    );
+    expect((await r.json()).rol).toBe("admin");
   });
 });
 

@@ -29,7 +29,13 @@ export type PluginInfo = {
   modificado: string | null;
   habilitado: boolean;
   cargado: boolean | null;
-  estado: "activo" | "deshabilitado" | "pendiente-reinicio" | "sin-cargar";
+  estado:
+    | "activo"
+    | "deshabilitado"
+    | "pendiente-reinicio"
+    | "sin-cargar"
+    | "sin-leer";
+  legible?: boolean;
   protegido: boolean;
   configuraciones: string[];
 };
@@ -41,6 +47,7 @@ const ETIQUETA_ESTADO: Record<
   activo: { texto: "Activo", tono: "bien" },
   deshabilitado: { texto: "Deshabilitado", tono: "neutro" },
   "pendiente-reinicio": { texto: "Se apagará al reiniciar", tono: "ojo" },
+  "sin-leer": { texto: "Jar sin permiso de lectura", tono: "ojo" },
   "sin-cargar": { texto: "Pendiente de reinicio", tono: "ojo" },
 };
 

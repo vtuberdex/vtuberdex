@@ -11,7 +11,9 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
-  return conMantenedor(request, async () =>
-    respuestaJson(await listarMinecraft()),
+  // `rol` solo decide qué muestra el panel (Experiencia, vetar, configuración…): cada ruta
+  // vuelve a comprobarlo por su cuenta. Sin él, el panel trataba a todos como no admin.
+  return conMantenedor(request, async (acceso) =>
+    respuestaJson({ ...(await listarMinecraft()), rol: acceso.sesion.role }),
   );
 }

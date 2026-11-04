@@ -147,6 +147,110 @@ describe("dashboard en vivo", () => {
   });
 });
 
+describe("experiencia manual", () => {
+  const FICHA = {
+    id: 7,
+    slug: "ana",
+    name: "Ana",
+    dex: 7,
+    level: 3,
+    experience: { current: 20, max: 100, total: 220 },
+    xpDeJuego: 50,
+    likes: 4,
+  };
+
+  it("solo el admin ve la pestaña", async () => {
+    montarFetch({ plugins: [], rol: "mantenedor" });
+    const { unmount } = render(<MinecraftAdminPage />);
+    await screen.findByRole("tab", { name: "Servidor" });
+    expect(screen.queryByRole("tab", { name: "Experiencia" })).toBeNull();
+    unmount();
+    montarFetch({ plugins: [], rol: "admin" });
+    render(<MinecraftAdminPage />);
+    expect(
+      await screen.findByRole("tab", { name: "Experiencia" }),
+    ).toBeTruthy();
+  });
+
+  it("busca una ficha y manda el ajuste con cantidad y motivo", async () => {
+    const mock = montarFetch({ plugins: [], rol: "admin" });
+    mock.mockImplementation(async (entrada: unknown, init?: RequestInit) => {
+      const url = String(entrada);
+      llamadas.push({ url, init });
+      if (url.includes("/experiencia?q="))
+        return respuesta({
+          fichas: [{ id: 7, slug: "ana", name: "Ana", dex: 7 }],
+        });
+      if (url.includes("/experiencia?ficha="))
+        return respuesta({ ficha: FICHA, historial: [], maximo: 10000 });
+      if (url.includes("/experiencia") && init?.method === "POST")
+        return respuesta({ ok: true }, true, 201);
+      return respuesta({ plugins: [], rol: "admin" });
+    });
+    render(<MinecraftAdminPage />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Experiencia" }));
+    fireEvent.change(screen.getByLabelText("Buscar ficha"), {
+      target: { value: "an" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: /Ana/ }));
+    expect(await screen.findByText("Nivel 3")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Cantidad de XP"), {
+      target: { value: "150" },
+    });
+    fireEvent.change(screen.getByLabelText("Motivo del ajuste"), {
+      target: { value: "Premio del evento" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar ajuste" }));
+    await waitFor(() =>
+      expect(
+        llamadas.some(
+          (l) => l.init?.method === "POST" && l.url.includes("/experiencia"),
+        ),
+      ).toBe(true),
+    );
+    const cuerpo = String(
+      llamadas.find(
+        (l) => l.init?.method === "POST" && l.url.includes("/experiencia"),
+      )!.init?.body,
+    );
+    expect(JSON.parse(cuerpo)).toEqual({
+      ficha: 7,
+      cantidad: 150,
+      motivo: "Premio del evento",
+    });
+  });
+
+  it("rechaza en el cliente una cantidad vacía o fuera de rango", async () => {
+    const mock = montarFetch({ plugins: [], rol: "admin" });
+    mock.mockImplementation(async (entrada: unknown) => {
+      const url = String(entrada);
+      llamadas.push({ url });
+      if (url.includes("/experiencia?q="))
+        return respuesta({
+          fichas: [{ id: 7, slug: "ana", name: "Ana", dex: 7 }],
+        });
+      if (url.includes("/experiencia?ficha="))
+        return respuesta({ ficha: FICHA, historial: [], maximo: 10000 });
+      return respuesta({ plugins: [], rol: "admin" });
+    });
+    render(<MinecraftAdminPage />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Experiencia" }));
+    fireEvent.change(screen.getByLabelText("Buscar ficha"), {
+      target: { value: "an" },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: /Ana/ }));
+    await screen.findByText("Nivel 3");
+    fireEvent.change(screen.getByLabelText("Cantidad de XP"), {
+      target: { value: "99999" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar ajuste" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(
+      /hasta 10000/,
+    );
+    expect(llamadas.some((l) => l.init?.method === "POST")).toBe(false);
+  });
+});
+
 describe("/minecraft-admin", () => {
   it("renderiza el listado de plugins, la subida y el editor de configuración", async () => {
     montarFetch();
