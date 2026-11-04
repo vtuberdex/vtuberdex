@@ -177,3 +177,82 @@ describe("configuración del servidor y del plugin", () => {
     expect(guardado.status).toBe(400);
   });
 });
+
+describe("saneado de rutas antes de escribir en disco", () => {
+  const rechazados: Array<[string, string]> = [
+    ["", "vacío"],
+    ["   ", "solo espacios"],
+    [".", "un punto"],
+    ["..", "dos puntos"],
+    ["../fuera.jar", "con ../"],
+    ["../../etc/passwd", "../ anidados"],
+    ["plugins/../../fuera.jar", "subida con .."],
+    ["..\\fuera.jar", "separador de Windows"],
+    ["sub/dir.jar", "un subdirectorio"],
+    ["/etc/passwd", "ruta absoluta"],
+    ["C:\\Windows\\System32\\evil.jar", "ruta absoluta de Windows"],
+    ["evil.jar\u0000.txt", "byte nulo"],
+    ["-rf.jar", "empieza por guion"],
+  ];
+
+  it.each(rechazados)("rechaza el nombre %j (%s)", (nombre) => {
+    const destino = admin.resolverRutaEnBase(nombre, { base: dir, carpeta: "plugins" });
+    expect(destino.ok).toBe(false);
+    expect(destino.status).toBe(400);
+    expect(destino.ruta).toBeUndefined();
+  });
+
+  it("acepta un nombre simple y lo resuelve dentro del directorio base", () => {
+    const destino = admin.resolverRutaEnBase("EssentialsX-2.20.1.jar", {
+      base: dir,
+      carpeta: "plugins",
+    });
+    expect(destino.ok).toBe(true);
+    expect(destino.nombre).toBe("EssentialsX-2.20.1.jar");
+    expect(destino.ruta).toBe(path.join(dir, "plugins", "EssentialsX-2.20.1.jar"));
+    const relativa = path.relative(dir, destino.ruta);
+    expect(relativa.startsWith("..")).toBe(false);
+    expect(path.isAbsolute(relativa)).toBe(false);
+  });
+
+  it("no rompe con nombres reales de plugin (acentos, espacios, paréntesis)", () => {
+    const nombres = ["Configuración-Ñandú_1.0.jar", "Mi Plugin (copia).jar", "geyser+floodgate.jar"];
+    for (const nombre of nombres) {
+      const destino = admin.resolverRutaEnBase(nombre, { base: dir, carpeta: "plugins" });
+      expect(destino.ok, nombre).toBe(true);
+      expect(path.dirname(destino.ruta)).toBe(path.join(dir, "plugins"));
+    }
+  });
+
+  it("ninguna ruta resultante se sale del directorio base", () => {
+    const nombres = ["a.jar", "a..b.jar", "a.b.c.jar", "ñ.jar", "a b.jar", "x_y-z+1.jar", "....jar"];
+    for (const nombre of nombres) {
+      const destino = admin.resolverRutaEnBase(nombre, { base: dir, carpeta: "plugins" });
+      if (!destino.ok) continue;
+      expect(path.dirname(destino.ruta)).toBe(path.join(dir, "plugins"));
+      expect(path.relative(dir, destino.ruta).startsWith("..")).toBe(false);
+    }
+  });
+
+  it("la subida de un jar usa la ruta saneada y rechaza la que se sale", async () => {
+    const contenido = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
+    const guardado = await admin.guardarJar({ nombre: "Prueba-1.0.jar", contenido, dir });
+    expect(guardado.ok).toBe(true);
+    expect(guardado.metadatos.ruta).toBe(path.join(dir, "plugins", "Prueba-1.0.jar"));
+    expect(await fs.readFile(guardado.metadatos.ruta)).toEqual(Buffer.from(contenido));
+
+    const fuera = await fs.mkdtemp(path.join(os.tmpdir(), "minecraft-fuera-"));
+    try {
+      const malo = await admin.guardarJar({
+        nombre: `../${path.basename(fuera)}/evil.jar`,
+        contenido,
+        dir,
+      });
+      expect(malo.ok).toBe(false);
+      expect(malo.status).toBe(400);
+      expect(await fs.readdir(fuera)).toEqual([]);
+    } finally {
+      await fs.rm(fuera, { recursive: true, force: true });
+    }
+  });
+});
