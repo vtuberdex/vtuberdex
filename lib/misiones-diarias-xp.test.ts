@@ -8,6 +8,7 @@ describe('misiones diarias: XP ligeramente mayor para dar incentivo a estar en e
     ['minero-del-dia', 25],
     ['pescador-del-dia', 20],
     ['granjero-del-dia', 20],
+    ['caminante-del-dia', 60],
   ])('%s otorga %i XP', (id, xp) => {
     expect(misionPorId(id)?.xp).toBe(xp);
   });
