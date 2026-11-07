@@ -287,12 +287,15 @@ describe("rolDeCorreo", () => {
     expect(rolDeCorreo("otro@example.com", env)).toBeNull();
     expect(rolDeCorreo("", env)).toBeNull();
   });
-  it("por defecto: los dos admin y Nero Schiffer como mantenedor", () => {
+  it("por defecto: los dos admin y dos mantenedores", () => {
     expect(rolDeCorreo("madkoding@gmail.com", {} as never)).toBe("admin");
     expect(rolDeCorreo("ritcher.recomienda@gmail.com", {} as never)).toBe(
       "admin",
     );
     expect(rolDeCorreo("neroschiffer@gmail.com", {} as never)).toBe(
+      "mantenedor",
+    );
+    expect(rolDeCorreo("incubuswoods@gmail.com", {} as never)).toBe(
       "mantenedor",
     );
   });
