@@ -60,10 +60,10 @@ export const RANGO_MAXIMO = 5;
  */
 export const PUNTOS_STATS_POR_NIVEL = 10;
 /**
- * XP de juego que puede sumar una ficha en un día (de Chile). Diez likes = 100 XP; el tope equivale a 30
+ * XP de juego que puede sumar una ficha en un día (de Chile). Diez likes = 100 XP; el tope equivale a 60
  * likes al día: jugar mucho ayuda, pero no deja a los likes de adorno ni premia un bot con la sesión abierta.
  */
-export const XP_JUEGO_MAX_DIA = 300;
+export const XP_JUEGO_MAX_DIA = 600;
 /**
  * XP que una ficha puede sumar al día SOLO por entregas del plugin de Minecraft (motivo `entrega`), aparte y ADEMÁS de
  * `XP_JUEGO_MAX_DIA`. Es lo que hace rentable el trabajo de repartidor (llevar paquetes en la mochila, cruzar zonas de
