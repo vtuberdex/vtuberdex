@@ -9,6 +9,7 @@ import {
   ESTADOS,
   bloqueDeEvolucion,
   buscarEstado,
+  tieneFaccion,
   estadosEntregados,
   htmlDeEfecto,
   textoPlanoDe,
@@ -238,4 +239,13 @@ test("textoPlanoDe no deja etiquetas reconstruidas al quitar las de dentro", () 
     textoPlanoDe("Ataque &lt;base&gt;<br>+10"),
     "Ataque <base>\n+10",
   );
+});
+
+test("tieneFaccion: acepta slug, etiqueta y variantes con errata de la misma facción", () => {
+  assert.equal(tieneFaccion(["mythical-legacy"], "mythical-legacy"), true);
+  assert.equal(tieneFaccion(["Mythical Legacy"], "mythical-legacy"), true);
+  assert.equal(tieneFaccion(["mythical-legacy3"], "mythical-legacy"), true);
+  assert.equal(tieneFaccion(["Mythical Lecagy"], "mythical-legacy"), true);
+  assert.equal(tieneFaccion(["netherbane"], "mythical-legacy"), false);
+  assert.equal(tieneFaccion([], "mythical-legacy"), false);
 });
