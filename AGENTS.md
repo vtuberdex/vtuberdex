@@ -571,7 +571,11 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
   código se ESCRIBE en el juego, nunca se canjea con un clic en el correo: quien pide con el correo de otra persona no ve el código, y
   un clic de la víctima vincularía la cuenta del intruso. Responde igual tenga o no fichas el correo; topes (`ENVIOS`): 1/min y 5/día
   por correo (solo su hash), 10/día por cuenta. «Mi ficha» también da códigos (sin cuenta atada). Ya NO existe elegir una ficha a mano.
-- **Modo híbrido: Java NO premium también entra** (`online-mode=false`, `enforce-secure-profile=false`). En offline el UUID de Java
+- **VIGENTE desde 2026-11-06 (decidido con el mantenedor el 2026-11-07): `online-mode=true`, SOLO entran cuentas Java premium** (y Bedrock por
+  Floodgate); `enforce-secure-profile=true`. El modo híbrido de abajo es HISTÓRICO: la sesión por red, `requiereSesion` y los UUID v3 ya no
+  se ejercitan en el servidor. PremiumBridge (puente de login para offline + AuthMe) quedó desactivado (`PremiumBridge.jar.disabled`): sin
+  plugin de autenticación no tenía función y exigía ProtocolLib, que no tiene versión para 26.x. Reactivarlo = renombrar el jar.
+- **(Histórico) Modo híbrido: Java NO premium también entra** (`online-mode=false`, `enforce-secure-profile=false`). En offline el UUID de Java
   sale del NOMBRE (versión 3), así que para esas cuentas (`requiereSesion`) el vínculo guardado no basta: hace falta una SESIÓN
   (`sesion_minecraft`) para la RED desde la que entra, que nace al canjear un código del correo y dura `SESION_DIAS` (7). Misma red y
   plazo → entra directo; otra red o vencida → `/vtd email` + `/vtd codigo` otra vez (`jugador` responde `necesitaSesion` SIN decir de
@@ -627,7 +631,7 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
   responder («HTTP/1.1 header parser received no bytes»; `curl --http2` reproduce: exit 52). `ApiClient` fuerza HTTP/1.1. Ningún
   gate lo vio: salió en la primera entrada real (Bedrock) y dejaba a todos en la sala de espera.
 - **Producción (VPS)**: servicio `vtuberdex-minecraft` (usuario `minecraft`, `/srv/minecraft`, Java 25 de apt, `-Xmx1536M`
-  `-XX:ActiveProcessorCount=2`, `ProtectSystem=strict`), puertos **25565/tcp** (Java) y **19132/udp** (Bedrock) públicos, `online-mode=false` (híbrido, ver arriba). **RCON activado el 2026-10-12** a petición del mantenedor (puerto 25575, contraseña en `server.properties` y en `~/.local/share/vtuberdex-auto/rcon-pass`; cliente `~/.local/bin/mc-rcon "<comando>"`): no hay cortafuegos, así que el drop-in `rcon-local.conf` del servicio añade una regla iptables que descarta 25575 salvo desde `lo`. Si cambias de máquina o quitas el drop-in, RCON queda abierto a internet. **No hagas
+  `-XX:ActiveProcessorCount=2`, `ProtectSystem=strict`), puertos **25565/tcp** (Java) y **19132/udp** (Bedrock) públicos, `online-mode=true` (solo premium, ver arriba). **RCON activado el 2026-10-12** a petición del mantenedor (puerto 25575, contraseña en `server.properties` y en `~/.local/share/vtuberdex-auto/rcon-pass`; cliente `~/.local/bin/mc-rcon "<comando>"`): no hay cortafuegos, así que el drop-in `rcon-local.conf` del servicio añade una regla iptables que descarta 25575 salvo desde `lo`. Si cambias de máquina o quitas el drop-in, RCON queda abierto a internet. **No hagas
   op por nombre a cuentas Java**: el permiso lo hereda quien use ese nombre (el plugin no lo deja saltarse el lobby, pero el op sigue
   siendo op en el resto del servidor). Se entra con `vtuberdex.com`
   (el registro A no pasa por el proxy de Cloudflare). El plugin habla con la app LOCAL (`api-url: http://127.0.0.1:3100`; `sitio-url`
