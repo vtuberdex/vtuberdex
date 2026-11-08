@@ -53,6 +53,7 @@ export const MISIONES = Object.freeze([
   diaria({ id: 'minero-del-dia', tipo: 'secundaria', nombre: 'Minero del día', descripcion: 'Extrae 64 minerales hoy.', requisitos: { mineria: 64 }, xp: 25 }),
   diaria({ id: 'pescador-del-dia', tipo: 'secundaria', nombre: 'Pescador del día', descripcion: 'Pesca 10 peces hoy.', requisitos: { pesca: 10 }, xp: 20 }),
   diaria({ id: 'granjero-del-dia', tipo: 'secundaria', nombre: 'Granjero del día', descripcion: 'Cosecha 64 cultivos hoy.', requisitos: { cosecha: 64 }, xp: 20 }),
+  diaria({ id: 'caminante-del-dia', tipo: 'secundaria', nombre: 'Caminante del día', descripcion: 'Recorre 3.000 metros hoy.', requisitos: { distancia: 3000 }, xp: 60 }),
   semanal({ id: 'cazador-semanal', tipo: 'secundaria', nombre: 'Cazador de la semana', descripcion: 'Derrota 500 monstruos esta semana.', requisitos: { mobs: 500 }, xp: 80 }),
   semanal({ id: 'repartidor-semanal', tipo: 'secundaria', nombre: 'Repartidor de la semana', descripcion: 'Completa 10 entregas esta semana.', requisitos: { entregas: 10 }, xp: 120 }),
   unica({ id: 'primer-jefe', tipo: 'secundaria', nombre: 'Primer jefe', descripcion: 'Derrota a tu primer jefe.', requisitos: { jefes: 1 }, xp: 100 }),

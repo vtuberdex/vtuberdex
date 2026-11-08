@@ -749,6 +749,29 @@ function etiquetaDePieza(category, posicion) {
 }
 
 /**
+ * ¿La ficha tiene esa facción? Compara por slug CANÓNICO, no por texto exacto: el formulario puede
+ * traer la etiqueta («Mythical Legacy») en vez del slug, y el scrape dejó variantes con errata
+ * (`mythical-legacy3`, `mythical-lecagy`). Con la comparación exacta, la Epopeya salía bloqueada
+ * aunque la ficha fuera Mythical Legacy.
+ * @param {string[]} facciones
+ * @param {string} slug
+ */
+export function tieneFaccion(facciones, slug) {
+  const canonico = (v) =>
+    String(v ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .replace(/\d+$/, "")
+      .replace(/-+$/, "")
+      .replace("lecagy", "legacy");
+  const buscada = canonico(slug);
+  return facciones.some((f) => canonico(f) === buscada);
+}
+
+/**
  * Valida un kit completo contra las reglas mecánicas del prompt maestro.
  *
  * ERROR = rompe una regla escrita («obtienes» con un negativo, estado base en la Ultimate, color que
@@ -872,7 +895,7 @@ export function validarKit({ habilidades, facciones = null }) {
           hallado.canonico,
         );
       }
-      if (estado.faccion && facciones && !facciones.includes(estado.faccion)) {
+      if (estado.faccion && facciones && !tieneFaccion(facciones, estado.faccion)) {
         anotar(
           "error",
           "faccion_exclusiva",

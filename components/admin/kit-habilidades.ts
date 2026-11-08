@@ -22,6 +22,7 @@ import {
   expandirEstados,
   spanDeEstado,
   textoPlanoDe,
+  tieneFaccion,
   validarKit,
 } from "@/server/src/habilidades.mjs";
 
@@ -194,7 +195,7 @@ export function estadosDisponibles(
     nombre: e.nombre,
     evolucion: e.evolucion.nombre,
     polaridad: e.polaridad,
-    bloqueado: Boolean(e.faccion && !facciones.includes(e.faccion)),
+    bloqueado: Boolean(e.faccion && !tieneFaccion(facciones, e.faccion)),
   }));
 }
 

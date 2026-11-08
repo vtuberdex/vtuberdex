@@ -494,7 +494,7 @@ calcula ni «procesar» una baja los aplica solo**.
   `cosecha`, `cria`, `entregas`, `distancia`) y la web decide qué se completó. Una misión pide uno o varios contadores y se completa al llegar
   todos a su meta; las diarias cuentan por día de Chile. **Idempotente**: el lote (`idLote`, UUID) es clave primaria, completar es un
   `INSERT … ON CONFLICT DO NOTHING` (solo el que gana paga) y la XP es otra fila (`xp_mision`, clave `ficha:mision:periodo`) que se suma en
-  `xpDeJuego`/`xpDeJuegoVarias` junto a `xp_juego` y `xp_directo`: **no gasta el tope diario de Minecraft** (las diarias suman 70 XP/día como mucho).
+  `xpDeJuego`/`xpDeJuegoVarias` junto a `xp_juego` y `xp_directo`: **no gasta el tope diario de Minecraft** (las diarias suman 130 XP/día como mucho).
   Rutas del plugin (con `X-Minecraft-Token`): `POST /api/minecraft/misiones` `{ uuid, idLote, avances }` y `GET /api/minecraft/misiones/:uuid`.
 - **Grado por misiones (opcional)**: las 5 misiones de grado (`grado-6` … `grado-8`) son DIFÍCILES (miles de mobs, jefes, 250 entregas…) y no dan
   XP: dan el derecho a reclamar el grado desde «Mi ficha» (`POST /api/mi-ficha/misiones`, con confirmación). **Tope 8** (`GRADO_MAXIMO_POR_MISIONES`):
@@ -571,7 +571,11 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
   código se ESCRIBE en el juego, nunca se canjea con un clic en el correo: quien pide con el correo de otra persona no ve el código, y
   un clic de la víctima vincularía la cuenta del intruso. Responde igual tenga o no fichas el correo; topes (`ENVIOS`): 1/min y 5/día
   por correo (solo su hash), 10/día por cuenta. «Mi ficha» también da códigos (sin cuenta atada). Ya NO existe elegir una ficha a mano.
-- **Modo híbrido: Java NO premium también entra** (`online-mode=false`, `enforce-secure-profile=false`). En offline el UUID de Java
+- **VIGENTE desde 2026-11-06 (decidido con el mantenedor el 2026-11-07): `online-mode=true`, SOLO entran cuentas Java premium** (y Bedrock por
+  Floodgate); `enforce-secure-profile=true`. El modo híbrido de abajo es HISTÓRICO: la sesión por red, `requiereSesion` y los UUID v3 ya no
+  se ejercitan en el servidor. PremiumBridge (puente de login para offline + AuthMe) quedó desactivado (`PremiumBridge.jar.disabled`): sin
+  plugin de autenticación no tenía función y exigía ProtocolLib, que no tiene versión para 26.x. Reactivarlo = renombrar el jar.
+- **(Histórico) Modo híbrido: Java NO premium también entra** (`online-mode=false`, `enforce-secure-profile=false`). En offline el UUID de Java
   sale del NOMBRE (versión 3), así que para esas cuentas (`requiereSesion`) el vínculo guardado no basta: hace falta una SESIÓN
   (`sesion_minecraft`) para la RED desde la que entra, que nace al canjear un código del correo y dura `SESION_DIAS` (7). Misma red y
   plazo → entra directo; otra red o vencida → `/vtd email` + `/vtd codigo` otra vez (`jugador` responde `necesitaSesion` SIN decir de
@@ -596,7 +600,7 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
   puntos y aviso de subida salen solos. `xpJuego` = `SUM(cantidad)` de `xp_juego` (incluida la de entregas) (ejecutor de `lib/solicitudes.mjs`), la leen la ficha
   pública, el like y «Mi ficha» (`xpJuegoDe` vale 0 si el almacén falla). El LISTADO no la aplica (tampoco los likes).
 - **Lotes idempotentes con tope en UNA sentencia**: lotes de ≤ `XP_POR_LOTE_MAX` (100) con `idLote` UUID fijado al crearlo (un
-  reintento no suma dos veces); el INSERT recorta a lo que cabe en `XP_JUEGO_MAX_DIA` (300, día de Chile). Motivos: `MOTIVOS_XP`.
+  reintento no suma dos veces); el INSERT recorta a lo que cabe en `XP_JUEGO_MAX_DIA` (600, día de Chile). Motivos: `MOTIVOS_XP`.
 - **Rutas**: `GET /api/minecraft/reglas` pública; `email`, `vincular`, `jugador/:uuid` (GET/DELETE), `xp` y `puntos` exigen `X-Minecraft-Token` =
   `VTUBERDEX_MINECRAFT_TOKEN` (≥16; sin él, 404). `POST /api/minecraft/puntos` `{ uuid, stat, cantidad? }` (1..50) gasta puntos de stats con `subirStat` (las mismas reglas que «Mi ficha»; lo usa la ventana `/vtd stats` del plugin) y responde `{ ok, aplicados, puntosStats }`; si se acaban a mitad, vale lo aplicado. «Mi ficha»: `POST /api/mi-ficha/minecraft`. No usan `responderRegistrando`.
 - **En el juego**: stats como `AttributeModifier` `vtuberdex:stat_<slug>` escalados/topados en `config.yml` (se quitan al salir: se
@@ -627,7 +631,7 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
   responder («HTTP/1.1 header parser received no bytes»; `curl --http2` reproduce: exit 52). `ApiClient` fuerza HTTP/1.1. Ningún
   gate lo vio: salió en la primera entrada real (Bedrock) y dejaba a todos en la sala de espera.
 - **Producción (VPS)**: servicio `vtuberdex-minecraft` (usuario `minecraft`, `/srv/minecraft`, Java 25 de apt, `-Xmx1536M`
-  `-XX:ActiveProcessorCount=2`, `ProtectSystem=strict`), puertos **25565/tcp** (Java) y **19132/udp** (Bedrock) públicos, `online-mode=false` (híbrido, ver arriba). **RCON activado el 2026-10-12** a petición del mantenedor (puerto 25575, contraseña en `server.properties` y en `~/.local/share/vtuberdex-auto/rcon-pass`; cliente `~/.local/bin/mc-rcon "<comando>"`): no hay cortafuegos, así que el drop-in `rcon-local.conf` del servicio añade una regla iptables que descarta 25575 salvo desde `lo`. Si cambias de máquina o quitas el drop-in, RCON queda abierto a internet. **No hagas
+  `-XX:ActiveProcessorCount=2`, `ProtectSystem=strict`), puertos **25565/tcp** (Java) y **19132/udp** (Bedrock) públicos, `online-mode=true` (solo premium, ver arriba). **RCON activado el 2026-10-12** a petición del mantenedor (puerto 25575, contraseña en `server.properties` y en `~/.local/share/vtuberdex-auto/rcon-pass`; cliente `~/.local/bin/mc-rcon "<comando>"`): no hay cortafuegos, así que el drop-in `rcon-local.conf` del servicio añade una regla iptables que descarta 25575 salvo desde `lo`. Si cambias de máquina o quitas el drop-in, RCON queda abierto a internet. **No hagas
   op por nombre a cuentas Java**: el permiso lo hereda quien use ese nombre (el plugin no lo deja saltarse el lobby, pero el op sigue
   siendo op en el resto del servidor). Se entra con `vtuberdex.com`
   (el registro A no pasa por el proxy de Cloudflare). El plugin habla con la app LOCAL (`api-url: http://127.0.0.1:3100`; `sitio-url`
@@ -675,9 +679,9 @@ mochilas y principal → entregas. Todo es del mundo principal; los de la sala d
 - **Encargos sin estado** (`Contratos`): salen de (puesto, ranura de 20 min, número), así que todos ven los mismos y no hay nada que
   guardar. Un jugador tiene UN encargo (`misiones.yml`). Paga `Recompensa.xp` (distancia, peso, zonas en la ruta recta) × lo que
   llega × factor de tiempo (1,2 / 1 / 0,5); menos de un cuarto entregado = fallido.
-- **XP**: motivo `entrega`, con tope diario propio en la web (`XP_ENTREGA_MAX_DIA` = 600) **además** de los 300 de siempre. Un lote de
+- **XP**: motivo `entrega`, con tope diario propio en la web (`XP_ENTREGA_MAX_DIA` = 600) **además** de los 600 de siempre. Un lote de
   entrega no se mezcla con otros motivos (`entrega_aparte`); `XpCollector.enviar` los empaqueta aparte. `hoy`/`topeDia` de la respuesta
-  siguen siendo solo los de siempre (el panel del juego muestra «hoy x/300»); lo de entregas va en `entregaHoy`/`topeEntrega`.
+  siguen siendo solo los de siempre (el panel del juego muestra «hoy x/600»); lo de entregas va en `entregaHoy`/`topeEntrega`.
 - **Zonas varadas** (`Zonas`, `Varados`): 9, sobre las rutas entre puestos y nunca a < 90 de un puesto ni < 220 del spawn (donde están
   el lobby, el coliseo, la caseta y la casa). Los varados son zombis a los que se les quitó su IA de ataque: el objetivo automático de
   vanilla se cancela y solo `Sigilo` decide cuándo atacan (alcance base 20 × lo que hagas: moto 2,2, correr 1,6, caminar 1, lento 0,7,
