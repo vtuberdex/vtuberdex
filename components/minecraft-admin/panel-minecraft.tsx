@@ -14,6 +14,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
+import { SeccionArchivos } from "./seccion-archivos";
+import { SeccionConsola } from "./seccion-consola";
 import { SeccionExperiencia } from "./seccion-experiencia";
 import { SeccionPlugins } from "./seccion-plugins";
 import {
@@ -44,18 +46,26 @@ type Estado = {
 };
 
 type Sesion = "comprobando" | "dentro" | "fuera";
-type Pestana = "servidor" | "plugins" | "configuracion" | "experiencia";
+type Pestana =
+  | "servidor"
+  | "plugins"
+  | "configuracion"
+  | "archivos"
+  | "consola"
+  | "experiencia";
 
 const PESTANAS: { id: Pestana; titulo: string }[] = [
   { id: "servidor", titulo: "Servidor" },
   { id: "plugins", titulo: "Plugins" },
   { id: "configuracion", titulo: "Configuración" },
+  { id: "archivos", titulo: "Archivos" },
+  { id: "consola", titulo: "Consola" },
   { id: "experiencia", titulo: "Experiencia" },
 ];
 
 /**
  * Acciones de un clic. El navegador manda el NOMBRE de la acción, nunca un comando: el servidor
- * arma el comando (`lib/minecraft-rcon.mjs`). Aquí no hay consola libre a propósito.
+ * arma el comando (`lib/minecraft-rcon.mjs`). La consola con comandos va aparte (pestaña «Consola»), con lista blanca para mantenedores.
  */
 const ACCIONES_RAPIDAS: { titulo: string; accion: string; ayuda: string }[] = [
   { titulo: "Quién juega", accion: "jugadores", ayuda: "Jugadores conectados" },
@@ -858,6 +868,12 @@ export function PanelMinecraftAdmin() {
                   </form>
                 </Seccion>
               </SeccionPlugins>
+            ) : null}
+
+            {pestana === "archivos" ? <SeccionArchivos /> : null}
+
+            {pestana === "consola" ? (
+              <SeccionConsola esAdmin={esAdmin} />
             ) : null}
 
             {pestana === "experiencia" && esAdmin ? (
