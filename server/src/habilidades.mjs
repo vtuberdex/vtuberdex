@@ -752,13 +752,17 @@ function etiquetaDePieza(category, posicion) {
  * ¿La ficha tiene esa facción? Compara por slug CANÓNICO, no por texto exacto: el formulario puede
  * traer la etiqueta («Mythical Legacy») en vez del slug, y el scrape dejó variantes con errata
  * (`mythical-legacy3`, `mythical-lecagy`). Con la comparación exacta, la Epopeya salía bloqueada
- * aunque la ficha fuera Mythical Legacy.
+ * aunque la ficha fuera Mythical Legacy. La SUBFACCIÓN («Mythical Legacy (Kitsune)») NO cambia la
+ * facción: se descarta lo que va entre paréntesis y los estados exclusivos se heredan de la madre.
  * @param {string[]} facciones
  * @param {string} slug
  */
 export function tieneFaccion(facciones, slug) {
   const canonico = (v) =>
     String(v ?? "")
+      // La SUBFACCIÓN va en el nombre («Mythical Legacy (Kitsune)») y no convierte la ficha en otra
+      // facción: se descarta lo que va entre paréntesis antes de comparar.
+      .replace(/[([{][^)\]}]*[)\]}]/g, " ")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
