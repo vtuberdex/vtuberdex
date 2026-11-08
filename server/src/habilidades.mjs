@@ -759,6 +759,9 @@ function etiquetaDePieza(category, posicion) {
 export function tieneFaccion(facciones, slug) {
   const canonico = (v) =>
     String(v ?? "")
+      // La SUBFACCIÓN va en el nombre («Mythical Legacy (Kitsune)») y no convierte la ficha en otra
+      // facción: se descarta lo que va entre paréntesis antes de comparar.
+      .replace(/[([{][^)\]}]*[)\]}]/g, " ")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
