@@ -248,4 +248,28 @@ test("tieneFaccion: acepta slug, etiqueta y variantes con errata de la misma fac
   assert.equal(tieneFaccion(["Mythical Lecagy"], "mythical-legacy"), true);
   assert.equal(tieneFaccion(["netherbane"], "mythical-legacy"), false);
   assert.equal(tieneFaccion([], "mythical-legacy"), false);
+  // La subfacción no es otra facción: sigue contando la de su madre.
+  assert.equal(
+    tieneFaccion(["Mythical Legacy (Kitsune)"], "mythical-legacy"),
+    true,
+  );
+  assert.equal(
+    tieneFaccion(["mythical-legacy (kitsune)"], "mythical-legacy"),
+    true,
+  );
+  assert.equal(
+    tieneFaccion(["Netherbane (Alfa)"], "mythical-legacy"),
+    false,
+  );
+});
+
+test("una ficha de una subfacción puede usar los estados exclusivos de su facción madre", () => {
+  const kit = kitValido();
+  kit[1].effectHtml = `Ataque Base +40 y obtienes ${s("Juramento")} durante 2 turnos.`;
+  const exclusivos = (facciones) =>
+    validarKit({ habilidades: kit, facciones })
+      .filter((p) => p.codigo === "faccion_exclusiva")
+      .map((p) => p.estado);
+  assert.deepEqual(exclusivos(["Heaven's Arbiter (Alfa)"]), []);
+  assert.deepEqual(exclusivos(["NeCrotic (Alfa)"]), ["Juramento"]);
 });
