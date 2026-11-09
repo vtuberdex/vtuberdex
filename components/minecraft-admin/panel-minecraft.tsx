@@ -846,7 +846,7 @@ export function PanelMinecraftAdmin() {
               <SeccionPlugins respaldo={estado.plugins ?? []}>
                 <Seccion
                   titulo="Subir plugin"
-                  bajada="Solo .jar, hasta 8 MB. Un jar es código que corre en el servidor: sube solo plugins de confianza. Queda en la carpeta y se carga al reiniciar."
+                  bajada="Solo .jar, hasta 50 MB. Un jar es código que corre en el servidor: sube solo plugins de confianza. Queda en la carpeta y se carga al reiniciar."
                 >
                   <form
                     onSubmit={subir}
