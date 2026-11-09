@@ -230,6 +230,14 @@ describe("subida de plugins", () => {
     expect((await r.json()).error).toBe("extension_no_permitida");
   });
 
+  it("acepta un .jar por encima del antiguo límite de 8 MB (hasta 50 MB)", async () => {
+    const jar = new Uint8Array(20 * 1024 * 1024);
+    jar.set([0x50, 0x4b, 0x03, 0x04]);
+    const r = await subir("con-dependencias.jar", jar, cookieDe("admin"));
+    expect(r.status).toBe(201);
+    expect((await r.json()).tamano).toBe(jar.byteLength);
+  });
+
   it("rechaza con 413 un archivo por encima del límite", async () => {
     // Se mide con el límite real: si mañana sube o baja, la prueba sigue valiendo.
     const grande = new Uint8Array(LIMITE_JAR_BYTES + 1);
