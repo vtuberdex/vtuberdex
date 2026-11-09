@@ -33,6 +33,7 @@ import {
 } from "../app/api/minecraft-admin/configuracion/route.js";
 import {
   COOKIE_MANTENEDOR,
+  LIMITE_JAR_BYTES,
   __reiniciarEnlaces,
   crearSesionMantenedor,
 } from "./minecraft-admin.mjs";
@@ -230,7 +231,8 @@ describe("subida de plugins", () => {
   });
 
   it("rechaza con 413 un archivo por encima del límite", async () => {
-    const grande = new Uint8Array(9 * 1024 * 1024);
+    // Se mide con el límite real: si mañana sube o baja, la prueba sigue valiendo.
+    const grande = new Uint8Array(LIMITE_JAR_BYTES + 1);
     const r = await subir("enorme.jar", grande, cookieDe("admin"));
     expect(r.status).toBe(413);
     expect((await r.json()).error).toBe("archivo_demasiado_grande");
