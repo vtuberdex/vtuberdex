@@ -33,6 +33,7 @@ import {
 } from "../app/api/minecraft-admin/configuracion/route.js";
 import {
   COOKIE_MANTENEDOR,
+  LIMITE_JAR_BYTES,
   __reiniciarEnlaces,
   crearSesionMantenedor,
 } from "./minecraft-admin.mjs";
@@ -229,8 +230,16 @@ describe("subida de plugins", () => {
     expect((await r.json()).error).toBe("extension_no_permitida");
   });
 
+  it("acepta un .jar por encima del antiguo límite de 8 MB (hasta 50 MB)", async () => {
+    const jar = new Uint8Array(20 * 1024 * 1024);
+    jar.set([0x50, 0x4b, 0x03, 0x04]);
+    const r = await subir("con-dependencias.jar", jar, cookieDe("admin"));
+    expect(r.status).toBe(201);
+    expect((await r.json()).tamano).toBe(jar.byteLength);
+  });
+
   it("rechaza con 413 un archivo por encima del límite", async () => {
-    const grande = new Uint8Array(9 * 1024 * 1024);
+    const grande = new Uint8Array(LIMITE_JAR_BYTES + 1);
     const r = await subir("enorme.jar", grande, cookieDe("admin"));
     expect(r.status).toBe(413);
     expect((await r.json()).error).toBe("archivo_demasiado_grande");
