@@ -869,8 +869,17 @@ export function listarFacciones(db) {
     .map((fila) => ({ ...fila }));
 }
 
-/** Crea una facción. Debe correr dentro de una transacción. */
-export function crearFaccion(db, { label, icon = null }, { id = null } = {}) {
+/**
+ * Crea una facción. Debe correr dentro de una transacción.
+ *
+ * `parent` la convierte en SUBFACCIÓN: se guarda la relación (id) y desde ese momento los estados
+ * exclusivos de la madre valen también para ella. Acepta id, slug o etiqueta de la madre.
+ */
+export function crearFaccion(
+  db,
+  { label, icon = null, parent },
+  { id = null } = {},
+) {
   const etiqueta = String(label ?? "").trim();
   if (!etiqueta)
     throw new MutationError(
@@ -892,17 +901,23 @@ export function crearFaccion(db, { label, icon = null }, { id = null } = {}) {
       `ya existe la facción ${etiqueta}`,
     );
   }
+  const madreId = resolverFaccionMadre(db, parent) ?? null;
   if (id !== null) {
     db.prepare(
-      "INSERT INTO faction (id, slug, label, icon, vtuber_count) VALUES (?, ?, ?, ?, 0)",
-    ).run(id, slug, etiqueta, icon);
+      "INSERT INTO faction (id, slug, label, icon, parent_id, vtuber_count) VALUES (?, ?, ?, ?, ?, 0)",
+    ).run(id, slug, etiqueta, icon, madreId);
   } else {
     db.prepare(
-      "INSERT INTO faction (slug, label, icon, vtuber_count) VALUES (?, ?, ?, 0)",
-    ).run(slug, etiqueta, icon);
+      "INSERT INTO faction (slug, label, icon, parent_id, vtuber_count) VALUES (?, ?, ?, ?, 0)",
+    ).run(slug, etiqueta, icon, madreId);
   }
   return db
-    .prepare("SELECT id, slug, label, icon FROM faction WHERE slug = ?")
+    .prepare(
+      `SELECT f.id, f.slug, f.label, f.icon, f.parent_id AS parentId,
+              madre.slug AS parentSlug, madre.label AS parentLabel
+         FROM faction f LEFT JOIN faction madre ON madre.id = f.parent_id
+        WHERE f.slug = ?`,
+    )
     .get(slug);
 }
 
