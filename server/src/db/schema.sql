@@ -62,7 +62,9 @@ CREATE TABLE IF NOT EXISTS faction (
   vtuber_count INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_faction_parent ON faction (parent_id);
+-- El índice de `parent_id` lo crea la migración `2026-11-faccion-madre`, NO este archivo: este esquema
+-- corre ANTES de las migraciones, y en una base anterior (la empaquetada) `faction` ya existe sin la
+-- columna, así que un índice aquí falla con «no such column: parent_id» y tumba el diario entero.
 
 -- --- carta principal --------------------------------------------------------
 CREATE TABLE IF NOT EXISTS vtuber (
