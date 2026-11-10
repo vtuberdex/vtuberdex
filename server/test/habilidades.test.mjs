@@ -201,6 +201,53 @@ test("los estados exclusivos exigen su facción, también en su forma evoluciona
   assert.deepEqual(exclusivos(null), [], "sin facciones conocidas no se acusa");
 });
 
+test("la subfacción acredita a su madre solo con la relación en los datos", () => {
+  const mapa = { "glovecaller-elfs": "glovecaller" };
+  // Con la relación guardada, la hija desbloquea lo exclusivo de la madre.
+  assert.equal(tieneFaccion(["glovecaller-elfs"], "glovecaller", mapa), true);
+  // La madre sigue sin acreditar lo de la hija (la herencia va hacia arriba).
+  assert.equal(tieneFaccion(["glovecaller"], "glovecaller-elfs", mapa), false);
+  // Sin la relación no se adivina: el slug se llama igual pero NO cuenta.
+  assert.equal(tieneFaccion(["glovecaller-elfs"], "glovecaller"), false);
+  // La etiqueta con paréntesis también funciona: se compara canónica.
+  assert.equal(
+    tieneFaccion(["Glovecaller (Elfs)"], "glovecaller", mapa),
+    true,
+  );
+});
+
+test("la herencia sube varios niveles y un ciclo en los datos no la cuelga", () => {
+  const cadena = {
+    "glovecaller-elfs": "glovecaller",
+    "glovecaller-elite": "glovecaller-elfs",
+  };
+  assert.equal(tieneFaccion(["glovecaller-elite"], "glovecaller", cadena), true);
+  const ciclo = { a: "b", b: "a" };
+  assert.equal(tieneFaccion(["a"], "c", ciclo), false);
+});
+
+test("el kit de una subfacción pasa la exclusividad de su madre", () => {
+  const kit = kitValido();
+  kit[1].effectHtml = `Ataque Base +40 y obtienes ${s("Fortificación")} durante 2 turnos.`;
+  const mapa = { "glovecaller-elfs": "glovecaller" };
+  const exclusivos = (facciones, subfacciones) =>
+    validarKit({ habilidades: kit, facciones, subfacciones })
+      .filter((p) => p.codigo === "faccion_exclusiva")
+      .map((p) => p.estado);
+  assert.deepEqual(exclusivos(["glovecaller"], mapa), [], "la madre puede");
+  assert.deepEqual(
+    exclusivos(["glovecaller-elfs"], mapa),
+    [],
+    "la hija puede por su madre",
+  );
+  assert.deepEqual(
+    exclusivos(["glovecaller-elfs"]),
+    ["Fortificación"],
+    "sin el mapa se sigue acusando",
+  );
+  assert.deepEqual(exclusivos(["abyssal"], mapa), ["Fortificación"]);
+});
+
 test("repetir un estado entre piezas es aviso, y la evolución cuenta como su base", () => {
   const kit = kitValido();
   kit[0].effectHtml = `Ataque Base +45 y aplicas ${s("Sangrado")} durante 2 turnos.`;
