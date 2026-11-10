@@ -367,8 +367,9 @@ export function FactionWizard({
                   </option>
                 ))}
               </select>
-            </Field>
-          )}
+              </Field>
+            )}
+          </fieldset>
           {madre && !trimmed.includes("(") && (
             <button
               type="button"
