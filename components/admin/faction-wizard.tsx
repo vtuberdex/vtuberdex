@@ -360,7 +360,7 @@ export function FactionWizard({
                 }}
                 className={inputClass}
               >
-                <option value="">Ninguna (facción raíz)</option>
+                <option value="">Elige la facción madre…</option>
                 {madres.map((faction) => (
                   <option key={faction.id} value={faction.id}>
                     {faction.label}
