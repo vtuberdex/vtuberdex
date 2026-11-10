@@ -25,6 +25,9 @@
  * partir de ellos, porque una textura pertenece a un renderer y el detalle y el libro
  * tienen cada uno el suyo. La subida a GPU es barata frente a la generación.
  *
+ * ANTES DE TOCAR LA COLA: `cancelar` y `anclar` son la única forma de sacar trabajo pendiente; el
+ * resto de la fábrica asume que un trabajo encolado o se ejecuta o se cancela, nunca ambos.
+ *
  * SIN CALIDAD ADAPTATIVA, A PROPÓSITO: hubo una que medía la generación de cada carta y bajaba el
  * ancho (512 → 384 → 256) en máquinas lentas. Se retiró: el ancho es FIJO (`TEXTURAS.ancho`), la
  * misma carta se ve igual en todos los equipos y no hay estado oculto que dependa del historial.
