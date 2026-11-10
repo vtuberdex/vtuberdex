@@ -89,6 +89,8 @@ export function FactionManager({
   };
 
   const withoutEmblem = factions.filter((faction) => !faction.icon);
+  /** Subfacciones a las que les falta la madre: sus estados exclusivos siguen bloqueados. */
+  const huerfanas = factions.filter(esSubfaccionHuerfana);
 
   return (
     <div className="space-y-4" data-testid="faction-manager">
