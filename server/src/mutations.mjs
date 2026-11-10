@@ -921,8 +921,11 @@ export function crearFaccion(
     .get(slug);
 }
 
-/** Renombra o cambia el emblema de una facción. El slug se conserva: es el que va en las URLs de filtro. */
-export function editarFaccion(db, id, { label, icon }) {
+/**
+ * Renombra, cambia el emblema o MUEVE DE MADRE una facción. El slug se conserva: es el que va en las
+ * URLs de filtro y en la ficha. `parent: null` (o `''`) la deja como facción raíz.
+ */
+export function editarFaccion(db, id, { label, icon, parent }) {
   const actual = db
     .prepare("SELECT id, label FROM faction WHERE id = ?")
     .get(id);
@@ -951,12 +954,22 @@ export function editarFaccion(db, id, { label, icon }) {
   }
   if (icon !== undefined)
     db.prepare("UPDATE faction SET icon = ? WHERE id = ?").run(icon, id);
+  if (parent !== undefined) {
+    const madreId = resolverFaccionMadre(db, parent) ?? null;
+    validarMadre(db, id, madreId);
+    db.prepare("UPDATE faction SET parent_id = ? WHERE id = ?").run(madreId, id);
+  }
   const ids = db
     .prepare("SELECT vtuber_id AS id FROM vtuber_faction WHERE faction_id = ?")
     .all(id);
   ids.forEach((fila) => refreshSearchIndex(db, fila.id));
   return db
-    .prepare("SELECT id, slug, label, icon FROM faction WHERE id = ?")
+    .prepare(
+      `SELECT f.id, f.slug, f.label, f.icon, f.parent_id AS parentId,
+              madre.slug AS parentSlug, madre.label AS parentLabel
+         FROM faction f LEFT JOIN faction madre ON madre.id = f.parent_id
+        WHERE f.id = ?`,
+    )
     .get(id);
 }
 
