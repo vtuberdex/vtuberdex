@@ -589,7 +589,10 @@ export function KitBuilder({
   const [confirmando, setConfirmando] = useState(false);
 
   const kitActual = skills.filter((s) => s.category !== "other");
-  const revision = useMemo(() => revisarKit(kit, facciones), [kit, facciones]);
+  const revision = useMemo(
+    () => revisarKit(kit, facciones, subfacciones),
+    [kit, facciones, subfacciones],
+  );
   /**
    * Lo que la ficha dice HOY en cada pieza. Activas y Ultimate no se pueden leer de vuelta como menús, así
    * que al rehacerlas se escriben desde cero: tener el texto anterior al lado evita trabajar de memoria.
