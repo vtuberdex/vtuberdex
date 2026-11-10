@@ -1,11 +1,14 @@
 # CI del repositorio: lint + gates + verificación del artefacto desplegable.
 #
-# ESTE ES EL ÚNICO WORKFLOW: VALIDA, NO PUBLICA
-# ---------------------------------------------
+# VALIDA EN TODO PUSH Y PR; EN `main` ADEMÁS ETIQUETA (Y ESO DESPLIEGA)
+# -------------------------------------------------------------------
 # El sitio corre en una VPS (nginx + `node server.js`) y se publica con
-# `scripts/release.sh` desde la propia máquina; ya no hay despliegue a Vercel ni
-# workflow que lo dispare (se eliminó `deploy.yml`). Aquí solo se mira verde o rojo
-# antes de mezclar trabajo: en CUALQUIER push y en cada PR, sin ningún secreto.
+# `scripts/release.sh` desde la propia máquina. GitHub NO empuja nada al servidor:
+# el timer `vtuberdex-autodeploy` de la VPS sigue la etiqueta `v*` más alta
+# (`sort -V`) y publica lo que apunta. Por eso este workflow no tiene secretos de
+# despliegue: su única salida es la ETIQUETA (job `etiquetar`, solo en `main` y
+# solo si `validar` pasó). Antes la etiqueta se creaba a mano y un arreglo
+# mezclado podía quedarse sin publicar (2026-11-10).
 #
 # Los gates que NO se cubren entre sí: el límite de samplers de GLSL, por ejemplo,
 # solo se manifiesta como la carta negra en el navegador, y `next build` no corre
@@ -47,14 +50,22 @@ on:
   # mezclar, no después. Nada se publica desde aquí.
   #
   # Sin filtro `branches:` a propósito. Un patrón glob mal escrito ahí es un fallo
-  # SILENCIOSO (el workflow no se dispara nunca y el repo parece "sin CI"), y no
-  # hay nada que ganar: este workflow no despliega nada.
+  # SILENCIOSO (el workflow no se dispara nunca y el repo parece "sin CI"). Lo que
+  # solo vale para `main` (etiquetar) se filtra con `if:` en su job.
+  #
+  # `tags-ignore`: la etiqueta que crea `etiquetar` es otro push; sin esto lanzaría
+  # un CI más sobre el mismo commit ya validado. (Con GITHUB_TOKEN tampoco se
+  # dispararía, pero así no depende de ese detalle.)
   push:
+    tags-ignore:
+      - "**"
   pull_request:
   workflow_dispatch:
 
 # Un CI por rama. `cancel-in-progress: true`: si se empuja de nuevo, la corrida anterior ya no
-# importa; solo interesa el resultado del último commit.
+# importa; solo interesa el resultado del último commit. En `main` eso también cancela su
+# `etiquetar`: con dos merges seguidos se etiqueta (y despliega) solo el último, que contiene
+# a los dos.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -117,3 +128,65 @@ jobs:
       # Va al final: si algo anterior falla, no se paga el build completo.
       - name: verify (escenario de producción)
         run: npm run verify
+
+  # Etiqueta el commit de `main` que acaba de pasar `validar` con el siguiente parche
+  # (v1.2.5 -> v1.2.6). El autodeploy de la VPS lo publica en pocos minutos y, si el
+  # sitio no responde tras publicar, vuelve solo al release anterior.
+  #
+  # Saltarse el despliegue de un merge: `[skip deploy]` en el mensaje del commit de
+  # `main` (en el título del PR si se mezcla con squash; en el cuerpo del merge si no).
+  # Una versión menor o mayor se etiqueta a mano: este job solo sube el parche y
+  # respeta la etiqueta más alta que exista.
+  etiquetar:
+    needs: validar
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      !contains(github.event.head_commit.message, '[skip deploy]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    # Nunca dos a la vez, y sin cancelar uno que ya está empujando la etiqueta.
+    concurrency:
+      group: etiquetar-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Crear la siguiente etiqueta de parche
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+
+          if [ -n "$(git tag --points-at "$SHA" --list 'v*')" ]; then
+            echo "$SHA ya tiene etiqueta: $(git tag --points-at "$SHA" --list 'v*' | tr '\n' ' ')"
+            exit 0
+          fi
+
+          ultima="$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)"
+          if [ -z "$ultima" ]; then
+            echo "::error::No hay ninguna etiqueta vX.Y.Z de la que partir; crea la primera a mano."
+            exit 1
+          fi
+
+          # Una corrida re-lanzada sobre un commit VIEJO no puede etiquetarlo por encima de lo
+          # desplegado: el autodeploy publicaría código anterior al que ya está en producción.
+          if ! git merge-base --is-ancestor "$ultima" "$SHA"; then
+            echo "$ultima no es ancestro de $SHA (corrida vieja o historia reescrita): no se etiqueta."
+            exit 0
+          fi
+
+          IFS=. read -r mayor menor parche <<<"${ultima#v}"
+          nueva="v${mayor}.${menor}.$((parche + 1))"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$nueva" "$SHA" -m "$nueva: ${SHA:0:7} (CI verde en main)"
+          git push origin "refs/tags/$nueva"
+
+          echo "Etiqueta $nueva -> ${SHA:0:7}; el autodeploy de la VPS la publica en unos minutos." | tee -a "$GITHUB_STEP_SUMMARY"
