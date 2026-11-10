@@ -82,7 +82,7 @@ Turso. Si añades tests, actualiza **los dos** archivos.
 
 ## Etiquetas, autodeploy y carga del token (información de la sesión)
 
-- **Etiqueta de release actual: `v1.0.0`** en los repositorios de VtuberDex. Para listar las etiquetas de origin: `git ls-remote --tags origin 'refs/tags/v*'`, que requiere cargar el token (ver abajo).
+- **Etiquetas = despliegue, y las crea el CI.** El job `etiquetar` de `.github/workflows/ci.yml` etiqueta cada commit de `main` que pasa `validar` con el siguiente parche (`v1.2.5` → `v1.2.6`); el autodeploy de la VPS lo publica en minutos. `[skip deploy]` en el mensaje del commit de `main` lo salta. Menor o mayor: etiqueta a mano (el job respeta la más alta). No crear etiquetas de parche a mano: chocarían con la del CI. Para listar: `git ls-remote --tags origin 'refs/tags/v*'` (requiere cargar el token, ver abajo).
 - **Autodeploy**: `vtuberdex-autodeploy` (`/usr/local/sbin/vtuberdex-autodeploy`) vive FUERA del repositorio y no se versiona aquí. Sigue la etiqueta más alta de origin ordenando con `sort -V`. Modo seco: `VTD_AUTO_DRY=1` con `VTD_ESTADO` apuntando a un directorio temporal.
 - **Carga del token** (`GITHUB_TOKEN`) antes de `git` contra GitHub o `gh`: `eval "$(grep -m1 '^export GITHUB_TOKEN=' /home/madkoding/.profile)"`. Nunca imprimir su valor.
 - **Remotos (específico de esta sesión)**: en este entorno `vtuberdex` usa HTTPS y funciona. Los remotos `vtuberdex-*` deben usar HTTPS con `GITHUB_TOKEN`; SSH falla con publickey aquí.
