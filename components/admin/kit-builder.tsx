@@ -708,6 +708,7 @@ export function KitBuilder({
                 valor={kit.ultimate}
                 onChange={(ultimate) => setKit({ ...kit, ultimate })}
                 facciones={facciones}
+                subfacciones={subfacciones}
               />
             )}
           </div>
