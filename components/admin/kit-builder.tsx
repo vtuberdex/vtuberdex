@@ -266,6 +266,7 @@ function EditorDeActiva({
         valor={valor.estado}
         onChange={(estado) => set({ estado })}
         facciones={facciones}
+        subfacciones={subfacciones}
       />
       <label className={labelClass}>
         Efecto adicional
