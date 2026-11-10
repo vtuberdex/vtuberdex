@@ -573,11 +573,14 @@ function EditorDePasiva({
 export function KitBuilder({
   skills,
   facciones,
+  subfacciones = {},
   onApply,
   onCancel,
 }: {
   skills: SkillForm[];
   facciones: string[];
+  /** Subfacción → madre (del catálogo): acredita los estados exclusivos de la madre. */
+  subfacciones?: Record<string, string>;
   onApply: (skills: SkillForm[]) => void;
   onCancel: () => void;
 }) {
