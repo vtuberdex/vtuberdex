@@ -49,13 +49,20 @@ CREATE TABLE IF NOT EXISTS tag (
 );
 
 -- --- facciones --------------------------------------------------------------
+-- Una facción puede tener MADRE (`parent_id`): entonces es una SUBFACCIÓN. La relación es un
+-- dato y no una convención del nombre: antes había que escribir «Glovecaller (Elfs)» para que el
+-- sistema adivinara que la madre era Glovecaller descartando el paréntesis. `ON DELETE SET NULL`:
+-- borrar la madre deja a las hijas sin madre (siguen existiendo), no las borra en cascada.
 CREATE TABLE IF NOT EXISTS faction (
   id    INTEGER PRIMARY KEY,
   slug  TEXT NOT NULL UNIQUE,
   label TEXT NOT NULL,
   icon  TEXT,
+  parent_id INTEGER REFERENCES faction (id) ON DELETE SET NULL,
   vtuber_count INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE INDEX IF NOT EXISTS idx_faction_parent ON faction (parent_id);
 
 -- --- carta principal --------------------------------------------------------
 CREATE TABLE IF NOT EXISTS vtuber (

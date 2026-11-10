@@ -182,9 +182,30 @@ export function kitDesdeHabilidades(skills: SkillForm[]): KitForm {
   return kit;
 }
 
-/** Estados que se pueden elegir: los exclusivos de una facción solo si la ficha la tiene. */
+/**
+ * Mapa `{slug de la subfacción: slug de su madre}` a partir del catálogo de facciones.
+ *
+ * Es el único puente entre el mantenedor y los estados: la relación vive en la base
+ * (`faction.parent_id`), no en el nombre. Sin este mapa, una subfacción no acredita los estados
+ * exclusivos de su madre.
+ */
+export function mapaSubfacciones(
+  facciones: Array<{ slug: string; parentSlug?: string | null }>,
+): Record<string, string> {
+  const mapa: Record<string, string> = {};
+  for (const faccion of facciones ?? []) {
+    if (faccion.slug && faccion.parentSlug) mapa[faccion.slug] = faccion.parentSlug;
+  }
+  return mapa;
+}
+
+/**
+ * Estados que se pueden elegir: los exclusivos de una facción solo si la ficha la tiene (o tiene una
+ * SUBFACCIÓN suya, según el mapa `subfacciones`).
+ */
 export function estadosDisponibles(
   facciones: string[],
+  subfacciones: Record<string, string> = {},
 ): Array<{
   nombre: string;
   evolucion: string;
@@ -195,7 +216,9 @@ export function estadosDisponibles(
     nombre: e.nombre,
     evolucion: e.evolucion.nombre,
     polaridad: e.polaridad,
-    bloqueado: Boolean(e.faccion && !tieneFaccion(facciones, e.faccion)),
+    bloqueado: Boolean(
+      e.faccion && !tieneFaccion(facciones, e.faccion, subfacciones),
+    ),
   }));
 }
 
@@ -363,7 +386,11 @@ export function faltantes(kit: KitForm): string[] {
 }
 
 /** Validación completa del kit armado: lo que falta + las reglas del sistema (`validarKit`). */
-export function revisarKit(kit: KitForm, facciones: string[]) {
+export function revisarKit(
+  kit: KitForm,
+  facciones: string[],
+  subfacciones: Record<string, string> = {},
+) {
   const habilidades = habilidadesDelKit(kit);
   const faltan = faltantes(kit);
   const estadosPendientes = faltan.some((f) => /estados/.test(f));
@@ -374,6 +401,7 @@ export function revisarKit(kit: KitForm, facciones: string[]) {
       effectHtml: h.effectHtml ?? "",
     })),
     facciones,
+    subfacciones,
     // «Falta: los dos estados» ya lo dice; el «entrega 0 estados» del validador sería el mismo aviso dos veces.
   }).filter((p) => !(estadosPendientes && p.codigo === "ultimate_estados"));
   return { habilidades, faltan, problemas };

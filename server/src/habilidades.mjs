@@ -749,20 +749,24 @@ function etiquetaDePieza(category, posicion) {
 }
 
 /**
- * ¿La ficha tiene esa facción? Compara por slug CANÓNICO, no por texto exacto: el formulario puede
- * traer la etiqueta («Mythical Legacy») en vez del slug, y el scrape dejó variantes con errata
- * (`mythical-legacy3`, `mythical-lecagy`). Con la comparación exacta, la Epopeya salía bloqueada
- * aunque la ficha fuera Mythical Legacy. La SUBFACCIÓN («Mythical Legacy (Kitsune)») NO cambia la
- * facción: se descarta lo que va entre paréntesis y los estados exclusivos se heredan de la madre.
- * @param {string[]} facciones
- * @param {string} slug
+ * ¿La ficha tiene esa facción? Una SUBFACCIÓN cuenta como su MADRE.
+ *
+ * La relación madre-hijo es un DATO (`faction.parent_id`): la guarda el mantenedor y aquí llega como
+ * mapa `{ slug de la hija: slug de la madre }`. Antes se adivinaba del NOMBRE —se descartaba el
+ * paréntesis de «Glovecaller (Elfs)» y se probaba el prefijo del slug (`glovecaller-elfs` valía para
+ * `glovecaller`)—, lo que obligaba a escribir la madre dentro del nombre para que los estados
+ * exclusivos se desbloquearan, y de paso daba por buena cualquier facción que empezara igual.
+ *
+ * Los nombres se siguen comparando canónicos: el formulario puede traer la etiqueta («Mythical
+ * Legacy») en vez del slug, y el scrape dejó variantes con errata (`mythical-lecagy`).
+ *
+ * @param {string[]} facciones Slugs (o etiquetas) de las facciones de la ficha.
+ * @param {string} slug Facción exclusiva del estado.
+ * @param {Record<string, string>} [subfacciones] Mapa `{hija: madre}`; admite cadenas de varios niveles.
  */
-export function tieneFaccion(facciones, slug) {
+export function tieneFaccion(facciones, slug, subfacciones = {}) {
   const canonico = (v) =>
     String(v ?? "")
-      // La SUBFACCIÓN va en el nombre («Mythical Legacy (Kitsune)») y no convierte la ficha en otra
-      // facción: se descarta lo que va entre paréntesis antes de comparar.
-      .replace(/[([{][^)\]}]*[)\]}]/g, " ")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
@@ -773,16 +777,25 @@ export function tieneFaccion(facciones, slug) {
       .replace("lecagy", "legacy");
   const buscada = canonico(slug);
   if (!buscada) return false;
-  return facciones.some((f) => {
-    const c = canonico(f);
-    // La subfacción también llega como SUFIJO DEL SLUG (`glovecaller-elfs`,
-    // `mythical-legacy-kitsune`): es así como el catálogo guarda una facción cuyo nombre lleva el
-    // paréntesis, y en la ficha se guarda el SLUG, no la etiqueta. No queda nada que descartar
-    // arriba, así que sin esto sus estados exclusivos salían bloqueados aunque la tuviera.
-    // Se exige el sufijo completo (`glovecaller-elfs`) para no dar por buena otra facción que solo
-    // empiece igual: `netherbane-oni` no cuenta como `mythical-legacy`.
-    return c === buscada || c.startsWith(`${buscada}-`);
-  });
+  // El mapa se compara canónico también: sus dos lados vienen de la base y de la interfaz.
+  const madreDe = new Map();
+  for (const [hija, madre] of Object.entries(subfacciones ?? {})) {
+    const claveHija = canonico(hija);
+    const claveMadre = canonico(madre);
+    if (claveHija && claveMadre) madreDe.set(claveHija, claveMadre);
+  }
+  /** La facción y todas sus madres. Con tope y sin repetir: un ciclo en los datos no cuelga esto. */
+  const conMadres = (inicial) => {
+    const ascendencia = new Set();
+    let actual = inicial;
+    for (let saltos = 0; actual && saltos < 32; saltos += 1) {
+      if (ascendencia.has(actual)) break;
+      ascendencia.add(actual);
+      actual = madreDe.get(actual);
+    }
+    return ascendencia;
+  };
+  return facciones.some((faccion) => conMadres(canonico(faccion)).has(buscada));
 }
 
 /**
@@ -796,11 +809,13 @@ export function tieneFaccion(facciones, slug) {
  * Lo que NO valida, porque no se puede leer en el HTML sin interpretar: si las habilidades salen del
  * lore, si hay frases narrativas, si la Habilidad Única copia otra o si el kit está balanceado.
  *
- * @param {{ habilidades: Habilidad[], facciones?: string[] | null }} kit
+ * @param {{ habilidades: Habilidad[], facciones?: string[] | null, subfacciones?: Record<string, string> }} kit
  *   `facciones` son slugs; si es `null` no se comprueba la exclusividad (no se sabe).
+ *   `subfacciones` es el mapa `{hija: madre}` del catálogo: sin él, una subfacción no acredita los
+ *   estados exclusivos de su madre.
  * @returns {Problema[]}
  */
-export function validarKit({ habilidades, facciones = null }) {
+export function validarKit({ habilidades, facciones = null, subfacciones = {} }) {
   /** @type {Problema[]} */
   const problemas = [];
   // El mismo `<span>` mal coloreado suele repetirse en la misma pieza: se anota una vez.
@@ -909,7 +924,11 @@ export function validarKit({ habilidades, facciones = null }) {
           hallado.canonico,
         );
       }
-      if (estado.faccion && facciones && !tieneFaccion(facciones, estado.faccion)) {
+      if (
+        estado.faccion &&
+        facciones &&
+        !tieneFaccion(facciones, estado.faccion, subfacciones)
+      ) {
         anotar(
           "error",
           "faccion_exclusiva",

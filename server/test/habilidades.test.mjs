@@ -201,6 +201,53 @@ test("los estados exclusivos exigen su facción, también en su forma evoluciona
   assert.deepEqual(exclusivos(null), [], "sin facciones conocidas no se acusa");
 });
 
+test("la subfacción acredita a su madre solo con la relación en los datos", () => {
+  const mapa = { "glovecaller-elfs": "glovecaller" };
+  // Con la relación guardada, la hija desbloquea lo exclusivo de la madre.
+  assert.equal(tieneFaccion(["glovecaller-elfs"], "glovecaller", mapa), true);
+  // La madre sigue sin acreditar lo de la hija (la herencia va hacia arriba).
+  assert.equal(tieneFaccion(["glovecaller"], "glovecaller-elfs", mapa), false);
+  // Sin la relación no se adivina: el slug se llama igual pero NO cuenta.
+  assert.equal(tieneFaccion(["glovecaller-elfs"], "glovecaller"), false);
+  // La etiqueta con paréntesis también funciona: se compara canónica.
+  assert.equal(
+    tieneFaccion(["Glovecaller (Elfs)"], "glovecaller", mapa),
+    true,
+  );
+});
+
+test("la herencia sube varios niveles y un ciclo en los datos no la cuelga", () => {
+  const cadena = {
+    "glovecaller-elfs": "glovecaller",
+    "glovecaller-elite": "glovecaller-elfs",
+  };
+  assert.equal(tieneFaccion(["glovecaller-elite"], "glovecaller", cadena), true);
+  const ciclo = { a: "b", b: "a" };
+  assert.equal(tieneFaccion(["a"], "c", ciclo), false);
+});
+
+test("el kit de una subfacción pasa la exclusividad de su madre", () => {
+  const kit = kitValido();
+  kit[1].effectHtml = `Ataque Base +40 y obtienes ${s("Fortificación")} durante 2 turnos.`;
+  const mapa = { "glovecaller-elfs": "glovecaller" };
+  const exclusivos = (facciones, subfacciones) =>
+    validarKit({ habilidades: kit, facciones, subfacciones })
+      .filter((p) => p.codigo === "faccion_exclusiva")
+      .map((p) => p.estado);
+  assert.deepEqual(exclusivos(["glovecaller"], mapa), [], "la madre puede");
+  assert.deepEqual(
+    exclusivos(["glovecaller-elfs"], mapa),
+    [],
+    "la hija puede por su madre",
+  );
+  assert.deepEqual(
+    exclusivos(["glovecaller-elfs"]),
+    ["Fortificación"],
+    "sin el mapa se sigue acusando",
+  );
+  assert.deepEqual(exclusivos(["abyssal"], mapa), ["Fortificación"]);
+});
+
 test("repetir un estado entre piezas es aviso, y la evolución cuenta como su base", () => {
   const kit = kitValido();
   kit[0].effectHtml = `Ataque Base +45 y aplicas ${s("Sangrado")} durante 2 turnos.`;
@@ -248,19 +295,17 @@ test("tieneFaccion: acepta slug, etiqueta y variantes con errata de la misma fac
   assert.equal(tieneFaccion(["Mythical Lecagy"], "mythical-legacy"), true);
   assert.equal(tieneFaccion(["netherbane"], "mythical-legacy"), false);
   assert.equal(tieneFaccion([], "mythical-legacy"), false);
-  // La subfacción no es otra facción: sigue contando la de su madre.
+  // Una SUBCACCIÓN no acredita nada sin su relación guardada: el nombre no la delata. Antes se
+  // adivinaba por el paréntesis y por el sufijo del slug, y eso daba por bueno cualquier parecido.
   assert.equal(
     tieneFaccion(["Mythical Legacy (Kitsune)"], "mythical-legacy"),
-    true,
+    false,
   );
+  assert.equal(tieneFaccion(["glovecaller-elfs"], "glovecaller"), false);
   assert.equal(
-    tieneFaccion(["mythical-legacy (kitsune)"], "mythical-legacy"),
-    true,
+    tieneFaccion(["mythical-legacy-kitsune"], "mythical-legacy"),
+    false,
   );
-  // Y también cuando el catálogo la guarda como SUFIJO DEL SLUG, que es lo que se elige en el
-  // mantenedor y lo que queda escrito en la ficha (`Glovecaller (Elfs)` → `glovecaller-elfs`).
-  assert.equal(tieneFaccion(["glovecaller-elfs"], "glovecaller"), true);
-  assert.equal(tieneFaccion(["mythical-legacy-kitsune"], "mythical-legacy"), true);
   assert.equal(tieneFaccion(["netherbane-oni"], "mythical-legacy"), false);
   assert.equal(tieneFaccion([], ""), false);
   assert.equal(
@@ -272,23 +317,44 @@ test("tieneFaccion: acepta slug, etiqueta y variantes con errata de la misma fac
 test("una ficha de una subfacción puede usar los estados exclusivos de su facción madre", () => {
   const kit = kitValido();
   kit[1].effectHtml = `Ataque Base +40 y obtienes ${s("Juramento")} durante 2 turnos.`;
-  const exclusivos = (facciones) =>
-    validarKit({ habilidades: kit, facciones })
+  const mapa = { "heaven-s-arbiter-alfa": "heaven-s-arbiter" };
+  const exclusivos = (facciones, subfacciones) =>
+    validarKit({ habilidades: kit, facciones, subfacciones })
       .filter((p) => p.codigo === "faccion_exclusiva")
       .map((p) => p.estado);
-  assert.deepEqual(exclusivos(["Heaven's Arbiter (Alfa)"]), []);
-  assert.deepEqual(exclusivos(["NeCrotic (Alfa)"]), ["Juramento"]);
+  assert.deepEqual(exclusivos(["heaven-s-arbiter"], mapa), []);
+  assert.deepEqual(exclusivos(["heaven-s-arbiter-alfa"], mapa), []);
+  // Sin la relación guardada, la subfacción no acredita lo de su madre.
+  assert.deepEqual(exclusivos(["heaven-s-arbiter-alfa"]), ["Juramento"]);
+  assert.deepEqual(exclusivos(["abyssal"], mapa), ["Juramento"]);
 
   // El caso que se reportó: la ficha de una subfacción guardada como slug (`glovecaller-elfs`)
   // no podía obtener Fortificación, que es exclusiva de la madre.
   const fortificacion = kitValido();
   fortificacion[1].effectHtml = `Ataque Base +40 y obtienes ${s("Fortificación")} durante 2 turnos.`;
-  const fortificacionBloqueada = (facciones) =>
-    validarKit({ habilidades: fortificacion, facciones })
+  const mapaGlovecaller = { "glovecaller-elfs": "glovecaller" };
+  const fortificacionBloqueada = (facciones, subfacciones) =>
+    validarKit({ habilidades: fortificacion, facciones, subfacciones })
       .filter((p) => p.codigo === "faccion_exclusiva")
       .map((p) => p.estado);
-  assert.deepEqual(fortificacionBloqueada(["glovecaller-elfs"]), []);
-  assert.deepEqual(fortificacionBloqueada(["Glovecaller (Elfs)"]), []);
-  assert.deepEqual(fortificacionBloqueada(["glovecaller"]), []);
-  assert.deepEqual(fortificacionBloqueada(["abyssal"]), ["Fortificación"]);
+  assert.deepEqual(
+    fortificacionBloqueada(["glovecaller"], mapaGlovecaller),
+    [],
+  );
+  assert.deepEqual(
+    fortificacionBloqueada(["glovecaller-elfs"], mapaGlovecaller),
+    [],
+  );
+  assert.deepEqual(
+    fortificacionBloqueada(["Glovecaller (Elfs)"], mapaGlovecaller),
+    [],
+  );
+  // Sin la relación en los datos se sigue acusando, y otra facción no se cuela.
+  assert.deepEqual(
+    fortificacionBloqueada(["glovecaller-elfs"]),
+    ["Fortificación"],
+  );
+  assert.deepEqual(fortificacionBloqueada(["abyssal"], mapaGlovecaller), [
+    "Fortificación",
+  ]);
 });

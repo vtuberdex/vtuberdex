@@ -90,6 +90,7 @@ function SelectorDeEstado({
   valor,
   onChange,
   facciones,
+  subfacciones = {},
   ultimate = false,
   etiqueta,
   opcional = false,
@@ -97,11 +98,13 @@ function SelectorDeEstado({
   valor: EstadoElegido;
   onChange: (v: EstadoElegido) => void;
   facciones: string[];
+  /** Subfacción → madre (catálogo): una subfacción habilita los estados de su madre. */
+  subfacciones?: Record<string, string>;
   ultimate?: boolean;
   etiqueta: string;
   opcional?: boolean;
 }) {
-  const estados = estadosDisponibles(facciones);
+  const estados = estadosDisponibles(facciones, subfacciones);
   const grupos: Array<{ titulo: string; polaridad: string }> = [
     { titulo: "Positivos (se obtienen)", polaridad: "positivo" },
     { titulo: "Negativos (se aplican)", polaridad: "negativo" },
@@ -186,11 +189,13 @@ function EditorDeActiva({
   valor,
   onChange,
   facciones,
+  subfacciones,
   indice,
 }: {
   valor: ActivaForm;
   onChange: (v: ActivaForm) => void;
   facciones: string[];
+  subfacciones?: Record<string, string>;
   indice: number;
 }) {
   const set = (parche: Partial<ActivaForm>) =>
@@ -261,6 +266,7 @@ function EditorDeActiva({
         valor={valor.estado}
         onChange={(estado) => set({ estado })}
         facciones={facciones}
+        subfacciones={subfacciones}
       />
       <label className={labelClass}>
         Efecto adicional
@@ -283,10 +289,12 @@ function EditorDeUltimate({
   valor,
   onChange,
   facciones,
+  subfacciones,
 }: {
   valor: UltimateForm;
   onChange: (v: UltimateForm) => void;
   facciones: string[];
+  subfacciones?: Record<string, string>;
 }) {
   const set = (parche: Partial<UltimateForm>) =>
     onChange({ ...valor, ...parche });
@@ -407,6 +415,7 @@ function EditorDeUltimate({
         valor={valor.estados[0]}
         onChange={(e) => setEstado(0, e)}
         facciones={facciones}
+        subfacciones={subfacciones}
       />
       <SelectorDeEstado
         etiqueta="Estado 2"
@@ -414,6 +423,7 @@ function EditorDeUltimate({
         valor={valor.estados[1]}
         onChange={(e) => setEstado(1, e)}
         facciones={facciones}
+        subfacciones={subfacciones}
       />
       <label className={labelClass}>
         Efecto adicional (opcional)
@@ -563,11 +573,14 @@ function EditorDePasiva({
 export function KitBuilder({
   skills,
   facciones,
+  subfacciones = {},
   onApply,
   onCancel,
 }: {
   skills: SkillForm[];
   facciones: string[];
+  /** Subfacción → madre (del catálogo): acredita los estados exclusivos de la madre. */
+  subfacciones?: Record<string, string>;
   onApply: (skills: SkillForm[]) => void;
   onCancel: () => void;
 }) {
@@ -576,7 +589,10 @@ export function KitBuilder({
   const [confirmando, setConfirmando] = useState(false);
 
   const kitActual = skills.filter((s) => s.category !== "other");
-  const revision = useMemo(() => revisarKit(kit, facciones), [kit, facciones]);
+  const revision = useMemo(
+    () => revisarKit(kit, facciones, subfacciones),
+    [kit, facciones, subfacciones],
+  );
   /**
    * Lo que la ficha dice HOY en cada pieza. Activas y Ultimate no se pueden leer de vuelta como menús, así
    * que al rehacerlas se escriben desde cero: tener el texto anterior al lado evita trabajar de memoria.
@@ -676,6 +692,7 @@ export function KitBuilder({
                 indice={paso}
                 valor={kit.activas[paso]}
                 facciones={facciones}
+                subfacciones={subfacciones}
                 onChange={(v) => setActiva(paso, v)}
               />
             )}
@@ -691,6 +708,7 @@ export function KitBuilder({
                 valor={kit.ultimate}
                 onChange={(ultimate) => setKit({ ...kit, ultimate })}
                 facciones={facciones}
+                subfacciones={subfacciones}
               />
             )}
           </div>

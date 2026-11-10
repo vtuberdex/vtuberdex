@@ -11,13 +11,18 @@
  */
 import { useMemo, useState } from "react";
 
+import type { FactionRow } from "@/lib/types";
 import { emptySkill, type SkillForm } from "@/components/admin/form-model";
 import {
   KitBuilder,
   ListaDeProblemas,
   type Problema,
 } from "@/components/admin/kit-builder";
-import { MP_ACTIVA, MP_ULTIMATE } from "@/components/admin/kit-habilidades";
+import {
+  MP_ACTIVA,
+  MP_ULTIMATE,
+  mapaSubfacciones,
+} from "@/components/admin/kit-habilidades";
 import type { StepProps } from "@/components/admin/steps/types";
 import {
   ghostButton,
@@ -53,12 +58,20 @@ function mpDe(
   return null;
 }
 
-export function SkillsStep({ form, set }: StepProps) {
+export function SkillsStep({ form, set, factions }: StepProps) {
   const [asistente, setAsistente] = useState(false);
   const [abierta, setAbierta] = useState<number | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const skills = form.skills;
   const cambiar = (next: SkillForm[]) => set("skills", next);
+  /**
+   * Subfacción → madre, desde el catálogo (`faction.parent_id`). Sin esto, una ficha con una
+   * subfacción veía bloqueados los estados exclusivos de su madre.
+   */
+  const subfacciones = useMemo(
+    () => mapaSubfacciones(factions ?? []),
+    [factions],
+  );
 
   const problemas: Problema[] = useMemo(() => {
     const kit = skills.filter((s) => s.category !== "other");
@@ -71,8 +84,10 @@ export function SkillsStep({ form, set }: StepProps) {
       })),
       // Sin facciones no se sabe nada de la exclusividad: no se acusa a ciegas (igual que el informe).
       facciones: form.factions.length ? form.factions : null,
+      // La subfacción acredita los estados de su madre: el mapa viene del catálogo (faction.parent_id).
+      subfacciones,
     });
-  }, [skills, form.factions]);
+  }, [skills, form.factions, subfacciones]);
   const errores = problemas.filter((p) => p.gravedad === "error").length;
   const avisos = problemas.length - errores;
   const delKit = problemas.filter((p) => p.pieza === "Kit");
@@ -82,6 +97,7 @@ export function SkillsStep({ form, set }: StepProps) {
       <KitBuilder
         skills={skills}
         facciones={form.factions}
+        subfacciones={subfacciones}
         onCancel={() => setAsistente(false)}
         onApply={(next) => {
           cambiar(next);

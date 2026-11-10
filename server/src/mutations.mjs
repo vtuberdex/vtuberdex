@@ -770,22 +770,116 @@ export function consolidarFacciones(db) {
   return resultado;
 }
 
-/** Facciones con su conteo real, para el administrador de facciones. */
+/**
+ * Resuelve la facción MADRE que llega del mantenedor: id, slug o etiqueta. `null` o `''` la quita.
+ * Devuelve `undefined` si el campo no venía (no se toca). Una madre inexistente es un 404: dejarla
+ * pasar guardaría una hija huérfana que después nadie podría arreglar desde la interfaz.
+ */
+function resolverFaccionMadre(db, parent) {
+  if (parent === undefined) return undefined;
+  if (parent === null || parent === "") return null;
+  const texto = String(parent).trim();
+  if (!texto) return null;
+  const comoId = /^\d+$/.test(texto) ? Number(texto) : -1;
+  const fila = db
+    .prepare(
+      `SELECT id FROM faction
+        WHERE id = ? OR slug = ? OR lower(label) = lower(?)
+        LIMIT 1`,
+    )
+    .get(comoId, texto, texto);
+  if (!fila)
+    throw new MutationError(
+      404,
+      "madre_no_encontrada",
+      `no existe la facción madre ${texto}`,
+    );
+  return fila.id;
+}
+
+/**
+ * Una facción no puede ser su propia madre ni cerrar un ciclo (`A` madre de `B` y `B` madre de `A`):
+ * la herencia de estados sube por la cadena y sin tope se quedaría dando vueltas.
+ */
+function validarMadre(db, id, madreId) {
+  if (madreId === null || madreId === undefined) return;
+  if (madreId === id)
+    throw new MutationError(
+      400,
+      "madre_ciclica",
+      "una facción no puede ser su propia madre",
+    );
+  let actual = madreId;
+  for (let saltos = 0; actual !== null && saltos < 32; saltos += 1) {
+    const fila = db
+      .prepare("SELECT parent_id AS parentId FROM faction WHERE id = ?")
+      .get(actual);
+    actual = fila?.parentId ?? null;
+    if (actual === id)
+      throw new MutationError(
+        400,
+        "madre_ciclica",
+        "esa facción ya depende de esta: la relación sería circular",
+      );
+  }
+}
+
+/** La cadena de MADRES de una facción, de la más cercana a la más lejana. Corta a 32 saltos. */
+export function cadenaDeMadres(db, id) {
+  const cadena = [];
+  const madreDe = db.prepare(
+    "SELECT parent_id AS parentId FROM faction WHERE id = ?",
+  );
+  let actual = madreDe.get(id)?.parentId ?? null;
+  while (actual !== null && cadena.length < 32) {
+    cadena.push(actual);
+    actual = madreDe.get(actual)?.parentId ?? null;
+  }
+  return cadena;
+}
+
+/**
+ * Mapa `{slug de la hija: slug de su madre}` de todo el catálogo. Es lo que consume el validador de
+ * habilidades para heredar los estados exclusivos de la madre, en vez de adivinarlo del nombre.
+ */
+export function subfaccionesDe(db) {
+  const filas = db
+    .prepare(
+      `SELECT hija.slug AS hija, madre.slug AS madre
+         FROM faction hija JOIN faction madre ON madre.id = hija.parent_id`,
+    )
+    .all();
+  return Object.fromEntries(filas.map((fila) => [fila.hija, fila.madre]));
+}
+
+/** Facciones con su conteo real y su madre, para el administrador de facciones. */
 export function listarFacciones(db) {
   return db
     .prepare(
-      `SELECT f.id, f.slug, f.label, f.icon,
+      `SELECT f.id, f.slug, f.label, f.icon, f.parent_id AS parentId,
+              madre.slug  AS parentSlug,
+              madre.label AS parentLabel,
               (SELECT COUNT(*) FROM vtuber_faction vf WHERE vf.faction_id = f.id) AS total,
               (SELECT COUNT(*) FROM vtuber_faction vf JOIN vtuber v ON v.id = vf.vtuber_id
                 WHERE vf.faction_id = f.id AND v.status = 'published') AS publicadas
-         FROM faction f ORDER BY f.label COLLATE NOCASE`,
+         FROM faction f LEFT JOIN faction madre ON madre.id = f.parent_id
+        ORDER BY f.label COLLATE NOCASE`,
     )
     .all()
     .map((fila) => ({ ...fila }));
 }
 
-/** Crea una facción. Debe correr dentro de una transacción. */
-export function crearFaccion(db, { label, icon = null }, { id = null } = {}) {
+/**
+ * Crea una facción. Debe correr dentro de una transacción.
+ *
+ * `parent` la convierte en SUBFACCIÓN: se guarda la relación (id) y desde ese momento los estados
+ * exclusivos de la madre valen también para ella. Acepta id, slug o etiqueta de la madre.
+ */
+export function crearFaccion(
+  db,
+  { label, icon = null, parent },
+  { id = null } = {},
+) {
   const etiqueta = String(label ?? "").trim();
   if (!etiqueta)
     throw new MutationError(
@@ -807,22 +901,31 @@ export function crearFaccion(db, { label, icon = null }, { id = null } = {}) {
       `ya existe la facción ${etiqueta}`,
     );
   }
+  const madreId = resolverFaccionMadre(db, parent) ?? null;
   if (id !== null) {
     db.prepare(
-      "INSERT INTO faction (id, slug, label, icon, vtuber_count) VALUES (?, ?, ?, ?, 0)",
-    ).run(id, slug, etiqueta, icon);
+      "INSERT INTO faction (id, slug, label, icon, parent_id, vtuber_count) VALUES (?, ?, ?, ?, ?, 0)",
+    ).run(id, slug, etiqueta, icon, madreId);
   } else {
     db.prepare(
-      "INSERT INTO faction (slug, label, icon, vtuber_count) VALUES (?, ?, ?, 0)",
-    ).run(slug, etiqueta, icon);
+      "INSERT INTO faction (slug, label, icon, parent_id, vtuber_count) VALUES (?, ?, ?, ?, 0)",
+    ).run(slug, etiqueta, icon, madreId);
   }
   return db
-    .prepare("SELECT id, slug, label, icon FROM faction WHERE slug = ?")
+    .prepare(
+      `SELECT f.id, f.slug, f.label, f.icon, f.parent_id AS parentId,
+              madre.slug AS parentSlug, madre.label AS parentLabel
+         FROM faction f LEFT JOIN faction madre ON madre.id = f.parent_id
+        WHERE f.slug = ?`,
+    )
     .get(slug);
 }
 
-/** Renombra o cambia el emblema de una facción. El slug se conserva: es el que va en las URLs de filtro. */
-export function editarFaccion(db, id, { label, icon }) {
+/**
+ * Renombra, cambia el emblema o MUEVE DE MADRE una facción. El slug se conserva: es el que va en las
+ * URLs de filtro y en la ficha. `parent: null` (o `''`) la deja como facción raíz.
+ */
+export function editarFaccion(db, id, { label, icon, parent }) {
   const actual = db
     .prepare("SELECT id, label FROM faction WHERE id = ?")
     .get(id);
@@ -851,12 +954,22 @@ export function editarFaccion(db, id, { label, icon }) {
   }
   if (icon !== undefined)
     db.prepare("UPDATE faction SET icon = ? WHERE id = ?").run(icon, id);
+  if (parent !== undefined) {
+    const madreId = resolverFaccionMadre(db, parent) ?? null;
+    validarMadre(db, id, madreId);
+    db.prepare("UPDATE faction SET parent_id = ? WHERE id = ?").run(madreId, id);
+  }
   const ids = db
     .prepare("SELECT vtuber_id AS id FROM vtuber_faction WHERE faction_id = ?")
     .all(id);
   ids.forEach((fila) => refreshSearchIndex(db, fila.id));
   return db
-    .prepare("SELECT id, slug, label, icon FROM faction WHERE id = ?")
+    .prepare(
+      `SELECT f.id, f.slug, f.label, f.icon, f.parent_id AS parentId,
+              madre.slug AS parentSlug, madre.label AS parentLabel
+         FROM faction f LEFT JOIN faction madre ON madre.id = f.parent_id
+        WHERE f.id = ?`,
+    )
     .get(id);
 }
 
@@ -905,6 +1018,12 @@ export function eliminarFaccion(db, id, { fusionarEn = null } = {}) {
         ).run(position, vtuberId, fusionarEn);
       }
     }
+    // Las SUBFACCIONES de la que desaparece pasan a la madre destino: con `ON DELETE SET NULL`
+    // quedarían sin madre y perderían los estados exclusivos que heredaban.
+    db.prepare("UPDATE faction SET parent_id = ? WHERE parent_id = ?").run(
+      fusionarEn,
+      id,
+    );
   }
   db.prepare("DELETE FROM vtuber_faction WHERE faction_id = ?").run(id);
   db.prepare("DELETE FROM faction WHERE id = ?").run(id);

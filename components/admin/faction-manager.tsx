@@ -204,6 +204,16 @@ function FactionCard({
             other.label.toLowerCase() === renaming.trim().toLowerCase(),
         )
       : undefined;
+  /**
+   * Madres ofrecidas: solo facciones raíz, más la que ya tiene (aunque ella misma sea
+   * subfacción) para que el desplegable no pierda el valor guardado. El servidor rechaza
+   * cualquier relación circular, así que esto es comodidad, no la única defensa.
+   */
+  const raices = all.filter(
+    (other) =>
+      other.id !== faction.id &&
+      (!other.parentId || other.id === faction.parentId),
+  );
 
   const upload = async (file: File) => {
     setUploading(true);
@@ -290,6 +300,44 @@ function FactionCard({
           </p>
         </div>
       </div>
+
+      <label className="block text-xs text-dex-muted">
+        Facción madre
+        <select
+          aria-label={`Facción madre de ${faction.label}`}
+          value={faction.parentId ? String(faction.parentId) : ""}
+          disabled={busy}
+          onChange={(event) => {
+            const valor = event.target.value;
+            const etiqueta = all.find(
+              (other) => String(other.id) === valor,
+            )?.label;
+            void run(
+              faction.id,
+              () =>
+                api.updateFaction(token, faction.id, {
+                  parent: valor ? Number(valor) : null,
+                }),
+              valor
+                ? `«${faction.label}» ahora es subfacción de «${etiqueta ?? valor}».`
+                : `«${faction.label}» quedó como facción raíz.`,
+            );
+          }}
+          className={inputClass}
+        >
+          <option value="">Ninguna (facción raíz)</option>
+          {raices.map((other) => (
+            <option key={other.id} value={other.id}>
+              {other.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="text-[11px] text-dex-muted">
+        {faction.parentLabel
+          ? `Subfacción de «${faction.parentLabel}»: acredita sus estados exclusivos.`
+          : "Se elige en la ficha como cualquier otra y ocupa uno de sus 2 cupos."}
+      </p>
 
       {!faction.icon && (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">

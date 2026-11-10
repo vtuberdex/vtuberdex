@@ -44,6 +44,30 @@ export function buscarFaccionDuplicada(
   );
 }
 
+/**
+ * Nombre visible de una SUBFACCIÓN: «Madre (Propia)». Es una convención del catálogo, no una regla
+ * del servidor: el paréntesis solo se muestra en la ficha y la relación real se guarda aparte
+ * (`parentId`), así que renombrar la madre después no rompe la herencia de estados.
+ */
+export function nombreDeSubfaccion(madreLabel: string, propio: string): string {
+  const madre = madreLabel.trim();
+  const texto = propio.trim();
+  if (!madre) return texto;
+  if (!texto) return `${madre} ()`;
+  if (
+    texto.toLowerCase().startsWith(`${madre.toLowerCase()} (`) &&
+    texto.endsWith(")")
+  )
+    return texto;
+  const resto = texto.toLowerCase().startsWith(madre.toLowerCase())
+    ? texto
+        .slice(madre.length)
+        .replace(/^[\s(]+/, "")
+        .replace(/\)+\s*$/, "")
+    : texto;
+  return resto ? `${madre} (${resto})` : `${madre} ()`;
+}
+
 export function FactionWizard({
   token,
   factions,
@@ -63,6 +87,7 @@ export function FactionWizard({
 }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
+  const [parentId, setParentId] = useState<number | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [skipped, setSkipped] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -78,6 +103,15 @@ export function FactionWizard({
     () => buscarFaccionDuplicada(trimmed, factions),
     [trimmed, factions],
   );
+  /** Madre elegida: solo las raíces, así la relación nunca puede cerrar un ciclo. */
+  const madres = useMemo(
+    () => factions.filter((faction) => !faction.parentId),
+    [factions],
+  );
+  const madre = useMemo(
+    () => factions.find((faction) => faction.id === parentId) ?? null,
+    [parentId, factions],
+  );
   const nameProblem = !trimmed
     ? "Escribe el nombre de la facción para continuar."
     : duplicate
@@ -87,6 +121,7 @@ export function FactionWizard({
   const reset = () => {
     setStep(0);
     setName("");
+    setParentId(null);
     setFile(null);
     setSkipped(false);
     setError(null);
@@ -97,8 +132,11 @@ export function FactionWizard({
     setBusy(true);
     setError(null);
     try {
+      // `parent` solo viaja cuando hay madre elegida: una facción raíz no necesita
+      // declarar `null` y así el alta se queda igual que antes para lo de siempre.
       const { faction, items } = await api.createFaction(token, {
         label: trimmed,
+        ...(parentId === null ? {} : { parent: parentId }),
       });
       onItems(items);
       let emblemFailed: string | null = null;
@@ -248,6 +286,49 @@ export function FactionWizard({
           {trimmed && !nameProblem && (
             <p className="text-xs text-emerald-300">✓ Nombre disponible.</p>
           )}
+          {madres.length > 0 && (
+            <Field
+              label="Facción madre (opcional)"
+              hint="Solo para una subfacción: se elige en la ficha como cualquier otra y ocupa uno de sus 2 cupos, pero acredita los estados exclusivos de su madre. El nombre se escribe «Madre (Propia)»."
+            >
+              <select
+                aria-label="Facción madre"
+                value={parentId === null ? "" : String(parentId)}
+                onChange={(event) => {
+                  const siguiente = event.target.value
+                    ? Number(event.target.value)
+                    : null;
+                  setParentId(siguiente);
+                  const etiqueta = factions.find(
+                    (faction) => faction.id === siguiente,
+                  )?.label;
+                  if (etiqueta)
+                    setName((actual) =>
+                      nombreDeSubfaccion(etiqueta, actual),
+                    );
+                }}
+                className={inputClass}
+              >
+                <option value="">Ninguna (facción raíz)</option>
+                {madres.map((faction) => (
+                  <option key={faction.id} value={faction.id}>
+                    {faction.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {madre && !trimmed.includes("(") && (
+            <button
+              type="button"
+              className={ghostButton}
+              onClick={() =>
+                setName(nombreDeSubfaccion(madre.label, trimmed))
+              }
+            >
+              Escribirlo como «{nombreDeSubfaccion(madre.label, trimmed)}»
+            </button>
+          )}
         </div>
       )}
 
@@ -308,6 +389,11 @@ export function FactionWizard({
               <p className="font-bold text-dex-ink">{trimmed}</p>
               <p className="text-xs text-dex-muted">
                 {file ? `Emblema: ${file.name}` : "Sin emblema por ahora"}
+              </p>
+              <p className="text-xs text-dex-muted">
+                {madre
+                  ? `Subfacción de «${madre.label}»`
+                  : "Facción raíz (sin madre)"}
               </p>
             </div>
           </div>
