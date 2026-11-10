@@ -76,8 +76,10 @@ export function SkillsStep({ form, set }: StepProps) {
       })),
       // Sin facciones no se sabe nada de la exclusividad: no se acusa a ciegas (igual que el informe).
       facciones: form.factions.length ? form.factions : null,
+      // La subfacción acredita los estados de su madre: el mapa viene del catálogo (faction.parent_id).
+      subfacciones,
     });
-  }, [skills, form.factions]);
+  }, [skills, form.factions, subfacciones]);
   const errores = problemas.filter((p) => p.gravedad === "error").length;
   const avisos = problemas.length - errores;
   const delKit = problemas.filter((p) => p.pieza === "Kit");
