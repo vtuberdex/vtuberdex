@@ -248,7 +248,8 @@ export function FactionWizard({
       data-testid="faction-wizard"
       onSubmit={(event) => {
         event.preventDefault();
-        if (step === 0 && !nameProblem) setStep(1);
+        if (step === 0 && !nameProblem && !faltaMadre(conMadre, parentId))
+          setStep(1);
         else if (step === 1 && (file || skipped)) setStep(2);
         else if (step === 2 && !busy) void create();
       }}
