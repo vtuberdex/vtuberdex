@@ -779,6 +779,8 @@ export function tieneFaccion(facciones, slug) {
     // `mythical-legacy-kitsune`): es así como el catálogo guarda una facción cuyo nombre lleva el
     // paréntesis, y en la ficha se guarda el SLUG, no la etiqueta. No queda nada que descartar
     // arriba, así que sin esto sus estados exclusivos salían bloqueados aunque la tuviera.
+    // Se exige el sufijo completo (`glovecaller-elfs`) para no dar por buena otra facción que solo
+    // empiece igual: `netherbane-oni` no cuenta como `mythical-legacy`.
     return c === buscada || c.startsWith(`${buscada}-`);
   });
 }
