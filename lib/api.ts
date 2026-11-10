@@ -476,7 +476,15 @@ export const api = {
       headers: bearer(token),
     });
   },
-  createFaction(token: string, body: { label: string; icon?: string | null }) {
+  /**
+   * `parent` marca la facción como SUBFACCIÓN de otra (id, slug o etiqueta; `null` = raíz).
+   * Una subfacción se elige en la ficha como cualquier otra, pero acredita los estados
+   * exclusivos de su madre.
+   */
+  createFaction(
+    token: string,
+    body: { label: string; icon?: string | null; parent?: number | string | null },
+  ) {
     return request<{ faction: FactionRow; items: FactionRow[] }>(
       "/api/admin/factions",
       {
@@ -489,7 +497,11 @@ export const api = {
   updateFaction(
     token: string,
     id: number,
-    body: { label?: string; icon?: string | null },
+    body: {
+      label?: string;
+      icon?: string | null;
+      parent?: number | string | null;
+    },
   ) {
     return request<{ faction: FactionRow; items: FactionRow[] }>(
       `/api/admin/factions/${id}`,
