@@ -257,6 +257,12 @@ test("tieneFaccion: acepta slug, etiqueta y variantes con errata de la misma fac
     tieneFaccion(["mythical-legacy (kitsune)"], "mythical-legacy"),
     true,
   );
+  // Y también cuando el catálogo la guarda como SUFIJO DEL SLUG, que es lo que se elige en el
+  // mantenedor y lo que queda escrito en la ficha (`Glovecaller (Elfs)` → `glovecaller-elfs`).
+  assert.equal(tieneFaccion(["glovecaller-elfs"], "glovecaller"), true);
+  assert.equal(tieneFaccion(["mythical-legacy-kitsune"], "mythical-legacy"), true);
+  assert.equal(tieneFaccion(["netherbane-oni"], "mythical-legacy"), false);
+  assert.equal(tieneFaccion([], ""), false);
   assert.equal(
     tieneFaccion(["Netherbane (Alfa)"], "mythical-legacy"),
     false,
@@ -272,4 +278,17 @@ test("una ficha de una subfacción puede usar los estados exclusivos de su facci
       .map((p) => p.estado);
   assert.deepEqual(exclusivos(["Heaven's Arbiter (Alfa)"]), []);
   assert.deepEqual(exclusivos(["NeCrotic (Alfa)"]), ["Juramento"]);
+
+  // El caso que se reportó: la ficha de una subfacción guardada como slug (`glovecaller-elfs`)
+  // no podía obtener Fortificación, que es exclusiva de la madre.
+  const fortificacion = kitValido();
+  fortificacion[1].effectHtml = `Ataque Base +40 y obtienes ${s("Fortificación")} durante 2 turnos.`;
+  const fortificacionBloqueada = (facciones) =>
+    validarKit({ habilidades: fortificacion, facciones })
+      .filter((p) => p.codigo === "faccion_exclusiva")
+      .map((p) => p.estado);
+  assert.deepEqual(fortificacionBloqueada(["glovecaller-elfs"]), []);
+  assert.deepEqual(fortificacionBloqueada(["Glovecaller (Elfs)"]), []);
+  assert.deepEqual(fortificacionBloqueada(["glovecaller"]), []);
+  assert.deepEqual(fortificacionBloqueada(["abyssal"]), ["Fortificación"]);
 });

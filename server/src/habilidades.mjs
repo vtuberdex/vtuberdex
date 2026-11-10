@@ -772,7 +772,17 @@ export function tieneFaccion(facciones, slug) {
       .replace(/-+$/, "")
       .replace("lecagy", "legacy");
   const buscada = canonico(slug);
-  return facciones.some((f) => canonico(f) === buscada);
+  if (!buscada) return false;
+  return facciones.some((f) => {
+    const c = canonico(f);
+    // La subfacción también llega como SUFIJO DEL SLUG (`glovecaller-elfs`,
+    // `mythical-legacy-kitsune`): es así como el catálogo guarda una facción cuyo nombre lleva el
+    // paréntesis, y en la ficha se guarda el SLUG, no la etiqueta. No queda nada que descartar
+    // arriba, así que sin esto sus estados exclusivos salían bloqueados aunque la tuviera.
+    // Se exige el sufijo completo (`glovecaller-elfs`) para no dar por buena otra facción que solo
+    // empiece igual: `netherbane-oni` no cuenta como `mythical-legacy`.
+    return c === buscada || c.startsWith(`${buscada}-`);
+  });
 }
 
 /**
