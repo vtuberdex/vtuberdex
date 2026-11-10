@@ -101,6 +101,8 @@ export function FactionWizard({
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [parentId, setParentId] = useState<number | null>(null);
+  /** Elección explícita: ¿la facción nueva cuelga de otra (subfacción) o es raíz? */
+  const [conMadre, setConMadre] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [skipped, setSkipped] = useState(false);
   const [busy, setBusy] = useState(false);
