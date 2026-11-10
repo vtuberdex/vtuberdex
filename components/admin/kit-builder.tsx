@@ -289,10 +289,12 @@ function EditorDeUltimate({
   valor,
   onChange,
   facciones,
+  subfacciones,
 }: {
   valor: UltimateForm;
   onChange: (v: UltimateForm) => void;
   facciones: string[];
+  subfacciones?: Record<string, string>;
 }) {
   const set = (parche: Partial<UltimateForm>) =>
     onChange({ ...valor, ...parche });
