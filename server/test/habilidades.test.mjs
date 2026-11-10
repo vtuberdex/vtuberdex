@@ -257,6 +257,12 @@ test("tieneFaccion: acepta slug, etiqueta y variantes con errata de la misma fac
     tieneFaccion(["mythical-legacy (kitsune)"], "mythical-legacy"),
     true,
   );
+  // Y también cuando el catálogo la guarda como SUFIJO DEL SLUG, que es lo que se elige en el
+  // mantenedor y lo que queda escrito en la ficha (`Glovecaller (Elfs)` → `glovecaller-elfs`).
+  assert.equal(tieneFaccion(["glovecaller-elfs"], "glovecaller"), true);
+  assert.equal(tieneFaccion(["mythical-legacy-kitsune"], "mythical-legacy"), true);
+  assert.equal(tieneFaccion(["netherbane-oni"], "mythical-legacy"), false);
+  assert.equal(tieneFaccion([], ""), false);
   assert.equal(
     tieneFaccion(["Netherbane (Alfa)"], "mythical-legacy"),
     false,
