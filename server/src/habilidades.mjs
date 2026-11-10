@@ -809,11 +809,13 @@ export function tieneFaccion(facciones, slug, subfacciones = {}) {
  * Lo que NO valida, porque no se puede leer en el HTML sin interpretar: si las habilidades salen del
  * lore, si hay frases narrativas, si la Habilidad Única copia otra o si el kit está balanceado.
  *
- * @param {{ habilidades: Habilidad[], facciones?: string[] | null }} kit
+ * @param {{ habilidades: Habilidad[], facciones?: string[] | null, subfacciones?: Record<string, string> }} kit
  *   `facciones` son slugs; si es `null` no se comprueba la exclusividad (no se sabe).
+ *   `subfacciones` es el mapa `{hija: madre}` del catálogo: sin él, una subfacción no acredita los
+ *   estados exclusivos de su madre.
  * @returns {Problema[]}
  */
-export function validarKit({ habilidades, facciones = null }) {
+export function validarKit({ habilidades, facciones = null, subfacciones = {} }) {
   /** @type {Problema[]} */
   const problemas = [];
   // El mismo `<span>` mal coloreado suele repetirse en la misma pieza: se anota una vez.
