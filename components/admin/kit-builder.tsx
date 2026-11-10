@@ -415,6 +415,7 @@ function EditorDeUltimate({
         valor={valor.estados[0]}
         onChange={(e) => setEstado(0, e)}
         facciones={facciones}
+        subfacciones={subfacciones}
       />
       <SelectorDeEstado
         etiqueta="Estado 2"
@@ -422,6 +423,7 @@ function EditorDeUltimate({
         valor={valor.estados[1]}
         onChange={(e) => setEstado(1, e)}
         facciones={facciones}
+        subfacciones={subfacciones}
       />
       <label className={labelClass}>
         Efecto adicional (opcional)
