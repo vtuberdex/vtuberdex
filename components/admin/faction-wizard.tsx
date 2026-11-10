@@ -121,6 +121,7 @@ export function FactionWizard({
   const reset = () => {
     setStep(0);
     setName("");
+    setParentId(null);
     setFile(null);
     setSkipped(false);
     setError(null);
