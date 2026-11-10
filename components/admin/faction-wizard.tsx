@@ -44,6 +44,30 @@ export function buscarFaccionDuplicada(
   );
 }
 
+/**
+ * Nombre visible de una SUBFACCIÓN: «Madre (Propia)». Es una convención del catálogo, no una regla
+ * del servidor: el paréntesis solo se muestra en la ficha y la relación real se guarda aparte
+ * (`parentId`), así que renombrar la madre después no rompe la herencia de estados.
+ */
+export function nombreDeSubfaccion(madreLabel: string, propio: string): string {
+  const madre = madreLabel.trim();
+  const texto = propio.trim();
+  if (!madre) return texto;
+  if (!texto) return `${madre} ()`;
+  if (
+    texto.toLowerCase().startsWith(`${madre.toLowerCase()} (`) &&
+    texto.endsWith(")")
+  )
+    return texto;
+  const resto = texto.toLowerCase().startsWith(madre.toLowerCase())
+    ? texto
+        .slice(madre.length)
+        .replace(/^[\s(]+/, "")
+        .replace(/\)+\s*$/, "")
+    : texto;
+  return resto ? `${madre} (${resto})` : `${madre} ()`;
+}
+
 export function FactionWizard({
   token,
   factions,
