@@ -299,3 +299,30 @@ test("2026-10-facciones-canonicas fusiona duplicados y deja máximo dos por fich
   );
   migrada.close();
 });
+
+test("la base empaquetada (faction sin parent_id) se abre y la migración crea columna e índice", () => {
+  // Caso real de producción (2026-11-10): el diario materializa sobre una copia de la base
+  // empaquetada, anterior a `parent_id`. Un índice sobre esa columna en schema.sql corría antes
+  // de la migración y fallaba con «no such column: parent_id»: el diario entero no se aplicaba
+  // y las fichas creadas por él daban 404.
+  const origen = new URL("../../deploy/data/vtuberdex.db", import.meta.url);
+  const archivo = tmpDb();
+  fs.copyFileSync(origen, archivo);
+  const previo = new DatabaseSync(archivo);
+  previo.exec("DROP INDEX IF EXISTS idx_faction_parent");
+  const columnas = previo.prepare("PRAGMA table_info(faction)").all();
+  if (columnas.some((c) => c.name === "parent_id")) {
+    previo.exec("ALTER TABLE faction DROP COLUMN parent_id");
+  }
+  previo
+    .prepare("DELETE FROM meta WHERE key = ?")
+    .run("migration:2026-11-faccion-madre");
+  previo.close();
+
+  const db = openDatabase(archivo);
+  const ahora = db.prepare("PRAGMA table_info(faction)").all();
+  assert.ok(ahora.some((c) => c.name === "parent_id"));
+  const indices = db.prepare("PRAGMA index_list(faction)").all();
+  assert.ok(indices.some((i) => i.name === "idx_faction_parent"));
+  db.close();
+});
