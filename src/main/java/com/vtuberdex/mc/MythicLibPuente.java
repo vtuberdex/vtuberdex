@@ -12,11 +12,11 @@ import java.util.Locale;
  *
  * POR QUÉ POR CONSOLA Y NO CON SU API
  * -----------------------------------
- * MythicLib no publica sus datos de maná por PlaceholderAPI más que para leer, y desde aquí no se pueden añadir
- * dependencias al build ni se abren jars ajenos, así que se usa lo que el propio plugin ofrece: los comandos
+ * MythicLib solo deja LEER su maná por PlaceholderAPI, y desde aquí no se pueden añadir dependencias al build ni se
+ * abren jars ajenos, así que se usa lo que el propio plugin ofrece: los comandos
  * {@code /ml stat clear} y {@code /ml stat add <jugador> <stat> <valor> 0 <clave>}, que sí cambian los stats de un
- * jugador en caliente y sin reiniciar nada. El maná máximo es el mismo número que usan los hechizos
- * ({@link Hechizos#manaMaximo}), así que la web sigue siendo la fuente de la verdad.
+ * jugador en caliente. El maná máximo es el mismo número que usan los hechizos ({@link Hechizos#manaMaximo}), así que la
+ * web sigue siendo la fuente de la verdad.
  *
  * REQUISITO EN MYTHICLIB
  * ----------------------
@@ -95,7 +95,7 @@ final class MythicLibPuente {
         for (String comando : comandos) {
             try {
                 if (!plugin.getServer().dispatchCommand(consola, comando)) {
-                    plugin.getLogger().warning("MythicLib no aceptó «" + comando + "»; el puente de maná queda inactivo hasta el próximo intento.");
+                    plugin.getLogger().warning("MythicLib no aceptó «" + comando + "»; el puente de maná lo reintentará en el próximo refresco.");
                 }
             } catch (RuntimeException e) {
                 plugin.getLogger().warning("Fallo al hablar con MythicLib («" + comando + "»): " + e.getMessage());
