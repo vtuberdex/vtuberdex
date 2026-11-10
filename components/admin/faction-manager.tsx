@@ -204,6 +204,16 @@ function FactionCard({
             other.label.toLowerCase() === renaming.trim().toLowerCase(),
         )
       : undefined;
+  /**
+   * Madres ofrecidas: solo facciones raíz, más la que ya tiene (aunque ella misma sea
+   * subfacción) para que el desplegable no pierda el valor guardado. El servidor rechaza
+   * cualquier relación circular, así que esto es comodidad, no la única defensa.
+   */
+  const raices = all.filter(
+    (other) =>
+      other.id !== faction.id &&
+      (!other.parentId || other.id === faction.parentId),
+  );
 
   const upload = async (file: File) => {
     setUploading(true);
