@@ -156,14 +156,21 @@ export const vtuberCreateSchema = vtuberUpdateSchema.extend({
   name: z.string().trim().min(1).max(160),
 });
 
+/** Madre de una facción (la convierte en subfacción): id, slug o etiqueta. `null` la deja raíz. */
+const factionParent = z
+  .union([z.number().int().positive(), z.string().trim().max(80), z.null()])
+  .optional();
+
 export const factionCreateSchema = z.object({
   label: z.string().trim().min(1).max(60),
   icon: z.string().trim().max(300).optional().nullable(),
+  parent: factionParent,
 });
 
 export const factionUpdateSchema = z.object({
   label: z.string().trim().min(1).max(60).optional(),
   icon: z.string().trim().max(300).optional().nullable(),
+  parent: factionParent,
 });
 
 /** Listado del mantenedor: incluye borradores y ocultos, que la API pública no devuelve. */
