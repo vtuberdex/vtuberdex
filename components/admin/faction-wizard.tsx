@@ -132,9 +132,11 @@ export function FactionWizard({
     setBusy(true);
     setError(null);
     try {
+      // `parent` solo viaja cuando hay madre elegida: una facción raíz no necesita
+      // declarar `null` y así el alta se queda igual que antes para lo de siempre.
       const { faction, items } = await api.createFaction(token, {
         label: trimmed,
-        parent: parentId,
+        ...(parentId === null ? {} : { parent: parentId }),
       });
       onItems(items);
       let emblemFailed: string | null = null;
