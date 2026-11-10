@@ -437,6 +437,10 @@ export function FactionWizard({
         <div className="flex flex-col items-end gap-1">
           {step === 0 && !trimmed ? (
             <Reason>Escribe un nombre para continuar.</Reason>
+          ) : step === 0 && faltaMadre(conMadre, parentId) ? (
+            <Reason>
+              Elige la facción madre, o marca que no pertenece a ninguna.
+            </Reason>
           ) : step === 1 && !file && !skipped ? (
             <Reason>Elige un archivo u omite este paso.</Reason>
           ) : null}
@@ -444,7 +448,11 @@ export function FactionWizard({
             <button
               type="submit"
               className={primaryButton}
-              disabled={step === 0 ? Boolean(nameProblem) : !file && !skipped}
+              disabled={
+                step === 0
+                  ? Boolean(nameProblem) || faltaMadre(conMadre, parentId)
+                  : !file && !skipped
+              }
             >
               Siguiente
             </button>
