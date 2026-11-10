@@ -11,13 +11,18 @@
  */
 import { useMemo, useState } from "react";
 
+import type { FactionRow } from "@/lib/types";
 import { emptySkill, type SkillForm } from "@/components/admin/form-model";
 import {
   KitBuilder,
   ListaDeProblemas,
   type Problema,
 } from "@/components/admin/kit-builder";
-import { MP_ACTIVA, MP_ULTIMATE } from "@/components/admin/kit-habilidades";
+import {
+  MP_ACTIVA,
+  MP_ULTIMATE,
+  mapaSubfacciones,
+} from "@/components/admin/kit-habilidades";
 import type { StepProps } from "@/components/admin/steps/types";
 import {
   ghostButton,
