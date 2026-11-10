@@ -386,7 +386,11 @@ export function faltantes(kit: KitForm): string[] {
 }
 
 /** Validación completa del kit armado: lo que falta + las reglas del sistema (`validarKit`). */
-export function revisarKit(kit: KitForm, facciones: string[]) {
+export function revisarKit(
+  kit: KitForm,
+  facciones: string[],
+  subfacciones: Record<string, string> = {},
+) {
   const habilidades = habilidadesDelKit(kit);
   const faltan = faltantes(kit);
   const estadosPendientes = faltan.some((f) => /estados/.test(f));
@@ -397,6 +401,7 @@ export function revisarKit(kit: KitForm, facciones: string[]) {
       effectHtml: h.effectHtml ?? "",
     })),
     facciones,
+    subfacciones,
     // «Falta: los dos estados» ya lo dice; el «entrega 0 estados» del validador sería el mismo aviso dos veces.
   }).filter((p) => !(estadosPendientes && p.codigo === "ultimate_estados"));
   return { habilidades, faltan, problemas };
