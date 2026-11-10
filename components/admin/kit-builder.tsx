@@ -90,6 +90,7 @@ function SelectorDeEstado({
   valor,
   onChange,
   facciones,
+  subfacciones = {},
   ultimate = false,
   etiqueta,
   opcional = false,
@@ -97,11 +98,13 @@ function SelectorDeEstado({
   valor: EstadoElegido;
   onChange: (v: EstadoElegido) => void;
   facciones: string[];
+  /** Subfacción → madre (catálogo): una subfacción habilita los estados de su madre. */
+  subfacciones?: Record<string, string>;
   ultimate?: boolean;
   etiqueta: string;
   opcional?: boolean;
 }) {
-  const estados = estadosDisponibles(facciones);
+  const estados = estadosDisponibles(facciones, subfacciones);
   const grupos: Array<{ titulo: string; polaridad: string }> = [
     { titulo: "Positivos (se obtienen)", polaridad: "positivo" },
     { titulo: "Negativos (se aplican)", polaridad: "negativo" },
