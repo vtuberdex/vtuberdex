@@ -134,6 +134,7 @@ export function FactionWizard({
     try {
       const { faction, items } = await api.createFaction(token, {
         label: trimmed,
+        parent: parentId,
       });
       onItems(items);
       let emblemFailed: string | null = null;
