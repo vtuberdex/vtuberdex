@@ -303,11 +303,45 @@ export function FactionWizard({
           {trimmed && !nameProblem && (
             <p className="text-xs text-emerald-300">✓ Nombre disponible.</p>
           )}
-          {madres.length > 0 && (
-            <Field
-              label="Facción madre (opcional)"
-              hint="Solo para una subfacción: se elige en la ficha como cualquier otra y ocupa uno de sus 2 cupos, pero acredita los estados exclusivos de su madre. El nombre se escribe «Madre (Propia)»."
-            >
+          <fieldset className="space-y-1 rounded-xl border border-dex-line p-3">
+            <legend className="px-1 text-xs uppercase tracking-[0.14em] text-dex-muted">
+              ¿Pertenece a otra facción?
+            </legend>
+            <label className="flex items-center gap-2 text-sm text-dex-ink">
+              <input
+                type="radio"
+                name="madre-eleccion"
+                aria-label="No pertenece a ninguna: facción raíz"
+                checked={!conMadre}
+                onChange={() => {
+                  setConMadre(false);
+                  setParentId(null);
+                }}
+                disabled={busy}
+              />
+              No, es una facción raíz
+            </label>
+            <label className="flex items-center gap-2 text-sm text-dex-ink">
+              <input
+                type="radio"
+                name="madre-eleccion"
+                aria-label="Sí: pertenece a una facción madre"
+                checked={conMadre}
+                onChange={() => setConMadre(true)}
+                disabled={busy || madres.length === 0}
+              />
+              Sí, es subfacción de otra facción
+            </label>
+            {madres.length === 0 && (
+              <p className="text-[11px] text-dex-muted">
+                No hay facciones raíz a las que colgarla: crea primero la madre.
+              </p>
+            )}
+            {conMadre && (
+              <Field
+                label="Facción madre"
+                hint="Se elige en la ficha como cualquier otra y ocupa uno de sus 2 cupos, pero acredita los estados exclusivos de su madre. El nombre se escribe «Madre (Propia)»."
+              >
               <select
                 aria-label="Facción madre"
                 value={parentId === null ? "" : String(parentId)}
