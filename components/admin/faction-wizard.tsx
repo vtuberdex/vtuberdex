@@ -388,6 +388,11 @@ export function FactionWizard({
               <p className="text-xs text-dex-muted">
                 {file ? `Emblema: ${file.name}` : "Sin emblema por ahora"}
               </p>
+              <p className="text-xs text-dex-muted">
+                {madre
+                  ? `Subfacción de «${madre.label}»`
+                  : "Facción raíz (sin madre)"}
+              </p>
             </div>
           </div>
           {error && (
