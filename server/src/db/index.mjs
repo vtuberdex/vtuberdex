@@ -188,7 +188,6 @@ const MIGRATIONS = [
         enlazar.run(madre.id, hija.id);
         hija.parentId = madre.id;
       }
-      porSlug.size; // la semilla no borra facciones: solo escribe la madre
     },
   },
 ];
