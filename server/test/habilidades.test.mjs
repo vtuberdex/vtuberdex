@@ -332,12 +332,29 @@ test("una ficha de una subfacción puede usar los estados exclusivos de su facci
   // no podía obtener Fortificación, que es exclusiva de la madre.
   const fortificacion = kitValido();
   fortificacion[1].effectHtml = `Ataque Base +40 y obtienes ${s("Fortificación")} durante 2 turnos.`;
-  const fortificacionBloqueada = (facciones) =>
-    validarKit({ habilidades: fortificacion, facciones })
+  const mapaGlovecaller = { "glovecaller-elfs": "glovecaller" };
+  const fortificacionBloqueada = (facciones, subfacciones) =>
+    validarKit({ habilidades: fortificacion, facciones, subfacciones })
       .filter((p) => p.codigo === "faccion_exclusiva")
       .map((p) => p.estado);
-  assert.deepEqual(fortificacionBloqueada(["glovecaller-elfs"]), []);
-  assert.deepEqual(fortificacionBloqueada(["Glovecaller (Elfs)"]), []);
-  assert.deepEqual(fortificacionBloqueada(["glovecaller"]), []);
-  assert.deepEqual(fortificacionBloqueada(["abyssal"]), ["Fortificación"]);
+  assert.deepEqual(
+    fortificacionBloqueada(["glovecaller"], mapaGlovecaller),
+    [],
+  );
+  assert.deepEqual(
+    fortificacionBloqueada(["glovecaller-elfs"], mapaGlovecaller),
+    [],
+  );
+  assert.deepEqual(
+    fortificacionBloqueada(["Glovecaller (Elfs)"], mapaGlovecaller),
+    [],
+  );
+  // Sin la relación en los datos se sigue acusando, y otra facción no se cuela.
+  assert.deepEqual(
+    fortificacionBloqueada(["glovecaller-elfs"]),
+    ["Fortificación"],
+  );
+  assert.deepEqual(fortificacionBloqueada(["abyssal"], mapaGlovecaller), [
+    "Fortificación",
+  ]);
 });
