@@ -137,6 +137,7 @@ export function FactionWizard({
     setStep(0);
     setName("");
     setParentId(null);
+    setConMadre(false);
     setFile(null);
     setSkipped(false);
     setError(null);
