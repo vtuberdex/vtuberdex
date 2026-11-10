@@ -115,6 +115,83 @@ const MIGRATIONS = [
     id: "2026-10-facciones-canonicas",
     run: (db) => consolidarFacciones(db),
   },
+  {
+    /**
+     * SUBFACCIONES REALES: una facción puede tener madre.
+     *
+     * Hasta ahora la relación no existía en la base: se adivinaba del TEXTO del nombre (se
+     * descartaba el paréntesis de «Glovecaller (Elfs)» o el sufijo del slug). Eso obligaba a
+     * escribir la madre a mano dentro del nombre y se rompía con cualquier otro formato. Aquí la
+     * relación pasa a ser un dato (`parent_id`), editable desde el mantenedor.
+     *
+     * La semilla es de UNA SOLA VEZ y solo para no perder lo que ya estaba escrito con paréntesis:
+     *   · `label` con paréntesis («Glovecaller (Elfs)»): la madre es lo que hay antes.
+     *   · si no hay paréntesis, el prefijo del slug (`glovecaller-elfs` → `glovecaller`).
+     * Después de esta migración nada vuelve a mirar el nombre: manda la columna.
+     */
+    id: "2026-11-faccion-madre",
+    run: (db) => {
+      const columnas = db.prepare("PRAGMA table_info(faction)").all();
+      if (!columnas.some((columna) => columna.name === "parent_id")) {
+        db.exec(
+          "ALTER TABLE faction ADD COLUMN parent_id INTEGER REFERENCES faction (id) ON DELETE SET NULL;",
+        );
+      }
+      db.exec(
+        "CREATE INDEX IF NOT EXISTS idx_faction_parent ON faction (parent_id);",
+      );
+      const facciones = db
+        .prepare("SELECT id, slug, label, parent_id AS parentId FROM faction")
+        .all();
+      if (facciones.length < 2) return;
+
+      const porEtiqueta = new Map(
+        facciones.map((f) => [String(f.label).trim().toLowerCase(), f]),
+      );
+      const porSlug = new Map(facciones.map((f) => [f.slug, f]));
+      const enlazar = db.prepare(
+        "UPDATE faction SET parent_id = ? WHERE id = ? AND parent_id IS NULL",
+      );
+
+      for (const hija of facciones) {
+        if (hija.parentId) continue;
+        const etiqueta = String(hija.label).trim();
+        const entreParentesis = /^(.+?)\s*[([]/.exec(etiqueta);
+        let madre = entreParentesis
+          ? porEtiqueta.get(entreParentesis[1].trim().toLowerCase())
+          : undefined;
+        if (!madre) {
+          // Respaldo: el slug generado del nombre («glovecaller-elfs») empieza por el de la madre.
+          const prefijo = facciones
+            .filter(
+              (otra) =>
+                otra.id !== hija.id &&
+                hija.slug.startsWith(`${otra.slug}-`) &&
+                otra.parentId === null,
+            )
+            .sort((a, b) => b.slug.length - a.slug.length)[0];
+          madre = prefijo;
+        }
+        if (!madre || madre.id === hija.id) continue;
+        // Una madre que a su vez es hija de la candidata crearía un ciclo: se deja sin madre.
+        let subiendo = madre;
+        let saltos = 0;
+        let ciclo = false;
+        while (subiendo?.parentId && saltos < 16) {
+          if (subiendo.parentId === hija.id) {
+            ciclo = true;
+            break;
+          }
+          subiendo = facciones.find((f) => f.id === subiendo.parentId);
+          saltos += 1;
+        }
+        if (ciclo) continue;
+        enlazar.run(madre.id, hija.id);
+        hija.parentId = madre.id;
+      }
+      porSlug.size; // la semilla no borra facciones: solo escribe la madre
+    },
+  },
 ];
 
 /**
