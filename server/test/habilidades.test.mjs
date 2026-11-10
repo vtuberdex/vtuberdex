@@ -295,19 +295,17 @@ test("tieneFaccion: acepta slug, etiqueta y variantes con errata de la misma fac
   assert.equal(tieneFaccion(["Mythical Lecagy"], "mythical-legacy"), true);
   assert.equal(tieneFaccion(["netherbane"], "mythical-legacy"), false);
   assert.equal(tieneFaccion([], "mythical-legacy"), false);
-  // La subfacción no es otra facción: sigue contando la de su madre.
+  // Una SUBCACCIÓN no acredita nada sin su relación guardada: el nombre no la delata. Antes se
+  // adivinaba por el paréntesis y por el sufijo del slug, y eso daba por bueno cualquier parecido.
   assert.equal(
     tieneFaccion(["Mythical Legacy (Kitsune)"], "mythical-legacy"),
-    true,
+    false,
   );
+  assert.equal(tieneFaccion(["glovecaller-elfs"], "glovecaller"), false);
   assert.equal(
-    tieneFaccion(["mythical-legacy (kitsune)"], "mythical-legacy"),
-    true,
+    tieneFaccion(["mythical-legacy-kitsune"], "mythical-legacy"),
+    false,
   );
-  // Y también cuando el catálogo la guarda como SUFIJO DEL SLUG, que es lo que se elige en el
-  // mantenedor y lo que queda escrito en la ficha (`Glovecaller (Elfs)` → `glovecaller-elfs`).
-  assert.equal(tieneFaccion(["glovecaller-elfs"], "glovecaller"), true);
-  assert.equal(tieneFaccion(["mythical-legacy-kitsune"], "mythical-legacy"), true);
   assert.equal(tieneFaccion(["netherbane-oni"], "mythical-legacy"), false);
   assert.equal(tieneFaccion([], ""), false);
   assert.equal(
