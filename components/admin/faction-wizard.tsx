@@ -103,6 +103,15 @@ export function FactionWizard({
     () => buscarFaccionDuplicada(trimmed, factions),
     [trimmed, factions],
   );
+  /** Madre elegida: solo las raíces, así la relación nunca puede cerrar un ciclo. */
+  const madres = useMemo(
+    () => factions.filter((faction) => !faction.parentId),
+    [factions],
+  );
+  const madre = useMemo(
+    () => factions.find((faction) => faction.id === parentId) ?? null,
+    [parentId, factions],
+  );
   const nameProblem = !trimmed
     ? "Escribe el nombre de la facción para continuar."
     : duplicate
