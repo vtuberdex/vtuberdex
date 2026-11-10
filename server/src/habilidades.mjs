@@ -924,7 +924,11 @@ export function validarKit({ habilidades, facciones = null, subfacciones = {} })
           hallado.canonico,
         );
       }
-      if (estado.faccion && facciones && !tieneFaccion(facciones, estado.faccion)) {
+      if (
+        estado.faccion &&
+        facciones &&
+        !tieneFaccion(facciones, estado.faccion, subfacciones)
+      ) {
         anotar(
           "error",
           "faccion_exclusiva",
