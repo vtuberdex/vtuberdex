@@ -1,12 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { VrtonBanners } from "@/components/vrton-banners";
+import { VRTON_VISIBLE, VrtonBanners } from "@/components/vrton-banners";
 
 describe("VrtonBanners", () => {
   it("pone un pendón a cada lado del contenido y ambos enlazan a vrton.org (licencia de los assets)", () => {
     render(
-      <VrtonBanners>
+      <VrtonBanners visible>
         <main>galería</main>
       </VrtonBanners>,
     );
@@ -29,7 +29,7 @@ describe("VrtonBanners", () => {
 
   it("lleva un estandarte horizontal para tablet y celular que también enlaza a vrton.org", () => {
     render(
-      <VrtonBanners>
+      <VrtonBanners visible>
         <main>galería</main>
       </VrtonBanners>,
     );
@@ -39,5 +39,20 @@ describe("VrtonBanners", () => {
     );
     // Solo se ve debajo de `xl`: arriba lo sustituyen los pendones laterales.
     expect(estandarte.className).toContain("xl:hidden");
+  });
+
+  it("ocultos por defecto: sin pendones ni estandarte, y el contenido se muestra igual", () => {
+    expect(VRTON_VISIBLE).toBe(false);
+    const { container } = render(
+      <VrtonBanners>
+        <main>galería</main>
+      </VrtonBanners>,
+    );
+    expect(screen.getByText("galería")).toBeTruthy();
+    expect(screen.queryByTestId("pendon-vrton")).toBeNull();
+    expect(screen.queryByTestId("estandarte-vrton")).toBeNull();
+    expect(container.querySelector('a[href="https://vrton.org/"]')).toBeNull();
+    // Sin `.pendon-h` en la página, globals.css no reserva el alto del estandarte.
+    expect(container.querySelector(".pendon-h")).toBeNull();
   });
 });
