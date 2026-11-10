@@ -56,7 +56,13 @@ on:
   # `tags-ignore`: la etiqueta que crea `etiquetar` es otro push; sin esto lanzaría
   # un CI más sobre el mismo commit ya validado. (Con GITHUB_TOKEN tampoco se
   # dispararía, pero así no depende de ese detalle.)
+  #
+  # OJO: `branches: ["**"]` es OBLIGATORIO junto a `tags-ignore`. Si en `push` solo se declara el
+  # filtro de etiquetas, GitHub deja de disparar el workflow para las RAMAS (pasó el 2026-11-10: el
+  # merge del etiquetado automático no corrió el CI en `main` y no se creó ninguna etiqueta).
   push:
+    branches:
+      - "**"
     tags-ignore:
       - "**"
   pull_request:
