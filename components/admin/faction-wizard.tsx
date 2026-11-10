@@ -284,6 +284,49 @@ export function FactionWizard({
           {trimmed && !nameProblem && (
             <p className="text-xs text-emerald-300">✓ Nombre disponible.</p>
           )}
+          {madres.length > 0 && (
+            <Field
+              label="Facción madre (opcional)"
+              hint="Solo para una subfacción: se elige en la ficha como cualquier otra y ocupa uno de sus 2 cupos, pero acredita los estados exclusivos de su madre. El nombre se escribe «Madre (Propia)»."
+            >
+              <select
+                aria-label="Facción madre"
+                value={parentId === null ? "" : String(parentId)}
+                onChange={(event) => {
+                  const siguiente = event.target.value
+                    ? Number(event.target.value)
+                    : null;
+                  setParentId(siguiente);
+                  const etiqueta = factions.find(
+                    (faction) => faction.id === siguiente,
+                  )?.label;
+                  if (etiqueta)
+                    setName((actual) =>
+                      nombreDeSubfaccion(etiqueta, actual),
+                    );
+                }}
+                className={inputClass}
+              >
+                <option value="">Ninguna (facción raíz)</option>
+                {madres.map((faction) => (
+                  <option key={faction.id} value={faction.id}>
+                    {faction.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {madre && !trimmed.includes("(") && (
+            <button
+              type="button"
+              className={ghostButton}
+              onClick={() =>
+                setName(nombreDeSubfaccion(madre.label, trimmed))
+              }
+            >
+              Escribirlo como «{nombreDeSubfaccion(madre.label, trimmed)}»
+            </button>
+          )}
         </div>
       )}
 
