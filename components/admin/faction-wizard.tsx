@@ -68,6 +68,19 @@ export function nombreDeSubfaccion(madreLabel: string, propio: string): string {
   return resto ? `${madre} (${resto})` : `${madre} ()`;
 }
 
+/**
+ * ¿Falta decir DE QUIÉN es la subfacción? Al marcar «sí, pertenece a otra facción» hay que elegir la
+ * madre: una hija sin madre no acredita los estados exclusivos de nadie —el nombre «Madre (Propia)»
+ * parece una subfacción, pero para el validador es una facción raíz con paréntesis—. Vive aparte de
+ * la pantalla para poder probarlo sin montar el asistente.
+ */
+export function faltaMadre(
+  conMadre: boolean,
+  parentId: number | null,
+): boolean {
+  return conMadre && parentId === null;
+}
+
 export function FactionWizard({
   token,
   factions,
