@@ -284,6 +284,13 @@ export interface FactionRow {
   label: string;
   /** Ruta pública sin barra inicial (`images/faction/<slug>.png`); se muestra como `/${icon}`. */
   icon: string | null;
+  /**
+   * Facción MADRE: si la tiene, esta es una SUBFACCIÓN. Se elige como cualquier otra en la ficha,
+   * pero acredita los estados exclusivos de su madre (ver `tieneFaccion`).
+   */
+  parentId?: number | null;
+  parentSlug?: string | null;
+  parentLabel?: string | null;
   total: number;
   publicadas: number;
 }
