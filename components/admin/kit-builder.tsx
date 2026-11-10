@@ -189,11 +189,13 @@ function EditorDeActiva({
   valor,
   onChange,
   facciones,
+  subfacciones,
   indice,
 }: {
   valor: ActivaForm;
   onChange: (v: ActivaForm) => void;
   facciones: string[];
+  subfacciones?: Record<string, string>;
   indice: number;
 }) {
   const set = (parche: Partial<ActivaForm>) =>
