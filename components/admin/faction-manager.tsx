@@ -119,6 +119,18 @@ export function FactionManager({
         </ul>
       )}
 
+      {huerfanas.length > 0 && (
+        <ul className="space-y-1" data-testid="faction-huerfanas">
+          {huerfanas.map((faction) => (
+            <li key={faction.id} className="text-xs text-red-300">
+              ⚠ {faction.label} parece una subfacción pero no tiene facción
+              madre: elige su madre en su tarjeta o sus estados exclusivos
+              seguirán bloqueados.
+            </li>
+          ))}
+        </ul>
+      )}
+
       {error && (
         <p
           role="alert"
