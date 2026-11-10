@@ -30,6 +30,19 @@ import {
 type Pending = { kind: "merge"; target: string } | { kind: "delete" };
 type Notify = (kind: "ok" | "error", text: string) => void;
 
+/**
+ * ¿Es una SUBFACCIÓN HUÉRFANA? El nombre se escribió como «Madre (Propia)» —la convención del
+ * catálogo— pero no tiene madre guardada en `parentId`.
+ *
+ * POR QUÉ IMPORTA: la herencia de estados no se adivina del nombre, se lee de `faction.parent_id`
+ * (ver `tieneFaccion`). Una hija huérfana se ve como subfacción en la carta y, en cambio, sus estados
+ * exclusivos siguen bloqueados: es el fallo que se reportó desde el mantenedor.
+ */
+export function esSubfaccionHuerfana(faction: FactionRow): boolean {
+  if (faction.parentId) return false;
+  return /\([^)]*\)\s*$/.test(faction.label.trim());
+}
+
 export function FactionManager({
   token,
   factions,
