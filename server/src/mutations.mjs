@@ -1018,6 +1018,12 @@ export function eliminarFaccion(db, id, { fusionarEn = null } = {}) {
         ).run(position, vtuberId, fusionarEn);
       }
     }
+    // Las SUBFACCIONES de la que desaparece pasan a la madre destino: con `ON DELETE SET NULL`
+    // quedarían sin madre y perderían los estados exclusivos que heredaban.
+    db.prepare("UPDATE faction SET parent_id = ? WHERE parent_id = ?").run(
+      fusionarEn,
+      id,
+    );
   }
   db.prepare("DELETE FROM vtuber_faction WHERE faction_id = ?").run(id);
   db.prepare("DELETE FROM faction WHERE id = ?").run(id);
