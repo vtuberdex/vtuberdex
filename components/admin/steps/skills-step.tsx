@@ -58,12 +58,20 @@ function mpDe(
   return null;
 }
 
-export function SkillsStep({ form, set }: StepProps) {
+export function SkillsStep({ form, set, factions }: StepProps) {
   const [asistente, setAsistente] = useState(false);
   const [abierta, setAbierta] = useState<number | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const skills = form.skills;
   const cambiar = (next: SkillForm[]) => set("skills", next);
+  /**
+   * Subfacción → madre, desde el catálogo (`faction.parent_id`). Sin esto, una ficha con una
+   * subfacción veía bloqueados los estados exclusivos de su madre.
+   */
+  const subfacciones = useMemo(
+    () => mapaSubfacciones(factions ?? []),
+    [factions],
+  );
 
   const problemas: Problema[] = useMemo(() => {
     const kit = skills.filter((s) => s.category !== "other");
