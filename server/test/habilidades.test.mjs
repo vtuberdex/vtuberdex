@@ -317,12 +317,16 @@ test("tieneFaccion: acepta slug, etiqueta y variantes con errata de la misma fac
 test("una ficha de una subfacción puede usar los estados exclusivos de su facción madre", () => {
   const kit = kitValido();
   kit[1].effectHtml = `Ataque Base +40 y obtienes ${s("Juramento")} durante 2 turnos.`;
-  const exclusivos = (facciones) =>
-    validarKit({ habilidades: kit, facciones })
+  const mapa = { "heaven-s-arbiter-alfa": "heaven-s-arbiter" };
+  const exclusivos = (facciones, subfacciones) =>
+    validarKit({ habilidades: kit, facciones, subfacciones })
       .filter((p) => p.codigo === "faccion_exclusiva")
       .map((p) => p.estado);
-  assert.deepEqual(exclusivos(["Heaven's Arbiter (Alfa)"]), []);
-  assert.deepEqual(exclusivos(["NeCrotic (Alfa)"]), ["Juramento"]);
+  assert.deepEqual(exclusivos(["heaven-s-arbiter"], mapa), []);
+  assert.deepEqual(exclusivos(["heaven-s-arbiter-alfa"], mapa), []);
+  // Sin la relación guardada, la subfacción no acredita lo de su madre.
+  assert.deepEqual(exclusivos(["heaven-s-arbiter-alfa"]), ["Juramento"]);
+  assert.deepEqual(exclusivos(["abyssal"], mapa), ["Juramento"]);
 
   // El caso que se reportó: la ficha de una subfacción guardada como slug (`glovecaller-elfs`)
   // no podía obtener Fortificación, que es exclusiva de la madre.
