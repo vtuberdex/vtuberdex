@@ -148,7 +148,6 @@ const MIGRATIONS = [
       const porEtiqueta = new Map(
         facciones.map((f) => [String(f.label).trim().toLowerCase(), f]),
       );
-      const porSlug = new Map(facciones.map((f) => [f.slug, f]));
       const enlazar = db.prepare(
         "UPDATE faction SET parent_id = ? WHERE id = ? AND parent_id IS NULL",
       );
