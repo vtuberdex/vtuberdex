@@ -575,7 +575,9 @@ export function CardWizard({
           )}
           {step.id === "historia" && <StoryStep form={form} set={set} />}
           {step.id === "atributos" && <AttributesStep form={form} set={set} />}
-          {step.id === "habilidades" && <SkillsStep form={form} set={set} />}
+          {step.id === "habilidades" && (
+            <SkillsStep form={form} set={set} factions={factions} />
+          )}
           {step.id === "redes" && <SocialsStep form={form} set={set} />}
           {step.id === "revision" && (
             <ReviewStep
