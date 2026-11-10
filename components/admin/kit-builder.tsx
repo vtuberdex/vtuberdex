@@ -692,6 +692,7 @@ export function KitBuilder({
                 indice={paso}
                 valor={kit.activas[paso]}
                 facciones={facciones}
+                subfacciones={subfacciones}
                 onChange={(v) => setActiva(paso, v)}
               />
             )}
