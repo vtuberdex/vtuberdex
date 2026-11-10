@@ -97,6 +97,7 @@ export function SkillsStep({ form, set, factions }: StepProps) {
       <KitBuilder
         skills={skills}
         facciones={form.factions}
+        subfacciones={subfacciones}
         onCancel={() => setAsistente(false)}
         onApply={(next) => {
           cambiar(next);
