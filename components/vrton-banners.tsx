@@ -141,7 +141,23 @@ function Pendon({ lado }: { lado: "izquierdo" | "derecho" }) {
   );
 }
 
-export function VrtonBanners({ children }: { children: React.ReactNode }) {
+/**
+ * Interruptor de la campaña. OCULTOS desde el 2026-11-10 (pedido del mantenedor): la página queda
+ * con su ancho completo y sin el estandarte. El código y los assets se quedan para la próxima
+ * edición; volver a mostrarlos es poner esto en `true`. El alto del estandarte en `--binder-chrome`
+ * (globals.css) solo se reserva si `.pendon-h` está en la página, así que no hay que tocar el CSS.
+ */
+export const VRTON_VISIBLE = false;
+
+export function VrtonBanners({
+  children,
+  visible = VRTON_VISIBLE,
+}: {
+  children: React.ReactNode;
+  visible?: boolean;
+}) {
+  // Mismo `grid gap-3` que con los pendones: los hijos conservan su separación vertical.
+  if (!visible) return <div className="grid gap-3">{children}</div>;
   return (
     <div className="grid gap-3 xl:gap-6 xl:grid-cols-[9.5rem_minmax(0,1fr)_9.5rem] xl:items-start">
       <Estandarte />
