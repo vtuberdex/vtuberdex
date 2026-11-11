@@ -234,6 +234,35 @@ export async function reiniciarRangos(
   return estadoDePuntos(e, { vtuberId, skills, nivelesGanados });
 }
 
+/**
+ * Pasa a la bolsa de stats los puntos de habilidad que ya NO caben en ninguna (`sobrantes`): con todas las
+ * habilidades en su rango máximo, sin esto quedarían muertos. Solo se convierte el SOBRANTE: si aún queda un
+ * rango por subir, ese punto se queda en habilidades y no se puede convertir por adelantado.
+ * Lo convertido no vuelve ni siquiera al reiniciar los rangos: forma parte de la bolsa de stats.
+ */
+export async function convertirPuntosSobrantes(
+  ejecutor,
+  { vtuberId, skills, nivelesGanados },
+) {
+  const e = await conTablas(ejecutor);
+  const antes = await estadoDePuntos(e, { vtuberId, skills, nivelesGanados });
+  if (antes.sobrantes < 1)
+    throw new PuntosError(
+      409,
+      "sin_sobrantes",
+      "Todavía te caben puntos en tus habilidades: gástalos ahí antes de pasarlos a stats.",
+    );
+  // Se escribe el total ABSOLUTO (lo ya convertido + lo sobrante) y solo si es mayor: dos clics a la vez no
+  // pueden convertir dos veces los mismos puntos (la base los ordena).
+  await e.execute(
+    `INSERT INTO punto_convertido (vtuber_id, puntos) VALUES (?, ?)
+     ON CONFLICT (vtuber_id) DO UPDATE SET puntos = excluded.puntos
+      WHERE punto_convertido.puntos < excluded.puntos`,
+    [Number(vtuberId), antes.convertidos + antes.sobrantes],
+  );
+  return estadoDePuntos(e, { vtuberId, skills, nivelesGanados });
+}
+
 /* ------------------------------------------------------------------ stats */
 
 /**
