@@ -35,6 +35,7 @@ import { useI18n } from "@/lib/i18n";
 import type { Clave } from "@/lib/i18n/mensajes";
 import { miFichaEs } from "@/lib/i18n/textos/mificha";
 import { XP_JUEGO_MAX_DIA } from "@/server/src/experiencia.mjs";
+import { AtributosPanel } from "./atributos";
 
 const CATEGORIAS: Array<HabilidadMejorable["category"]> = [
   "active",
