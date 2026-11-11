@@ -21,12 +21,17 @@ import {
 import { ejecutorSqlite } from "../src/solicitudes.mjs";
 
 const SKILLS = [{ category: "active", name: "Rayo Láser" }];
+const CLAVE = claveDeHabilidad(SKILLS[0]);
 const STATS = [
   { slug: "hp", label: "HP", value: 1000 },
   { slug: "attack", label: "Ataque", value: 100 },
 ];
 const nuevo = () => ejecutorSqlite(new DatabaseSync(":memory:"));
-const entrada = (nivelesGanados) => ({ vtuberId: 7, skills: SKILLS, nivelesGanados });
+const entrada = (nivelesGanados) => ({
+  vtuberId: 7,
+  skills: SKILLS,
+  nivelesGanados,
+});
 const enStats = (nivelesGanados) => ({
   vtuberId: 7,
   stats: STATS,
@@ -37,12 +42,15 @@ const mensajeDe = async (promesa) =>
     () => null,
     (e) => e,
   );
+const subir = (e, nivelesGanados) =>
+  subirHabilidad(e, { ...entrada(nivelesGanados), clave: CLAVE });
 
-/** Sube la única habilidad hasta su rango máximo gastando los puntos que haya. */
+/** Sube la única habilidad hasta su rango máximo, comprobando que CADA punto queda guardado. */
 async function maxear(e, nivelesGanados) {
-  const clave = claveDeHabilidad(SKILLS[0]);
-  for (let i = 0; i < RANGO_MAXIMO; i += 1)
-    await subirHabilidad(e, { ...entrada(nivelesGanados), clave });
+  for (let rango = 1; rango <= RANGO_MAXIMO; rango += 1) {
+    const estado = await subir(e, nivelesGanados);
+    assert.equal(estado.habilidades[0].rango, rango);
+  }
 }
 
 test("mientras quepan puntos en una habilidad NO hay sobrantes ni se pueden convertir", async () => {
@@ -52,9 +60,7 @@ test("mientras quepan puntos en una habilidad NO hay sobrantes ni se pueden conv
   assert.equal(antes.ganados, PUNTOS_POR_NIVEL);
   assert.equal(antes.hueco, RANGO_MAXIMO);
   assert.equal(antes.sobrantes, 0);
-  const error = await mensajeDe(
-    convertirPuntosSobrantes(e, entrada(1)),
-  );
+  const error = await mensajeDe(convertirPuntosSobrantes(e, entrada(1)));
   assert.ok(error instanceof PuntosError);
   assert.equal(error.code, "sin_sobrantes");
   // Nada se convirtió: la bolsa de stats sigue con lo suyo.
@@ -62,28 +68,42 @@ test("mientras quepan puntos en una habilidad NO hay sobrantes ni se pueden conv
   assert.equal(stats.convertidos, 0);
 });
 
-test("con las habilidades al máximo, lo que sobra se pasa a la bolsa de stats", async () => {
+test("con todas las habilidades al máximo no queda hueco y lo ganado de más sobra", async () => {
   const e = nuevo();
   const niveles = 4;
   await maxear(e, niveles);
   const antes = await estadoDePuntos(e, entrada(niveles));
-  const ganados = niveles * PUNTOS_POR_NIVEL;
-  assert.equal(antes.hueco, 0);
   assert.equal(antes.repartidos, RANGO_MAXIMO);
-  assert.equal(antes.sobrantes, ganados - RANGO_MAXIMO);
-  assert.ok(antes.sobrantes > 0);
+  assert.equal(antes.hueco, 0);
+  assert.equal(antes.sobrantes, niveles * PUNTOS_POR_NIVEL - RANGO_MAXIMO);
+});
 
+test("lo que sobra se pasa a la bolsa de stats y sale de la de habilidades", async () => {
+  const e = nuevo();
+  const niveles = 4;
+  await maxear(e, niveles);
+  const antes = await estadoDePuntos(e, entrada(niveles));
   const despues = await convertirPuntosSobrantes(e, entrada(niveles));
   assert.equal(despues.convertidos, antes.sobrantes);
   assert.equal(despues.disponibles, 0);
   assert.equal(despues.sobrantes, 0);
-  assert.equal(despues.gastables, ganados - antes.sobrantes);
+  assert.equal(despues.gastables, niveles * PUNTOS_POR_NIVEL - antes.sobrantes);
   // Los rangos no se tocan al convertir: siguen donde estaban.
   assert.equal(despues.habilidades[0].rango, RANGO_MAXIMO);
+});
 
+test("lo convertido aparece como puntos de stats disponibles", async () => {
+  const e = nuevo();
+  const niveles = 4;
+  await maxear(e, niveles);
+  const antes = await estadoDePuntos(e, entrada(niveles));
+  await convertirPuntosSobrantes(e, entrada(niveles));
   const stats = await estadoDeStats(e, enStats(niveles));
   assert.equal(stats.convertidos, antes.sobrantes);
-  assert.equal(stats.disponibles, niveles * PUNTOS_STATS_POR_NIVEL + antes.sobrantes);
+  assert.equal(
+    stats.disponibles,
+    niveles * PUNTOS_STATS_POR_NIVEL + antes.sobrantes,
+  );
 });
 
 test("no se convierte dos veces lo mismo", async () => {
