@@ -1,7 +1,7 @@
 /**
  * `/api/minecraft-admin/archivos` — explorador de archivos del servidor.
  *
- * `GET` sin `ruta` lista lo editable (raíz permitida + todo lo de texto bajo `plugins/`);
+ * `GET ?carpeta=` lista UNA carpeta (subcarpetas, archivos editables y si admite escritura);
  * `GET ?ruta=` devuelve el texto; `PUT { ruta, contenido }` valida y guarda con copia `.bak`.
  * El rol se comprueba en cada método. Las reglas de qué se puede abrir viven en
  * `lib/minecraft-archivos.mjs`; cada guardado se anota en la auditoría.
