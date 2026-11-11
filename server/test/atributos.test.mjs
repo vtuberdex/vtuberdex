@@ -56,6 +56,18 @@ test("ningún atributo final pasa de 100 aunque el bono lo empuje", () => {
   assert.equal(conSobra.find((a) => a.slug === "str").valor, 100);
 });
 
+test("cada atributo parte de 40 de base y los puntos se suman encima", () => {
+  const finales = atributosFinales({ str: 10 }, {});
+  const str = finales.find((a) => a.slug === "str");
+  assert.equal(str.base, 40);
+  assert.equal(str.valor, 50); // 40 + 10
+  assert.equal(str.maximoAsignable, 60); // hasta 100
+  // Con un bono de +20 solo caben 40 puntos más.
+  const conBono = atributosFinales({}, { cha: 20 }).find((a) => a.slug === "cha");
+  assert.equal(conBono.valor, 60); // 40 + 20
+  assert.equal(conBono.maximoAsignable, 40);
+});
+
 test("los stats derivados salen de los atributos finales y se redondean", () => {
   const finales = atributosFinales(
     { con: 40, int: 30, str: 51, wis: 20, dex: 25, cha: 15 },
@@ -63,17 +75,18 @@ test("los stats derivados salen de los atributos finales y se redondean", () => 
   );
   const valor = (slug) =>
     statsDerivados(finales).find((d) => d.slug === slug).value;
-  assert.equal(valor("hp"), 600); // 40 × 15
-  assert.equal(valor("mp"), 300); // 30 × 10
-  assert.equal(valor("attack"), 112); // 51 × 2,2 = 112,2
-  assert.equal(valor("defense"), 60); // 40 × 1,5
-  assert.equal(valor("magicAttack"), 66); // 30 × 2,2
-  assert.equal(valor("magicDefense"), 36); // 20 × 1,8
-  assert.equal(valor("speed"), 38); // 25 × 1,5 = 37,5 → 38
-  assert.equal(valor("evasion"), 20); // 25 × 0,8
-  assert.equal(valor("accuracy"), 30); // 25 × 1,2
-  assert.equal(valor("critic"), 8); // 15 × 0,5 = 7,5 → 8
-  assert.equal(valor("luck"), 2); // (20 + 15) / 2 / 10 = 1,75 → 2
+  // Con los 40 de base: CON 80, INT 70, STR 91, WIS 60, DEX 65 y CHA 55.
+  assert.equal(valor("hp"), 1200); // 80 × 15
+  assert.equal(valor("mp"), 700); // 70 × 10
+  assert.equal(valor("attack"), 200); // 91 × 2,2 = 200,2
+  assert.equal(valor("defense"), 120); // 80 × 1,5
+  assert.equal(valor("magicAttack"), 154); // 70 × 2,2
+  assert.equal(valor("magicDefense"), 108); // 60 × 1,8
+  assert.equal(valor("speed"), 98); // 65 × 1,5 = 97,5 → 98
+  assert.equal(valor("evasion"), 52); // 65 × 0,8
+  assert.equal(valor("accuracy"), 78); // 65 × 1,2
+  assert.equal(valor("critic"), 28); // 55 × 0,5 = 27,5 → 28
+  assert.equal(valor("luck"), 6); // (60 + 55) / 2 / 10 = 5,75 → 6
 });
 
 test("una ficha nueva reparte sus 200 puntos y los recupera al volver", async () => {
