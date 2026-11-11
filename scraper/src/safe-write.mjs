@@ -11,9 +11,13 @@ import { writeFile } from "node:fs/promises";
 
 /** Escribe solo dentro de `base`: rechaza rutas que, ya resueltas, salgan de él (p. ej. por un slug con `..`). */
 export async function writeInside(base, target, data) {
-  const rel = path.relative(path.resolve(base), path.resolve(target));
+  const raiz = path.resolve(base);
+  const rel = path.relative(raiz, path.resolve(target));
   if (!rel || rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel)) {
     throw new Error(`ruta fuera de ${base}: ${target}`);
   }
-  await writeFile(target, data);
+  // El destino se reconstruye desde la ruta relativa ya validada (con su último tramo reducido a su
+  // nombre base): nunca se escribe sobre la ruta original, que puede venir de la red.
+  const destino = path.join(raiz, path.dirname(rel), path.basename(rel));
+  await writeFile(destino, data);
 }
