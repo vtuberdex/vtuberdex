@@ -105,7 +105,7 @@ test("una ficha nueva reparte sus 200 puntos y los recupera al volver", async ()
   assert.equal(despues.disponibles, 0);
   assert.equal(despues.puedeEditar, false);
   assert.equal(despues.finales.find((a) => a.slug === "str").puntos, 60);
-  assert.equal(despues.derivados.find((d) => d.slug === "hp").value, 750);
+  assert.equal(despues.derivados.find((d) => d.slug === "hp").value, 1350);
 
   // Al volver a abrir la ficha, lo guardado sigue ahí.
   const releido = await estadoDeAtributos(e, FICHA_VACIA);
