@@ -129,6 +129,23 @@ test("una ficha que ya tiene stats del scrape no reparte atributos", async () =>
   assert.equal(error.code, "atributos_bloqueados");
 });
 
+test("los stats ya creados no se reescriben ni con el mantenedor", async () => {
+  const e = nuevo();
+  const estado = await estadoDeAtributos(e, { ...FICHA_CON_STATS, admin: true });
+  assert.equal(estado.puedeEditar, false);
+  const error = await fallo(
+    guardarAtributos(e, {
+      ...FICHA_CON_STATS,
+      puntos: { str: 10 },
+      admin: true,
+    }),
+  );
+  assert.equal(error?.code, "atributos_bloqueados");
+  // Y aunque hubiera puntos guardados de antes, la ficha no recibe derivados: sus stats mandan.
+  assert.deepEqual(await statsDeAtributosDe(e, FICHA_CON_STATS), []);
+  assert.ok((await statsDeAtributosDe(e, FICHA_VACIA)).length === 0);
+});
+
 test("el mantenedor puede retocar una build ya repartida", async () => {
   const e = nuevo();
   await guardarAtributos(e, { ...FICHA_VACIA, puntos: { str: 200 - 100 } });
