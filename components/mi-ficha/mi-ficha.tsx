@@ -645,7 +645,12 @@ export function MiFicha() {
   };
 
   const aplicar = async (
-    accion: "subir" | "reiniciar" | "subir-stat" | "reiniciar-stats",
+    accion:
+      | "subir"
+      | "reiniciar"
+      | "subir-stat"
+      | "reiniciar-stats"
+      | "convertir-sobrantes",
     ficha: VistaMiFicha,
     clave?: string,
     nombre?: string,
