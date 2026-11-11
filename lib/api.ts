@@ -704,7 +704,12 @@ export const api = {
   repartirPuntos(
     token: string,
     slug: string,
-    accion: "subir" | "reiniciar" | "subir-stat" | "reiniciar-stats",
+    accion:
+      | "subir"
+      | "reiniciar"
+      | "subir-stat"
+      | "reiniciar-stats"
+      | "convertir-sobrantes",
     clave?: string,
   ) {
     return request<{ ok: true; ficha: VistaMiFicha }>("/api/mi-ficha/puntos", {
