@@ -212,8 +212,11 @@ export async function estadoDeAtributos(
   const finales = atributosFinales(puntos, bonos);
   const repartidos = finales.reduce((suma, a) => suma + a.puntos, 0);
   const conOrigen = tieneStatsDeOrigen(stats);
-  // La titular reparte una vez; después solo mira (el mantenedor siempre puede corregir).
-  const puedeEditar = Boolean(admin) || (repartidos === 0 && !conOrigen);
+  // Los stats que ya trae la ficha NO se tocan: ni la titular ni el mantenedor reparten atributos
+  // donde ya hay stats propios. En una ficha sin stats, la titular reparte una vez y después solo
+  // mira (el mantenedor sí puede corregir una build ya repartida).
+  const puedeEditar =
+    !conOrigen && (Boolean(admin) || repartidos === 0);
   return {
     catalogo: ATRIBUTOS.map((a) => ({ ...a })),
     puntos,
