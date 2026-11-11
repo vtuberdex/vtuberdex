@@ -124,9 +124,10 @@ test("los bonos de facción no gastan puntos y entran en los derivados", async (
   assert.equal(estado.disponibles, 120);
   const cha = estado.finales.find((a) => a.slug === "cha");
   assert.equal(cha.bono, 20);
-  assert.equal(cha.valor, 60);
-  assert.equal(estado.derivados.find((d) => d.slug === "attack").value, 121);
-  assert.equal(estado.derivados.find((d) => d.slug === "critic").value, 30);
+  assert.equal(cha.valor, 100); // 40 de base + 40 repartidos + 20 de bono (ya en el tope)
+  assert.equal(cha.maximoAsignable, 40); // con el bono solo caben 40 puntos más
+  assert.equal(estado.derivados.find((d) => d.slug === "attack").value, 209); // 95 × 2,2
+  assert.equal(estado.derivados.find((d) => d.slug === "critic").value, 50); // 100 × 0,5
 });
 
 test("una ficha que ya tiene stats del scrape no reparte atributos", async () => {
