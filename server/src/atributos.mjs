@@ -320,5 +320,9 @@ export async function statsDeAtributosDe(
   { vtuberId, facciones = [], stats = [] },
 ) {
   const estado = await estadoDeAtributos(ejecutor, { vtuberId, facciones, stats });
-  return estado.repartidos > 0 ? estado.derivados : [];
+  // Una ficha con stats propios nunca recibe los derivados: sus valores ya están creados y la web
+  // no los reescribe (solo las fichas nuevas se calculan desde los atributos).
+  return estado.repartidos > 0 && !estado.tieneStatsDeOrigen
+    ? estado.derivados
+    : [];
 }
