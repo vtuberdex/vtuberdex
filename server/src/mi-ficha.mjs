@@ -134,11 +134,26 @@ export async function estadoDePuntos(
   const repartidos = habilidades.reduce((suma, h) => suma + h.rango, 0);
   const ganados =
     Math.max(0, Math.trunc(Number(nivelesGanados) || 0)) * PUNTOS_POR_NIVEL;
+  // Lo que ya se pasó a stats sale de esta bolsa: suma en la otra y deja de estar disponible aquí.
+  const convertidos = await leerConvertidos(e, vtuberId);
+  // Hueco que todavía cabe en las habilidades vigentes: mientras quede, un punto NO sobra.
+  const hueco = habilidades.reduce(
+    (suma, h) => suma + Math.max(0, RANGO_MAXIMO - h.rango),
+    0,
+  );
+  const disponibles = Math.max(0, ganados - repartidos - convertidos);
   return {
     habilidades,
     ganados,
     repartidos,
-    disponibles: Math.max(0, ganados - repartidos),
+    convertidos,
+    disponibles,
+    /** Puntos que no caben en ninguna habilidad: lo único que se puede pasar a stats. */
+    sobrantes: Math.max(0, disponibles - hueco),
+    /** Hueco libre en las habilidades vigentes (rangos que aún se pueden subir). */
+    hueco,
+    /** Tope de lo que se puede repartir en habilidades: lo ganado menos lo ya convertido. */
+    gastables: Math.max(0, ganados - convertidos),
     rangoMaximo: RANGO_MAXIMO,
     puntosPorNivel: PUNTOS_POR_NIVEL,
   };
