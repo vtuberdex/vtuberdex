@@ -977,7 +977,7 @@ export function MiFichaVista({
         <AtributosPanel
           estado={ficha.atributos}
           ocupada={ocupada}
-          alGuardar={(atributos) => guardarAtributos(ficha, atributos)}
+          alGuardar={(atributos) => alGuardarAtributos(ficha, atributos)}
         />
       )}
 
