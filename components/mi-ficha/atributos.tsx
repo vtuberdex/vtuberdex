@@ -18,7 +18,6 @@ import type { EstadoDeAtributos } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import type { Clave } from "@/lib/i18n/mensajes";
 import {
-  ATRIBUTO_MAXIMO,
   PUNTOS_DE_ATRIBUTOS,
   atributosFinales,
   statsDerivados,
