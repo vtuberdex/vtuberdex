@@ -54,6 +54,18 @@ export const miFichaEs = {
     "Ganas {por} puntos de stats con cada nivel (aparte de los de habilidades). Sirven para HP, MP, ataques y defensas.",
   "mificha.statsDisponibles": "{n} para repartir · {a} de {b} usados",
   "mificha.statsPaso": "+{paso} por punto",
+  "mificha.atrTitulo": "Atributos RPG",
+  "mificha.atrTexto":
+    "Reparte tus {total} puntos entre los seis atributos: de ahí salen tu vida, tu maná, tus ataques y tus defensas.",
+  "mificha.atrDisponibles": "Te quedan {n} de {total} puntos",
+  "mificha.atrBono": "+{n} por facción",
+  "mificha.atrSuma":
+    "Repartidos {a} de {b}: los bonos de tus facciones no gastan puntos.",
+  "mificha.atrDerivados": "Lo que sale de tus atributos",
+  "mificha.atrGuardar": "Guardar atributos",
+  "mificha.atrBloqueado":
+    "Tus atributos ya están guardados. Si necesitas cambiarlos, pide al equipo que los ajuste.",
+  "mificha.atrGuardado": "Atributos guardados.",
   "mificha.statsSubioA": "¡{nombre} subió a {valor}!",
   "mificha.statsReiniciar": "Repartir stats de nuevo",
   "mificha.statsReiniciarConfirma":
