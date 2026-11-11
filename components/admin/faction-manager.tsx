@@ -30,6 +30,19 @@ import {
 type Pending = { kind: "merge"; target: string } | { kind: "delete" };
 type Notify = (kind: "ok" | "error", text: string) => void;
 
+/**
+ * ¿Es una SUBFACCIÓN HUÉRFANA? El nombre se escribió como «Madre (Propia)» —la convención del
+ * catálogo— pero no tiene madre guardada en `parentId`.
+ *
+ * POR QUÉ IMPORTA: la herencia de estados no se adivina del nombre, se lee de `faction.parent_id`
+ * (ver `tieneFaccion`). Una hija huérfana se ve como subfacción en la carta y, en cambio, sus estados
+ * exclusivos siguen bloqueados: es el fallo que se reportó desde el mantenedor.
+ */
+export function esSubfaccionHuerfana(faction: FactionRow): boolean {
+  if (faction.parentId) return false;
+  return /\([^)]*\)\s*$/.test(faction.label.trim());
+}
+
 export function FactionManager({
   token,
   factions,
@@ -76,6 +89,8 @@ export function FactionManager({
   };
 
   const withoutEmblem = factions.filter((faction) => !faction.icon);
+  /** Subfacciones a las que les falta la madre: sus estados exclusivos siguen bloqueados. */
+  const huerfanas = factions.filter(esSubfaccionHuerfana);
 
   return (
     <div className="space-y-4" data-testid="faction-manager">
@@ -99,6 +114,18 @@ export function FactionManager({
           {withoutEmblem.map((faction) => (
             <li key={faction.id} className="text-xs text-amber-200">
               ⚠ {faction.label} no tiene emblema aún.
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {huerfanas.length > 0 && (
+        <ul className="space-y-1" data-testid="faction-huerfanas">
+          {huerfanas.map((faction) => (
+            <li key={faction.id} className="text-xs text-red-300">
+              ⚠ {faction.label} parece una subfacción pero no tiene facción
+              madre: elige su madre en su tarjeta o sus estados exclusivos
+              seguirán bloqueados.
             </li>
           ))}
         </ul>
