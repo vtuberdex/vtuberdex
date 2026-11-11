@@ -774,6 +774,7 @@ export function MiFicha() {
         void aplicar("subir", datos.ficha, clave, nombre)
       }
       alReiniciar={() => void aplicar("reiniciar", datos.ficha)}
+      alConvertir={() => void aplicar("convertir-sobrantes", datos.ficha)}
       alConfirmar={setConfirmando}
     />
   );
