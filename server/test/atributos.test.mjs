@@ -176,19 +176,28 @@ test("el mantenedor puede retocar una build ya repartida", async () => {
   assert.equal(admin.finales.find((a) => a.slug === "str").puntos, 10);
 });
 
-test("no se puede pasar de 200 puntos ni de 100 en un atributo", async () => {
+test("no se puede pasar de 200 puntos ni del tope que deja la base", async () => {
   const e = nuevo();
   const deMas = await fallo(
     guardarAtributos(e, {
       ...FICHA_VACIA,
-      puntos: { str: 100, dex: 100, con: 1 },
+      puntos: { str: 60, dex: 60, con: 60, int: 60, wis: 1 },
     }),
   );
   assert.equal(deMas.code, "atributos_de_mas");
   const atributo = await fallo(
-    guardarAtributos(e, { ...FICHA_VACIA, puntos: { str: 101 } }),
+    guardarAtributos(e, { ...FICHA_VACIA, puntos: { str: 61 } }),
   );
   assert.equal(atributo.code, "atributo_invalido");
+  // Con un bono de +20 en CHA, a CHA solo le caben 40 puntos más.
+  const conBono = await fallo(
+    guardarAtributos(e, {
+      ...FICHA_VACIA,
+      facciones: ["Netherbane"],
+      puntos: { cha: 41 },
+    }),
+  );
+  assert.equal(conBono.code, "atributo_invalido");
   const negativo = await fallo(
     guardarAtributos(e, { ...FICHA_VACIA, puntos: { str: -1 } }),
   );
