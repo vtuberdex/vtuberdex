@@ -435,7 +435,7 @@ export async function subirStat(
       slug,
       Number(vtuberId),
       ...slugs,
-      antes.ganados,
+      antes.gastables,
       Number.isFinite(maxPuntos) ? maxPuntos : 1_000_000,
     ],
   );
