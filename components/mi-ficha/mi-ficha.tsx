@@ -682,6 +682,11 @@ export function MiFicha() {
             valor: nuevo?.valor ?? 0,
           }),
         });
+      } else if (accion === "convertir-sobrantes") {
+        setAviso({
+          tipo: "ok",
+          texto: t("mificha.sobrantesListo", { n: convertidos }),
+        });
       } else {
         setConfirmando(false);
         setConfirmandoStats(false);
