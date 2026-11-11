@@ -242,6 +242,10 @@ export interface VistaMiFicha {
     ganados: number;
     repartidos: number;
     disponibles: number;
+    /** Puntos que ya no caben en ninguna habilidad (todas al máximo): se pueden pasar a stats. */
+    sobrantes?: number;
+    /** Puntos que ya se pasaron a la bolsa de stats. */
+    convertidos?: number;
     rangoMaximo: number;
     puntosPorNivel: number;
   };
