@@ -241,8 +241,8 @@ export async function estadoDeAtributos(
   };
 }
 
-/** Valida una distribución completa y la devuelve como mapa de enteros. */
-export function validarDistribucion(puntos) {
+/** Valida una distribución completa y la devuelve como mapa de enteros (con el tope de cada uno). */
+export function validarDistribucion(puntos, bonos = {}) {
   if (!puntos || typeof puntos !== "object" || Array.isArray(puntos))
     throw new AtributoError(
       400,
