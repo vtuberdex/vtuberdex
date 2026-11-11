@@ -819,6 +819,7 @@ export function MiFichaVista({
   alSubir?: (clave: string, nombre: string) => void;
   alReiniciar?: () => void;
   alConfirmar?: (abierto: boolean) => void;
+  alConvertir?: () => void;
 }) {
   const { t } = useI18n();
   const { ficha, fichas } = datos;
