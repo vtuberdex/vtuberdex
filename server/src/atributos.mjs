@@ -265,11 +265,17 @@ export function validarDistribucion(puntos, bonos = {}) {
         "atributo_invalido",
         "Los puntos de cada atributo tienen que ser un número entero de 0 o más.",
       );
-    if (n > ATRIBUTO_MAXIMO)
+    // La base y el bono de facción ya gastan parte del tope: a cada atributo solo le caben los
+    // puntos que faltan hasta 100 (60 sin bono, 40 con un bono de +20).
+    const bono = Math.max(0, Math.trunc(Number(bonos[slug]) || 0));
+    const tope = Math.max(0, ATRIBUTO_MAXIMO - ATRIBUTO_BASE - bono);
+    if (n > tope)
       throw new AtributoError(
         400,
         "atributo_invalido",
-        `Ningún atributo puede pasar de ${ATRIBUTO_MAXIMO} puntos.`,
+        tope === 0
+          ? `Con la base de ${ATRIBUTO_BASE} y el bono de ${bono}, ${slug} ya llega a ${ATRIBUTO_MAXIMO}.`
+          : `A ${slug} solo le caben ${tope} puntos más (base ${ATRIBUTO_BASE} y bono ${bono} incluidos).`,
       );
     limpio[slug] = n;
     suma += n;
