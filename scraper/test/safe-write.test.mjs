@@ -49,3 +49,16 @@ test("permite un nombre que empieza por .. dentro del base", async () => {
     await rm(base, { recursive: true, force: true });
   }
 });
+
+test("escribe en una subcarpeta del base sin salirse", async () => {
+  const base = await mkdtemp(path.join(os.tmpdir(), "vd-safe-"));
+  try {
+    const carpeta = path.join(base, "raw");
+    await mkdir(carpeta);
+    const target = path.join(carpeta, "captura.png");
+    await writeInside(base, target, "png");
+    assert.equal(await readFile(target, "utf8"), "png");
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
