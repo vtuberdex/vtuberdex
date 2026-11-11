@@ -746,6 +746,17 @@ export const api = {
       body: JSON.stringify({ token, slug, accion, clave }),
     });
   },
+  /** Guarda la distribución de los seis atributos (200 puntos) de una ficha. */
+  guardarAtributosDeMiFicha(
+    token: string,
+    slug: string,
+    puntos: Record<string, number>,
+  ) {
+    return request<{ ok: true; ficha: VistaMiFicha }>("/api/mi-ficha/puntos", {
+      method: "POST",
+      body: JSON.stringify({ token, slug, accion: "atributos", puntos }),
+    });
+  },
   /** Código de un uso para vincular la cuenta de Minecraft (`codigo`) o soltar el vínculo (`desvincular`). */
   minecraftDeMiFicha(
     token: string,
