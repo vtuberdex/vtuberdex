@@ -386,12 +386,17 @@ export async function estadoDeStats(
   const ganados =
     Math.max(0, Math.trunc(Number(nivelesGanados) || 0)) *
     PUNTOS_STATS_POR_NIVEL;
+  // Además de los 10 por nivel, esta bolsa suma lo que se pasó de la de habilidades (`convertirPuntosSobrantes`).
+  const convertidos = await leerConvertidos(ejecutor, vtuberId);
   return {
     stats: lista,
     automaticos,
     ganados,
+    convertidos,
     repartidos,
-    disponibles: Math.max(0, ganados - repartidos),
+    disponibles: Math.max(0, ganados + convertidos - repartidos),
+    /** Tope de lo que se puede repartir en stats: los del nivel más los pasados de habilidades. */
+    gastables: ganados + convertidos,
     puntosPorNivel: PUNTOS_STATS_POR_NIVEL,
   };
 }
