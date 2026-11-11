@@ -968,6 +968,14 @@ export function MiFichaVista({
         />
       )}
 
+      {ficha.atributos && (
+        <AtributosPanel
+          estado={ficha.atributos}
+          ocupada={ocupada}
+          alGuardar={(atributos) => guardarAtributos(ficha, atributos)}
+        />
+      )}
+
       {puntos.habilidades.length === 0 ? (
         <p className="text-sm text-dex-muted">{t("mificha.sinHabilidades")}</p>
       ) : (
