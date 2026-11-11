@@ -213,6 +213,18 @@ export const miFichaEn: { [K in keyof typeof miFichaEs]: string } = {
     "You earn {por} stat points per level (separate from skill points). Spend them on HP, MP, attacks and defenses.",
   "mificha.statsDisponibles": "{n} to spend · {a} of {b} used",
   "mificha.statsPaso": "+{paso} per point",
+  "mificha.atrTitulo": "RPG attributes",
+  "mificha.atrTexto":
+    "Split your {total} points between the six attributes: your HP, MP, attacks and defenses come from them.",
+  "mificha.atrDisponibles": "You have {n} of {total} points left",
+  "mificha.atrBono": "+{n} from factions",
+  "mificha.atrSuma":
+    "Spent {a} of {b}: your faction bonuses cost no points.",
+  "mificha.atrDerivados": "What your attributes give you",
+  "mificha.atrGuardar": "Save attributes",
+  "mificha.atrBloqueado":
+    "Your attributes are already saved. If you need them changed, ask the team.",
+  "mificha.atrGuardado": "Attributes saved.",
   "mificha.statsSubioA": "{nombre} rose to {valor}!",
   "mificha.statsReiniciar": "Respec stats",
   "mificha.statsReiniciarConfirma":
