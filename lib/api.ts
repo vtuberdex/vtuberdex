@@ -299,6 +299,33 @@ export interface EstadoMinecraft {
   xpJuego: number;
 }
 
+/** Un atributo RPG de la ficha: puntos repartidos, bono de facción y valor final (tope 100). */
+export interface AtributoDeFicha {
+  slug: string;
+  label: string;
+  puntos: number;
+  bono: number;
+  valor: number;
+  maximo: number;
+}
+
+/** «Mi ficha»: los seis atributos (STR, DEX, CON, INT, WIS, CHA) y los stats que salen de ellos. */
+export interface EstadoDeAtributos {
+  catalogo: Array<{ slug: string; label: string }>;
+  puntos: Record<string, number>;
+  bonos: Record<string, number>;
+  finales: AtributoDeFicha[];
+  derivados: Array<{ slug: string; label: string; value: number }>;
+  total: number;
+  maximo: number;
+  repartidos: number;
+  disponibles: number;
+  /** La ficha ya traía stats propios: no reparte atributos y sus valores no se tocan. */
+  tieneStatsDeOrigen: boolean;
+  puedeEditar: boolean;
+  estado: "vacio" | "repartido" | "origen";
+}
+
 export interface RespuestaMiFicha {
   ok: true;
   fichas: Array<{ slug: string; name: string }>;
