@@ -162,7 +162,7 @@ test("los stats ya creados no se reescriben ni con el mantenedor", async () => {
 
 test("el mantenedor puede retocar una build ya repartida", async () => {
   const e = nuevo();
-  await guardarAtributos(e, { ...FICHA_VACIA, puntos: { str: 200 - 100 } });
+  await guardarAtributos(e, { ...FICHA_VACIA, puntos: { str: 60 } });
   const error = await fallo(
     guardarAtributos(e, { ...FICHA_VACIA, puntos: { str: 10 } }),
   );
