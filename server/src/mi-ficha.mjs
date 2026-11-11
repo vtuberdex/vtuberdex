@@ -135,7 +135,7 @@ export async function estadoDePuntos(
   const ganados =
     Math.max(0, Math.trunc(Number(nivelesGanados) || 0)) * PUNTOS_POR_NIVEL;
   // Lo que ya se pasó a stats sale de esta bolsa: suma en la otra y deja de estar disponible aquí.
-  const convertidos = await leerConvertidos(e, vtuberId);
+  const convertidos = await leerConvertidos(ejecutor, vtuberId);
   // Hueco que todavía cabe en las habilidades vigentes: mientras quede, un punto NO sobra.
   const hueco = habilidades.reduce(
     (suma, h) => suma + Math.max(0, RANGO_MAXIMO - h.rango),
