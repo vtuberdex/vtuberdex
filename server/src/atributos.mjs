@@ -313,7 +313,7 @@ export async function guardarAtributos(
         ? "Tu ficha ya tiene stats propios: los atributos se rellenan solo en fichas nuevas."
         : "Tus atributos ya están repartidos. Pide al equipo que los ajuste si necesitas cambiarlos.",
     );
-  const limpio = validarDistribucion(puntos);
+  const limpio = validarDistribucion(puntos, bonosDeFacciones(facciones));
   await e.execute("DELETE FROM atributo_ficha WHERE vtuber_id = ?", [
     Number(vtuberId),
   ]);
