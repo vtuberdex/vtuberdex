@@ -136,17 +136,21 @@ export function bonosDeFacciones(facciones = []) {
   return bono;
 }
 
-/** Atributos finales: puntos repartidos + bono de facción, sin pasar del tope. */
+/** Atributos finales: base 40 + puntos repartidos + bono de facción, sin pasar del tope. */
 export function atributosFinales(puntos = {}, bonos = {}) {
   return ATRIBUTOS.map(({ slug, label }) => {
     const puestos = Math.max(0, Math.trunc(Number(puntos[slug]) || 0));
     const bono = Math.max(0, Math.trunc(Number(bonos[slug]) || 0));
+    // La base y el bono ya ocupan parte del tope: solo caben los puntos que faltan hasta 100.
+    const maximoAsignable = Math.max(0, ATRIBUTO_MAXIMO - ATRIBUTO_BASE - bono);
     return {
       slug,
       label,
+      base: ATRIBUTO_BASE,
       puntos: puestos,
       bono,
-      valor: Math.min(ATRIBUTO_MAXIMO, puestos + bono),
+      maximoAsignable,
+      valor: Math.min(ATRIBUTO_MAXIMO, ATRIBUTO_BASE + puestos + bono),
       maximo: ATRIBUTO_MAXIMO,
     };
   });
