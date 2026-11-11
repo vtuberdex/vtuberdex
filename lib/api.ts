@@ -221,8 +221,12 @@ export interface EstadoDeStats {
   stats: StatMejorable[];
   automaticos: StatAutomatico[];
   ganados: number;
+  /** Puntos de habilidad pasados a esta bolsa (ya no cuentan en la de habilidades). */
+  convertidos?: number;
   repartidos: number;
   disponibles: number;
+  /** Tope de lo que se puede repartir: lo del nivel más lo pasado de habilidades. */
+  gastables?: number;
   puntosPorNivel: number;
 }
 
