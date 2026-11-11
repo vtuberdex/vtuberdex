@@ -251,6 +251,8 @@ export interface VistaMiFicha {
   };
   /** Puntos de stats (bolsa aparte de las habilidades). Opcional: la maqueta de /niveles no lo trae. */
   statsPuntos?: EstadoDeStats;
+  /** Los seis atributos RPG y los stats que salen de ellos. Opcional: falta en la maqueta de /niveles. */
+  atributos?: EstadoDeAtributos;
   /** Cuenta de Minecraft vinculada y XP traída del juego. Opcional: la maqueta de /niveles no lo trae. */
   minecraft?: EstadoMinecraft;
   /** Misiones de Minecraft con su progreso. `null` si el almacén falló; ausente en la maqueta de /niveles. */
