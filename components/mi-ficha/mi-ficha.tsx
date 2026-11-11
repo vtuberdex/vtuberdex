@@ -658,6 +658,9 @@ export function MiFicha() {
     if (!token) return;
     setOcupada(clave ?? "reiniciar");
     setAviso(null);
+    // El sobrante se lee ANTES de convertir: después ya es 0 y el aviso diría «pasaste 0».
+    const convertidos =
+      accion === "convertir-sobrantes" ? (ficha.puntos.sobrantes ?? 0) : 0;
     try {
       const r = await api.repartirPuntos(token, ficha.slug, accion, clave);
       setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
