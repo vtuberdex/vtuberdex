@@ -200,7 +200,7 @@ export async function subirHabilidad(
       clave,
       Number(vtuberId),
       ...claves,
-      antes.ganados,
+      antes.gastables,
       RANGO_MAXIMO,
     ],
   );
