@@ -801,6 +801,7 @@ export function MiFichaVista({
   alSubir = () => {},
   alReiniciar = () => {},
   alConfirmar = () => {},
+  alConvertir = () => {},
 }: {
   datos: RespuestaMiFicha;
   ocupada?: string | null;
