@@ -65,7 +65,9 @@ describe("rutas de archivos y consola", () => {
   });
 
   it("el mantenedor ve y edita la config anidada de un plugin", async () => {
-    const lista = await (await archivosGET(req("http://x/a", MANT))).json();
+    const lista = await (
+      await archivosGET(req("http://x/a?carpeta=plugins/MythicMobs", MANT))
+    ).json();
     expect(lista.archivos.map((a: { ruta: string }) => a.ruta)).toContain(
       "plugins/MythicMobs/config.yml",
     );
