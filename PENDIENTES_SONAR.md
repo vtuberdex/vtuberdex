@@ -17,8 +17,8 @@ el comportamiento.
 
 - Quality gate: **OK**
 - Bugs: **0** · Vulnerabilidades: **0** · Hotspots: **0**
-- Code smells: **5523** · Duplicación: 1.4 % · Cobertura: 63.9 % · Deuda: ~472 h
-- Último análisis: 2026-11-10 10:58 (-03:00)
+- Code smells: **5529** · Duplicación: 1.4 % · Cobertura: 63.8 % · Deuda: ~473 h
+- Último análisis: 2026-11-11 13:34 (-03:00)
 
 Nada urgente: no hay ni un bug ni una vulnerabilidad abiertos. Lo que queda es limpieza.
 
