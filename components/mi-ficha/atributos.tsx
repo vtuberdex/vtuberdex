@@ -39,8 +39,8 @@ export function AtributosPanel({
   // Al guardar (o al cambiar de ficha) se vuelve a lo que hay en el servidor.
   useEffect(() => setPuntos(estado.puntos), [estado]);
 
-  // Una ficha que ya traía stats del scrape no entra en el reparto: sus valores mandan.
-  if (estado.estado === "origen" && !estado.puedeEditar) return null;
+  // Una ficha que ya traía stats propios no entra en el reparto: sus valores mandan y no se tocan.
+  if (estado.tieneStatsDeOrigen) return null;
 
   const repartidos = Object.values(puntos).reduce(
     (suma, n) => suma + (Number(n) || 0),
