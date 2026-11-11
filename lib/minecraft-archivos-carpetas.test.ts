@@ -146,7 +146,10 @@ describe("guardar sin permiso de escritura", () => {
   it.skipIf(esRoot)(
     "una carpeta de solo lectura responde «sin permiso», no un 500",
     async () => {
-      await fs.chmod(path.join(base, "plugins", "Solo"), 0o555);
+      // El permiso que decide es el del ARCHIVO: con la carpeta en solo lectura el texto
+      // existente se sigue pudiendo reescribir.
+      const archivo = path.join(base, "plugins", "Solo", "config.yml");
+      await fs.chmod(archivo, 0o444);
       const r = (await guardarArchivo({
         dir: base,
         ruta: "plugins/Solo/config.yml",
@@ -156,7 +159,7 @@ describe("guardar sin permiso de escritura", () => {
       expect(r.ok).toBe(false);
       expect(r.status).toBe(403);
       expect(r.cuerpo.error).toBe("sin_permiso_escritura");
-      await fs.chmod(path.join(base, "plugins", "Solo"), 0o755);
+      await fs.chmod(archivo, 0o644);
     },
   );
 });
