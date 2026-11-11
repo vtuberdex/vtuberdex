@@ -13,9 +13,9 @@
  *
  * VISIBILIDAD
  * -----------
- * Solo se reparten en fichas SIN stats de origen (una ficha nueva) o cuando la persona todavía no
- * ha repartido nada; una vez repartidos, la titular los ve en modo lectura para que su build no
- * cambie por un clic. El mantenedor (`admin`) puede retocarlos siempre.
+ * Solo se reparten en fichas SIN stats propios (una ficha nueva); una ficha que ya trae stats se
+ * queda como está y ni siquiera ve el bloque. Una vez repartidos, la titular los ve en modo lectura
+ * para que su build no cambie por un clic. El mantenedor (`admin`) puede retocar una build ya hecha.
  *
  * JS puro sobre un EJECUTOR `{ execute, exec }` (Turso/`file:` en producción, SQLite en los tests).
  */
