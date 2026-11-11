@@ -12,6 +12,7 @@ import {
   bonosDeFacciones,
   estadoDeAtributos,
   guardarAtributos,
+  statsDeAtributosDe,
   statsDerivados,
 } from "../src/atributos.mjs";
 import { ejecutorSqlite } from "../src/solicitudes.mjs";
