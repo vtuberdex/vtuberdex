@@ -105,6 +105,20 @@ export async function leerRangos(ejecutor, vtuberId) {
 }
 
 /**
+ * Puntos de habilidad que la ficha ya pasó a la bolsa de stats. Es la ÚNICA cifra de esta bolsa que se guarda:
+ * el resto es `ganados − repartidos`. No puede desincronizarse porque el tope que se puede repartir en
+ * habilidades baja en la misma cantidad (`gastables` en `estadoDePuntos`).
+ */
+export async function leerConvertidos(ejecutor, vtuberId) {
+  const e = await conTablas(ejecutor);
+  const { rows } = await e.execute(
+    "SELECT puntos FROM punto_convertido WHERE vtuber_id = ?",
+    [Number(vtuberId)],
+  );
+  return Math.max(0, Math.trunc(Number(rows[0]?.puntos) || 0));
+}
+
+/**
  * Cómo está el reparto: rango de cada habilidad vigente y puntos que quedan.
  * @param {{ vtuberId: number, skills: Array<object>, nivelesGanados: number }} entrada
  */
