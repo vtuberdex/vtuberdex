@@ -104,7 +104,7 @@ export function AtributosPanel({
                 <input
                   type="number"
                   min={0}
-                  max={ATRIBUTO_MAXIMO}
+                  max={atributo.maximoAsignable}
                   value={puntos[atributo.slug] ?? 0}
                   onChange={(e) => fijar(atributo.slug, e.target.value)}
                   aria-label={atributo.label}
