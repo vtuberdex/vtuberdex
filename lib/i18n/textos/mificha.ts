@@ -372,6 +372,18 @@ export const miFichaJa: { [K in keyof typeof miFichaEs]: string } = {
     "レベルごとに {por} ポイントを獲得します（スキルポイントとは別）。HP・MP・攻撃・防御に使えます。",
   "mificha.statsDisponibles": "残り {n} · 使用 {a} / {b}",
   "mificha.statsPaso": "1ポイントで +{paso}",
+  "mificha.atrTitulo": "RPG 属性",
+  "mificha.atrTexto":
+    "6 つの属性に {total} ポイントを振り分けましょう。HP・MP・攻撃・防御はここから決まります。",
+  "mificha.atrDisponibles": "残り {n} / {total} ポイント",
+  "mificha.atrBono": "勢力ボーナス +{n}",
+  "mificha.atrSuma":
+    "{b} のうち {a} を配分済み。勢力ボーナスはポイントを使いません。",
+  "mificha.atrDerivados": "属性から決まるステータス",
+  "mificha.atrGuardar": "属性を保存",
+  "mificha.atrBloqueado":
+    "属性は保存済みです。変更が必要なら運営にご相談ください。",
+  "mificha.atrGuardado": "属性を保存しました。",
   "mificha.statsSubioA": "{nombre} が {valor} に上がりました！",
   "mificha.statsReiniciar": "ステータスを振り直す",
   "mificha.statsReiniciarConfirma":
