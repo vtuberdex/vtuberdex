@@ -54,15 +54,12 @@ export function AtributosPanel({
     finales.some((a) => a.puntos !== (estado.puntos[a.slug] ?? 0));
 
   const fijar = (slug: string, valor: string) => {
+    // Lo que cabe: 60 sin bono, 40 con un bono de +20 (los 40 de base cuentan para el tope) y
+    // nunca más de los puntos que quedan por repartir.
+    const cabe = finales.find((a) => a.slug === slug)?.maximoAsignable ?? 0;
     const n = Math.max(
       0,
-      Math.min(
-        ATRIBUTO_MAXIMO,
-        Math.trunc(Number(valor) || 0),
-        Math.trunc(Number(valor) || 0) > disponibles + (puntos[slug] ?? 0)
-          ? disponibles + (puntos[slug] ?? 0)
-          : ATRIBUTO_MAXIMO,
-      ),
+      Math.min(Math.trunc(Number(valor) || 0), cabe, disponibles + (puntos[slug] ?? 0)),
     );
     setPuntos((actual) => ({ ...actual, [slug]: n }));
   };
