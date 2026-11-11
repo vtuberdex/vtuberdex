@@ -210,6 +210,10 @@ export const miFichaEn: { [K in keyof typeof miFichaEs]: string } = {
     "These stats grow with your levels, no points needed.",
   "mificha.statsAutoCada": "+{suma} every {cada} levels",
   "mificha.statsAutoTope": "max {tope}",
+  "mificha.sobrantesTexto":
+    "Your skills are all maxed out: you have {n} points that no longer fit anywhere. You can move them to the stats pool.",
+  "mificha.sobrantesBoton": "Move {n} to stats",
+  "mificha.sobrantesListo": "You moved {n} points to the stats pool!",
   "mificha.verFicha": "See my public profile",
   "mificha.errorSinPuntos": "No points left. You earn more by leveling up.",
   "mificha.errorGeneral": "It could not be saved. Please try again.",
