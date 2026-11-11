@@ -35,6 +35,10 @@ import { ejecutorDeSolicitudes } from "../../../../lib/solicitudes.mjs";
 import { marcarSinCorreo } from "../../../../lib/sin-correo.mjs";
 import { equilibrarStats } from "../../../../server/src/equilibrio.mjs";
 import {
+  aplicarAtributosAStats,
+  statsDeAtributosDe,
+} from "../../../../server/src/atributos.mjs";
+import {
   aplicarPuntosAStats,
   claveDeHabilidad,
   leerPuntosDeStats,
