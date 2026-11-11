@@ -53,7 +53,8 @@ export const ATRIBUTOS = Object.freeze([
   { slug: "cha", label: "Carisma" },
 ]);
 
-/** Puntos que reparte cada ficha y tope de cada atributo (bonos incluidos). */
+/** Base de cada atributo, puntos que reparte cada ficha y tope final (base y bonos incluidos). */
+export const ATRIBUTO_BASE = 40;
 export const PUNTOS_DE_ATRIBUTOS = 200;
 export const ATRIBUTO_MAXIMO = 100;
 
