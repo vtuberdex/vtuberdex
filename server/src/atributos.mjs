@@ -3,9 +3,10 @@
  *
  * REGLA
  * -----
- * Cada ficha reparte `PUNTOS_DE_ATRIBUTOS` (200) entre los seis atributos. Los bonos de sus dos
- * facciones se SUMAN encima, sin gastar puntos, y ningún atributo final pasa de `ATRIBUTO_MAXIMO`
- * (100): si el bono se pasa, el valor se queda en 100.
+ * Cada atributo parte de `ATRIBUTO_BASE` (40) y la ficha reparte `PUNTOS_DE_ATRIBUTOS` (200) entre
+ * los seis. Los bonos de sus dos facciones se SUMAN encima, sin gastar puntos. Todo cuenta para el
+ * mismo tope, `ATRIBUTO_MAXIMO` (100): con 40 de base y un bono de +20 solo caben 40 puntos más, y
+ * sin bono caben 60.
  *
  * Los stats que ve la ficha y el plugin (HP, MP, ataques, defensas, velocidad, evasión, precisión,
  * crítico y suerte) son DERIVADOS de los atributos finales: no se guardan, se calculan, así que no
