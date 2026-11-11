@@ -47,16 +47,18 @@ async function maxear(e, nivelesGanados) {
 
 test("mientras quepan puntos en una habilidad NO hay sobrantes ni se pueden convertir", async () => {
   const e = nuevo();
-  const antes = await estadoDePuntos(e, entrada(2));
-  assert.equal(antes.hueco > 0, true);
+  // 1 nivel = 3 puntos y la única habilidad admite 5 rangos: todos caben, ninguno sobra.
+  const antes = await estadoDePuntos(e, entrada(1));
+  assert.equal(antes.ganados, PUNTOS_POR_NIVEL);
+  assert.equal(antes.hueco, RANGO_MAXIMO);
   assert.equal(antes.sobrantes, 0);
   const error = await mensajeDe(
-    convertirPuntosSobrantes(e, entrada(2)),
+    convertirPuntosSobrantes(e, entrada(1)),
   );
   assert.ok(error instanceof PuntosError);
   assert.equal(error.code, "sin_sobrantes");
   // Nada se convirtió: la bolsa de stats sigue con lo suyo.
-  const stats = await estadoDeStats(e, enStats(2));
+  const stats = await estadoDeStats(e, enStats(1));
   assert.equal(stats.convertidos, 0);
 });
 
