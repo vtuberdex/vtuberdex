@@ -126,8 +126,10 @@ test("lo convertido no vuelve ni al reiniciar los rangos", async () => {
   const trasReiniciar = await reiniciarRangos(e, entrada(niveles));
   assert.equal(trasReiniciar.repartidos, 0);
   assert.equal(trasReiniciar.convertidos, convertido.convertidos);
-  assert.equal(trasReiniciar.disponibles, convertido.disponibles);
   assert.equal(trasReiniciar.gastables, convertido.gastables);
+  // Vuelven los puntos de las habilidades (los rangos se borraron), pero no lo convertido: lo disponible
+  // después de reiniciar es justo el tope que se puede repartir.
+  assert.equal(trasReiniciar.disponibles, trasReiniciar.gastables);
 });
 
 test("el punto convertido se puede gastar en un stat y sube su valor", async () => {
