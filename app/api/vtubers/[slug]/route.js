@@ -131,6 +131,24 @@ export async function GET(request, { params }) {
       `[mi-ficha] la ficha ${slug} sale sin puntos de stats: ${error.message}`,
     );
   }
+  // Si la ficha repartió sus seis atributos (STR, DEX, CON…), los stats que ve el juego salen de
+  // ahí: se calculan, no se guardan. Si el almacén falla, la ficha sale con lo que tenía.
+  try {
+    const derivados = await statsDeAtributosDe(await ejecutorDeSolicitudes(), {
+      vtuberId: card.id,
+      facciones: card.factions ?? [],
+      stats: card.stats,
+    });
+    if (derivados.length)
+      conLikes = {
+        ...conLikes,
+        stats: aplicarAtributosAStats(conLikes.stats, derivados),
+      };
+  } catch (error) {
+    console.error(
+      `[mi-ficha] la ficha ${slug} sale sin atributos: ${error.message}`,
+    );
+  }
   return Response.json(
     {
       ...(await marcarSinCorreo(db, [conLikes]))[0],
