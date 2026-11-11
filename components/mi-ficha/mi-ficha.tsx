@@ -800,6 +800,9 @@ export function MiFicha() {
       }
       alReiniciar={() => void aplicar("reiniciar", datos.ficha)}
       alConvertir={() => void aplicar("convertir-sobrantes", datos.ficha)}
+      alGuardarAtributos={(ficha, atributos) =>
+        void guardarAtributos(ficha, atributos)
+      }
       alConfirmar={setConfirmando}
     />
   );
