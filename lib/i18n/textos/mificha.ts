@@ -63,6 +63,10 @@ export const miFichaEs = {
     "Estos stats crecen con tus niveles, sin gastar puntos.",
   "mificha.statsAutoCada": "+{suma} cada {cada} niveles",
   "mificha.statsAutoTope": "máx. {tope}",
+  "mificha.sobrantesTexto":
+    "Tus habilidades están al máximo: te quedan {n} puntos que ya no caben en ninguna. Puedes pasarlos a la bolsa de stats.",
+  "mificha.sobrantesBoton": "Pasar {n} a stats",
+  "mificha.sobrantesListo": "¡Pasaste {n} puntos a la bolsa de stats!",
   "mificha.verFicha": "Ver mi ficha pública",
   "mificha.errorSinPuntos": "No te quedan puntos. Ganas más al subir de nivel.",
   "mificha.errorGeneral": "No se pudo guardar. Inténtalo de nuevo.",
