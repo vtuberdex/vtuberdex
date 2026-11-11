@@ -699,6 +699,30 @@ export function MiFicha() {
     }
   };
 
+  // Los seis atributos se guardan de una vez (la distribución completa): el servidor valida el tope
+  // de 200 puntos y de 100 por atributo antes de escribirlos.
+  const guardarAtributos = async (
+    ficha: VistaMiFicha,
+    atributos: Record<string, number>,
+  ) => {
+    if (!token) return;
+    setOcupada("atributos");
+    setAviso(null);
+    try {
+      const r = await api.guardarAtributosDeMiFicha(
+        token,
+        ficha.slug,
+        atributos,
+      );
+      setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
+      setAviso({ tipo: "ok", texto: t("mificha.atrGuardado") });
+    } catch (causa) {
+      avisarFallo(causa);
+    } finally {
+      setOcupada(null);
+    }
+  };
+
   const minecraft = async (
     accion: "codigo" | "desvincular",
     ficha: VistaMiFicha,
