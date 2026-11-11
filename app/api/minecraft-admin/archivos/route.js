@@ -13,7 +13,7 @@ import {
 import {
   guardarArchivo,
   leerArchivo,
-  listarArchivos,
+  listarCarpeta,
 } from "../../../../lib/minecraft-archivos.mjs";
 import { anotarAuditoria } from "../../../../lib/minecraft-consola.mjs";
 
@@ -21,9 +21,19 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   return conMantenedor(request, async (acceso) => {
-    const ruta = new URL(request.url).searchParams.get("ruta");
+    const params = new URL(request.url).searchParams;
+    const ruta = params.get("ruta");
+    // Sin `ruta` es navegar: `?carpeta=plugins/MythicMobs` abre esa carpeta y sin `carpeta`
+    // se abre la raíz (archivos de Paper/Bukkit/Spigot y las carpetas navegables).
     if (!ruta) {
-      return respuestaJson(await listarArchivos({ rol: acceso.sesion.role }));
+      const resultado = await listarCarpeta({
+        ruta: params.get("carpeta"),
+        rol: acceso.sesion.role,
+      });
+      if (!resultado.ok) {
+        return respuestaJson(resultado.cuerpo, resultado.status);
+      }
+      return respuestaJson(resultado);
     }
     const resultado = await leerArchivo({ ruta, rol: acceso.sesion.role });
     if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
