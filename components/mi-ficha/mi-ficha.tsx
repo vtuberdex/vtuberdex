@@ -827,6 +827,7 @@ export function MiFichaVista({
   alReiniciar = () => {},
   alConfirmar = () => {},
   alConvertir = () => {},
+  alGuardarAtributos = () => {},
 }: {
   datos: RespuestaMiFicha;
   ocupada?: string | null;
