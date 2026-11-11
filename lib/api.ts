@@ -251,6 +251,8 @@ export interface VistaMiFicha {
   };
   /** Puntos de stats (bolsa aparte de las habilidades). Opcional: la maqueta de /niveles no lo trae. */
   statsPuntos?: EstadoDeStats;
+  /** Los seis atributos RPG y los stats que salen de ellos. Opcional: falta en la maqueta de /niveles. */
+  atributos?: EstadoDeAtributos;
   /** Cuenta de Minecraft vinculada y XP traída del juego. Opcional: la maqueta de /niveles no lo trae. */
   minecraft?: EstadoMinecraft;
   /** Misiones de Minecraft con su progreso. `null` si el almacén falló; ausente en la maqueta de /niveles. */
@@ -297,6 +299,33 @@ export interface EstadoMinecraft {
   jugador: string | null;
   desde: string | null;
   xpJuego: number;
+}
+
+/** Un atributo RPG de la ficha: puntos repartidos, bono de facción y valor final (tope 100). */
+export interface AtributoDeFicha {
+  slug: string;
+  label: string;
+  puntos: number;
+  bono: number;
+  valor: number;
+  maximo: number;
+}
+
+/** «Mi ficha»: los seis atributos (STR, DEX, CON, INT, WIS, CHA) y los stats que salen de ellos. */
+export interface EstadoDeAtributos {
+  catalogo: Array<{ slug: string; label: string }>;
+  puntos: Record<string, number>;
+  bonos: Record<string, number>;
+  finales: AtributoDeFicha[];
+  derivados: Array<{ slug: string; label: string; value: number }>;
+  total: number;
+  maximo: number;
+  repartidos: number;
+  disponibles: number;
+  /** La ficha ya traía stats propios: no reparte atributos y sus valores no se tocan. */
+  tieneStatsDeOrigen: boolean;
+  puedeEditar: boolean;
+  estado: "vacio" | "repartido" | "origen";
 }
 
 export interface RespuestaMiFicha {
@@ -715,6 +744,17 @@ export const api = {
     return request<{ ok: true; ficha: VistaMiFicha }>("/api/mi-ficha/puntos", {
       method: "POST",
       body: JSON.stringify({ token, slug, accion, clave }),
+    });
+  },
+  /** Guarda la distribución de los seis atributos (200 puntos) de una ficha. */
+  guardarAtributosDeMiFicha(
+    token: string,
+    slug: string,
+    puntos: Record<string, number>,
+  ) {
+    return request<{ ok: true; ficha: VistaMiFicha }>("/api/mi-ficha/puntos", {
+      method: "POST",
+      body: JSON.stringify({ token, slug, accion: "atributos", puntos }),
     });
   },
   /** Código de un uso para vincular la cuenta de Minecraft (`codigo`) o soltar el vínculo (`desvincular`). */

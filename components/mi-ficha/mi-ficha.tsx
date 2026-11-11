@@ -35,6 +35,7 @@ import { useI18n } from "@/lib/i18n";
 import type { Clave } from "@/lib/i18n/mensajes";
 import { miFichaEs } from "@/lib/i18n/textos/mificha";
 import { XP_JUEGO_MAX_DIA } from "@/server/src/experiencia.mjs";
+import { AtributosPanel } from "./atributos";
 
 const CATEGORIAS: Array<HabilidadMejorable["category"]> = [
   "active",
@@ -698,6 +699,30 @@ export function MiFicha() {
     }
   };
 
+  // Los seis atributos se guardan de una vez (la distribución completa): el servidor valida el tope
+  // de 200 puntos y de 100 por atributo antes de escribirlos.
+  const guardarAtributos = async (
+    ficha: VistaMiFicha,
+    atributos: Record<string, number>,
+  ) => {
+    if (!token) return;
+    setOcupada("atributos");
+    setAviso(null);
+    try {
+      const r = await api.guardarAtributosDeMiFicha(
+        token,
+        ficha.slug,
+        atributos,
+      );
+      setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
+      setAviso({ tipo: "ok", texto: t("mificha.atrGuardado") });
+    } catch (causa) {
+      avisarFallo(causa);
+    } finally {
+      setOcupada(null);
+    }
+  };
+
   const minecraft = async (
     accion: "codigo" | "desvincular",
     ficha: VistaMiFicha,
@@ -775,6 +800,9 @@ export function MiFicha() {
       }
       alReiniciar={() => void aplicar("reiniciar", datos.ficha)}
       alConvertir={() => void aplicar("convertir-sobrantes", datos.ficha)}
+      alGuardarAtributos={(ficha, atributos) =>
+        void guardarAtributos(ficha, atributos)
+      }
       alConfirmar={setConfirmando}
     />
   );
@@ -802,6 +830,7 @@ export function MiFichaVista({
   alReiniciar = () => {},
   alConfirmar = () => {},
   alConvertir = () => {},
+  alGuardarAtributos = () => {},
 }: {
   datos: RespuestaMiFicha;
   ocupada?: string | null;
@@ -820,6 +849,10 @@ export function MiFichaVista({
   alReiniciar?: () => void;
   alConfirmar?: (abierto: boolean) => void;
   alConvertir?: () => void;
+  alGuardarAtributos?: (
+    ficha: VistaMiFicha,
+    atributos: Record<string, number>,
+  ) => void;
 }) {
   const { t } = useI18n();
   const { ficha, fichas } = datos;
@@ -940,6 +973,14 @@ export function MiFichaVista({
           alSubir={alSubirStat}
           alReiniciar={alReiniciarStats}
           alConfirmar={alConfirmarStats}
+        />
+      )}
+
+      {ficha.atributos && (
+        <AtributosPanel
+          estado={ficha.atributos}
+          ocupada={ocupada}
+          alGuardar={(atributos) => alGuardarAtributos(ficha, atributos)}
         />
       )}
 
