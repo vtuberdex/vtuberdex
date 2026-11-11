@@ -645,7 +645,12 @@ export function MiFicha() {
   };
 
   const aplicar = async (
-    accion: "subir" | "reiniciar" | "subir-stat" | "reiniciar-stats",
+    accion:
+      | "subir"
+      | "reiniciar"
+      | "subir-stat"
+      | "reiniciar-stats"
+      | "convertir-sobrantes",
     ficha: VistaMiFicha,
     clave?: string,
     nombre?: string,
@@ -653,6 +658,9 @@ export function MiFicha() {
     if (!token) return;
     setOcupada(clave ?? "reiniciar");
     setAviso(null);
+    // El sobrante se lee ANTES de convertir: después ya es 0 y el aviso diría «pasaste 0».
+    const convertidos =
+      accion === "convertir-sobrantes" ? (ficha.puntos.sobrantes ?? 0) : 0;
     try {
       const r = await api.repartirPuntos(token, ficha.slug, accion, clave);
       setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
@@ -673,6 +681,11 @@ export function MiFicha() {
             nombre: nombre ?? "",
             valor: nuevo?.valor ?? 0,
           }),
+        });
+      } else if (accion === "convertir-sobrantes") {
+        setAviso({
+          tipo: "ok",
+          texto: t("mificha.sobrantesListo", { n: convertidos }),
         });
       } else {
         setConfirmando(false);
@@ -761,6 +774,7 @@ export function MiFicha() {
         void aplicar("subir", datos.ficha, clave, nombre)
       }
       alReiniciar={() => void aplicar("reiniciar", datos.ficha)}
+      alConvertir={() => void aplicar("convertir-sobrantes", datos.ficha)}
       alConfirmar={setConfirmando}
     />
   );
@@ -787,6 +801,7 @@ export function MiFichaVista({
   alSubir = () => {},
   alReiniciar = () => {},
   alConfirmar = () => {},
+  alConvertir = () => {},
 }: {
   datos: RespuestaMiFicha;
   ocupada?: string | null;
@@ -804,6 +819,7 @@ export function MiFichaVista({
   alSubir?: (clave: string, nombre: string) => void;
   alReiniciar?: () => void;
   alConfirmar?: (abierto: boolean) => void;
+  alConvertir?: () => void;
 }) {
   const { t } = useI18n();
   const { ficha, fichas } = datos;
@@ -898,6 +914,23 @@ export function MiFichaVista({
       </section>
 
       {aviso && <Aviso tipo={aviso.tipo}>{aviso.texto}</Aviso>}
+
+      {(puntos.sobrantes ?? 0) > 0 && (
+        <section className="rounded-2xl border border-dex-accent/40 bg-dex-panel/60 p-5">
+          <p className="text-sm text-dex-ink/85">
+            {t("mificha.sobrantesTexto", { n: puntos.sobrantes ?? 0 })}
+          </p>
+          <button
+            type="button"
+            onClick={alConvertir}
+            disabled={ocupada !== null}
+            className={`mt-3 ${claseSecundario}`}
+            data-testid="mificha-sobrantes"
+          >
+            {t("mificha.sobrantesBoton", { n: puntos.sobrantes ?? 0 })}
+          </button>
+        </section>
+      )}
 
       {ficha.statsPuntos && (
         <SeccionStats

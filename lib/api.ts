@@ -221,8 +221,12 @@ export interface EstadoDeStats {
   stats: StatMejorable[];
   automaticos: StatAutomatico[];
   ganados: number;
+  /** Puntos de habilidad pasados a esta bolsa (ya no cuentan en la de habilidades). */
+  convertidos?: number;
   repartidos: number;
   disponibles: number;
+  /** Tope de lo que se puede repartir: lo del nivel más lo pasado de habilidades. */
+  gastables?: number;
   puntosPorNivel: number;
 }
 
@@ -238,6 +242,10 @@ export interface VistaMiFicha {
     ganados: number;
     repartidos: number;
     disponibles: number;
+    /** Puntos que ya no caben en ninguna habilidad (todas al máximo): se pueden pasar a stats. */
+    sobrantes?: number;
+    /** Puntos que ya se pasaron a la bolsa de stats. */
+    convertidos?: number;
     rangoMaximo: number;
     puntosPorNivel: number;
   };
@@ -696,7 +704,12 @@ export const api = {
   repartirPuntos(
     token: string,
     slug: string,
-    accion: "subir" | "reiniciar" | "subir-stat" | "reiniciar-stats",
+    accion:
+      | "subir"
+      | "reiniciar"
+      | "subir-stat"
+      | "reiniciar-stats"
+      | "convertir-sobrantes",
     clave?: string,
   ) {
     return request<{ ok: true; ficha: VistaMiFicha }>("/api/mi-ficha/puntos", {

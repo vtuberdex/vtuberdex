@@ -41,6 +41,10 @@ const DDL = `
     puntos     INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (vtuber_id, slug)
   );
+  CREATE TABLE IF NOT EXISTS punto_convertido (
+    vtuber_id  INTEGER PRIMARY KEY,
+    puntos     INTEGER NOT NULL DEFAULT 0
+  );
   CREATE TABLE IF NOT EXISTS aviso_nivel (
     vtuber_id  INTEGER PRIMARY KEY,
     nivel      INTEGER NOT NULL,
@@ -101,6 +105,20 @@ export async function leerRangos(ejecutor, vtuberId) {
 }
 
 /**
+ * Puntos de habilidad que la ficha ya pasó a la bolsa de stats. Es la ÚNICA cifra de esta bolsa que se guarda:
+ * el resto es `ganados − repartidos`. No puede desincronizarse porque el tope que se puede repartir en
+ * habilidades baja en la misma cantidad (`gastables` en `estadoDePuntos`).
+ */
+export async function leerConvertidos(ejecutor, vtuberId) {
+  const e = await conTablas(ejecutor);
+  const { rows } = await e.execute(
+    "SELECT puntos FROM punto_convertido WHERE vtuber_id = ?",
+    [Number(vtuberId)],
+  );
+  return Math.max(0, Math.trunc(Number(rows[0]?.puntos) || 0));
+}
+
+/**
  * Cómo está el reparto: rango de cada habilidad vigente y puntos que quedan.
  * @param {{ vtuberId: number, skills: Array<object>, nivelesGanados: number }} entrada
  */
@@ -116,11 +134,26 @@ export async function estadoDePuntos(
   const repartidos = habilidades.reduce((suma, h) => suma + h.rango, 0);
   const ganados =
     Math.max(0, Math.trunc(Number(nivelesGanados) || 0)) * PUNTOS_POR_NIVEL;
+  // Lo que ya se pasó a stats sale de esta bolsa: suma en la otra y deja de estar disponible aquí.
+  const convertidos = await leerConvertidos(ejecutor, vtuberId);
+  // Hueco que todavía cabe en las habilidades vigentes: mientras quede, un punto NO sobra.
+  const hueco = habilidades.reduce(
+    (suma, h) => suma + Math.max(0, RANGO_MAXIMO - h.rango),
+    0,
+  );
+  const disponibles = Math.max(0, ganados - repartidos - convertidos);
   return {
     habilidades,
     ganados,
     repartidos,
-    disponibles: Math.max(0, ganados - repartidos),
+    convertidos,
+    disponibles,
+    /** Puntos que no caben en ninguna habilidad: lo único que se puede pasar a stats. */
+    sobrantes: Math.max(0, disponibles - hueco),
+    /** Hueco libre en las habilidades vigentes (rangos que aún se pueden subir). */
+    hueco,
+    /** Tope de lo que se puede repartir en habilidades: lo ganado menos lo ya convertido. */
+    gastables: Math.max(0, ganados - convertidos),
     rangoMaximo: RANGO_MAXIMO,
     puntosPorNivel: PUNTOS_POR_NIVEL,
   };
@@ -167,7 +200,7 @@ export async function subirHabilidad(
       clave,
       Number(vtuberId),
       ...claves,
-      antes.ganados,
+      antes.gastables,
       RANGO_MAXIMO,
     ],
   );
@@ -198,6 +231,35 @@ export async function reiniciarRangos(
   await e.execute("DELETE FROM punto_habilidad WHERE vtuber_id = ?", [
     Number(vtuberId),
   ]);
+  return estadoDePuntos(e, { vtuberId, skills, nivelesGanados });
+}
+
+/**
+ * Pasa a la bolsa de stats los puntos de habilidad que ya NO caben en ninguna (`sobrantes`): con todas las
+ * habilidades en su rango máximo, sin esto quedarían muertos. Solo se convierte el SOBRANTE: si aún queda un
+ * rango por subir, ese punto se queda en habilidades y no se puede convertir por adelantado.
+ * Lo convertido no vuelve ni siquiera al reiniciar los rangos: forma parte de la bolsa de stats.
+ */
+export async function convertirPuntosSobrantes(
+  ejecutor,
+  { vtuberId, skills, nivelesGanados },
+) {
+  const e = await conTablas(ejecutor);
+  const antes = await estadoDePuntos(e, { vtuberId, skills, nivelesGanados });
+  if (antes.sobrantes < 1)
+    throw new PuntosError(
+      409,
+      "sin_sobrantes",
+      "Todavía te caben puntos en tus habilidades: gástalos ahí antes de pasarlos a stats.",
+    );
+  // Se escribe el total ABSOLUTO (lo ya convertido + lo sobrante) y solo si es mayor: dos clics a la vez no
+  // pueden convertir dos veces los mismos puntos (la base los ordena).
+  await e.execute(
+    `INSERT INTO punto_convertido (vtuber_id, puntos) VALUES (?, ?)
+     ON CONFLICT (vtuber_id) DO UPDATE SET puntos = excluded.puntos
+      WHERE punto_convertido.puntos < excluded.puntos`,
+    [Number(vtuberId), antes.convertidos + antes.sobrantes],
+  );
   return estadoDePuntos(e, { vtuberId, skills, nivelesGanados });
 }
 
@@ -324,12 +386,17 @@ export async function estadoDeStats(
   const ganados =
     Math.max(0, Math.trunc(Number(nivelesGanados) || 0)) *
     PUNTOS_STATS_POR_NIVEL;
+  // Además de los 10 por nivel, esta bolsa suma lo que se pasó de la de habilidades (`convertirPuntosSobrantes`).
+  const convertidos = await leerConvertidos(ejecutor, vtuberId);
   return {
     stats: lista,
     automaticos,
     ganados,
+    convertidos,
     repartidos,
-    disponibles: Math.max(0, ganados - repartidos),
+    disponibles: Math.max(0, ganados + convertidos - repartidos),
+    /** Tope de lo que se puede repartir en stats: los del nivel más los pasados de habilidades. */
+    gastables: ganados + convertidos,
     puntosPorNivel: PUNTOS_STATS_POR_NIVEL,
   };
 }
@@ -368,7 +435,7 @@ export async function subirStat(
       slug,
       Number(vtuberId),
       ...slugs,
-      antes.ganados,
+      antes.gastables,
       Number.isFinite(maxPuntos) ? maxPuntos : 1_000_000,
     ],
   );

@@ -63,6 +63,10 @@ export const miFichaEs = {
     "Estos stats crecen con tus niveles, sin gastar puntos.",
   "mificha.statsAutoCada": "+{suma} cada {cada} niveles",
   "mificha.statsAutoTope": "máx. {tope}",
+  "mificha.sobrantesTexto":
+    "Tus habilidades están al máximo: te quedan {n} puntos que ya no caben en ninguna. Puedes pasarlos a la bolsa de stats.",
+  "mificha.sobrantesBoton": "Pasar {n} a stats",
+  "mificha.sobrantesListo": "¡Pasaste {n} puntos a la bolsa de stats!",
   "mificha.verFicha": "Ver mi ficha pública",
   "mificha.errorSinPuntos": "No te quedan puntos. Ganas más al subir de nivel.",
   "mificha.errorGeneral": "No se pudo guardar. Inténtalo de nuevo.",
@@ -206,6 +210,10 @@ export const miFichaEn: { [K in keyof typeof miFichaEs]: string } = {
     "These stats grow with your levels, no points needed.",
   "mificha.statsAutoCada": "+{suma} every {cada} levels",
   "mificha.statsAutoTope": "max {tope}",
+  "mificha.sobrantesTexto":
+    "Your skills are all maxed out: you have {n} points that no longer fit anywhere. You can move them to the stats pool.",
+  "mificha.sobrantesBoton": "Move {n} to stats",
+  "mificha.sobrantesListo": "You moved {n} points to the stats pool!",
   "mificha.verFicha": "See my public profile",
   "mificha.errorSinPuntos": "No points left. You earn more by leveling up.",
   "mificha.errorGeneral": "It could not be saved. Please try again.",
@@ -349,6 +357,10 @@ export const miFichaJa: { [K in keyof typeof miFichaEs]: string } = {
     "これらのステータスはレベルに応じて自動で上がります。",
   "mificha.statsAutoCada": "{cada} レベルごとに +{suma}",
   "mificha.statsAutoTope": "最大 {tope}",
+  "mificha.sobrantesTexto":
+    "スキルがすべて最大です。どこにも入らないポイントが {n} あります。ステータスのポイントに回せます。",
+  "mificha.sobrantesBoton": "{n} をステータスへ",
+  "mificha.sobrantesListo": "{n} ポイントをステータスに回しました！",
   "mificha.verFicha": "公開カードを見る",
   "mificha.errorSinPuntos":
     "ポイントがありません。レベルアップするともらえます。",
