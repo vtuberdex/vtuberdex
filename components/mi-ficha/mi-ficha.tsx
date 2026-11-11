@@ -915,6 +915,23 @@ export function MiFichaVista({
 
       {aviso && <Aviso tipo={aviso.tipo}>{aviso.texto}</Aviso>}
 
+      {(puntos.sobrantes ?? 0) > 0 && (
+        <section className="rounded-2xl border border-dex-accent/40 bg-dex-panel/60 p-5">
+          <p className="text-sm text-dex-ink/85">
+            {t("mificha.sobrantesTexto", { n: puntos.sobrantes ?? 0 })}
+          </p>
+          <button
+            type="button"
+            onClick={alConvertir}
+            disabled={ocupada !== null}
+            className={`mt-3 ${claseSecundario}`}
+            data-testid="mificha-sobrantes"
+          >
+            {t("mificha.sobrantesBoton", { n: puntos.sobrantes ?? 0 })}
+          </button>
+        </section>
+      )}
+
       {ficha.statsPuntos && (
         <SeccionStats
           estado={ficha.statsPuntos}
