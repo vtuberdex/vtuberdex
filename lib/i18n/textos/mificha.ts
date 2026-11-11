@@ -357,6 +357,10 @@ export const miFichaJa: { [K in keyof typeof miFichaEs]: string } = {
     "これらのステータスはレベルに応じて自動で上がります。",
   "mificha.statsAutoCada": "{cada} レベルごとに +{suma}",
   "mificha.statsAutoTope": "最大 {tope}",
+  "mificha.sobrantesTexto":
+    "スキルがすべて最大です。どこにも入らないポイントが {n} あります。ステータスのポイントに回せます。",
+  "mificha.sobrantesBoton": "{n} をステータスへ",
+  "mificha.sobrantesListo": "{n} ポイントをステータスに回しました！",
   "mificha.verFicha": "公開カードを見る",
   "mificha.errorSinPuntos":
     "ポイントがありません。レベルアップするともらえます。",
