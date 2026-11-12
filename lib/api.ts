@@ -193,12 +193,30 @@ async function request<T>(
   // Al llamar SIEMPRE al cliente con cuerpo JSON, el valor por defecto es JSON y
   // solo lo sobreescribe un llamador que lo pida explícitamente.
   const { headers: extraHeaders, ...rest } = init ?? {};
-  const response = await fetch(`${BASE}${path}`, {
-    ...rest,
-    headers: { "content-type": "application/json", ...(extraHeaders ?? {}) },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}${path}`, {
+      ...rest,
+      headers: { "content-type": "application/json", ...(extraHeaders ?? {}) },
+    });
+  } catch {
+    // Sin red (o la web caída) `fetch` lanza un TypeError que NO es `ApiError`: el formulario lo tapaba con su
+    // aviso genérico y parecía un fallo de los datos. Aquí se dice lo que de verdad pasó.
+    throw new ApiError(
+      "No pudimos conectar con la web. Revisa tu conexión e inténtalo de nuevo.",
+      0,
+    );
+  }
   const text = await response.text();
-  const payload = text ? (JSON.parse(text) as unknown) : null;
+  let payload: unknown = null;
+  try {
+    payload = text ? (JSON.parse(text) as unknown) : null;
+  } catch {
+    // Una respuesta que NO es JSON (la página de error del proxy, un 502 en texto) hacía que `JSON.parse`
+    // lanzara un SyntaxError, que tampoco era ApiError y se tapaba igual. Se queda `null` y el mensaje lo
+    // pone `motivoDeError`, que sí sabe el estado.
+    payload = null;
+  }
   // La API pública del catálogo exige una sesión de visitante (prueba de trabajo): se abre sola
   // y la petición se repite UNA vez. Ver `lib/sesion-visitante.mjs`.
   if (
