@@ -123,6 +123,57 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Los códigos de error de la API que llegan SIN explicación (`detail`) y que la persona puede entender. Sin esto
+ * la pantalla enseñaba el código crudo o, peor, el aviso genérico del formulario, que ocultaba la causa real.
+ */
+const EXPLICACIONES: Record<string, string> = {
+  origen_no_permitido:
+    "El envío se bloqueó por seguridad. Recarga la página e inténtalo de nuevo.",
+  demasiados_correos:
+    "Pediste códigos demasiadas veces. Espera unos minutos (o hasta mañana) antes de pedir otro.",
+  correo_no_disponible:
+    "No pudimos enviar el correo. Revisa la dirección e inténtalo de nuevo en unos minutos.",
+  solicitudes_no_disponibles:
+    "La web no pudo atender el envío. Inténtalo de nuevo en unos minutos.",
+  correo_no_registrado:
+    "Ese correo no tiene ninguna ficha. Si crees que es un error, habla con el mantenedor.",
+  falta_verificacion:
+    "Tu correo ya no está verificado. Vuelve al paso 1 y pide un código nuevo.",
+};
+
+/**
+ * El mensaje que lee quien rellena un formulario cuando la API dice que no: primero lo que explica el
+ * servidor (`detail`), después lo que se sabe de su código y, si la respuesta no era ni JSON (la página de
+ * error del proxy), el estado. Un código técnico a pelo no se enseña nunca.
+ */
+export function motivoDeError(status: number, payload: unknown): string {
+  const datos = (payload ?? {}) as {
+    error?: string;
+    detail?: string;
+    issues?: unknown;
+  };
+  if (typeof datos.detail === "string" && datos.detail.trim())
+    return datos.detail;
+  const codigo = typeof datos.error === "string" ? datos.error : "";
+  const explicado = EXPLICACIONES[codigo];
+  if (explicado) return explicado;
+  // Un 400 de validación traía `issues` (qué campo y por qué) y se perdía: la pantalla solo decía
+  // «payload_invalido» y nadie sabía qué corregir. Se añade el primero al mensaje.
+  const primero = Array.isArray(datos.issues)
+    ? (datos.issues[0] as { path?: string; message?: string } | undefined)
+    : undefined;
+  const que = primero?.path
+    ? ` (${primero.path}: ${primero.message ?? "no válido"})`
+    : "";
+  if (!codigo) {
+    return status >= 500
+      ? "La web no pudo atender el envío. Inténtalo de nuevo en unos minutos."
+      : "No se pudo completar el envío. Inténtalo de nuevo.";
+  }
+  return `No se pudo completar (${codigo}). Inténtalo de nuevo.${que}`;
+}
+
 /** Formularios públicos que suben imágenes y su carpeta en `/api`. */
 export type FormularioConImagenes = "inscripcion" | "modificacion";
 const RUTA_DE_FORMULARIO: Record<FormularioConImagenes, string> = {
