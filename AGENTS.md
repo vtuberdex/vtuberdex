@@ -313,6 +313,11 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   campo** (`socials.0.url`). **Nunca** correo, contenido, red ni mensaje (puede citar lo escrito); se poda a los 30 días y no lanza jamás.
   Se ve en el mantenedor, «Envíos rechazados (últimos 7 días)» (`GET /api/admin/solicitudes/rechazos?dias=`, Next y Express). Si añades
   un formulario público, estrénalo con `responderRegistrando`.
+- **El fallo se cuenta en palabras** (`motivoDeError` en `lib/api.ts`): el cliente prefiere el `detail` del servidor; si solo llega un
+  `error` lo traduce con su tabla (`origen_no_permitido`, `demasiados_correos`…, un código desconocido va dentro de una frase, nunca a
+  pelo); si `fetch` falla (sin red) o la respuesta no es JSON (la página de error del proxy) también se convierte en `ApiError` con el
+  motivo, porque antes lanzaba un error suelto y el formulario lo tapaba con su aviso genérico: varios fallos distintos parecían uno.
+  Al añadir un código de error nuevo que ve la persona, añádelo a `EXPLICACIONES`.
 
 ## Correo saliente, verificación de solicitudes y acceso por enlace mágico
 
