@@ -228,23 +228,10 @@ async function request<T>(
     return request<T>(path, init, true);
   }
   if (!response.ok) {
-    const detail = payload as {
-      error?: string;
-      detail?: string;
-      issues?: unknown;
-    } | null;
-    // Un 400 de validación traía `issues` (qué campo y por qué) y se perdía: la pantalla solo decía
-    // «payload_invalido» y nadie sabía qué corregir. Se añade el primero al mensaje.
-    const primero = Array.isArray(detail?.issues)
-      ? (detail.issues[0] as { path?: string; message?: string } | undefined)
-      : undefined;
-    const que = primero?.path
-      ? ` (${primero.path}: ${primero.message ?? "no válido"})`
-      : "";
     throw new ApiError(
-      `${detail?.detail ?? detail?.error ?? `HTTP ${response.status}`}${detail?.detail ? "" : que}`,
+      motivoDeError(response.status, payload),
       response.status,
-      detail?.issues,
+      (payload as { issues?: unknown } | null)?.issues,
     );
   }
   return payload as T;
