@@ -230,3 +230,10 @@ test("los derivados reemplazan el valor de los stats que ya existen", () => {
     value: 300,
   });
 });
+
+test("las facciones con errata o cifra final dan el mismo bono que la canónica", () => {
+  const canonica = bonosDeFacciones(["Netherbane"]);
+  assert.deepEqual(bonosDeFacciones(["Netherbane2"]), canonica);
+  assert.deepEqual(bonosDeFacciones(["--Netherbane--12--"]), canonica);
+  assert.deepEqual(bonosDeFacciones(["Mythical Lecagy"]), bonosDeFacciones(["Mythical Legacy"]));
+});

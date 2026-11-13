@@ -678,7 +678,8 @@ export function bloqueDeEvolucion(nombre) {
   }
   const { evolucion } = hallado.estado;
   const span = spanDeEstado(evolucion.nombre);
-  return `<br>Mientras ${span} esté activo:<br>\n${evolucion.efecto.map((l) => `${l}<br>`).join("\n")}`;
+  const lineas = evolucion.efecto.map((l) => `${l}<br>`).join("\n");
+  return `<br>Mientras ${span} esté activo:<br>\n${lineas}`;
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -705,22 +706,70 @@ export function spansDe(html) {
 export function estadosEntregados(html) {
   const texto = String(html ?? "");
   const salida = [];
-  const RE_VERBO =
-    /\b(obtienes|obtiene|aplicas|aplica)\s+((?:<span\s+style\s*=\s*"[^"]*"\s*>[^<]*<\/span>\s*(?:,|\by\b|\be\b)?\s*)+)/gi;
-  for (const m of texto.matchAll(RE_VERBO)) {
+  // Antes era UNA regex (verbo + `(?:span …)+`) demasiado compleja de leer y de auditar. Ahora se
+  // busca el verbo y, desde ahí, se encadenan los spans con una regex fija (`y`): mismo resultado,
+  // porque el separador nunca empieza por `<` y consumirlo entero no puede impedir el span siguiente.
+  const reVerbo = /\b(obtienes|obtiene|aplicas|aplica)\s+/gi;
+  let m;
+  while ((m = reVerbo.exec(texto)) !== null) {
+    const fin = finDeSpansEncadenados(texto, reVerbo.lastIndex);
+    if (fin === reVerbo.lastIndex) {
+      // Sin ningún span detrás, ese verbo no entrega nada: se sigue buscando desde el siguiente carácter.
+      reVerbo.lastIndex = m.index + 1;
+      continue;
+    }
     const verbo = m[1].toLowerCase().startsWith("obtien")
       ? "obtienes"
       : "aplicas";
-    for (const s of spansDe(m[2])) {
+    for (const s of spansDe(texto.slice(reVerbo.lastIndex, fin))) {
       salida.push({ verbo, texto: s.texto });
     }
+    reVerbo.lastIndex = fin;
   }
   return salida;
 }
 
+/** Un `<span>` de estado seguido de su separador de enumeración («,», «y», «e»), anclado (`y`). */
+const RE_SPAN_ENCADENADO =
+  /<span\s+style\s*=\s*"[^"]*"\s*>[^<]*<\/span>\s*(?:(?:,|\by\b|\be\b)\s*)?/iy;
+
+/** Posición donde acaba la tira de spans que empieza en `desde` (`desde` si no hay ninguno). */
+function finDeSpansEncadenados(texto, desde) {
+  let fin = desde;
+  RE_SPAN_ENCADENADO.lastIndex = fin;
+  while (RE_SPAN_ENCADENADO.exec(texto) !== null) {
+    fin = RE_SPAN_ENCADENADO.lastIndex;
+  }
+  return fin;
+}
+
+/**
+ * Sustituye cada etiqueta `<…>` por `reemplazo`, como `replace(/<[^>]+>/g, …)` (o `/<[^>]*>/g` con
+ * `vacias`), pero recorriendo con `indexOf`: la regex reintentaba desde cada `<` sin cerrar y era
+ * cuadrática con un texto lleno de `<`. Cada etiqueta va del `<` al PRIMER `>` que le sigue.
+ */
+function reemplazarEtiquetas(texto, reemplazo, { vacias = false } = {}) {
+  let salida = "";
+  let desde = 0;
+  let abre = texto.indexOf("<");
+  while (abre >= 0) {
+    const cierra = texto.indexOf(">", abre + 1);
+    if (cierra < 0) {
+      // Sin un `>` posterior no queda ninguna etiqueta más.
+      break;
+    }
+    if (vacias || cierra > abre + 1) {
+      salida += texto.slice(desde, abre) + reemplazo;
+      desde = cierra + 1;
+    }
+    abre = texto.indexOf("<", vacias || cierra > abre + 1 ? desde : abre + 1);
+  }
+  return salida + texto.slice(desde);
+}
+
 /** Texto plano comparable: sin etiquetas, sin tildes, minúsculas y sin la persona del verbo. */
 function textoComparable(html) {
-  return clave(String(html ?? "").replace(/<[^>]+>/g, " "))
+  return clave(reemplazarEtiquetas(String(html ?? ""), " "))
     .replace(/[•.,;:]/g, " ")
     .replace(/\bobtienes\b/g, "obtiene")
     .replace(/\btus\b/g, "las")
@@ -761,6 +810,28 @@ function etiquetaDePieza(category, posicion) {
 }
 
 /**
+ * Slug canónico de una facción. Tras colapsar a guiones no puede haber dos seguidos, así que basta con
+ * quitar UNO por extremo; las cifras finales se quitan con un bucle (`/\d+$/` sin ancla de inicio
+ * reintenta desde cada cifra y es cuadrática).
+ */
+function faccionCanonica(v) {
+  const conGuiones = String(v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  let fin = conGuiones.length;
+  while (fin > 0 && conGuiones[fin - 1] >= "0" && conGuiones[fin - 1] <= "9") {
+    fin -= 1;
+  }
+  return conGuiones
+    .slice(0, fin)
+    .replace(/-$/, "")
+    .replace("lecagy", "legacy");
+}
+
+/**
  * ¿La ficha tiene esa facción? Una SUBFACCIÓN cuenta como su MADRE.
  *
  * La relación madre-hijo es un DATO (`faction.parent_id`): la guarda el mantenedor y aquí llega como
@@ -777,16 +848,7 @@ function etiquetaDePieza(category, posicion) {
  * @param {Record<string, string>} [subfacciones] Mapa `{hija: madre}`; admite cadenas de varios niveles.
  */
 export function tieneFaccion(facciones, slug, subfacciones = {}) {
-  const canonico = (v) =>
-    String(v ?? "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .replace(/\d+$/, "")
-      .replace(/-+$/, "")
-      .replace("lecagy", "legacy");
+  const canonico = faccionCanonica;
   const buscada = canonico(slug);
   if (!buscada) {
     return false;
@@ -855,18 +917,7 @@ export function validarKit({ habilidades, facciones = null, subfacciones = {} })
     });
   };
 
-  // Forma del kit.
-  for (const [category, esperado] of Object.entries(FORMA_DEL_KIT)) {
-    const n = habilidades.filter((h) => h.category === category).length;
-    if (n !== esperado) {
-      anotar(
-        "error",
-        "forma_del_kit",
-        "Kit",
-        `se esperaban ${esperado} ${category} y hay ${n}`,
-      );
-    }
-  }
+  revisarFormaDelKit(habilidades, anotar);
 
   const contadores = { active: 0, passive: 0, ultimate: 0 };
   /** base canónica → piezas que la entregan (para los repetidos). */
@@ -874,92 +925,13 @@ export function validarKit({ habilidades, facciones = null, subfacciones = {} })
   const ultimates = [];
 
   for (const h of habilidades) {
-    const posicion = contadores[h.category]++;
+    const posicion = contadores[h.category];
+    contadores[h.category] += 1;
     const pieza = etiquetaDePieza(h.category, posicion);
     const html = h.effectHtml ?? "";
 
-    // Colores y nombres de cada span que sea un estado del catálogo. Los spans que no lo son pueden
-    // ser la Habilidad Única: solo se avisa fuera de la Ultimate, donde no debería haber ninguno.
-    for (const s of spansDe(html)) {
-      const hallado = buscarEstado(s.texto);
-      if (!hallado) {
-        if (h.category !== "ultimate") {
-          anotar(
-            "aviso",
-            "estado_desconocido",
-            pieza,
-            `«${s.texto}» no es un estado del sistema`,
-            s.texto,
-          );
-        }
-        continue;
-      }
-      if (!estiloCoincide(s.estilo, hallado.estado)) {
-        const oficial = hallado.estado.estilo
-          ? "el degradado de Hackeo"
-          : hallado.estado.color;
-        anotar(
-          "error",
-          "color_incorrecto",
-          pieza,
-          `«${s.texto}» va en ${colorDelEstilo(s.estilo) ?? s.estilo} y el oficial es ${oficial}`,
-          hallado.canonico,
-        );
-      }
-      if (s.texto !== hallado.canonico) {
-        anotar(
-          "aviso",
-          "nombre_no_canonico",
-          pieza,
-          `«${s.texto}» se escribe «${hallado.canonico}»`,
-          hallado.canonico,
-        );
-      }
-    }
-
-    // Lo que la pieza entrega: verbo, facción y conteo.
-    const entregados = [];
-    for (const { verbo, texto } of estadosEntregados(html)) {
-      const hallado = buscarEstado(texto);
-      if (!hallado) {
-        continue;
-      }
-      const { estado } = hallado;
-      if (!entregados.some((e) => e.hallado.estado === estado)) {
-        entregados.push({ hallado, verbo });
-      }
-
-      if (estado.polaridad === "positivo" && verbo === "aplicas") {
-        anotar(
-          "error",
-          "verbo_invertido",
-          pieza,
-          `«${hallado.canonico}» es positivo: se obtiene, no se aplica`,
-          hallado.canonico,
-        );
-      } else if (estado.polaridad === "negativo" && verbo === "obtienes") {
-        anotar(
-          "error",
-          "verbo_invertido",
-          pieza,
-          `«${hallado.canonico}» es negativo: se aplica, no se obtiene`,
-          hallado.canonico,
-        );
-      }
-      if (
-        estado.faccion &&
-        facciones &&
-        !tieneFaccion(facciones, estado.faccion, subfacciones)
-      ) {
-        anotar(
-          "error",
-          "faccion_exclusiva",
-          pieza,
-          `«${hallado.canonico}» es exclusivo de ${estado.faccion}`,
-          hallado.canonico,
-        );
-      }
-    }
+    revisarSpans(h.category, pieza, html, anotar);
+    const entregados = revisarEntregados(pieza, html, { facciones, subfacciones }, anotar);
 
     for (const { hallado } of entregados) {
       const lista = usoPorEstado.get(hallado.estado.nombre) ?? [];
@@ -980,40 +952,8 @@ export function validarKit({ habilidades, facciones = null, subfacciones = {} })
     }
   }
 
-  for (const { pieza, html, entregados } of ultimates) {
-    if (entregados.length !== ESTADOS_DE_LA_ULTIMATE) {
-      anotar(
-        "error",
-        "ultimate_estados",
-        pieza,
-        `entrega ${entregados.length} estados; deben ser exactamente 2`,
-      );
-    }
-    const comparable = textoComparable(html);
-    for (const { hallado } of entregados) {
-      if (!hallado.esEvolucion) {
-        anotar(
-          "error",
-          "ultimate_estado_base",
-          pieza,
-          `usa «${hallado.canonico}»: en la Ultimate va su evolución «${hallado.estado.evolucion.nombre}»`,
-          hallado.canonico,
-        );
-        continue;
-      }
-      const faltan = hallado.estado.evolucion.efecto.filter(
-        (l) => !comparable.includes(textoComparable(l)),
-      );
-      if (faltan.length) {
-        anotar(
-          "aviso",
-          "efecto_no_oficial",
-          pieza,
-          `«${hallado.canonico}» no trae ${faltan.length} de sus ${hallado.estado.evolucion.efecto.length} líneas oficiales`,
-          hallado.canonico,
-        );
-      }
-    }
+  for (const ultimate of ultimates) {
+    revisarUltimate(ultimate, anotar);
   }
 
   for (const [nombre, piezas] of usoPorEstado) {
@@ -1029,6 +969,156 @@ export function validarKit({ habilidades, facciones = null, subfacciones = {} })
   }
 
   return problemas;
+}
+
+/** Forma del kit: cuántas piezas de cada categoría. */
+function revisarFormaDelKit(habilidades, anotar) {
+  for (const [category, esperado] of Object.entries(FORMA_DEL_KIT)) {
+    const n = habilidades.filter((h) => h.category === category).length;
+    if (n !== esperado) {
+      anotar(
+        "error",
+        "forma_del_kit",
+        "Kit",
+        `se esperaban ${esperado} ${category} y hay ${n}`,
+      );
+    }
+  }
+}
+
+/**
+ * Colores y nombres de cada span que sea un estado del catálogo. Los spans que no lo son pueden
+ * ser la Habilidad Única: solo se avisa fuera de la Ultimate, donde no debería haber ninguno.
+ */
+function revisarSpans(category, pieza, html, anotar) {
+  for (const s of spansDe(html)) {
+    const hallado = buscarEstado(s.texto);
+    if (!hallado) {
+      if (category !== "ultimate") {
+        anotar(
+          "aviso",
+          "estado_desconocido",
+          pieza,
+          `«${s.texto}» no es un estado del sistema`,
+          s.texto,
+        );
+      }
+      continue;
+    }
+    if (!estiloCoincide(s.estilo, hallado.estado)) {
+      const oficial = hallado.estado.estilo
+        ? "el degradado de Hackeo"
+        : hallado.estado.color;
+      anotar(
+        "error",
+        "color_incorrecto",
+        pieza,
+        `«${s.texto}» va en ${colorDelEstilo(s.estilo) ?? s.estilo} y el oficial es ${oficial}`,
+        hallado.canonico,
+      );
+    }
+    if (s.texto !== hallado.canonico) {
+      anotar(
+        "aviso",
+        "nombre_no_canonico",
+        pieza,
+        `«${s.texto}» se escribe «${hallado.canonico}»`,
+        hallado.canonico,
+      );
+    }
+  }
+}
+
+/** «Obtienes» con un negativo o «aplicas» con un positivo: el verbo no casa con la polaridad. */
+function revisarVerbo(pieza, hallado, verbo, anotar) {
+  const { polaridad } = hallado.estado;
+  if (polaridad === "positivo" && verbo === "aplicas") {
+    anotar(
+      "error",
+      "verbo_invertido",
+      pieza,
+      `«${hallado.canonico}» es positivo: se obtiene, no se aplica`,
+      hallado.canonico,
+    );
+  } else if (polaridad === "negativo" && verbo === "obtienes") {
+    anotar(
+      "error",
+      "verbo_invertido",
+      pieza,
+      `«${hallado.canonico}» es negativo: se aplica, no se obtiene`,
+      hallado.canonico,
+    );
+  } else {
+    // `ambos`, o el verbo que corresponde: nada que anotar.
+  }
+}
+
+/** Lo que la pieza entrega: verbo, facción y conteo. Devuelve los estados distintos entregados. */
+function revisarEntregados(pieza, html, { facciones, subfacciones }, anotar) {
+  const entregados = [];
+  for (const { verbo, texto } of estadosEntregados(html)) {
+    const hallado = buscarEstado(texto);
+    if (!hallado) {
+      continue;
+    }
+    const { estado } = hallado;
+    if (!entregados.some((e) => e.hallado.estado === estado)) {
+      entregados.push({ hallado, verbo });
+    }
+
+    revisarVerbo(pieza, hallado, verbo, anotar);
+    if (
+      estado.faccion &&
+      facciones &&
+      !tieneFaccion(facciones, estado.faccion, subfacciones)
+    ) {
+      anotar(
+        "error",
+        "faccion_exclusiva",
+        pieza,
+        `«${hallado.canonico}» es exclusivo de ${estado.faccion}`,
+        hallado.canonico,
+      );
+    }
+  }
+  return entregados;
+}
+
+/** La Ultimate: exactamente 2 estados, ambos evoluciones y con sus efectos oficiales. */
+function revisarUltimate({ pieza, html, entregados }, anotar) {
+  if (entregados.length !== ESTADOS_DE_LA_ULTIMATE) {
+    anotar(
+      "error",
+      "ultimate_estados",
+      pieza,
+      `entrega ${entregados.length} estados; deben ser exactamente 2`,
+    );
+  }
+  const comparable = textoComparable(html);
+  for (const { hallado } of entregados) {
+    if (!hallado.esEvolucion) {
+      anotar(
+        "error",
+        "ultimate_estado_base",
+        pieza,
+        `usa «${hallado.canonico}»: en la Ultimate va su evolución «${hallado.estado.evolucion.nombre}»`,
+        hallado.canonico,
+      );
+      continue;
+    }
+    const faltan = hallado.estado.evolucion.efecto.filter(
+      (l) => !comparable.includes(textoComparable(l)),
+    );
+    if (faltan.length) {
+      anotar(
+        "aviso",
+        "efecto_no_oficial",
+        pieza,
+        `«${hallado.canonico}» no trae ${faltan.length} de sus ${hallado.estado.evolucion.efecto.length} líneas oficiales`,
+        hallado.canonico,
+      );
+    }
+  }
 }
 
 /** Descripción corta de cada código, para el informe y el mantenedor. */
@@ -1058,17 +1148,39 @@ export const CODIGOS = Object.freeze({
  * Un token que no es un estado se deja tal cual para que se vea el error en la vista previa.
  */
 export function expandirEstados(texto) {
-  return String(texto ?? "").replace(/\[\[([^\]]+)\]\]/g, (entero, nombre) =>
-    buscarEstado(nombre) ? spanDeEstado(nombre) : entero,
-  );
+  const fuente = String(texto ?? "");
+  // Lo mismo que `replace(/\[\[([^\]]+)\]\]/g, …)` recorriendo con `indexOf`: la regex reintentaba
+  // desde cada `[[` hasta el primer `]` y era cuadrática con muchos `[[` sin cerrar.
+  let salida = "";
+  let desde = 0;
+  let abre = fuente.indexOf("[[");
+  while (abre >= 0) {
+    const cierra = fuente.indexOf("]", abre + 2);
+    if (cierra < 0) {
+      break;
+    }
+    if (cierra > abre + 2 && fuente[cierra + 1] === "]") {
+      const nombre = fuente.slice(abre + 2, cierra);
+      const entero = fuente.slice(abre, cierra + 2);
+      salida +=
+        fuente.slice(desde, abre) +
+        (buscarEstado(nombre) ? spanDeEstado(nombre) : entero);
+      desde = cierra + 2;
+      abre = fuente.indexOf("[[", desde);
+    } else {
+      // Ningún `[[` anterior a ese `]` puede cerrar bien: todos llegarían al MISMO `]`.
+      abre = fuente.indexOf("[[", cierra);
+    }
+  }
+  return salida + fuente.slice(desde);
 }
 
 /** Escapa `<`, `>` y `&` de un texto escrito a mano antes de mezclarlo con el HTML del sistema. */
 export function escaparHtml(texto) {
   return String(texto ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
 /**
@@ -1122,22 +1234,38 @@ export function htmlDeHabilidadSeguro(html) {
   return true;
 }
 
+/**
+ * Quita espacios y tabuladores del final de una línea. Es el `replace(/[ \t]+\n/g, "\n")` de antes,
+ * línea a línea y sin regex: con una tira larga de blancos sin salto detrás era cuadrática.
+ */
+function sinBlancosFinales(linea) {
+  let fin = linea.length;
+  while (fin > 0 && (linea[fin - 1] === " " || linea[fin - 1] === "\t")) {
+    fin -= 1;
+  }
+  return linea.slice(0, fin);
+}
+
 /** El texto plano de una habilidad (columna `effect`: búsqueda y respaldo sin formato). */
 export function textoPlanoDe(html) {
   let sinEtiquetas = String(html ?? "").replace(/<br\s*\/?>\r?\n?/gi, "\n");
   // Hasta que no quede ninguna: quitar `<b>` de `<<b>script>` no debe dejar otra etiqueta armada.
   for (let previo = ""; previo !== sinEtiquetas;) {
     previo = sinEtiquetas;
-    sinEtiquetas = sinEtiquetas.replace(/<[^>]*>/g, "");
+    sinEtiquetas = reemplazarEtiquetas(sinEtiquetas, "", { vacias: true });
   }
   return (
     sinEtiquetas
       // Un `<` o `>` suelto que sobrevive al quitar etiquetas (`<<b>script>`) no es texto: fuera.
       .replace(/[<>]/g, "")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&amp;/g, "&")
-      .replace(/[ \t]+\n/g, "\n")
+      .replaceAll("&lt;", "<")
+      .replaceAll("&gt;", ">")
+      .replaceAll("&amp;", "&")
+      .split("\n")
+      .map((linea, i, lineas) =>
+        i < lineas.length - 1 ? sinBlancosFinales(linea) : linea,
+      )
+      .join("\n")
       .replace(/\n{3,}/g, "\n\n")
       .trim()
   );
