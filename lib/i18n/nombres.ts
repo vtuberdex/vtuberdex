@@ -47,7 +47,7 @@ export function isoDeBandera(
   if (letras.some((l) => l < 0 || l > 25)) {
     return null;
   }
-  return letras.map((l) => String.fromCharCode(65 + l)).join("");
+  return letras.map((l) => String.fromCodePoint(65 + l)).join("");
 }
 
 export function nombreDePais(

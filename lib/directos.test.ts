@@ -140,7 +140,7 @@ describe("estadoDeCanal", () => {
     expect(a).toMatchObject({ enVivo: true, titulo: "Hola", espectadores: 7, categoria: "Just Chatting" });
     const llamadas = f.mock.calls.length;
     await estadoDeCanal(canal, opciones);
-    expect(f.mock.calls.length).toBe(llamadas); // desde caché
+    expect(f.mock.calls).toHaveLength(llamadas); // desde caché
     t += 61_000;
     await estadoDeCanal(canal, opciones);
     expect(f.mock.calls.length).toBeGreaterThan(llamadas); // caducó
@@ -166,7 +166,7 @@ describe("estadoDeCanal", () => {
     expect((await estadoDeCanal(canal, opciones)).estado).toBe("error");
     const n = f.mock.calls.length;
     await estadoDeCanal(canal, opciones);
-    expect(f.mock.calls.length).toBe(n);
+    expect(f.mock.calls).toHaveLength(n);
   });
 
   it("YouTube: estadísticas, directo en curso y últimos vídeos", async () => {
@@ -264,10 +264,10 @@ describe("precalentarTwitch", () => {
     const fuera = await estadoDeCanal(todos[6], { fetch: f as never, env: ENV as never });
     expect(vivo).toMatchObject({ estado: "ok", enVivo: true, titulo: "canal_005", espectadores: 3 });
     expect(fuera).toMatchObject({ estado: "ok", enVivo: false });
-    expect(f.mock.calls.length).toBe(antes);
+    expect(f.mock.calls).toHaveLength(antes);
     // Una segunda pasada con todo vigente no vuelve a preguntar.
     await precalentarTwitch(todos, { fetch: f as never, env: ENV as never });
-    expect(f.mock.calls.length).toBe(antes);
+    expect(f.mock.calls).toHaveLength(antes);
   });
 
   test("si el lote falla, los canales quedan en error (poco tiempo) y no cae a una llamada por canal", async () => {
@@ -282,7 +282,7 @@ describe("precalentarTwitch", () => {
     await precalentarTwitch(todos, { fetch: f as never, env: ENV as never });
     const antes = f.mock.calls.length;
     expect((await estadoDeCanal(todos[0], { fetch: f as never, env: ENV as never })).estado).toBe("error");
-    expect(f.mock.calls.length).toBe(antes);
+    expect(f.mock.calls).toHaveLength(antes);
   });
 
   test("sin credenciales de Twitch no hace nada", async () => {
