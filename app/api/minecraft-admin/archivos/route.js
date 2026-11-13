@@ -1,17 +1,21 @@
 /**
  * `/api/minecraft-admin/archivos` — explorador de archivos del servidor.
  *
- * `GET ?carpeta=` lista UNA carpeta (subcarpetas, archivos editables y si admite escritura);
- * `GET ?ruta=` devuelve el texto; `PUT { ruta, contenido }` valida y guarda con copia `.bak`.
+ * `GET ?carpeta=` lista UNA carpeta (subcarpetas, archivos editables, comprimidos y si admite
+ * escritura); `GET ?ruta=` devuelve el texto; `PUT { ruta, contenido }` valida y guarda con copia
+ * `.bak`; `POST` sube un `.zip` dentro de `plugins/` (el nombre va en `?nombre=` y la carpeta en
+ * `?carpeta=`).
  * El rol se comprueba en cada método. Las reglas de qué se puede abrir viven en
  * `lib/minecraft-archivos.mjs`; cada guardado se anota en la auditoría.
  */
 import {
+  LIMITE_JAR_BYTES,
   conMantenedor,
   respuestaJson,
 } from "../../../../lib/minecraft-admin.mjs";
 import {
   guardarArchivo,
+  guardarComprimido,
   leerArchivo,
   listarCarpeta,
 } from "../../../../lib/minecraft-archivos.mjs";
