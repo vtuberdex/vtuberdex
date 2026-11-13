@@ -17,10 +17,10 @@ const compact = `${inputClass} !mt-1`;
 export function ProfileEditor({
   items,
   onChange,
-}: {
+}: Readonly<{
   items: ProfileField[];
   onChange: (items: ProfileField[]) => void;
-}) {
+}>) {
   return (
     <ListEditor
       noun="dato"
@@ -33,7 +33,7 @@ export function ProfileEditor({
       renderItem={(item, update) => (
         <div className="grid gap-2 sm:grid-cols-[1fr_2fr]">
           <label className={labelClass}>
-            Nombre
+            Nombre{" "}
             <input
               value={item.label}
               onChange={(event) => update({ label: event.target.value })}
@@ -41,7 +41,7 @@ export function ProfileEditor({
             />
           </label>
           <label className={labelClass}>
-            Valor
+            Valor{" "}
             <input
               value={item.value}
               onChange={(event) => update({ value: event.target.value })}
@@ -57,10 +57,10 @@ export function ProfileEditor({
 export function SocialsEditor({
   items,
   onChange,
-}: {
+}: Readonly<{
   items: SocialForm[];
   onChange: (items: SocialForm[]) => void;
-}) {
+}>) {
   return (
     <ListEditor
       noun="red"
@@ -92,7 +92,7 @@ export function SocialsEditor({
               />
             </label>
             <label className={`${labelClass} sm:col-span-2`}>
-              Etiqueta (opcional)
+              Etiqueta (opcional){" "}
               <input
                 value={item.label}
                 onChange={(event) => update({ label: event.target.value })}
@@ -100,7 +100,7 @@ export function SocialsEditor({
               />
             </label>
             <label className={`${labelClass} sm:col-span-3`}>
-              URL
+              URL{" "}
               <input
                 value={item.url}
                 onChange={(event) => update({ url: event.target.value })}

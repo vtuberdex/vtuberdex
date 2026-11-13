@@ -14,7 +14,7 @@ import { Field, ghostButton, inputClass } from "@/components/admin/ui";
 
 const LORE_MAX = 4000;
 
-export function StoryStep({ form, set }: StepProps) {
+export function StoryStep({ form, set }: Readonly<StepProps>) {
   const [modo, setModo] = useState<"manual" | "pegar">("manual");
   const [html, setHtml] = useState("");
   const [aviso, setAviso] = useState("");

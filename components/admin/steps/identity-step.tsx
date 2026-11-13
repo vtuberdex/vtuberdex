@@ -26,7 +26,7 @@ export function IdentityStep({
   emailDirty,
   savingEmail,
   onSaveEmail,
-}: StepProps & {
+}: Readonly<StepProps & {
   setForm: Dispatch<SetStateAction<EditorForm>>;
   mode: "create" | "edit";
   nextDex: number | null;
@@ -44,7 +44,7 @@ export function IdentityStep({
   emailDirty: boolean;
   savingEmail: boolean;
   onSaveEmail: () => void;
-}) {
+}>) {
   const normalized = slugifyUrl(form.slug);
   const slugChanged =
     currentSlug !== null && normalized !== "" && normalized !== currentSlug;

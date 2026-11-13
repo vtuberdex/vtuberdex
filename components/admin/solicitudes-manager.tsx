@@ -98,11 +98,11 @@ function Veredicto({
   vista,
   cargando,
   solicitud,
-}: {
+}: Readonly<{
   vista: VistaPreviaSolicitud | null;
   cargando: boolean;
   solicitud: SolicitudAdmin;
-}) {
+}>) {
   if (solicitud.estado !== "pendiente") {
     return null;
   }
@@ -177,12 +177,12 @@ function ElegirFicha({
   candidatas,
   elegida,
   onElegir,
-}: {
+}: Readonly<{
   token: string;
   candidatas: FichaResumen[];
   elegida: string | null;
   onElegir: (slug: string | null) => void;
-}) {
+}>) {
   const [consulta, setConsulta] = useState("");
   const [resultados, setResultados] = useState<FichaResumen[]>([]);
   useEffect(() => {
@@ -265,10 +265,10 @@ function ElegirFicha({
 function ImagenesSubidas({
   token,
   solicitud,
-}: {
+}: Readonly<{
   token: string;
   solicitud: SolicitudAdmin;
-}) {
+}>) {
   const [imagenes, setImagenes] = useState<
     Array<{
       tipo: string;
@@ -403,11 +403,11 @@ function Seccion({
   titulo,
   children,
   abierta = true,
-}: {
+}: Readonly<{
   titulo: string;
   children: React.ReactNode;
   abierta?: boolean;
-}) {
+}>) {
   return (
     <details
       open={abierta}
@@ -426,12 +426,12 @@ function Dato({
   v,
   ancho = false,
   enlace = false,
-}: {
+}: Readonly<{
   k: string;
   v: string;
   ancho?: boolean;
   enlace?: boolean;
-}) {
+}>) {
   if (!v) {
     return null;
   }
@@ -460,7 +460,7 @@ function Dato({
 }
 
 /** Los campos de perfil de una inscripción (o todo lo enviado en una modificación), en una rejilla. */
-function CamposDeFicha({ s }: { s: SolicitudAdmin }) {
+function CamposDeFicha({ s }: Readonly<{ s: SolicitudAdmin }>) {
   const d = s.datos;
   return (
     <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
@@ -481,7 +481,7 @@ function CamposDeFicha({ s }: { s: SolicitudAdmin }) {
   );
 }
 
-function Redes({ s }: { s: SolicitudAdmin }) {
+function Redes({ s }: Readonly<{ s: SolicitudAdmin }>) {
   const redes = Array.isArray(s.datos.socials)
     ? (s.datos.socials as Array<{ platform: string; url: string }>)
     : [];
@@ -512,7 +512,7 @@ function Redes({ s }: { s: SolicitudAdmin }) {
  * para saber dónde se atasca la gente (una validación que falla no deja otro rastro). No lleva correos ni
  * contenido. Se pide al abrirlo, no al montar la cola.
  */
-export function RechazosPanel({ token }: { token: string }) {
+export function RechazosPanel({ token }: Readonly<{ token: string }>) {
   const [datos, setDatos] = useState<ResumenRechazos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abrir = (abierto: boolean) => {
@@ -603,12 +603,12 @@ export function SolicitudesManager({
   token,
   notify,
   onChanged,
-}: {
+}: Readonly<{
   token: string;
   notify?: Notify;
   /** Aprobar crea una ficha: el padre refresca lista y métricas. */
   onChanged?: () => void;
-}) {
+}>) {
   const [estado, setEstado] = useState<Estado>("pendiente");
   const [tipo, setTipo] = useState<Tipo>("todos");
   const [items, setItems] = useState<SolicitudAdmin[]>([]);
@@ -992,7 +992,7 @@ export function SolicitudesManager({
                         data-testid="solicitud-confirmar-rechazo"
                       >
                         ¿Rechazar? Se borrará el contacto y no se puede
-                        deshacer.
+                        deshacer.{" "}
                         <button
                           type="button"
                           className={ghostButton}

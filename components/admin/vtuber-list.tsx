@@ -33,7 +33,7 @@ export function VtuberList({
   refreshKey,
   onOpen,
   onCreate,
-}: {
+}: Readonly<{
   token: string;
   selectedId: number | null;
   /** Cambia tras guardar/crear para volver a pedir la página actual. */
@@ -41,7 +41,7 @@ export function VtuberList({
   onOpen: (row: VtuberCard) => void;
   /** Acción del estado vacío. */
   onCreate?: () => void;
-}) {
+}>) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<AdminStatusFilter>("all");
   const [correo, setCorreo] = useState<AdminCorreoFilter>("todos");
@@ -87,7 +87,7 @@ export function VtuberList({
   return (
     <aside className="rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
       <label className={labelClass}>
-        Buscar ficha
+        Buscar ficha{" "}
         <span className="relative block">
           <input
             value={query}
@@ -108,7 +108,7 @@ export function VtuberList({
         </span>
       </label>
       <label className={`${labelClass} mt-3`}>
-        Estado
+        Estado{" "}
         <select
           aria-label="Filtrar por estado"
           value={status}
@@ -124,7 +124,7 @@ export function VtuberList({
         </select>
       </label>
       <label className={`${labelClass} mt-3`}>
-        Correo
+        Correo{" "}
         <select
           aria-label="Filtrar por correo"
           value={correo}

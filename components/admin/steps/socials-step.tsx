@@ -6,7 +6,7 @@ import { SOCIAL_SHORTCUTS } from "@/components/admin/suggestions";
 import type { StepProps } from "@/components/admin/steps/types";
 import { ghostButton } from "@/components/admin/ui";
 
-export function SocialsStep({ form, set }: StepProps) {
+export function SocialsStep({ form, set }: Readonly<StepProps>) {
   return (
     <section className="space-y-3">
       <p className="text-sm text-dex-muted">

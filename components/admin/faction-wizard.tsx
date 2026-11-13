@@ -96,7 +96,7 @@ export function FactionWizard({
   onAssign,
   onDone,
   onClose,
-}: {
+}: Readonly<{
   token: string;
   factions: FactionRow[];
   onItems: (items: FactionRow[]) => void;
@@ -105,7 +105,7 @@ export function FactionWizard({
   /** Al abrirlo desde el asistente de una carta: vuelve con la facción creada. */
   onDone?: (faction: FactionRow) => void;
   onClose: () => void;
-}) {
+}>) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [parentId, setParentId] = useState<number | null>(null);
@@ -330,7 +330,7 @@ export function FactionWizard({
                 }}
                 disabled={busy}
               />
-              No, es una facción raíz
+              {" "}No, es una facción raíz
             </label>
             <label className="flex items-center gap-2 text-sm text-dex-ink">
               <input
@@ -341,7 +341,7 @@ export function FactionWizard({
                 onChange={() => setConMadre(true)}
                 disabled={busy || madres.length === 0}
               />
-              Sí, es subfacción de otra facción
+              {" "}Sí, es subfacción de otra facción
             </label>
             {madres.length === 0 && (
               <p className="text-[11px] text-dex-muted">

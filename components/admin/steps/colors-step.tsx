@@ -12,7 +12,7 @@ export function ColorsStep({
   set,
   factions,
   onCreateFaction,
-}: StepProps & { factions: FactionRow[]; onCreateFaction: () => void }) {
+}: Readonly<StepProps & { factions: FactionRow[]; onCreateFaction: () => void }>) {
   const valid = /^#[0-9a-fA-F]{6}$/.test(form.themeColor);
   return (
     <div className="space-y-6">

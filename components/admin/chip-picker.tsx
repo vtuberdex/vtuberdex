@@ -14,13 +14,13 @@ export function ChipPicker({
   value,
   onChange,
   max,
-}: {
+}: Readonly<{
   label: string;
   options: ChipOption[];
   value: string[];
   onChange: (next: string[]) => void;
   max?: number;
-}) {
+}>) {
   const labelOf = (slug: string) =>
     options.find((option) => option.value === slug)?.label ?? slug;
   const available = options.filter((option) => !value.includes(option.value));

@@ -8,11 +8,11 @@ export function ImagesStep({
   token,
   detail,
   onUpdated,
-}: {
+}: Readonly<{
   token: string;
   detail: VtuberDetail;
   onUpdated: (detail: VtuberDetail) => void;
-}) {
+}>) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-dex-muted">

@@ -49,10 +49,10 @@ export type Problema = ReturnType<typeof validarKit>[number];
 export function ListaDeProblemas({
   problemas,
   faltan = [],
-}: {
+}: Readonly<{
   problemas: Problema[];
   faltan?: string[];
-}) {
+}>) {
   if (!problemas.length && !faltan.length) {
     return (
       <p className="text-xs text-emerald-300" data-testid="kit-ok">
@@ -95,7 +95,7 @@ function SelectorDeEstado({
   ultimate = false,
   etiqueta,
   opcional = false,
-}: {
+}: Readonly<{
   valor: EstadoElegido;
   onChange: (v: EstadoElegido) => void;
   facciones: string[];
@@ -104,7 +104,7 @@ function SelectorDeEstado({
   ultimate?: boolean;
   etiqueta: string;
   opcional?: boolean;
-}) {
+}>) {
   const estados = estadosDisponibles(facciones, subfacciones);
   const grupos: Array<{ titulo: string; polaridad: string }> = [
     { titulo: "Positivos (se obtienen)", polaridad: "positivo" },
@@ -144,7 +144,7 @@ function SelectorDeEstado({
       </label>
       {ambos && (
         <label className={labelClass}>
-          Verbo
+          Verbo{" "}
           <select
             value={valor.verbo}
             onChange={(e) =>
@@ -168,11 +168,11 @@ function Pieza({
   titulo,
   mp,
   children,
-}: {
+}: Readonly<{
   titulo: string;
   mp?: number;
   children: ReactNode;
-}) {
+}>) {
   return (
     <fieldset className="space-y-2 rounded-xl border border-dex-line p-3">
       <legend className="px-1 text-xs font-bold uppercase tracking-[0.14em] text-dex-ink">
@@ -192,20 +192,20 @@ function EditorDeActiva({
   facciones,
   subfacciones,
   indice,
-}: {
+}: Readonly<{
   valor: ActivaForm;
   onChange: (v: ActivaForm) => void;
   facciones: string[];
   subfacciones?: Record<string, string>;
   indice: number;
-}) {
+}>) {
   const set = (parche: Partial<ActivaForm>) =>
     onChange({ ...valor, ...parche });
   return (
     <Pieza titulo={`Activa ${indice + 1}`} mp={MP_ACTIVA[indice]}>
       <div className="grid gap-2 sm:grid-cols-2">
         <label className={labelClass}>
-          Nombre
+          Nombre{" "}
           <input
             value={valor.nombre}
             onChange={(e) => set({ nombre: e.target.value })}
@@ -213,7 +213,7 @@ function EditorDeActiva({
           />
         </label>
         <label className={labelClass}>
-          Tipo
+          Tipo{" "}
           <select
             value={valor.tipo}
             onChange={(e) =>
@@ -227,7 +227,7 @@ function EditorDeActiva({
           </select>
         </label>
         <label className={labelClass}>
-          Daño
+          Daño{" "}
           <select
             value={valor.ataque}
             onChange={(e) =>
@@ -242,7 +242,7 @@ function EditorDeActiva({
         </label>
         {valor.ataque !== "ninguno" && (
           <label className={labelClass}>
-            Bono (+)
+            Bono (+){" "}
             <input
               inputMode="numeric"
               value={valor.bono}
@@ -252,7 +252,7 @@ function EditorDeActiva({
           </label>
         )}
         <label className={labelClass}>
-          Turnos
+          Turnos{" "}
           <input
             inputMode="numeric"
             value={valor.turnos}
@@ -270,7 +270,7 @@ function EditorDeActiva({
         subfacciones={subfacciones}
       />
       <label className={labelClass}>
-        Efecto adicional
+        Efecto adicional{" "}
         <textarea
           rows={2}
           value={valor.extra}
@@ -291,12 +291,12 @@ function EditorDeUltimate({
   onChange,
   facciones,
   subfacciones,
-}: {
+}: Readonly<{
   valor: UltimateForm;
   onChange: (v: UltimateForm) => void;
   facciones: string[];
   subfacciones?: Record<string, string>;
-}) {
+}>) {
   const set = (parche: Partial<UltimateForm>) =>
     onChange({ ...valor, ...parche });
   const setUnica = (parche: Partial<UltimateForm["unica"]>) =>
@@ -310,7 +310,7 @@ function EditorDeUltimate({
     <Pieza titulo="Ultimate" mp={MP_ULTIMATE}>
       <div className="grid gap-2 sm:grid-cols-2">
         <label className={`${labelClass} sm:col-span-2`}>
-          Nombre
+          Nombre{" "}
           <input
             value={valor.nombre}
             onChange={(e) => set({ nombre: e.target.value })}
@@ -318,7 +318,7 @@ function EditorDeUltimate({
           />
         </label>
         <label className={labelClass}>
-          Fórmula
+          Fórmula{" "}
           <select
             value={valor.formula}
             onChange={(e) =>
@@ -332,7 +332,7 @@ function EditorDeUltimate({
           </select>
         </label>
         <label className={labelClass}>
-          Daño
+          Daño{" "}
           <select
             value={valor.ataque}
             onChange={(e) =>
@@ -347,7 +347,7 @@ function EditorDeUltimate({
         {valor.formula === "dado" ? (
           <>
             <label className={labelClass}>
-              Dados
+              Dados{" "}
               <select
                 value={valor.dados}
                 onChange={(e) =>
@@ -360,7 +360,7 @@ function EditorDeUltimate({
               </select>
             </label>
             <label className={labelClass}>
-              Caras
+              Caras{" "}
               <select
                 value={valor.caras}
                 onChange={(e) => set({ caras: e.target.value as CarasDelDado })}
@@ -376,7 +376,7 @@ function EditorDeUltimate({
           </>
         ) : (
           <label className={labelClass}>
-            Bono (+)
+            Bono (+){" "}
             <input
               inputMode="numeric"
               value={valor.bono}
@@ -387,7 +387,7 @@ function EditorDeUltimate({
         )}
         {valor.formula === "consecutivos" && (
           <label className={labelClass}>
-            Ataques
+            Ataques{" "}
             <input
               inputMode="numeric"
               value={valor.golpes}
@@ -397,7 +397,7 @@ function EditorDeUltimate({
           </label>
         )}
         <label className={labelClass}>
-          Turnos
+          Turnos{" "}
           <input
             inputMode="numeric"
             value={valor.turnos}
@@ -427,7 +427,7 @@ function EditorDeUltimate({
         subfacciones={subfacciones}
       />
       <label className={labelClass}>
-        Efecto adicional (opcional)
+        Efecto adicional (opcional){" "}
         <textarea
           rows={2}
           value={valor.extra}
@@ -442,12 +442,12 @@ function EditorDeUltimate({
           checked={valor.unica.activa}
           onChange={(e) => setUnica({ activa: e.target.checked })}
         />
-        Activa una Habilidad Única
+        {" "}Activa una Habilidad Única
       </label>
       {valor.unica.activa && (
         <div className="grid gap-2 rounded-lg border border-dex-line/70 p-2 sm:grid-cols-4">
           <label className={`${labelClass} sm:col-span-2`}>
-            Nombre (en inglés)
+            Nombre (en inglés){" "}
             <input
               value={valor.unica.nombre}
               onChange={(e) => setUnica({ nombre: e.target.value })}
@@ -455,7 +455,7 @@ function EditorDeUltimate({
             />
           </label>
           <label className={labelClass}>
-            Color
+            Color{" "}
             <input
               type="color"
               value={valor.unica.color}
@@ -464,7 +464,7 @@ function EditorDeUltimate({
             />
           </label>
           <label className={labelClass}>
-            Turnos
+            Turnos{" "}
             <input
               inputMode="numeric"
               value={valor.unica.turnos}
@@ -473,7 +473,7 @@ function EditorDeUltimate({
             />
           </label>
           <label className={`${labelClass} sm:col-span-4`}>
-            Condición (opcional)
+            Condición (opcional){" "}
             <input
               value={valor.unica.condicion}
               onChange={(e) => setUnica({ condicion: e.target.value })}
@@ -482,7 +482,7 @@ function EditorDeUltimate({
             />
           </label>
           <label className={`${labelClass} sm:col-span-4`}>
-            Efectos mientras está activa
+            Efectos mientras está activa{" "}
             <textarea
               rows={3}
               value={valor.unica.efectos}
@@ -499,7 +499,7 @@ function EditorDeUltimate({
   );
 }
 
-function VistaPrevia({ habilidades }: { habilidades: SkillForm[] }) {
+function VistaPrevia({ habilidades }: Readonly<{ habilidades: SkillForm[] }>) {
   return (
     <ul className="space-y-2" data-testid="kit-vista-previa">
       {habilidades.map((h, i) => (
@@ -542,15 +542,15 @@ function EditorDePasiva({
   valor,
   onChange,
   indice,
-}: {
+}: Readonly<{
   valor: PasivaForm;
   onChange: (v: PasivaForm) => void;
   indice: number;
-}) {
+}>) {
   return (
     <Pieza titulo={`Pasiva ${indice + 1}`}>
       <label className={labelClass}>
-        Nombre
+        Nombre{" "}
         <input
           value={valor.nombre}
           onChange={(e) => onChange({ ...valor, nombre: e.target.value })}
@@ -558,7 +558,7 @@ function EditorDePasiva({
         />
       </label>
       <label className={labelClass}>
-        Efecto
+        Efecto{" "}
         <textarea
           rows={4}
           value={valor.texto}
@@ -579,14 +579,14 @@ export function KitBuilder({
   subfacciones = {},
   onApply,
   onCancel,
-}: {
+}: Readonly<{
   skills: SkillForm[];
   facciones: string[];
   /** Subfacción → madre (del catálogo): acredita los estados exclusivos de la madre. */
   subfacciones?: Record<string, string>;
   onApply: (skills: SkillForm[]) => void;
   onCancel: () => void;
-}) {
+}>) {
   const [kit, setKit] = useState<KitForm>(() => kitDesdeHabilidades(skills));
   const [paso, setPaso] = useState(0);
   const [confirmando, setConfirmando] = useState(false);

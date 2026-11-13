@@ -124,7 +124,7 @@ export function CardWizard({
   onFactionsChanged,
   onExit,
   onCreateAnother,
-}: {
+}: Readonly<{
   token: string;
   mode: "create" | "edit";
   initial: VtuberDetail | null;
@@ -137,7 +137,7 @@ export function CardWizard({
   onFactionsChanged: (items: FactionRow[]) => void;
   onExit: () => void;
   onCreateAnother?: () => void;
-}) {
+}>) {
   const [detail, setDetail] = useState<VtuberDetail | null>(initial);
   const [form, setForm] = useState<EditorForm>(() =>
     initial ? formFromDetail(initial) : emptyForm(),
@@ -544,8 +544,8 @@ export function CardWizard({
           >
             <span>
               Esta carta está en{" "}
-              <strong>{form.status === "draft" ? "borrador" : "oculta"}</strong>
-              : no se ve en el catálogo hasta que la publiques (último paso).
+              <strong>{form.status === "draft" ? "borrador" : "oculta"}</strong>: no
+              se ve en el catálogo hasta que la publiques (último paso).
             </span>
             <button
               type="button"

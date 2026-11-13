@@ -12,7 +12,6 @@
  */
 import { useMemo, useState } from "react";
 
-import type { FactionRow } from "@/lib/types";
 import { emptySkill, type SkillForm } from "@/components/admin/form-model";
 import {
   KitBuilder,
@@ -69,7 +68,7 @@ function mpDe(
   return null;
 }
 
-export function SkillsStep({ form, set, factions }: StepProps) {
+export function SkillsStep({ form, set, factions }: Readonly<StepProps>) {
   const [asistente, setAsistente] = useState(false);
   const [abierta, setAbierta] = useState<number | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -266,7 +265,7 @@ export function SkillsStep({ form, set, factions }: StepProps) {
                           </summary>
                           <div className="mt-2 grid gap-2 sm:grid-cols-3">
                             <label className={`${labelClass} sm:col-span-2`}>
-                              Nombre
+                              Nombre{" "}
                               <input
                                 value={s.name}
                                 onChange={(e) =>
@@ -276,7 +275,7 @@ export function SkillsStep({ form, set, factions }: StepProps) {
                               />
                             </label>
                             <label className={labelClass}>
-                              Categoría
+                              Categoría{" "}
                               <select
                                 value={s.category}
                                 onChange={(e) =>
@@ -294,7 +293,7 @@ export function SkillsStep({ form, set, factions }: StepProps) {
                               </select>
                             </label>
                             <label className={labelClass}>
-                              Tipo
+                              Tipo{" "}
                               <input
                                 value={s.type}
                                 onChange={(e) =>
@@ -304,7 +303,7 @@ export function SkillsStep({ form, set, factions }: StepProps) {
                               />
                             </label>
                             <label className={`${labelClass} sm:col-span-2`}>
-                              Sección
+                              Sección{" "}
                               <input
                                 value={s.section}
                                 onChange={(e) =>

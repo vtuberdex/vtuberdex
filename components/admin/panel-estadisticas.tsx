@@ -42,11 +42,11 @@ function Tarjeta({
   titulo,
   children,
   className = "",
-}: {
+}: Readonly<{
   titulo: string;
   children: React.ReactNode;
   className?: string;
-}) {
+}>) {
   return (
     <section
       className={`rounded-2xl border border-dex-line bg-dex-panel/60 p-4 ${className}`}
@@ -65,12 +65,12 @@ export function Medidor({
   parte,
   total,
   detalle,
-}: {
+}: Readonly<{
   titulo: string;
   parte: number;
   total: number;
   detalle: string;
-}) {
+}>) {
   const valor = pct(parte, total);
   return (
     <figure
@@ -126,10 +126,10 @@ export function Medidor({
 function Barras({
   filas,
   color = COLOR.principal,
-}: {
+}: Readonly<{
   filas: Array<{ label: string; value: number }>;
   color?: string;
-}) {
+}>) {
   const max = Math.max(1, ...filas.map((fila) => fila.value));
   if (filas.length === 0) {
     return <p className="text-xs text-dex-muted">Sin datos.</p>;
@@ -163,9 +163,9 @@ function Barras({
 
 function Leyenda({
   items,
-}: {
+}: Readonly<{
   items: Array<{ label: string; color: string; value: number }>;
-}) {
+}>) {
   return (
     <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
       {items.map((item) => (
@@ -187,7 +187,7 @@ function Leyenda({
 }
 
 /** Estado de las fichas: una barra apilada (con 2 px de separación entre tramos) + leyenda con los valores. */
-function BarraDeEstados({ estados }: { estados: AdminStats["estados"] }) {
+function BarraDeEstados({ estados }: Readonly<{ estados: AdminStats["estados"] }>) {
   const tramos = [
     { label: "Publicadas", color: COLOR.principal, value: estados.published },
     { label: "Borradores", color: COLOR.borrador, value: estados.draft },
@@ -221,7 +221,7 @@ function BarraDeEstados({ estados }: { estados: AdminStats["estados"] }) {
 }
 
 /** Columnas por grado, de la baja (1) a la Black Label; las degradadas en otro color y con leyenda. */
-function ColumnasDeGrados({ grados }: { grados: AdminStats["grados"] }) {
+function ColumnasDeGrados({ grados }: Readonly<{ grados: AdminStats["grados"] }>) {
   const cuenta = new Map(grados.map((fila) => [fila.grade, fila.count]));
   const max = Math.max(1, ...grados.map((fila) => fila.count));
   const degradadas = grados
@@ -286,11 +286,11 @@ function Indicador({
   label,
   value,
   nota,
-}: {
+}: Readonly<{
   label: string;
   value: number | string;
   nota?: string;
-}) {
+}>) {
   return (
     <div className="rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
       <p className="text-xs uppercase tracking-[0.14em] text-dex-muted">
@@ -318,10 +318,10 @@ export function resumenDeCalidad(quality: AdminStats["quality"]) {
 export function PanelEstadisticas({
   stats,
   onVerSolicitudes,
-}: {
+}: Readonly<{
   stats: AdminStats;
   onVerSolicitudes?: () => void;
-}) {
+}>) {
   const { totals } = stats;
   const pendientes = stats.solicitudes
     ? stats.solicitudes.pendientes.inscripcion +

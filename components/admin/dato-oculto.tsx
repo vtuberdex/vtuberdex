@@ -33,11 +33,11 @@ export function DatoOculto({
   valor,
   etiqueta = "correo",
   children,
-}: {
+}: Readonly<{
   valor: string;
   etiqueta?: string;
   children?: ReactNode;
-}) {
+}>) {
   const [visible, setVisible] = useState(false);
   return (
     <span className="inline-flex items-baseline" data-testid="dato-oculto">
@@ -63,7 +63,7 @@ export function DatoOculto({
 }
 
 /** Texto que PUEDE ser un correo (el actor de un cambio, quien resolvió una solicitud): solo se oculta si lo es. */
-export function QuizasCorreo({ texto }: { texto: string }) {
+export function QuizasCorreo({ texto }: Readonly<{ texto: string }>) {
   return pareceCorreo(texto) ? <DatoOculto valor={texto} /> : <>{texto}</>;
 }
 
@@ -76,12 +76,12 @@ export function CampoCorreoOculto({
   onChange,
   etiqueta,
   placeholder,
-}: {
+}: Readonly<{
   valor: string;
   onChange: (valor: string) => void;
   etiqueta: string;
   placeholder?: string;
-}) {
+}>) {
   // Se oculta lo que YA venía guardado al abrir; si nació vacío, lo que se escribe se queda a la vista
   // (con `valor && !visible` el campo se escondía al teclear la primera letra).
   const [visible, setVisible] = useState(() => !valor);

@@ -53,7 +53,7 @@ export function FactionManager({
   onStructureChanged,
   onAssign,
   notify,
-}: {
+}: Readonly<{
   token: string;
   factions: FactionRow[];
   /** Recibe el catálogo ACTUALIZADO que devuelve cada operación. */
@@ -62,7 +62,7 @@ export function FactionManager({
   onStructureChanged?: () => void;
   onAssign?: () => void;
   notify?: Notify;
-}) {
+}>) {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [wizard, setWizard] = useState(false);
@@ -208,7 +208,7 @@ function FactionCard({
   token,
   run,
   notify,
-}: {
+}: Readonly<{
   faction: FactionRow;
   all: FactionRow[];
   busy: boolean;
@@ -220,7 +220,7 @@ function FactionCard({
     structural?: boolean,
   ) => Promise<boolean>;
   notify: Notify;
-}) {
+}>) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -336,7 +336,7 @@ function FactionCard({
       </div>
 
       <label className="block text-xs text-dex-muted">
-        Facción madre
+        Facción madre{" "}
         <select
           aria-label={`Facción madre de ${faction.label}`}
           value={faction.parentId ? String(faction.parentId) : ""}

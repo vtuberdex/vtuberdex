@@ -112,7 +112,7 @@ function avisoDeGrado(
 }
 
 /** Cuándo se cambió el grado por última vez y si toca revisarla este mes. */
-function UltimoCambio({ row }: { row: VtuberCard }) {
+function UltimoCambio({ row }: Readonly<{ row: VtuberCard }>) {
   const premium = row.premium;
   if (!premium) {
     return null;
@@ -136,13 +136,13 @@ function PanelMas({
   guardar,
   confirmando,
   setConfirmando,
-}: {
+}: Readonly<{
   row: VtuberCard;
   busy: boolean;
   guardar: Guardar;
   confirmando: boolean;
   setConfirmando: (valor: boolean) => void;
-}) {
+}>) {
   const premium = row.premium!;
   const degradada = esGradoDegradado(premium.grade);
   const siguiente = gradoSiguiente(premium.grade);
@@ -182,7 +182,7 @@ function PanelMas({
 
       <div className="space-y-1">
         <label className={labelClass}>
-          Fijar grado
+          Fijar grado{" "}
           <select
             aria-label={`Grado de ${row.name}`}
             value={premium.grade}
@@ -344,7 +344,7 @@ function Fila({
   guardar,
   confirmando,
   setConfirmando,
-}: {
+}: Readonly<{
   row: VtuberCard;
   abierta: boolean;
   alternar: () => void;
@@ -352,7 +352,7 @@ function Fila({
   guardar: Guardar;
   confirmando: boolean;
   setConfirmando: (valor: boolean) => void;
-}) {
+}>) {
   const premium = row.premium;
   if (!premium) {
     return null;
@@ -464,12 +464,12 @@ export function PremiumManager({
   token,
   notify,
   onChanged,
-}: {
+}: Readonly<{
   token: string;
   notify?: Notify;
   /** Cambiar el premium cambia lo que se ve de la ficha: el padre refresca lista y métricas. */
   onChanged?: () => void;
-}) {
+}>) {
   const [rows, setRows] = useState<VtuberCard[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [version, setVersion] = useState(0);
@@ -636,7 +636,7 @@ export function PremiumManager({
           </p>
           <div className="grid gap-3 sm:grid-cols-[1fr_12rem]">
             <label className={labelClass}>
-              Buscar ficha
+              Buscar ficha{" "}
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -646,7 +646,7 @@ export function PremiumManager({
               />
             </label>
             <label className={labelClass}>
-              Grado inicial
+              Grado inicial{" "}
               <select
                 aria-label="Grado inicial"
                 value={grade}
@@ -719,7 +719,7 @@ export function PremiumManager({
               Opciones de deterioro (bajas)
             </summary>
             <label className={`${labelClass} mt-2 max-w-xs`}>
-              Grado de deterioro
+              Grado de deterioro{" "}
               <select
                 aria-label="Grado de deterioro"
                 value={gradeDeterioro}
@@ -779,7 +779,7 @@ export function PremiumManager({
 
           <div className="flex flex-wrap items-end gap-3">
             <label className={`${labelClass} min-w-[14rem] flex-1`}>
-              Buscar en la lista
+              Buscar en la lista{" "}
               <input
                 value={texto}
                 onChange={(event) => {
@@ -792,7 +792,7 @@ export function PremiumManager({
               />
             </label>
             <label className={labelClass}>
-              Ordenar por
+              Ordenar por{" "}
               <select
                 aria-label="Ordenar"
                 value={orden}

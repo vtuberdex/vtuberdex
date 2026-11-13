@@ -15,11 +15,11 @@ export function ReclamosMisiones({
   token,
   notify,
   onChanged,
-}: {
+}: Readonly<{
   token: string;
   notify: (tipo: "ok" | "error", texto: string) => void;
   onChanged?: () => void;
-}) {
+}>) {
   const [items, setItems] = useState<ReclamoDeMision[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState<string | null>(null);
