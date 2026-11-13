@@ -148,6 +148,74 @@ export function SeccionArchivos() {
     }
   };
 
+  /**
+   * Sube el `.zip` elegido a la carpeta abierta. Si el nombre ya está, el servidor responde
+   * «ya existe» y aquí se pregunta: al confirmar se reemplaza de una vez, sin copia del anterior
+   * (así lo pidió el equipo). Nunca se descomprime: el zip se queda como archivo.
+   */
+  const subirZip = async (evento: React.FormEvent) => {
+    evento.preventDefault();
+    setError(null);
+    setAviso(null);
+    if (!zip) {
+      setError("elige un archivo .zip");
+      return;
+    }
+    if (!/\.zip$/i.test(zip.name)) {
+      setError("solo se pueden subir archivos .zip");
+      return;
+    }
+    if (zip.size === 0) {
+      setError("el archivo llegó vacío");
+      return;
+    }
+    if (zip.size > LIMITE_ZIP_BYTES) {
+      setError("el zip pasa de los 50 MB");
+      return;
+    }
+    const carpeta = datos?.ruta ?? "";
+    setOcupado(true);
+    try {
+      const enviar = (sobrescribir: boolean) => {
+        const consulta = new URLSearchParams({
+          carpeta,
+          nombre: zip.name,
+        });
+        if (sobrescribir) consulta.set("sobrescribir", "1");
+        return fetch(`/api/minecraft-admin/archivos?${consulta}`, {
+          method: "POST",
+          headers: { "content-type": "application/zip" },
+          body: zip,
+        });
+      };
+      let r = await enviar(false);
+      if (r.status === 409) {
+        const cuerpo = (await r.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        if (cuerpo?.error !== "ya_existe") {
+          throw new Error("no se pudo subir el zip");
+        }
+        const reemplaza = window.confirm(
+          `Ya hay un «${zip.name}» en esta carpeta. ¿Reemplazarlo? No se guarda copia del anterior.`,
+        );
+        if (!reemplaza) return;
+        r = await enviar(true);
+      }
+      if (!r.ok) throw new Error(await leerError(r, "no se pudo subir el zip"));
+      const guardado = (await r.json()) as { nombre?: string };
+      setAviso(
+        `Zip guardado: ${guardado.nombre ?? zip.name}. Se queda en la carpeta tal cual; no se descomprime solo.`,
+      );
+      setZip(null);
+      await cargar(carpeta);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "no se pudo subir el zip");
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   const f = filtro.trim().toLowerCase();
   const carpetas = useMemo(
     () =>
