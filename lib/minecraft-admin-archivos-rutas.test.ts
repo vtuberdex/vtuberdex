@@ -50,7 +50,7 @@ beforeAll(async () => {
     "a: 1\n",
   );
   process.env.VTUBERDEX_MINECRAFT_DIR = base;
-  process.env.VTUBERDEX_MINECRAFT_AUDITORIA = path.join(base, "aud.log");
+  usarArchivoDeAuditoria(path.join(base, "aud.log"));
 });
 
 describe("rutas de archivos y consola", () => {
