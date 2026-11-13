@@ -229,6 +229,16 @@ export function SeccionArchivos() {
       ),
     [datos, f],
   );
+  const comprimidos = useMemo(
+    () =>
+      (datos?.comprimidos ?? []).filter(
+        (a) => !f || a.nombre.toLowerCase().includes(f),
+      ),
+    [datos, f],
+  );
+  // La subida de zip solo tiene sentido dentro de `plugins/` (el servidor lo vuelve a exigir).
+  const enPlugins =
+    datos?.ruta === "plugins" || (datos?.ruta ?? "").startsWith("plugins/");
 
   const abierto = datos?.archivos.find((a) => a.ruta === ruta);
   const soloLectura =
