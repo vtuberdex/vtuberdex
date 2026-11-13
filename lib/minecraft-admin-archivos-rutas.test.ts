@@ -17,6 +17,7 @@ import {
   COOKIE_MANTENEDOR,
   crearSesionMantenedor,
 } from "./minecraft-admin.mjs";
+import { usarArchivoDeAuditoria } from "./minecraft-consola.mjs";
 
 process.env.VTUBERDEX_ADMIN_EMAILS = "admin@example.com";
 process.env.VTUBERDEX_MINECRAFT_MANTENEDORES = "mantenedor@example.com";
@@ -49,7 +50,7 @@ beforeAll(async () => {
     "a: 1\n",
   );
   process.env.VTUBERDEX_MINECRAFT_DIR = base;
-  process.env.VTUBERDEX_MINECRAFT_AUDITORIA = path.join(base, "aud.log");
+  usarArchivoDeAuditoria(path.join(base, "aud.log"));
 });
 
 describe("rutas de archivos y consola", () => {
@@ -65,7 +66,9 @@ describe("rutas de archivos y consola", () => {
   });
 
   it("el mantenedor ve y edita la config anidada de un plugin", async () => {
-    const lista = await (await archivosGET(req("http://x/a", MANT))).json();
+    const lista = await (
+      await archivosGET(req("http://x/a?carpeta=plugins/MythicMobs", MANT))
+    ).json();
     expect(lista.archivos.map((a: { ruta: string }) => a.ruta)).toContain(
       "plugins/MythicMobs/config.yml",
     );
