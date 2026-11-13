@@ -18,6 +18,24 @@ export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 2048;
 
+/** Registra el latido con lo que decide el servidor (familia del UA e ID de ficha); los robots no cuentan. */
+async function registrarLatido(request, cuerpo) {
+  const { navegador, so, robot } = clasificarUserAgent(
+    request.headers.get("user-agent"),
+  );
+  if (robot) {
+    return;
+  }
+  const fichaId =
+    cuerpo.ruta === "ficha" ? await idDeFichaPublica(cuerpo.ficha) : null;
+  // Lo que el cliente diga de sí mismo se IGNORA: estas cuatro claves las pone solo el servidor.
+  const resto = { ...cuerpo };
+  for (const clave of ["ficha", "navegador", "so", "fichaId"]) {
+    delete resto[clave];
+  }
+  registrar({ ...resto, navegador, so, fichaId });
+}
+
 export async function POST(request) {
   try {
     const texto = await request.text();
@@ -26,19 +44,7 @@ export async function POST(request) {
     }
     const cuerpo = JSON.parse(texto);
     if (cuerpo && typeof cuerpo === "object" && !Array.isArray(cuerpo)) {
-      const { navegador, so, robot } = clasificarUserAgent(
-        request.headers.get("user-agent"),
-      );
-      if (!robot) {
-        const fichaId =
-          cuerpo.ruta === "ficha" ? await idDeFichaPublica(cuerpo.ficha) : null;
-        // Lo que el cliente diga de sí mismo se IGNORA: estas cuatro claves las pone solo el servidor.
-        const resto = { ...cuerpo };
-        for (const clave of ["ficha", "navegador", "so", "fichaId"]) {
-          delete resto[clave];
-        }
-        registrar({ ...resto, navegador, so, fichaId });
-      }
+      await registrarLatido(request, cuerpo);
     }
   } catch {
     /* un cuerpo ilegible no es un error del servidor ni merece respuesta distinta */
