@@ -441,7 +441,8 @@ export function SeccionArchivos() {
               {error}
             </p>
           ) : null}
-        </form>
+          </form>
+        </div>
       </div>
     </Seccion>
   );
