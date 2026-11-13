@@ -339,6 +339,20 @@ export function SeccionArchivos() {
                 </button>
               </li>
             ))}
+            {comprimidos.map((c) => (
+              <li key={c.ruta}>
+                <span
+                  className={`flex items-center gap-1.5 rounded-lg px-2 py-1 ${MONO} text-dex-muted`}
+                  title={`${c.ruta} · ${tamano(c.bytes)} · se reemplaza subiendo otro con el mismo nombre`}
+                >
+                  <span aria-hidden>📦</span>
+                  <span className="truncate">{c.nombre}</span>
+                  <span className="ml-auto shrink-0 text-[10px]">
+                    {tamano(c.bytes)}
+                  </span>
+                </span>
+              </li>
+            ))}
           </ul>
         </div>
 
