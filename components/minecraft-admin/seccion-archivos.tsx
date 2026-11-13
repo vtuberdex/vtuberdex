@@ -299,7 +299,9 @@ export function SeccionArchivos() {
             aria-label="Contenido de la carpeta"
             className="max-h-[32rem] overflow-auto rounded-xl border border-dex-line bg-dex-void/60 p-1 text-xs"
           >
-            {carpetas.length === 0 && archivos.length === 0 ? (
+            {carpetas.length === 0 &&
+            archivos.length === 0 &&
+            comprimidos.length === 0 ? (
               <li className="p-2 text-dex-muted">Carpeta vacía.</li>
             ) : null}
             {carpetas.map((c) => (
