@@ -17,6 +17,7 @@ import {
   COOKIE_MANTENEDOR,
   crearSesionMantenedor,
 } from "./minecraft-admin.mjs";
+import { usarArchivoDeAuditoria } from "./minecraft-consola.mjs";
 
 process.env.VTUBERDEX_ADMIN_EMAILS = "admin@example.com";
 process.env.VTUBERDEX_MINECRAFT_MANTENEDORES = "mantenedor@example.com";
