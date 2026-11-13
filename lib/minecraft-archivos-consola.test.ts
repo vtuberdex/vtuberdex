@@ -15,6 +15,7 @@ import {
   anotarAuditoria,
   leerAuditoria,
   prepararComando,
+  usarArchivoDeAuditoria,
 } from "./minecraft-consola.mjs";
 
 let base = "";
