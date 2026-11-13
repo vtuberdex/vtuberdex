@@ -17,6 +17,7 @@ import {
   COOKIE_MANTENEDOR,
   crearSesionMantenedor,
 } from "./minecraft-admin.mjs";
+import { usarArchivoDeAuditoria } from "./minecraft-consola.mjs";
 
 process.env.VTUBERDEX_ADMIN_EMAILS = "admin@example.com";
 process.env.VTUBERDEX_MINECRAFT_MANTENEDORES = "mantenedor@example.com";
@@ -49,7 +50,7 @@ beforeAll(async () => {
     "a: 1\n",
   );
   process.env.VTUBERDEX_MINECRAFT_DIR = base;
-  process.env.VTUBERDEX_MINECRAFT_AUDITORIA = path.join(base, "aud.log");
+  usarArchivoDeAuditoria(path.join(base, "aud.log"));
 });
 
 describe("rutas de archivos y consola", () => {

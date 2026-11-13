@@ -15,6 +15,7 @@ import {
   anotarAuditoria,
   leerAuditoria,
   prepararComando,
+  usarArchivoDeAuditoria,
 } from "./minecraft-consola.mjs";
 
 let base = "";
@@ -159,20 +160,15 @@ describe("consola", () => {
   });
 
   it("la auditoría anota una línea por evento y no se deja forjar otra", async () => {
-    const env = {
-      VTUBERDEX_MINECRAFT_AUDITORIA: path.join(base, "aud", "a.log"),
-    } as unknown as NodeJS.ProcessEnv;
-    await anotarAuditoria(
-      {
-        quien: "a@b.c",
-        rol: "admin",
-        tipo: "consola",
-        detalle: 'say hola\n{"falso":1}',
-        ok: true,
-      },
-      env,
-    );
-    const e = await leerAuditoria({ env });
+    usarArchivoDeAuditoria(path.join(base, "aud", "a.log"));
+    await anotarAuditoria({
+      quien: "a@b.c",
+      rol: "admin",
+      tipo: "consola",
+      detalle: 'say hola\n{"falso":1}',
+      ok: true,
+    });
+    const e = await leerAuditoria();
     expect(e).toHaveLength(1);
     expect(e[0].detalle).not.toContain("\n");
   });
