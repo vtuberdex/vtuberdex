@@ -56,6 +56,9 @@ const tamano = (bytes: number) =>
 
 const MONO = "font-[ui-monospace,SFMono-Regular,Menlo,Consolas,monospace]";
 
+/** Mismo tope que un jar de plugin (50 MB): el servidor lo vuelve a comprobar. */
+const LIMITE_ZIP_BYTES = 50 * 1024 * 1024;
+
 export function SeccionArchivos() {
   const [datos, setDatos] = useState<Contenido | null>(null);
   const [filtro, setFiltro] = useState("");
@@ -65,6 +68,7 @@ export function SeccionArchivos() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [zip, setZip] = useState<File | null>(null);
 
   const cargar = useCallback(async (destino: string) => {
     setError(null);
