@@ -27,6 +27,8 @@ type Contenido = {
   migas: Migaja[];
   carpetas: Carpeta[];
   archivos: Archivo[];
+  /** Solo aparecen dentro de `plugins/`: son los `.zip` que se pueden subir y reemplazar. */
+  comprimidos?: Archivo[];
   escribible: boolean;
   legible: boolean;
 };
