@@ -356,7 +356,41 @@ export function SeccionArchivos() {
           </ul>
         </div>
 
-        <form onSubmit={guardar} className="space-y-3">
+        <div className="space-y-3">
+          {enPlugins ? (
+            <form
+              onSubmit={subirZip}
+              className="space-y-2 rounded-xl border border-dex-line bg-dex-void/60 p-3"
+            >
+              <p className="text-xs text-dex-muted">
+                Subir un <strong>.zip</strong> a esta carpeta (máximo 50 MB, igual que
+                un jar). Solo se aceptan comprimidos y no se descomprimen solos: si
+                ya hay uno con ese nombre, se pregunta antes de reemplazarlo.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="file"
+                  accept=".zip,application/zip"
+                  aria-label="Zip para subir"
+                  onChange={(e) => setZip(e.target.files?.[0] ?? null)}
+                  className="text-xs text-dex-ink"
+                />
+                <button
+                  type="submit"
+                  disabled={ocupado || !zip || datos?.escribible === false}
+                  className={CLASE_BOTON.primario}
+                >
+                  Subir zip
+                </button>
+                {zip ? (
+                  <span className={`text-[11px] text-dex-muted ${MONO}`}>
+                    {tamano(zip.size)}
+                  </span>
+                ) : null}
+              </div>
+            </form>
+          ) : null}
+          <form onSubmit={guardar} className="space-y-3">
           {soloLectura ? (
             <p
               role="alert"
