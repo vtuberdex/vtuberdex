@@ -37,6 +37,8 @@ const MENSAJES: Record<string, string> = {
   sin_permiso_escritura:
     "El panel puede leer esta carpeta pero no guardar: al servicio web le falta permiso de escritura en ella.",
   sin_espacio: "No queda espacio en disco.",
+  extension_no_permitida: "Solo se pueden subir archivos .zip.",
+  archivo_demasiado_grande: "El zip pasa de los 50 MB.",
 };
 const leerError = async (r: Response, porDefecto: string) => {
   const c = (await r.json().catch(() => null)) as {
