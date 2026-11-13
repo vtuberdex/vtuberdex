@@ -98,6 +98,10 @@ jobs:
           pattern: sarif-*
           path: sarif
           merge-multiple: true
+      # Sonar no aplica sonar.issue.ignore.multicriteria a los issues importados de SARIF:
+      # se quitan aquí los ya revisados, con la misma lista (scripts/lib/filtrar-sarif.mjs).
+      - name: Quitar del SARIF los hallazgos revisados
+        run: node scripts/filtrar-sarif.mjs sarif/codeql.sarif sarif/semgrep.sarif
       # La guarda falla si faltan los secretos en un run que sí puede recibirlos
       # (push, PR del mismo repositorio, incluidos los que abre Dependabot) y solo
       # deja pasar el skip en PR desde forks, que no reciben los del repo base.
