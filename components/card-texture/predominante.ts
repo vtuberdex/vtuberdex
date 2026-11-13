@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Color PREDOMINANTE de la superficie de la carta, para teñir el holograma del fondo.
  *
@@ -40,22 +41,30 @@ function matiz(
 ): number {
   const d = max - min;
   let h: number;
-  if (max === r) h = ((g - b) / d) % 6;
-  else if (max === g) h = (b - r) / d + 2;
-  else h = (r - g) / d + 4;
+  if (max === r) {
+    h = ((g - b) / d) % 6;
+  } else if (max === g) {
+    h = (b - r) / d + 2;
+  } else {
+    h = (r - g) / d + 4;
+  }
   return (((h / 6) % 1) + 1) % 1;
 }
 
 export function colorPredominante(
   fuente: CanvasImageSource | null,
 ): ColorPredominante {
-  if (!fuente || typeof document === "undefined") return SIN_COLOR;
+  if (!fuente || typeof document === "undefined") {
+    return SIN_COLOR;
+  }
   const lado = DOMINANT.grid;
   const canvas = document.createElement("canvas");
   canvas.width = lado;
   canvas.height = lado;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return SIN_COLOR;
+  if (!ctx) {
+    return SIN_COLOR;
+  }
   ctx.drawImage(fuente, 0, 0, lado, lado);
   const datos = ctx.getImageData(0, 0, lado, lado).data;
 
@@ -68,13 +77,17 @@ export function colorPredominante(
   let pesoTotal = 0;
   let pixeles = 0;
   for (let i = 0; i < datos.length; i += 4) {
-    if (datos[i + 3] < 8) continue;
+    if (datos[i + 3] < 8) {
+      continue;
+    }
     pixeles += 1;
     const [r, g, b] = [datos[i], datos[i + 1], datos[i + 2]];
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
     const croma = (max - min) / 255;
-    if (croma < DOMINANT.minChroma) continue;
+    if (croma < DOMINANT.minChroma) {
+      continue;
+    }
     // El brillo también pesa: un píxel casi negro con algo de croma no «es» ese color.
     const peso = croma * (max / 255);
     const cubo =
@@ -90,7 +103,9 @@ export function colorPredominante(
     cubo.b += b * peso;
     pesoTotal += peso;
   }
-  if (pixeles === 0 || pesoTotal === 0) return SIN_COLOR;
+  if (pixeles === 0 || pesoTotal === 0) {
+    return SIN_COLOR;
+  }
 
   const ganador = cubos.reduce(
     (mejor, cubo) => (cubo.peso > mejor.peso ? cubo : mejor),

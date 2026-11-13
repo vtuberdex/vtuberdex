@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Selector de idioma de la cabecera. Cada idioma se nombra en sí mismo (quien lo busca no lee el actual). */
 import { useI18n } from "@/lib/i18n";

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Habilidades agrupadas por categoría (activas, pasivas, ultimate). */
 import { useState } from "react";

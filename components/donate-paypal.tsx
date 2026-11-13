@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Invitación a donar por PayPal, en la ficha.
  *
@@ -139,7 +140,9 @@ export function DonatePayPal({
   const { t } = useI18n();
   const [copiado, setCopiado] = useState<boolean | null>(null);
   // Una carta en Black Label ya está en lo más alto: no hay nada que subir con una donación.
-  if (premium?.grade === "BL") return null;
+  if (premium?.grade === "BL") {
+    return null;
+  }
   /** Con ID de comerciante el código va en el propio enlace (`item_number`); sin él, hay que pegarlo. */
   const viajaConElPago = Boolean(merchantId);
   // Mensaje único y sin promesas de contraprestación: antes hablaba de «gradear y subir de nivel», y
@@ -193,8 +196,9 @@ export function DonatePayPal({
         // Con el enlace fijo, el código no viaja: se copia al pulsar (el clic es el gesto que el
         // portapapeles exige) para pegarlo en la nota. No bloquea ni cambia la navegación.
         onClick={() => {
-          if (card && !viajaConElPago)
+          if (card && !viajaConElPago) {
             void copiar(codigoDeReferencia(card.dexNumber)).then(setCopiado);
+          }
         }}
         rel="noopener noreferrer"
         className="mt-3 inline-flex items-center gap-2.5 rounded-xl bg-[#ffc439] px-4 py-2.5 text-sm font-bold text-[#003087] shadow hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dex-accent"

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Rutas del mantenedor.
  *
@@ -124,7 +125,9 @@ const noAutenticado = () =>
 async function exigirSesion(request) {
   const token = tokenDeCabecera(request);
   const user = await leerSesion(token);
-  if (!user) return [null, noAutenticado()];
+  if (!user) {
+    return [null, noAutenticado()];
+  }
   return [user, null];
 }
 
@@ -163,7 +166,9 @@ function responderError(error) {
  */
 async function detalleConReemplazos(db, slug) {
   const detalle = getVtuberBySlug(db, slug, { includeHidden: true });
-  if (!detalle) return null;
+  if (!detalle) {
+    return null;
+  }
   return aplicarImagenesDelMantenedor(
     detalle,
     await reemplazosDelMantenedor(detalle.slug),
@@ -264,8 +269,9 @@ async function login(request) {
   }
   const user = { id: 0, username: usuarioEsperado(), role: "admin" };
   const token = await emitirSesion(user);
-  if (!token)
+  if (!token) {
     return noDisponible("no se pudo emitir la sesión (¿Turso configurado?)");
+  }
   return NextResponse.json({
     token,
     user: { username: user.username, role: user.role },
@@ -280,11 +286,12 @@ async function login(request) {
  */
 async function enlaceDeAcceso(request, accion) {
   const cabeceras = { "cache-control": "no-store" };
-  if (!origenPermitido(request.headers))
+  if (!origenPermitido(request.headers)) {
     return NextResponse.json(
       { error: "origen_no_permitido" },
       { status: 403, headers: cabeceras },
     );
+  }
   const cuerpo = await request.json().catch(() => null);
   try {
     const { status, cuerpo: respuesta } =
@@ -326,7 +333,9 @@ async function sesionTurso(request) {
     });
   }
   const user = await leerSesion(tokenDeCabecera(request));
-  if (!user) return noAutenticado();
+  if (!user) {
+    return noAutenticado();
+  }
   return NextResponse.json({
     mode: "turso",
     login: true,
@@ -407,16 +416,18 @@ async function editarVtuber(request, id, usuario) {
   try {
     const db = await dbConDiario();
     const actual = fichaPorId(db, id);
-    if (!actual)
+    if (!actual) {
       return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+    }
     const { db: dbNueva, resultado } = await aplicarYAnotar(
       { tipo: "vtuber.editar", id: actual.id, patch: parsed.data },
       usuario.username,
     );
     // Los reemplazos de imagen del mantenedor se guardan por slug: al cambiar la URL se mudan
     // con la ficha, o la imagen subida dejaría de verse.
-    if (resultado.slug !== actual.slug)
+    if (resultado.slug !== actual.slug) {
       await renombrarAssetsDelMantenedor(actual.slug, resultado.slug);
+    }
     return NextResponse.json(
       await detalleConReemplazos(dbNueva, resultado.slug),
     );
@@ -470,11 +481,12 @@ async function listarVtubers(request) {
       error,
     );
   }
-  if (correo && !ejecutor)
+  if (correo && !ejecutor) {
     return NextResponse.json(
       { error: "solicitudes_no_disponibles" },
       { status: 503 },
     );
+  }
   const resultado = await listarConCorreo(db, ejecutor, {
     q,
     correo,
@@ -496,8 +508,9 @@ async function detalleVtuber(id) {
   const db = await dbConDiario();
   const actual = fichaPorId(db, id);
   const detalle = actual ? await detalleConReemplazos(db, actual.slug) : null;
-  if (!detalle)
+  if (!detalle) {
     return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+  }
   // El correo va SOLO en el detalle del mantenedor; sin cola no tumba la ficha.
   let email = null;
   try {
@@ -525,8 +538,9 @@ async function fijarCorreo(request, id) {
   }
   const db = await dbConDiario();
   const actual = fichaPorId(db, id);
-  if (!actual)
+  if (!actual) {
     return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+  }
   try {
     const ejecutor = await ejecutorDeSolicitudes();
     const resolverFicha = (slug) =>
@@ -560,11 +574,12 @@ async function fijarCorreo(request, id) {
     }
     return NextResponse.json({ email, bienvenida });
   } catch (error) {
-    if (error instanceof SolicitudError)
+    if (error instanceof SolicitudError) {
       return NextResponse.json(
         { error: error.code, detail: error.detail },
         { status: error.status },
       );
+    }
     console.error("[admin] no se pudo guardar el correo", error);
     return NextResponse.json(
       { error: "solicitudes_no_disponibles", detail: error.message },
@@ -638,8 +653,9 @@ async function editarFaccionRuta(request, id, usuario) {
  */
 function leerMedidasPng(bytes) {
   const firma = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  if (bytes.length < 24 || firma.some((valor, i) => bytes[i] !== valor))
+  if (bytes.length < 24 || firma.some((valor, i) => bytes[i] !== valor)) {
     return null;
+  }
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
 }
 
@@ -657,8 +673,9 @@ async function subirEmblema(request, id, usuario) {
     const faccion = db
       .prepare("SELECT id, slug FROM faction WHERE id = ?")
       .get(Number(id));
-    if (!faccion)
+    if (!faccion) {
       return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+    }
     const bytes = Buffer.from(await request.arrayBuffer());
     if (bytes.length > 2 * 1024 * 1024) {
       return NextResponse.json(
@@ -670,11 +687,12 @@ async function subirEmblema(request, id, usuario) {
       );
     }
     const medidas = leerMedidasPng(bytes);
-    if (!medidas)
+    if (!medidas) {
       return NextResponse.json(
         { error: "formato_invalido", detail: "se esperaba un PNG" },
         { status: 400 },
       );
+    }
     await guardarAssetDelMantenedor(
       faccion.slug,
       "faction",
@@ -738,8 +756,9 @@ async function subirImagen(request, id, kind) {
   }
   const db = await dbConDiario();
   const actual = fichaPorId(db, id);
-  if (!actual)
+  if (!actual) {
     return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+  }
 
   const bytes = Buffer.from(await request.arrayBuffer());
   // Firma de WebP: "RIFF" + 4 bytes de tamaño + "WEBP". Es el contenedor que usan las
@@ -806,8 +825,9 @@ async function subirImagen(request, id, kind) {
 async function borrarImagen(id, kind) {
   const db = await dbConDiario();
   const actual = fichaPorId(db, id);
-  if (!actual)
+  if (!actual) {
     return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+  }
   if (!KINDS_GESTIONABLES.includes(kind)) {
     return NextResponse.json(
       {
@@ -949,8 +969,9 @@ async function reclamosDeMisionesRuta() {
  */
 async function revocarReclamoRuta(vtuberId, misionId, usuario) {
   const id = Number(vtuberId);
-  if (!Number.isInteger(id) || !misionPorId(misionId))
+  if (!Number.isInteger(id) || !misionPorId(misionId)) {
     return NextResponse.json({ error: "query_invalida" }, { status: 400 });
+  }
   try {
     const { grado, gradoPrevio } = await revocarReclamo(await ejecutorDeSolicitudes(), { vtuberId: id, misionId });
     let actual = null;
@@ -960,15 +981,17 @@ async function revocarReclamoRuta(vtuberId, misionId, usuario) {
       /* sin tabla premium */
     }
     const quitada = actual === grado;
-    if (quitada)
+    if (quitada) {
       await aplicarYAnotar(
         { tipo: "vtuber.editar", id, patch: { premium: gradoPrevio === null ? null : { grade: gradoPrevio } } },
         usuario,
       );
+    }
     return NextResponse.json({ ok: true, grado, gradoPrevio, cartaModificada: quitada });
   } catch (error) {
-    if (error instanceof MisionError)
+    if (error instanceof MisionError) {
       return NextResponse.json({ error: error.code, detail: error.detail }, { status: error.status });
+    }
     return responderError(error);
   }
 }
@@ -983,12 +1006,14 @@ const SLUG_DE_FICHA = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
  */
 async function vistaPreviaRuta(request, id) {
   const fichaSlug = new URL(request.url).searchParams.get("ficha");
-  if (fichaSlug !== null && !SLUG_DE_FICHA.test(fichaSlug))
+  if (fichaSlug !== null && !SLUG_DE_FICHA.test(fichaSlug)) {
     return NextResponse.json({ error: "query_invalida" }, { status: 400 });
+  }
   try {
     const solicitud = await leerSolicitud(await ejecutorDeSolicitudes(), id);
-    if (!solicitud)
+    if (!solicitud) {
       return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+    }
     return NextResponse.json(
       vistaPrevia(await dbConDiario(), solicitud, { fichaSlug }),
       { headers: { "cache-control": "no-store" } },
@@ -1021,8 +1046,9 @@ async function imagenDeSolicitudRuta(id, tipo) {
     const imagen = (
       await imagenesParaAplicar(await ejecutorDeSolicitudes(), id)
     ).find((i) => i.tipo === tipo);
-    if (!imagen)
+    if (!imagen) {
       return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+    }
     return new NextResponse(imagen.bytes, {
       headers: {
         "content-type": "image/webp",
@@ -1065,8 +1091,9 @@ async function resolverSolicitudRuta(request, id, usuario) {
   try {
     const ejecutor = await ejecutorDeSolicitudes();
     const solicitud = await leerSolicitud(ejecutor, id);
-    if (!solicitud)
+    if (!solicitud) {
       return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
+    }
     if (solicitud.estado !== "pendiente") {
       return NextResponse.json(
         { error: "ya_resuelta", detail: "esta solicitud ya fue resuelta" },
@@ -1084,7 +1111,7 @@ async function resolverSolicitudRuta(request, id, usuario) {
         elegida = SLUG_DE_FICHA.test(cuerpo.fichaSlug)
           ? getVtuberBySlug(db, cuerpo.fichaSlug, { includeHidden: true })
           : null;
-        if (!elegida)
+        if (!elegida) {
           return NextResponse.json(
             {
               error: "ficha_no_encontrada",
@@ -1092,6 +1119,7 @@ async function resolverSolicitudRuta(request, id, usuario) {
             },
             { status: 404 },
           );
+        }
       }
       const {
         id: fichaId,
@@ -1165,7 +1193,9 @@ async function resolverSolicitudRuta(request, id, usuario) {
             "image/webp",
             { width: ancho, height: alto },
           );
-          if (!guardada) throw new Error("el almacén de imágenes no está disponible");
+          if (!guardada) {
+            throw new Error("el almacén de imágenes no está disponible");
+          }
         },
       );
     }
@@ -1188,75 +1218,117 @@ function sinBackend() {
 }
 
 export async function GET(request, context) {
-  if (ADMIN_UPSTREAM) return reenviar(request, context, "GET");
-  if (!tursoConfigurado()) return sinBackend();
+  if (ADMIN_UPSTREAM) {
+    return reenviar(request, context, "GET");
+  }
+  if (!tursoConfigurado()) {
+    return sinBackend();
+  }
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
   const sufijo = partes.join("/");
-  if (sufijo === "session") return sesionTurso(request);
+  if (sufijo === "session") {
+    return sesionTurso(request);
+  }
   const [, negado] = await exigirSesion(request);
-  if (negado) return negado;
-  if (sufijo === "stats") return estadisticas();
+  if (negado) {
+    return negado;
+  }
+  if (sufijo === "stats") {
+    return estadisticas();
+  }
   // `audit` va vacío a propósito: el registro vive en `audit_log`, que la base que se
   // despliega sanea (contiene el hash de la contraseña). Se devuelve `{items: []}` para que
   // la UI muestre "sin registros" en vez de un error que parecería una avería.
-  if (sufijo === "audit") return NextResponse.json({ items: [] });
-  if (sufijo === "vtubers") return listarVtubers(request);
-  if (partes[0] === "vtubers" && partes[1] && partes.length === 2)
+  if (sufijo === "audit") {
+    return NextResponse.json({ items: [] });
+  }
+  if (sufijo === "vtubers") {
+    return listarVtubers(request);
+  }
+  if (partes[0] === "vtubers" && partes[1] && partes.length === 2) {
     return detalleVtuber(partes[1]);
-  if (sufijo === "dex/next") return siguienteDex();
-  if (sufijo === "factions") return listaDeFacciones();
-  if (sufijo === "solicitudes") return listarSolicitudesRuta(request);
-  if (sufijo === "solicitudes/rechazos") return rechazosRuta(request);
-  if (sufijo === "misiones/reclamos") return reclamosDeMisionesRuta();
+  }
+  if (sufijo === "dex/next") {
+    return siguienteDex();
+  }
+  if (sufijo === "factions") {
+    return listaDeFacciones();
+  }
+  if (sufijo === "solicitudes") {
+    return listarSolicitudesRuta(request);
+  }
+  if (sufijo === "solicitudes/rechazos") {
+    return rechazosRuta(request);
+  }
+  if (sufijo === "misiones/reclamos") {
+    return reclamosDeMisionesRuta();
+  }
   if (
     partes[0] === "solicitudes" &&
     partes[1] &&
     partes[2] === "vista-previa" &&
     partes.length === 3
-  )
+  ) {
     return vistaPreviaRuta(request, partes[1]);
+  }
   if (
     partes[0] === "solicitudes" &&
     partes[1] &&
     partes[2] === "imagenes" &&
     partes.length === 3
-  )
+  ) {
     return imagenesDeSolicitudRuta(partes[1]);
+  }
   if (
     partes[0] === "solicitudes" &&
     partes[1] &&
     partes[2] === "imagen" &&
     partes[3] &&
     partes.length === 4
-  )
+  ) {
     return imagenDeSolicitudRuta(partes[1], partes[3]);
+  }
   return noDisponible(
     `ruta del mantenedor no soportada en producción: ${sufijo}`,
   );
 }
 
 export async function PATCH(request, context) {
-  if (ADMIN_UPSTREAM) return reenviar(request, context, "PATCH");
-  if (!tursoConfigurado()) return sinBackend();
+  if (ADMIN_UPSTREAM) {
+    return reenviar(request, context, "PATCH");
+  }
+  if (!tursoConfigurado()) {
+    return sinBackend();
+  }
   const [usuario, negado] = await exigirSesion(request);
-  if (negado) return negado;
+  if (negado) {
+    return negado;
+  }
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
-  if (partes[0] === "vtubers" && partes[1])
+  if (partes[0] === "vtubers" && partes[1]) {
     return editarVtuber(request, partes[1], usuario);
-  if (partes[0] === "factions" && partes[1])
+  }
+  if (partes[0] === "factions" && partes[1]) {
     return editarFaccionRuta(request, partes[1], usuario);
+  }
   return noDisponible(
     `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
   );
 }
 
 export async function PUT(request, context) {
-  if (ADMIN_UPSTREAM) return reenviar(request, context, "PUT");
-  if (!tursoConfigurado()) return sinBackend();
+  if (ADMIN_UPSTREAM) {
+    return reenviar(request, context, "PUT");
+  }
+  if (!tursoConfigurado()) {
+    return sinBackend();
+  }
   const [, negado] = await exigirSesion(request);
-  if (negado) return negado;
+  if (negado) {
+    return negado;
+  }
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
   if (
@@ -1264,28 +1336,43 @@ export async function PUT(request, context) {
     partes[1] &&
     partes[2] === "correo" &&
     partes.length === 3
-  )
+  ) {
     return fijarCorreo(request, partes[1]);
+  }
   return noDisponible(
     `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
   );
 }
 
 export async function POST(request, context) {
-  if (ADMIN_UPSTREAM) return reenviar(request, context, "POST");
-  if (!tursoConfigurado()) return sinBackend();
+  if (ADMIN_UPSTREAM) {
+    return reenviar(request, context, "POST");
+  }
+  if (!tursoConfigurado()) {
+    return sinBackend();
+  }
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
   // El login es la ÚNICA ruta sin sesión: es la que la crea.
-  if (partes[0] === "login") return login(request);
-  if (partes[0] === "enlace") return enlaceDeAcceso(request, partes[1]);
-  if (partes[0] === "logout") return logout(request);
+  if (partes[0] === "login") {
+    return login(request);
+  }
+  if (partes[0] === "enlace") {
+    return enlaceDeAcceso(request, partes[1]);
+  }
+  if (partes[0] === "logout") {
+    return logout(request);
+  }
   const [usuario, negado] = await exigirSesion(request);
-  if (negado) return negado;
-  if (partes[0] === "vtubers" && partes.length === 1)
+  if (negado) {
+    return negado;
+  }
+  if (partes[0] === "vtubers" && partes.length === 1) {
     return crearVtuber(request, usuario);
-  if (partes[0] === "vtubers" && partes[1] === "bulk-status")
+  }
+  if (partes[0] === "vtubers" && partes[1] === "bulk-status") {
     return estadoMasivo(request, usuario);
+  }
   if (
     partes[0] === "vtubers" &&
     partes[1] &&
@@ -1294,8 +1381,9 @@ export async function POST(request, context) {
   ) {
     return subirImagen(request, partes[1], partes[3]);
   }
-  if (partes[0] === "solicitudes" && partes[1] && partes[2] === "resolver")
+  if (partes[0] === "solicitudes" && partes[1] && partes[2] === "resolver") {
     return resolverSolicitudRuta(request, partes[1], usuario);
+  }
   if (
     partes[0] === "misiones" &&
     partes[1] === "reclamos" &&
@@ -1303,22 +1391,31 @@ export async function POST(request, context) {
     partes[3] &&
     partes[4] === "revocar" &&
     partes.length === 5
-  )
+  ) {
     return revocarReclamoRuta(partes[2], partes[3], usuario);
-  if (partes[0] === "factions" && partes.length === 1)
+  }
+  if (partes[0] === "factions" && partes.length === 1) {
     return crearFaccionRuta(request, usuario);
-  if (partes[0] === "factions" && partes[1] && partes[2] === "image")
+  }
+  if (partes[0] === "factions" && partes[1] && partes[2] === "image") {
     return subirEmblema(request, partes[1], usuario);
+  }
   return noDisponible(
     `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
   );
 }
 
 export async function DELETE(request, context) {
-  if (ADMIN_UPSTREAM) return reenviar(request, context, "DELETE");
-  if (!tursoConfigurado()) return sinBackend();
+  if (ADMIN_UPSTREAM) {
+    return reenviar(request, context, "DELETE");
+  }
+  if (!tursoConfigurado()) {
+    return sinBackend();
+  }
   const [usuario, negado] = await exigirSesion(request);
-  if (negado) return negado;
+  if (negado) {
+    return negado;
+  }
   const { path } = await context.params;
   const partes = Array.isArray(path) ? path : [path];
   if (
@@ -1329,8 +1426,9 @@ export async function DELETE(request, context) {
   ) {
     return borrarImagen(partes[1], partes[3]);
   }
-  if (partes[0] === "factions" && partes[1])
+  if (partes[0] === "factions" && partes[1]) {
     return eliminarFaccionRuta(request, partes[1], usuario);
+  }
   return noDisponible(
     `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
   );

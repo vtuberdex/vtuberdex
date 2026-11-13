@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `GET /images/*` — sirve una imagen publicada.
  *
@@ -128,7 +129,9 @@ function fechaDeMarca(marca) {
 /** Lee la imagen de un árbol local; `null` si no existe o la ruta es sospechosa. */
 function serveLocal(key, etagPedido, raiz = LOCAL_IMAGE_ROOT) {
   const absolute = path.join(raiz, key.replace(/^images\//, ""));
-  if (!isInsideRoot(absolute, raiz)) return null;
+  if (!isInsideRoot(absolute, raiz)) {
+    return null;
+  }
 
   let bytes;
   try {
@@ -301,9 +304,13 @@ export async function GET(request, { params }) {
      * 404: de eso se encargan las ramas de arriba, que se evalúan antes.
      */
     const reemplazo = serveLocal(key, etagPedido, REEMPLAZOS_IMAGE_ROOT);
-    if (reemplazo) return reemplazo;
+    if (reemplazo) {
+      return reemplazo;
+    }
     const local = serveLocal(key, etagPedido);
-    if (local) return local;
+    if (local) {
+      return local;
+    }
     return Response.json(
       { error: "imagen_no_publicada", path: key },
       { status: 404 },

@@ -143,8 +143,9 @@ describe("validarMedidas", () => {
       { ancho: 721, alto: 1008 },
       { ancho: 720, alto: 1000 },
       { ancho: 1008, alto: 720 },
-    ])
+    ]) {
       expect(() => validarMedidas("character", m)).toThrow(SolicitudError);
+    }
   });
 
   test("el logo tiene entre 64 y 900 px por lado", () => {
@@ -158,8 +159,9 @@ describe("validarMedidas", () => {
       { ancho: 901, alto: 100 },
       { ancho: 100, alto: 63 },
       { ancho: 30, alto: 30 },
-    ])
+    ]) {
       expect(() => validarMedidas("logo", m)).toThrow(SolicitudError);
+    }
   });
 });
 
@@ -199,8 +201,9 @@ describe("guardarImagen", () => {
   });
 
   test("tope de subidas por correo y por día", async () => {
-    for (let i = 0; i < LIMITES.porCorreoDia; i++)
+    for (let i = 0; i < LIMITES.porCorreoDia; i++) {
       await subir("luna@example.com", "character", `9.9.${i}.1`);
+    }
     const error = await rechazo(
       subir("luna@example.com", "character", "9.9.200.1"),
     );
@@ -212,8 +215,9 @@ describe("guardarImagen", () => {
   });
 
   test("tope de subidas por red y por día", async () => {
-    for (let i = 0; i < LIMITES.porRedDia; i++)
+    for (let i = 0; i < LIMITES.porRedDia; i++) {
       await subir(`p${i}@example.com`, "character", "7.7.7.7");
+    }
     expect(
       (await rechazo(subir("nuevo@example.com", "character", "7.7.7.7")))
         .status,
@@ -409,7 +413,9 @@ describe("aplicarImagenesDeSolicitud (aprobar)", () => {
       e,
       5,
       async ({ tipo }: { tipo: string }) => {
-        if (tipo === "logo") throw new Error("almacén caído");
+        if (tipo === "logo") {
+          throw new Error("almacén caído");
+        }
       },
     );
     expect(r.aplicadas).toEqual(["character"]);

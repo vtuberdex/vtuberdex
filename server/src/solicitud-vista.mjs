@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * VISTA PREVIA de una solicitud: lo que pasaría si el mantenedor la aprueba, sin escribir nada.
  *
@@ -109,7 +110,9 @@ export function candidatasParaReferencia(db, referencia, limite = 6) {
     .replace(/\s+/g, " ")
     .trim();
   const q = sinDex || dex || "";
-  if (!q) return [];
+  if (!q) {
+    return [];
+  }
   try {
     return searchVtubers(db, {
       q,
@@ -125,34 +128,40 @@ export function candidatasParaReferencia(db, referencia, limite = 6) {
 export function cambiosDeModificacion(actual, patch) {
   const cambios = [];
   const agregar = (campo, antes, despues) => {
-    if (igual(antes, despues)) return;
+    if (igual(antes, despues)) {
+      return;
+    }
     cambios.push({ campo, antes, despues, nuevo: !String(antes).trim() });
   };
   for (const [clave, etiqueta] of Object.entries(ETIQUETAS)) {
-    if (patch[clave] === undefined) continue;
+    if (patch[clave] === undefined) {
+      continue;
+    }
     agregar(etiqueta, comoTexto(actual[clave]), comoTexto(patch[clave]));
   }
   if (patch.profile) {
     const antes = new Map(
       (actual.profile ?? []).map((f) => [normalizeText(f.label), f.value]),
     );
-    for (const fila of patch.profile)
+    for (const fila of patch.profile) {
       agregar(
         `Gusto · ${fila.label}`,
         antes.get(normalizeText(fila.label)) ?? "",
         fila.value,
       );
+    }
   }
   if (patch.socials) {
     const antes = new Map(
       (actual.socials ?? []).map((r) => [normalizeText(r.platform), r.url]),
     );
-    for (const red of patch.socials)
+    for (const red of patch.socials) {
       agregar(
         `Red · ${red.label ?? red.platform}`,
         antes.get(normalizeText(red.platform)) ?? "",
         red.url,
       );
+    }
   }
   return cambios;
 }
@@ -179,13 +188,14 @@ function vistaInscripcion(db, solicitud, base) {
       `Ya existe una ficha llamada «${g.name}» (/v/${g.slug}). Revisa que no sea un duplicado.`,
   );
   const corrida = simular(db, () => crearFicha(db, parsed.data));
-  if (!corrida.ok)
+  if (!corrida.ok) {
     return {
       ...base,
       avisos,
       puedeAprobar: false,
       problema: problemaDe(corrida.error),
     };
+  }
   return {
     ...base,
     avisos,
@@ -203,14 +213,17 @@ function vistaModificacion(db, solicitud, base, { fichaSlug }) {
     ficha = fichaSlug
       ? getVtuberBySlug(db, fichaSlug, { includeHidden: true })
       : fichaDeLaSolicitud(db, solicitud.datos.ficha);
-    if (!ficha)
+    if (!ficha) {
       throw new SolicitudError(
         404,
         "ficha_no_encontrada",
         "no se encontró esa ficha",
       );
+    }
   } catch (error) {
-    if (!(error instanceof SolicitudError)) throw error;
+    if (!(error instanceof SolicitudError)) {
+      throw error;
+    }
     return {
       ...base,
       puedeAprobar: false,
@@ -238,11 +251,12 @@ function vistaModificacion(db, solicitud, base, { fichaSlug }) {
   }
   const cambios = cambiosDeModificacion(ficha, parsed.data);
   const avisos = [];
-  if (cambios.length === 0)
+  if (cambios.length === 0) {
     avisos.push(
       "No cambia nada: los valores propuestos ya coinciden con la ficha.",
     );
-  if (imagenes.imageId || imagenes.logoId)
+  }
+  if (imagenes.imageId || imagenes.logoId) {
     avisos.push(
       "Trae imágenes nuevas (" +
         [imagenes.imageId && "avatar", imagenes.logoId && "logo"]
@@ -250,13 +264,15 @@ function vistaModificacion(db, solicitud, base, { fichaSlug }) {
           .join(" y ") +
         "): al aprobar REEMPLAZAN a las actuales de la ficha. Míralas antes en «Imágenes» de la solicitud.",
     );
-  if (ficha.status !== "published")
+  }
+  if (ficha.status !== "published") {
     avisos.push(
       "La ficha no está publicada: los cambios no se verán en el catálogo hasta que lo esté.",
     );
+  }
 
   const corrida = simular(db, () => aplicarParche(db, ficha.id, parsed.data));
-  if (!corrida.ok)
+  if (!corrida.ok) {
     return {
       ...salida,
       cambios,
@@ -264,6 +280,7 @@ function vistaModificacion(db, solicitud, base, { fichaSlug }) {
       puedeAprobar: false,
       problema: problemaDe(corrida.error),
     };
+  }
   return { ...salida, cambios, avisos };
 }
 
@@ -271,21 +288,26 @@ function vistaBaja(db, solicitud, base) {
   let ficha = null;
   const escrita = String(solicitud.datos.ficha ?? "").trim();
   try {
-    if (escrita) ficha = fichaDeLaSolicitud(db, escrita);
+    if (escrita) {
+      ficha = fichaDeLaSolicitud(db, escrita);
+    }
   } catch (error) {
-    if (!(error instanceof SolicitudError)) throw error;
+    if (!(error instanceof SolicitudError)) {
+      throw error;
+    }
   }
   const avisos = [
     "«Marcar procesada» solo cierra la solicitud: la degradación de la ficha (cláusula de salida) se aplica aparte, desde «Premium».",
   ];
-  if (!escrita)
+  if (!escrita) {
     avisos.unshift(
       "No indicó ficha y su correo no está asociado a ninguna inscripción: escríbele al correo de contacto para saber cuál es.",
     );
-  else if (!ficha)
+  } else if (!ficha) {
     avisos.unshift(
       `No se encontró la ficha «${escrita}»: ubícala a mano desde «Fichas».`,
     );
+  }
   return { ...base, ficha: ficha ? resumenDeFicha(ficha) : null, avisos };
 }
 
@@ -302,10 +324,14 @@ export function vistaPrevia(db, solicitud, { fichaSlug = null } = {}) {
     problema: null,
     avisos: [],
   };
-  if (solicitud.estado !== "pendiente") return { ...base, puedeAprobar: false };
-  if (solicitud.tipo === "inscripcion")
+  if (solicitud.estado !== "pendiente") {
+    return { ...base, puedeAprobar: false };
+  }
+  if (solicitud.tipo === "inscripcion") {
     return vistaInscripcion(db, solicitud, base);
-  if (solicitud.tipo === "modificacion")
+  }
+  if (solicitud.tipo === "modificacion") {
     return vistaModificacion(db, solicitud, base, { fichaSlug });
+  }
   return vistaBaja(db, solicitud, base);
 }

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Formulario PÚBLICO de inscripción de una ficha, en CINCO pasos y con el correo demostrado ANTES de
@@ -108,15 +109,23 @@ export function InscripcionForm() {
   /** Lleva el foco al control (o al primero del grupo) que falta. */
   const irAlCampo = (campo: string) => {
     const destino = formulario.current?.querySelector<HTMLElement>(`[data-campo="${campo}"]`);
-    if (!destino) return;
+    if (!destino) {
+      return;
+    }
     destino.scrollIntoView?.({ block: "center", behavior: "smooth" });
     (destino.matches("input,select,textarea,button") ? destino : destino.querySelector<HTMLElement>("input,button"))?.focus({ preventScroll: true });
   };
 
   const textoDeFalta = (f: Falta) => {
-    if (f.campo === "acepta") return t("ins.falta.terminos");
-    if (f.campo === "languages") return t("ins.falta.idiomas");
-    if (f.campo === "socials") return `${t("ins.redes")}: ${t("ins.falta.redes")}`;
+    if (f.campo === "acepta") {
+      return t("ins.falta.terminos");
+    }
+    if (f.campo === "languages") {
+      return t("ins.falta.idiomas");
+    }
+    if (f.campo === "socials") {
+      return `${t("ins.redes")}: ${t("ins.falta.redes")}`;
+    }
     return t(f.motivo === "vacio" ? "ins.falta.vacio" : "ins.falta.invalido", { campo: t(f.etiqueta as Clave) });
   };
 
@@ -145,7 +154,9 @@ export function InscripcionForm() {
   // dejar de escribir. Es un efecto y no un `onChange` por campo: son ~25 campos y una sola vía para todos.
   const huella = JSON.stringify(instantanea());
   useEffect(() => {
-    if (!sesion || paso < 3 || enviada) return;
+    if (!sesion || paso < 3 || enviada) {
+      return;
+    }
     setBorrador({ estado: "guardando" });
     const espera = setTimeout(() => {
       api

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * La PLACA DE ACRÍLICO de una carta premium (como las de CGC) y su material.

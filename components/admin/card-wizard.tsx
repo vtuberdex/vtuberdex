@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Asistente de carta: UNA sola experiencia para crear y para editar.
@@ -96,10 +97,18 @@ export function conflictKind(
   dexRequested: boolean,
   slugRequested: boolean,
 ): "dex" | "slug" | null {
-  if (error?.status !== 409) return null;
-  if (/slug|url|direcci/i.test(error.message)) return "slug";
-  if (/dex|n[uú]mero|#\d+/i.test(error.message) && dexRequested) return "dex";
-  if (dexRequested && !slugRequested) return "dex";
+  if (error?.status !== 409) {
+    return null;
+  }
+  if (/slug|url|direcci/i.test(error.message)) {
+    return "slug";
+  }
+  if (/dex|n[uú]mero|#\d+/i.test(error.message) && dexRequested) {
+    return "dex";
+  }
+  if (dexRequested && !slugRequested) {
+    return "dex";
+  }
   return slugRequested ? "slug" : dexRequested ? "dex" : null;
 }
 
@@ -221,24 +230,29 @@ export function CardWizard({
   /** Guarda el correo si cambió. `false` = falló (ya avisó) y no hay que seguir. */
   const persistEmail = async (id: number): Promise<boolean> => {
     const wanted = email.trim();
-    if (wanted === emailSaved.trim()) return true;
+    if (wanted === emailSaved.trim()) {
+      return true;
+    }
     try {
       const response = await api.setVtuberEmail(token, id, wanted || null);
       const stored = response.email ?? "";
       setEmail(stored);
       setEmailSaved(stored);
-      if (!stored) notify("ok", "Correo quitado.");
-      else if (response.bienvenida === "enviada")
+      if (!stored) {
+        notify("ok", "Correo quitado.");
+      } else if (response.bienvenida === "enviada") {
         notify(
           "ok",
           `Correo guardado. Se envió el correo de bienvenida a ${stored}.`,
         );
-      else if (response.bienvenida === "fallo")
+      } else if (response.bienvenida === "fallo") {
         notify(
           "error",
           "Correo guardado, pero no se pudo enviar la bienvenida. Revisa el servidor de correo.",
         );
-      else notify("ok", "Correo guardado.");
+      } else {
+        notify("ok", "Correo guardado.");
+      }
       return true;
     } catch (cause) {
       const failure: SaveFailure = {
@@ -256,7 +270,9 @@ export function CardWizard({
 
   const [savingEmail, setSavingEmail] = useState(false);
   const saveEmailOnly = async () => {
-    if (!detail) return;
+    if (!detail) {
+      return;
+    }
     setError(null);
     setSavingEmail(true);
     try {
@@ -314,8 +330,11 @@ export function CardWizard({
        * Solo se adopta la respuesta si trae la ficha entera: una ruta antigua devolvía
        * `{ok, slug, editado}` y adoptarla dejaba el asistente sin nombre ni campos.
        */
-      if (updated?.slug) adopt(updated);
-      else setSavedAt(new Date().toISOString());
+      if (updated?.slug) {
+        adopt(updated);
+      } else {
+        setSavedAt(new Date().toISOString());
+      }
       notify("ok", "Cambios guardados.");
       return await persistEmail(detail.id);
     } catch (cause) {
@@ -330,12 +349,17 @@ export function CardWizard({
   };
 
   const goNext = async () => {
-    if (await persist())
+    if (await persist()) {
       setIndex((current) => Math.min(current + 1, lastIndex));
+    }
   };
   const finish = async () => {
-    if (!(await persist())) return;
-    if (mode === "create") setFinished(true);
+    if (!(await persist())) {
+      return;
+    }
+    if (mode === "create") {
+      setFinished(true);
+    }
   };
 
   // La dirección no se escribe a mano: sale SIEMPRE del nombre, también al editar (la anterior sigue
@@ -416,9 +440,11 @@ export function CardWizard({
         data-testid="admin-editor"
         onSubmit={(event) => {
           event.preventDefault();
-          if (mode === "create")
+          if (mode === "create") {
             void (index === lastIndex ? finish() : goNext());
-          else void persist();
+          } else {
+            void persist();
+          }
         }}
       >
         <header className="space-y-3 p-5 pb-3">
@@ -665,7 +691,9 @@ export function CardWizard({
                   className={ghostButton}
                   disabled={saving || nameMissing}
                   onClick={async () => {
-                    if (await persist()) onExit();
+                    if (await persist()) {
+                      onExit();
+                    }
                   }}
                 >
                   Guardar y salir

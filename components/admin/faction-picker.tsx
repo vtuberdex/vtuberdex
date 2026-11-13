@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Selector de facciones de una ficha: máximo DOS, elegidas del catálogo cerrado.
@@ -28,9 +29,11 @@ export function FactionPicker({
   );
 
   const toggle = (slug: string) => {
-    if (value.includes(slug))
+    if (value.includes(slug)) {
       onChange(value.filter((current) => current !== slug));
-    else if (!full) onChange([...value, slug]);
+    } else if (!full) {
+      onChange([...value, slug]);
+    }
   };
 
   return (

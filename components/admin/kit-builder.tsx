@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Asistente del KIT de habilidades (2 activas, 2 pasivas, Ultimate y Habilidad Única opcional).
@@ -531,7 +532,9 @@ const REVISAR = PIEZAS.length;
 
 /** A qué pieza pertenece un «Falta: …» de `faltantes` (las de la Ultimate no nombran «Ultimate» siempre). */
 function piezaDeFaltante(texto: string): string {
-  if (/Ultimate|Única/.test(texto)) return "Ultimate";
+  if (/Ultimate|Única/.test(texto)) {
+    return "Ultimate";
+  }
   return /(Activa|Pasiva) \d/.exec(texto)?.[0] ?? "";
 }
 

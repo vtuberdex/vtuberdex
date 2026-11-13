@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 
 /**
@@ -77,12 +78,15 @@ export function VerificarCorreo() {
     ).get("t");
     setToken(encontrado);
     setListo(true);
-    if (encontrado)
+    if (encontrado) {
       window.history.replaceState(null, "", window.location.pathname);
+    }
   }, []);
 
   const confirmar = async () => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     setEnviando(true);
     setError(null);
     try {
@@ -99,7 +103,9 @@ export function VerificarCorreo() {
     }
   };
 
-  if (hecho) return <ResultadoDeLaVerificacion resultado={hecho} />;
+  if (hecho) {
+    return <ResultadoDeLaVerificacion resultado={hecho} />;
+  }
 
   if (listo && !token) {
     return (

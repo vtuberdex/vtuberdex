@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Listas editables de una ficha que usan `ListEditor` (perfil y redes). Atributos y habilidades

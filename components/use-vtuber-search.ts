@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Hook de búsqueda: estado en URL, fetch cancelable y facetas. */
 import { useRouter, useSearchParams } from "next/navigation";
@@ -44,13 +45,18 @@ export interface UseVtuberSearchOptions {
  * delante del usuario. El ancho es el mismo que usa el libro (`card-binder.tsx`).
  */
 const calentarImagenes = (items: VtuberCard[]) => {
-  if (typeof Image === "undefined") return;
-  for (const src of imagenesDeCartas(items)) void loadImage(src);
+  if (typeof Image === "undefined") {
+    return;
+  }
+  for (const src of imagenesDeCartas(items)) {
+    void loadImage(src);
+  }
   if (
     typeof document === "undefined" ||
     typeof HTMLCanvasElement === "undefined"
-  )
+  ) {
     return;
+  }
   pregenerar(items, TEXTURAS.ancho);
 };
 
@@ -123,17 +129,23 @@ export function useVtuberSearch({
     setLoading(true);
     pedirPagina(params, controller.signal)
       .then((response) => {
-        if (requestId.current !== id) return;
+        if (requestId.current !== id) {
+          return;
+        }
         guardarPagina(params, response);
         setData(response);
         programarPrecarga(response);
       })
       .catch((cause: unknown) => {
-        if (controller.signal.aborted || requestId.current !== id) return;
+        if (controller.signal.aborted || requestId.current !== id) {
+          return;
+        }
         setError(cause instanceof Error ? cause.message : "error desconocido");
       })
       .finally(() => {
-        if (requestId.current === id) setLoading(false);
+        if (requestId.current === id) {
+          setLoading(false);
+        }
       });
 
     return () => {

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** `POST /api/minecraft/xp` — un lote de XP ganada jugando, para la ficha vinculada (solo con `X-Minecraft-Token`). */
 import { recibirXp } from "../../../../lib/minecraft.mjs";
 

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Orquestador del scrape.
  *
@@ -58,7 +59,9 @@ async function readCache(target) {
 /** Slugs candidatos para una carta: enlace del index, nombre y número. */
 function candidateSlugs(entry) {
   const candidates = [];
-  if (entry.detailSlug) candidates.push(entry.detailSlug);
+  if (entry.detailSlug) {
+    candidates.push(entry.detailSlug);
+  }
   const cleaned = (entry.name ?? "")
     .replace(/\[[^\]]*\]/g, "")
     .replace(/\s+/g, " ")
@@ -74,7 +77,9 @@ function candidateSlugs(entry) {
       .split("/")
       .pop()
       ?.replace(/\.[a-z0-9]+$/i, "");
-    if (base) candidates.push(base.replace(/\s+/g, ""));
+    if (base) {
+      candidates.push(base.replace(/\s+/g, ""));
+    }
   }
   return [...new Set(candidates.filter(Boolean))];
 }
@@ -91,8 +96,12 @@ async function loadDetail(entry) {
   for (const slug of candidateSlugs(entry)) {
     const cacheFile = detailCachePath(slug, entry.dexNumber);
     const cached = await readCache(cacheFile);
-    if (cached) return { html: cached, slug, cacheFile };
-    if (FROM_CACHE) continue;
+    if (cached) {
+      return { html: cached, slug, cacheFile };
+    }
+    if (FROM_CACHE) {
+      continue;
+    }
     try {
       const { html, soft404 } = await fetchText(
         `${BASE_URL}${slug.split("/").map(encodeURIComponent).join("/")}`,
@@ -112,7 +121,9 @@ async function loadDetail(entry) {
  */
 function bufferFromDataUri(src) {
   const match = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(src);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const [, , isBase64, payload] = match;
   try {
     return isBase64
@@ -131,7 +142,9 @@ function bufferFromDataUri(src) {
  */
 async function reuseCardLogo({ sharp, folder, slug }) {
   const file = path.join(IMAGES, folder, `${slug}.webp`);
-  if (!(await exists(file))) return null;
+  if (!(await exists(file))) {
+    return null;
+  }
   // Se normaliza el ancho como en convertImage para que el tamaño sea uniforme.
   // El PERSONAJE ya viene normalizado al lienzo de carta (720x1008) por
   // así que no se le toca el tamaño: solo se comprueba que exista.
@@ -148,11 +161,15 @@ async function convertImage(
   src,
   { sharp, folder, slug, width, quality = 82, keepAlpha = false, trim = false },
 ) {
-  if (!src) return null;
+  if (!src) {
+    return null;
+  }
   const isDataUri = src.startsWith("data:");
   const url = isDataUri ? null : `${BASE_URL}${src.replace(/^\.?\//, "")}`;
   const buffer = isDataUri ? bufferFromDataUri(src) : await fetchBinary(url);
-  if (!buffer) return null;
+  if (!buffer) {
+    return null;
+  }
   const targetDir = path.join(IMAGES, folder);
   await fs.mkdir(targetDir, { recursive: true });
   const file = path.join(targetDir, `${slug}.webp`);
@@ -160,7 +177,9 @@ async function convertImage(
   // objetivo (permite subir la resolución de un tipo de asset sin --force).
   if (!FORCE && (await exists(file))) {
     const current = await sharp(file).metadata();
-    if ((current.width ?? 0) >= width) return `images/${folder}/${slug}.webp`;
+    if ((current.width ?? 0) >= width) {
+      return `images/${folder}/${slug}.webp`;
+    }
   }
   try {
     let pipeline = sharp(buffer, { animated: false });
@@ -194,7 +213,9 @@ async function convertImage(
           ? "webp"
           : "jpg";
     const fallback = path.join(targetDir, `${slug}.${ext}`);
-    if (!(await exists(fallback))) await writeInside(IMAGES, fallback, buffer);
+    if (!(await exists(fallback))) {
+      await writeInside(IMAGES, fallback, buffer);
+    }
     return `images/${folder}/${slug}.${ext}`;
   }
 }
@@ -220,8 +241,9 @@ async function main() {
     async (entry) => {
       const detail = await loadDetail(entry);
       done += 1;
-      if (done % 50 === 0)
+      if (done % 50 === 0) {
         console.log(`[scrape] detalles ${done}/${entries.length}`);
+      }
       return { entry, detail };
     },
   );
@@ -363,11 +385,15 @@ async function main() {
           ["radar", parsed?.radar],
         ];
         for (const [key, src] of wanted) {
-          if (src && assets[key]) imageStats[key] += 1;
-          else if (src && !assets[key])
+          if (src && assets[key]) {
+            imageStats[key] += 1;
+          } else if (src && !assets[key]) {
             imageStats.failed.push(`${slug}:${key}`);
+          }
         }
-        if (assets.thumb) imageStats.thumb += 1;
+        if (assets.thumb) {
+          imageStats.thumb += 1;
+        }
         void fallbackSlug;
       }
       return {

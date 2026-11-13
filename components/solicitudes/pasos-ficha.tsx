@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Piezas de los formularios por PASOS que rellenan una ficha (inscripción y modificación): el código del
@@ -65,7 +66,9 @@ export function useCodigoDelEnlace(alLlegar: (codigo: string) => void) {
     const deEnlace = new URLSearchParams(
       window.location.hash.replace(/^#/, ""),
     ).get("t");
-    if (!deEnlace) return;
+    if (!deEnlace) {
+      return;
+    }
     alLlegar(deEnlace);
     window.history.replaceState(null, "", window.location.pathname);
     // Solo al montar: el fragmento se lee una vez.
@@ -536,12 +539,15 @@ export function BotoneraPasos({
 }) {
   const { t } = useI18n();
   let texto: string;
-  if (paso === 1)
+  if (paso === 1) {
     texto = enviando ? t("ficha.enviando") : t("ficha.enviarCodigo");
-  else if (paso === 2)
+  } else if (paso === 2) {
     texto = enviando ? t("ficha.confirmando") : t("ficha.confirmarCodigo");
-  else if (paso < total) texto = t("ficha.siguiente");
-  else texto = enviando ? t("ficha.enviando") : textoEnviar;
+  } else if (paso < total) {
+    texto = t("ficha.siguiente");
+  } else {
+    texto = enviando ? t("ficha.enviando") : textoEnviar;
+  }
   return (
     <>
       {error && <Aviso tipo="error">{error}</Aviso>}

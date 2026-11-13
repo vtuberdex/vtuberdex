@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Utilidades de imagen que corren EN EL NAVEGADOR, compartidas por el gestor de
  * imágenes de las fichas y por el mantenedor de emblemas de facción.
@@ -15,7 +16,9 @@
 export async function cargarBitmap(file: Blob): Promise<ImageBitmap | null> {
   // Se comprueba ANTES de llamarla: en navegadores antiguos invocarla lanzaría un
   // TypeError síncrono y el `.catch()` no llegaría a engancharse.
-  if (typeof createImageBitmap !== "function") return null;
+  if (typeof createImageBitmap !== "function") {
+    return null;
+  }
   return createImageBitmap(file).catch(() => null);
 }
 
@@ -46,9 +49,13 @@ export async function aPngCuadrado(
 ): Promise<Blob> {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-  if (!ctx) return file;
+  if (!ctx) {
+    return file;
+  }
   const bitmap = await cargarBitmap(file);
-  if (!bitmap) return file;
+  if (!bitmap) {
+    return file;
+  }
 
   const lado = Math.min(maxLado, Math.max(bitmap.width, bitmap.height));
   const escala = Math.min(lado / bitmap.width, lado / bitmap.height, 1);
@@ -112,10 +119,16 @@ export async function normalizarImagenDeSolicitud(
   file: File,
   tipo: TipoImagenSolicitud,
 ): Promise<Blob> {
-  if (file.size > IMAGEN_SOLICITUD.entradaMaxBytes) throw new ErrorDeImagen("peso");
-  if (!file.type.startsWith("image/")) throw new ErrorDeImagen("tipo");
+  if (file.size > IMAGEN_SOLICITUD.entradaMaxBytes) {
+    throw new ErrorDeImagen("peso");
+  }
+  if (!file.type.startsWith("image/")) {
+    throw new ErrorDeImagen("tipo");
+  }
   const bitmap = await cargarBitmap(file);
-  if (!bitmap) throw new ErrorDeImagen("tipo");
+  if (!bitmap) {
+    throw new ErrorDeImagen("tipo");
+  }
   const minimo = tipo === "character" ? IMAGEN_SOLICITUD.character.minLado : IMAGEN_SOLICITUD.logo.minLado;
   if (Math.min(bitmap.width, bitmap.height) < minimo) {
     bitmap.close?.();
@@ -146,8 +159,12 @@ export async function normalizarImagenDeSolicitud(
 
   for (const calidad of [0.92, 0.85, 0.75, 0.65, 0.5]) {
     const webp = await canvasABlob(canvas, "image/webp", calidad);
-    if (!webp || webp.type !== "image/webp") throw new ErrorDeImagen("navegador");
-    if (webp.size <= IMAGEN_SOLICITUD.salidaMaxBytes) return webp;
+    if (!webp || webp.type !== "image/webp") {
+      throw new ErrorDeImagen("navegador");
+    }
+    if (webp.size <= IMAGEN_SOLICITUD.salidaMaxBytes) {
+      return webp;
+    }
   }
   throw new ErrorDeImagen("grande");
 }

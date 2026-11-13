@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Grados que la gente reclamó con misiones de Minecraft. El mantenedor puede revisarlos y REVOCAR uno (por ejemplo si se

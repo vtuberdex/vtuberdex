@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Guard de los shaders GLSL: lo que NINGÚN otro gate del stack ve.
  *
@@ -287,12 +288,16 @@ for (const { cuerpo, linea } of bloques) {
       const sucio = nombre.trim().replace(/\[.*\]$/, "");
       // Un nombre de uniform es un identificador; si trae espacios o símbolos es
       // texto que se coló, no una declaración.
-      if (/^[A-Za-z_]\w*$/.test(sucio)) declarados.add(sucio);
+      if (/^[A-Za-z_]\w*$/.test(sucio)) {
+        declarados.add(sucio);
+      }
     }
   }
 
   const usados = new Set();
-  for (const uso of limpio.matchAll(/\bu[A-Z]\w*/g)) usados.add(uso[0]);
+  for (const uso of limpio.matchAll(/\bu[A-Z]\w*/g)) {
+    usados.add(uso[0]);
+  }
 
   for (const nombre of usados) {
     if (!declarados.has(nombre) && !APORTADOS.has(nombre)) {
@@ -316,9 +321,13 @@ for (const { cuerpo, linea } of bloques) {
    * sin decimal es lo correcto. Se detecta por el contexto del encabezado del for.
    */
   for (const interp of cuerpo.matchAll(/\$\{\s*(?!f\(|vec3\()([^}]*)\}/g)) {
-    if (!/\bCFG\.|slots?\[/.test(interp[1])) continue;
+    if (!/\bCFG\.|slots?\[/.test(interp[1])) {
+      continue;
+    }
     const antes = cuerpo.slice(Math.max(0, interp.index - 60), interp.index);
-    if (/for\s*\(\s*int\s+\w+\s*=[^;]*;[^;]*<\s*$/.test(antes)) continue;
+    if (/for\s*\(\s*int\s+\w+\s*=[^;]*;[^;]*<\s*$/.test(antes)) {
+      continue;
+    }
     problemas.push(
       `interpolación sin f()/vec3() en el shader que empieza en la línea ${linea}: ` +
         `\${${interp[1]}} — un entero sale sin el .0 y GLSL ES 3.0 no lo promociona ` +
@@ -339,12 +348,16 @@ for (const { cuerpo, linea } of bloques) {
     // línea entera: saltarla escondía el caso más común, una línea con un `f()` legítimo
     // Y una perilla suelta a la vez (p. ej. `uTilt.y * 1.4 + uTime * ${f(...)}`).
     const sinConfig = l.replace(/\$\{[^}]*\}/g, " ");
-    if (/^\s*(\*|\/\/|\/\*)/.test(sinConfig)) continue; // comentario
+    if (/^\s*(\*|\/\/|\/\*)/.test(sinConfig)) {
+      continue; // comentario
+    }
     for (const lit of sinConfig.matchAll(/(?<![\w$.])(\d+\.\d+)(?![\w.])/g)) {
       const legitimo = LITERALES_LEGITIMOS.some(
         (r) => r.valor === lit[1] && r.en.test(sinConfig),
       );
-      if (legitimo) continue;
+      if (legitimo) {
+        continue;
+      }
       problemas.push(
         `literal ${lit[1]} suelto en el shader que empieza en la línea ${linea} ` +
           `(línea ${linea + i}): si es una perilla del efecto, va en card3d-config.ts; ` +
@@ -386,7 +399,9 @@ if (existsSync(rutaDeclarante)) {
     )) {
       for (const nombre of decl[1].split(",")) {
         const limpio = nombre.trim().replace(/\[.*\]$/, "");
-        if (limpio) enShaders.add(limpio);
+        if (limpio) {
+          enShaders.add(limpio);
+        }
       }
     }
   }
@@ -408,7 +423,9 @@ if (existsSync(rutaDeclarante)) {
 
 if (problemas.length > 0) {
   console.error(`check-shaders: ${problemas.length} problema(s) en ${ruta}`);
-  for (const p of problemas) console.error(`  · ${p}`);
+  for (const p of problemas) {
+    console.error(`  · ${p}`);
+  }
   process.exit(1);
 }
 

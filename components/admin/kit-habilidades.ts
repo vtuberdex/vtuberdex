@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * El ASISTENTE DE KIT: de lo que el mantenedor elige en menús al HTML de las 5 habilidades.
  *
@@ -169,8 +170,9 @@ export function kitDesdeHabilidades(skills: SkillForm[]): KitForm {
   const ultimate = skills.find((s) => s.category === "ultimate");
   activas.slice(0, 2).forEach((s, i) => {
     kit.activas[i].nombre = s.name;
-    if (s.type === "Defensivo" || s.type === "Soporte")
+    if (s.type === "Defensivo" || s.type === "Soporte") {
       kit.activas[i].tipo = s.type;
+    }
   });
   pasivas.slice(0, 2).forEach((s, i) => {
     kit.pasivas[i] = {
@@ -178,7 +180,9 @@ export function kitDesdeHabilidades(skills: SkillForm[]): KitForm {
       texto: aTokens(s.effectHtml ?? s.effect),
     };
   });
-  if (ultimate) kit.ultimate.nombre = ultimate.name;
+  if (ultimate) {
+    kit.ultimate.nombre = ultimate.name;
+  }
   return kit;
 }
 
@@ -194,7 +198,9 @@ export function mapaSubfacciones(
 ): Record<string, string> {
   const mapa: Record<string, string> = {};
   for (const faccion of facciones ?? []) {
-    if (faccion.slug && faccion.parentSlug) mapa[faccion.slug] = faccion.parentSlug;
+    if (faccion.slug && faccion.parentSlug) {
+      mapa[faccion.slug] = faccion.parentSlug;
+    }
   }
   return mapa;
 }
@@ -225,7 +231,9 @@ export function estadosDisponibles(
 /** El verbo que corresponde: el de la polaridad, o el elegido si el estado es `ambos`. */
 export function verboDe(elegido: EstadoElegido): Verbo {
   const hallado = buscarEstado(elegido.nombre);
-  if (!hallado || hallado.estado.polaridad === "ambos") return elegido.verbo;
+  if (!hallado || hallado.estado.polaridad === "ambos") {
+    return elegido.verbo;
+  }
   return hallado.estado.polaridad === "positivo" ? "obtienes" : "aplicas";
 }
 
@@ -304,11 +312,15 @@ export function htmlDeUltimate(u: UltimateForm): string {
             )
             .join(" y ");
     partes.push(`\n<br>${frase} durante ${turnos(u.turnos)}.<br>`);
-    for (const e of elegidos) partes.push(`\n${bloqueDeEvolucion(e.nombre)}`);
+    for (const e of elegidos) {
+      partes.push(`\n${bloqueDeEvolucion(e.nombre)}`);
+    }
   }
 
   const extra = lineas(u.extra);
-  if (extra.length) partes.push(`\n<br>${extra.join("\n")}`);
+  if (extra.length) {
+    partes.push(`\n<br>${extra.join("\n")}`);
+  }
 
   const unica = u.unica;
   if (unica.activa && unica.nombre.trim()) {
@@ -367,21 +379,32 @@ export function habilidadesDelKit(kit: KitForm): SkillForm[] {
 export function faltantes(kit: KitForm): string[] {
   const faltan: string[] = [];
   kit.activas.forEach((a, i) => {
-    if (!a.nombre.trim()) faltan.push(`Nombre de la Activa ${i + 1}`);
-    if (a.ataque === "ninguno" && !a.estado.nombre && !a.extra.trim())
+    if (!a.nombre.trim()) {
+      faltan.push(`Nombre de la Activa ${i + 1}`);
+    }
+    if (a.ataque === "ninguno" && !a.estado.nombre && !a.extra.trim()) {
       faltan.push(`Efecto de la Activa ${i + 1}`);
+    }
   });
   kit.pasivas.forEach((p, i) => {
-    if (!p.nombre.trim()) faltan.push(`Nombre de la Pasiva ${i + 1}`);
-    if (!p.texto.trim()) faltan.push(`Efecto de la Pasiva ${i + 1}`);
+    if (!p.nombre.trim()) {
+      faltan.push(`Nombre de la Pasiva ${i + 1}`);
+    }
+    if (!p.texto.trim()) {
+      faltan.push(`Efecto de la Pasiva ${i + 1}`);
+    }
   });
-  if (!kit.ultimate.nombre.trim()) faltan.push("Nombre de la Ultimate");
-  if (kit.ultimate.estados.some((e) => !e.nombre))
+  if (!kit.ultimate.nombre.trim()) {
+    faltan.push("Nombre de la Ultimate");
+  }
+  if (kit.ultimate.estados.some((e) => !e.nombre)) {
     faltan.push("Los dos estados de la Ultimate");
-  else if (kit.ultimate.estados[0].nombre === kit.ultimate.estados[1].nombre)
+  } else if (kit.ultimate.estados[0].nombre === kit.ultimate.estados[1].nombre) {
     faltan.push("Dos estados DISTINTOS en la Ultimate");
-  if (kit.ultimate.unica.activa && !kit.ultimate.unica.nombre.trim())
+  }
+  if (kit.ultimate.unica.activa && !kit.ultimate.unica.nombre.trim()) {
     faltan.push("Nombre de la Habilidad Única");
+  }
   return faltan;
 }
 

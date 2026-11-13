@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * CAPA 6 — wordmark VTUBERDEX.
  */
@@ -22,7 +23,9 @@ export function drawWordmarkLayer({
   width: number;
 }): HTMLCanvasElement {
   const { canvas, ctx, H } = createLayer(width);
-  if (!ctx) return canvas;
+  if (!ctx) {
+    return canvas;
+  }
   const pad = 46;
   const { accent } = cardPalette(card.themeColor, card.secondaryColor);
   /**

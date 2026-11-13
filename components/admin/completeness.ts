@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Completitud de una carta: la lista de lo que le falta, con el paso del asistente
  * donde se arregla cada cosa.
@@ -138,7 +139,9 @@ export function checklist(input: CompletenessInput): CheckItem[] {
 
 export function percent(items: CheckItem[]): number {
   const core = items.filter((item) => !item.optional);
-  if (core.length === 0) return 0;
+  if (core.length === 0) {
+    return 0;
+  }
   return Math.round(
     (core.filter((item) => item.ok).length / core.length) * 100,
   );
@@ -165,7 +168,8 @@ export function percentOfCard(card: VtuberCard): number {
 /** Estado de un paso: `null` = no tiene requisitos (revisión). */
 export function stepComplete(items: CheckItem[], step: StepId): boolean | null {
   const own = items.filter((item) => item.step === step && !item.optional);
-  if (own.length === 0)
+  if (own.length === 0) {
     return step === "revision" ? percent(items) === 100 : null;
+  }
   return own.every((item) => item.ok);
 }

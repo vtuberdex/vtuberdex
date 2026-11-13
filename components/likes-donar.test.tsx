@@ -214,8 +214,9 @@ describe("código de referencia", () => {
   });
 
   test("el código es lo que ve la gente: ida y vuelta para cualquier dex", () => {
-    for (const dex of [0, 1, 16, 99, 100, 777, 999, 1000, 1005])
+    for (const dex of [0, 1, 16, 99, 100, 777, 999, 1000, 1005]) {
       expect(dexDeCodigo(codigoDeReferencia(dex))).toBe(dex);
+    }
   });
 
   test("los códigos ANTIGUOS de 6 dígitos (el id interno) se rechazan, no se leen como otro dex", () => {
@@ -224,8 +225,9 @@ describe("código de referencia", () => {
       "VTD-000014",
       "VTD-100001",
       "VTD-000000",
-    ])
+    ]) {
       expect(dexDeCodigo(viejo), viejo).toBeNull();
+    }
   });
 
   test("lo que no es un código no da dex", () => {
@@ -238,8 +240,9 @@ describe("código de referencia", () => {
       "XVTD-17",
       "VTD-1234567890",
       "VTD--5",
-    ])
+    ]) {
       expect(dexDeCodigo(texto), texto).toBeNull();
+    }
   });
 });
 

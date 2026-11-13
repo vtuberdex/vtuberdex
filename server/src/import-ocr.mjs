@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Importa a SQLite el texto personalizado extraído por OCR de las cartas.
  *
@@ -84,9 +85,13 @@ export function importOcr({
       }
       update.run(text, confidence, item.dexNumber);
       saved += 1;
-      if (confidence >= 80) porConfianza.alta += 1;
-      else if (confidence >= 60) porConfianza.media += 1;
-      else porConfianza.baja += 1;
+      if (confidence >= 80) {
+        porConfianza.alta += 1;
+      } else if (confidence >= 60) {
+        porConfianza.media += 1;
+      } else {
+        porConfianza.baja += 1;
+      }
     }
     setMeta(db, "ocr_imported_at", new Date().toISOString());
     setMeta(db, "ocr_source", path.relative(ROOT, OCR_PATH));

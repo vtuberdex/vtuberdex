@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Gráfico de telaraña de los atributos de combate.
  *
@@ -28,7 +29,9 @@ export function StatRadar({
   palette: { accent: string; secondary: string };
 }) {
   const vertices = verticesDeRadar(stats);
-  if (vertices.length < MIN_EJES) return null;
+  if (vertices.length < MIN_EJES) {
+    return null;
+  }
   const n = vertices.length;
   const descripcion = vertices.map((v) => `${v.label} ${v.value}`).join(", ");
 

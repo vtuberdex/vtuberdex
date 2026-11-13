@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Calibración: usa las 154 cartas cuyo logo YA conocemos (vienen de `logos/` en
  * el sitio) para descubrir DÓNDE está el logo dentro de la carta y A QUÉ ESCALA.
@@ -60,7 +61,9 @@ export function locateLogo(
   for (const scale of scales) {
     const sw = Math.round(logoW * scale);
     const sh = Math.round(logoH * scale);
-    if (sw < 24 || sh < 24 || sw > cardW || sh > yLimit) continue;
+    if (sw < 24 || sh < 24 || sw > cardW || sh > yLimit) {
+      continue;
+    }
 
     for (let y = 0; y + sh <= yLimit; y += step) {
       for (let x = 0; x + sw <= cardW; x += step) {
@@ -72,14 +75,18 @@ export function locateLogo(
           for (let lx = 0; lx < sw; lx += 2) {
             const sx = Math.min(logoW - 1, Math.floor(lx / scale));
             const a = logoAlpha[sy * logoW + sx];
-            if (a < 160) continue; // solo píxeles sólidos del logo
+            if (a < 160) {
+              continue; // solo píxeles sólidos del logo
+            }
             const cardPixel = cardGray[(y + ly) * cardW + (x + lx)];
             const logoPixel = logoGray[sy * logoW + sx];
             sum += Math.abs(cardPixel - logoPixel);
             count += 1;
           }
         }
-        if (count < 40) continue;
+        if (count < 40) {
+          continue;
+        }
         const score = sum / count;
         if (!best || score < best.score) {
           best = {
@@ -139,8 +146,9 @@ async function main() {
         let p = 0, i = 3;
         p < alpha.length;
         p += 1, i += logoRaw.info.channels
-      )
+      ) {
         alpha[p] = logoRaw.data[i];
+      }
 
       // Escalas: el logo del sitio se guardó a 900px de ancho como máximo, pero la
       // carta es 720: hay que probar desde bastante reducido hasta casi completo.

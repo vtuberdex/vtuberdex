@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Subida de una imagen (avatar o logo) en los formularios públicos de inscripción y modificación, en lugar
@@ -67,7 +68,9 @@ export function SubidaImagen({
   // Las URL de objeto se liberan al cambiarlas y al desmontar.
   useEffect(
     () => () => {
-      if (vista) URL.revokeObjectURL(vista);
+      if (vista) {
+        URL.revokeObjectURL(vista);
+      }
     },
     [vista],
   );
@@ -78,10 +81,14 @@ export function SubidaImagen({
 
   // Borrador recuperado: hay id pero ninguna vista local → se pide al servidor.
   useEffect(() => {
-    if (!id || vistaDe.current === id || !credencial) return;
+    if (!id || vistaDe.current === id || !credencial) {
+      return;
+    }
     let vigente = true;
     void api.imagenDeSolicitud(formulario, credencial, id).then((blob) => {
-      if (!vigente) return;
+      if (!vigente) {
+        return;
+      }
       if (blob) {
         vistaDe.current = id;
         mostrar(blob);
@@ -99,7 +106,9 @@ export function SubidaImagen({
   }, [id, credencial, formulario, mostrar, onId, t]);
 
   const elegir = async (file: File | undefined) => {
-    if (!file) return;
+    if (!file) {
+      return;
+    }
     setError(null);
     setFase("preparando");
     try {
@@ -118,7 +127,9 @@ export function SubidaImagen({
       setFase("lista");
     } catch (causa) {
       setFase(id ? "lista" : "vacia");
-      if (!id) setVista(null);
+      if (!id) {
+        setVista(null);
+      }
       setError(
         causa instanceof ErrorDeImagen
           ? t(`img.error.${causa.codigo}` as Clave)
@@ -127,7 +138,9 @@ export function SubidaImagen({
             }),
       );
     } finally {
-      if (entrada.current) entrada.current.value = "";
+      if (entrada.current) {
+        entrada.current.value = "";
+      }
     }
   };
 

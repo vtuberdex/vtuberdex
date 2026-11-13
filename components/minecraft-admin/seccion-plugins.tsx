@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 
 /**
@@ -67,7 +68,9 @@ export function VisorRegistro({ plugin }: { plugin?: string }) {
 
   const cargar = useCallback(async () => {
     const q = new URLSearchParams({ lineas: "200" });
-    if (plugin) q.set("plugin", plugin);
+    if (plugin) {
+      q.set("plugin", plugin);
+    }
     try {
       const r = await fetch(`/api/minecraft-admin/registros?${q}`, {
         cache: "no-store",
@@ -89,7 +92,9 @@ export function VisorRegistro({ plugin }: { plugin?: string }) {
   }, [cargar]);
 
   useEffect(() => {
-    if (!vivo) return;
+    if (!vivo) {
+      return;
+    }
     const ciclo = setInterval(() => void cargar(), 5000);
     return () => clearInterval(ciclo);
   }, [vivo, cargar]);
@@ -232,7 +237,9 @@ export function SeccionPlugins({
 
   const guardarConfig = async (evento: React.FormEvent) => {
     evento.preventDefault();
-    if (!archivoConfig) return;
+    if (!archivoConfig) {
+      return;
+    }
     setError(null);
     setAviso(null);
     setOcupado(true);

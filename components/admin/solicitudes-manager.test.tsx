@@ -117,7 +117,7 @@ beforeEach(() => {
           ],
         } satisfies VistaPreviaSolicitud;
       }
-      if (id === 3)
+      if (id === 3) {
         return {
           tipo: "baja",
           estado: "pendiente",
@@ -126,6 +126,7 @@ beforeEach(() => {
           avisos: ["«Marcar procesada» solo cierra la solicitud"],
           ficha: null,
         } satisfies VistaPreviaSolicitud;
+      }
       return OK;
     },
   );

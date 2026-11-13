@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Motor de búsqueda y facetas sobre SQLite.
  *
@@ -36,7 +37,9 @@ const SIN_PREMIUM_COLUMNAS = `, NULL AS premiumGrade, NULL AS premiumSince, NULL
  */
 const conPremium = new WeakSet();
 export function tienePremium(db) {
-  if (conPremium.has(db)) return true;
+  if (conPremium.has(db)) {
+    return true;
+  }
   const hay = Boolean(
     db
       .prepare(
@@ -44,7 +47,9 @@ export function tienePremium(db) {
       )
       .get(),
   );
-  if (hay) conPremium.add(db);
+  if (hay) {
+    conPremium.add(db);
+  }
   return hay;
 }
 
@@ -103,7 +108,9 @@ const cardSelect = (db) =>
   tienePremium(db) ? SELECT_CON_PREMIUM : SELECT_SIN_PREMIUM;
 
 const parseJsonArray = (value) => {
-  if (!value) return [];
+  if (!value) {
+    return [];
+  }
   try {
     const parsed = JSON.parse(value);
     return Array.isArray(parsed) ? parsed : [];
@@ -130,7 +137,9 @@ const toPublicPath = (value) =>
 
 /** Fila SQL -> objeto JSON que consume la app. */
 export function mapCard(row) {
-  if (!row) return null;
+  if (!row) {
+    return null;
+  }
   return {
     id: row.id,
     dexNumber: row.dexNumber,
@@ -214,7 +223,9 @@ export function buildFtsQuery(term) {
     .split(/[^\p{L}\p{N}]+/u)
     .filter((token) => token.length > 0)
     .slice(0, 8);
-  if (tokens.length === 0) return null;
+  if (tokens.length === 0) {
+    return null;
+  }
   return tokens.map((token) => `"${token}"*`).join(" AND ");
 }
 
@@ -258,17 +269,19 @@ export function searchVtubers(db, params = {}) {
   const where = [];
   const args = [];
 
-  if (!includeHidden) where.push(`v.status = 'published'`);
-  else if (status) {
+  if (!includeHidden) {
+    where.push(`v.status = 'published'`);
+  } else if (status) {
     where.push("v.status = ?");
     args.push(status);
   }
   if (premium) {
     // Sin la tabla no hay ninguna premium: el filtro devuelve vacío en vez de fallar.
-    if (!tienePremium(db)) where.push("0");
-    else if (premium === "todas")
+    if (!tienePremium(db)) {
+      where.push("0");
+    } else if (premium === "todas") {
       where.push("EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id)");
-    else {
+    } else {
       where.push(
         `EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id AND p.grade IN (${GRADOS.map(() => "?").join(",")}))`,
       );
@@ -340,7 +353,9 @@ export function searchVtubers(db, params = {}) {
       .flatMap((value) => String(value).split(","))
       .map((v) => v.trim().toLowerCase())
       .filter(Boolean);
-    if (list.length === 0) return;
+    if (list.length === 0) {
+      return;
+    }
     where.push(`EXISTS (
       SELECT 1 FROM vtuber_tag vt JOIN tag t ON t.id = vt.tag_id
       WHERE vt.vtuber_id = v.id AND t.kind = ?
@@ -400,7 +415,9 @@ export function facetCounts(db, params = {}) {
   const { language = null, q = "", includeHidden = false } = params;
   const baseArgs = [];
   const baseWhere = [];
-  if (!includeHidden) baseWhere.push(`v.status = 'published'`);
+  if (!includeHidden) {
+    baseWhere.push(`v.status = 'published'`);
+  }
   if (language) {
     baseWhere.push(
       `EXISTS (SELECT 1 FROM vtuber_language vl WHERE vl.vtuber_id = v.id AND vl.code = ?)`,
@@ -513,13 +530,18 @@ export function getVtuberBySlug(db, slug, { includeHidden = false } = {}) {
     // la ficha con su slug ACTUAL y el cliente redirige. Sin esto, renombrar una página rompería
     // todos los enlaces compartidos.
     const alias = buscarAlias(db, slug);
-    if (alias)
+    if (alias) {
       row = db.prepare(`${cardSelect(db)} WHERE v.id = ? ${where}`).get(alias);
+    }
   }
-  if (!row) return null;
+  if (!row) {
+    return null;
+  }
   // Una ficha deteriorada (baja) no tiene página pública: es un 404, igual que un borrador. Así ni el
   // nombre ni nada de la ficha se puede leer por la URL, ni por la API, ni por un alias antiguo.
-  if (!includeHidden && row.premiumGrade === GRADO_DE_BAJA) return null;
+  if (!includeHidden && row.premiumGrade === GRADO_DE_BAJA) {
+    return null;
+  }
   const card = mapCard(row);
 
   card.profile = db

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * A/B del camino de lectura de ediciones/assets, con el cliente de verdad.
  *
@@ -72,24 +73,35 @@ for (const slug of ["yeicokp-harv", "ex-porygon-z-explicador-de-vtubers"]) {
 const metricas = { peticiones: 0, tipos: new Map() };
 
 function aJson(valor) {
-  if (valor === null || valor === undefined) return { type: "null" };
-  if (typeof valor === "bigint")
+  if (valor === null || valor === undefined) {
+    return { type: "null" };
+  }
+  if (typeof valor === "bigint") {
     return { type: "integer", value: String(valor) };
+  }
   if (typeof valor === "number") {
     return Number.isInteger(valor)
       ? { type: "integer", value: String(valor) }
       : { type: "float", value: valor };
   }
-  if (valor instanceof Uint8Array)
+  if (valor instanceof Uint8Array) {
     return { type: "blob", base64: Buffer.from(valor).toString("base64") };
+  }
   return { type: "text", value: String(valor) };
 }
 function deJson(valor) {
-  if (valor.type === "null") return null;
-  if (valor.type === "integer") return Number(valor.value);
-  if (valor.type === "float") return valor.value;
-  if (valor.type === "blob")
+  if (valor.type === "null") {
+    return null;
+  }
+  if (valor.type === "integer") {
+    return Number(valor.value);
+  }
+  if (valor.type === "float") {
+    return valor.value;
+  }
+  if (valor.type === "blob") {
     return new Uint8Array(Buffer.from(valor.base64, "base64"));
+  }
   return valor.value;
 }
 
@@ -100,7 +112,9 @@ function ejecutar(req) {
     db.exec(req.sql);
     return { type: "sequence" };
   }
-  if (req.type === "close") return { type: "close" };
+  if (req.type === "close") {
+    return { type: "close" };
+  }
 
   const sql = req.stmt.sql;
   const valores = (req.stmt.args ?? []).map(deJson);
@@ -159,8 +173,11 @@ const servidor = createServer((req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(salida));
     };
-    if (RETARDO > 0) setTimeout(responder, RETARDO);
-    else responder();
+    if (RETARDO > 0) {
+      setTimeout(responder, RETARDO);
+    } else {
+      responder();
+    }
   });
 });
 await new Promise((resolve) => servidor.listen(0, "127.0.0.1", resolve));
@@ -319,8 +336,11 @@ for (let i = 0; i < a.length; i += 1) {
     JSON.stringify(sinVersion(b[i].images));
   const mismosAssets =
     JSON.stringify(a[i].assets) === JSON.stringify(b[i].assets);
-  if (mismaImagen && mismosAssets) iguales += 1;
-  else console.log(`  ✖ difiere ${a[i].slug}`);
+  if (mismaImagen && mismosAssets) {
+    iguales += 1;
+  } else {
+    console.log(`  ✖ difiere ${a[i].slug}`);
+  }
   if (
     JSON.stringify(b[i].images).includes("?v=") &&
     !JSON.stringify(a[i].images).includes("?v=")

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** Chip de país con bandera; tolera países sin bandera en el dataset. */
 import type { CountryRef } from "@/lib/types";
 

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * La HOJA INTERIOR de la placa premium, dibujada en un lienzo 2D: el marco con la ventana donde va
  * la carta y la ETIQUETA con el nombre, el certificado y la nota (como la de una carta de CGC).
@@ -47,7 +48,9 @@ export function ajustarFuente(
   minimo = 8,
 ): number {
   let px = tamano;
-  while (px > minimo && medir(px) > ancho) px -= 1;
+  while (px > minimo && medir(px) > ancho) {
+    px -= 1;
+  }
   return px;
 }
 
@@ -97,8 +100,9 @@ function textoAjustado(
   const px = ajustarFuente(medir, ancho, tamano, Math.round(tamano * 0.55));
   ctx.font = `${peso} ${px}px ${FUENTE}`;
   let salida = texto;
-  while (salida.length > 1 && ctx.measureText(salida).width > ancho)
+  while (salida.length > 1 && ctx.measureText(salida).width > ancho) {
     salida = salida.slice(0, -1);
+  }
   return salida === texto ? texto : `${salida.trimEnd()}…`;
 }
 
@@ -113,7 +117,9 @@ export function dibujarHojaInterior(
   canvas.width = insert.pxWidth;
   canvas.height = Math.round(layout.height * escala);
   const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
+  if (!ctx) {
+    return canvas;
+  }
 
   const px = (unidades: number) => unidades * escala;
   const aX = (x: number) => (x + layout.width / 2) * escala;
@@ -283,7 +289,9 @@ function dibujarEtiqueta(
   ctx.fillStyle = colores.ink;
   barrasDeCertificado(cert).forEach((ancho, indice) => {
     const largo = ancho * unidad;
-    if (indice % 2 === 0) ctx.fillRect(barraX, barraY, largo, barraH);
+    if (indice % 2 === 0) {
+      ctx.fillRect(barraX, barraY, largo, barraH);
+    }
     barraX += largo;
   });
   ctx.fillStyle = colores.mutedInk;

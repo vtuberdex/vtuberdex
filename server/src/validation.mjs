@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Validación de payloads del mantenedor y de la query de búsqueda (zod).
  * Un único lugar define qué es un dato válido, reutilizado por rutas y tests.

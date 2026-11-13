@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paso 4: historia — frase, lore y datos de perfil con atajos. */
 import { useState } from "react";
@@ -28,10 +29,18 @@ export function StoryStep({ form, set }: StepProps) {
     const perfil = fundirPerfil(form.profile, nuevos);
     set("profile", perfil);
     const derivados = camposDerivados(nuevos);
-    if (derivados.birthday) set("birthday", derivados.birthday);
-    if (derivados.height) set("height", derivados.height);
-    if (derivados.hashtag) set("hashtag", derivados.hashtag);
-    if (derivados.favoriteColor) set("favoriteColor", derivados.favoriteColor);
+    if (derivados.birthday) {
+      set("birthday", derivados.birthday);
+    }
+    if (derivados.height) {
+      set("height", derivados.height);
+    }
+    if (derivados.hashtag) {
+      set("hashtag", derivados.hashtag);
+    }
+    if (derivados.favoriteColor) {
+      set("favoriteColor", derivados.favoriteColor);
+    }
     setAviso(
       `Se aplicaron ${nuevos.length} datos. Revísalos en la pestaña «Manual».`,
     );

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 
 /**
@@ -630,19 +631,22 @@ export function MiFicha() {
     const tk = m ? decodeURIComponent(m[1]) : null;
     setToken(tk);
     setListo(true);
-    if (tk) void cargar(tk);
+    if (tk) {
+      void cargar(tk);
+    }
   }, [cargar]);
 
   /** Un enlace caducado vuelve a pedir el enlace; cualquier otro fallo se avisa sin perder la ficha. */
   const avisarFallo = (causa: unknown) => {
-    if (causa instanceof ApiError && causa.status === 410)
+    if (causa instanceof ApiError && causa.status === 410) {
       setError({ tipo: "caducado" });
-    else
+    } else {
       setAviso({
         tipo: "error",
         texto:
           causa instanceof ApiError ? causa.message : t("mificha.errorGeneral"),
       });
+    }
   };
 
   const aplicar = async (
@@ -656,7 +660,9 @@ export function MiFicha() {
     clave?: string,
     nombre?: string,
   ) => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     setOcupada(clave ?? "reiniciar");
     setAviso(null);
     // El sobrante se lee ANTES de convertir: después ya es 0 y el aviso diría «pasaste 0».
@@ -705,7 +711,9 @@ export function MiFicha() {
     ficha: VistaMiFicha,
     atributos: Record<string, number>,
   ) => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     setOcupada("atributos");
     setAviso(null);
     try {
@@ -727,15 +735,18 @@ export function MiFicha() {
     accion: "codigo" | "desvincular",
     ficha: VistaMiFicha,
   ) => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     setOcupada("minecraft");
     setAviso(null);
     try {
       const r = await api.minecraftDeMiFicha(token, ficha.slug, accion);
       setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
       setCodigoMinecraft(r.codigo?.codigo ?? null);
-      if (accion === "desvincular")
+      if (accion === "desvincular") {
         setAviso({ tipo: "ok", texto: t("mificha.minecraftDesvinculado") });
+      }
     } catch (causa) {
       avisarFallo(causa);
     } finally {
@@ -744,7 +755,9 @@ export function MiFicha() {
   };
 
   const reclamarGrado = async (mision: string, grado: string, ficha: VistaMiFicha) => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     setOcupada(mision);
     setAviso(null);
     try {
@@ -758,20 +771,28 @@ export function MiFicha() {
     }
   };
 
-  if (!listo)
+  if (!listo) {
     return <p className="text-sm text-dex-muted">{t("mificha.cargando")}</p>;
-  if (!token) return <PedirEnlace />;
-  if (error?.tipo === "caducado")
+  }
+  if (!token) {
+    return <PedirEnlace />;
+  }
+  if (error?.tipo === "caducado") {
     return <PedirEnlace aviso={t("mificha.enlaceCaducado")} />;
-  if (error?.tipo === "sin_fichas")
+  }
+  if (error?.tipo === "sin_fichas") {
     return <Aviso tipo="error">{t("mificha.sinFichas")}</Aviso>;
-  if (error) return <Aviso tipo="error">{t("mificha.error")}</Aviso>;
-  if (!datos)
+  }
+  if (error) {
+    return <Aviso tipo="error">{t("mificha.error")}</Aviso>;
+  }
+  if (!datos) {
     return (
       <p className="text-sm text-dex-muted" data-testid="mificha-cargando">
         {t("mificha.cargando")}
       </p>
     );
+  }
 
   return (
     <MiFichaVista
@@ -793,7 +814,9 @@ export function MiFicha() {
       }
       alElegirFicha={(slug) => {
         setCodigoMinecraft(null);
-        if (token) void cargar(token, slug);
+        if (token) {
+          void cargar(token, slug);
+        }
       }}
       alSubir={(clave, nombre) =>
         void aplicar("subir", datos.ficha, clave, nombre)
@@ -991,7 +1014,9 @@ export function MiFichaVista({
           const lista = puntos.habilidades.filter(
             (h) => h.category === categoria,
           );
-          if (!lista.length) return null;
+          if (!lista.length) {
+            return null;
+          }
           return (
             <section
               key={categoria}

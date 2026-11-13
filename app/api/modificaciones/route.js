@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `POST /api/modificaciones` — el formulario PÚBLICO para pedir cambios en una ficha ya registrada.
  *

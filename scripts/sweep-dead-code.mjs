@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Barrido de código muerto: exports y funciones sin consumidores.
  *
@@ -24,11 +25,16 @@ const IGNORAR = new Set([
 /** Todos los archivos de código del repo, sin los directorios ignorados. */
 function archivos(dir, acc = []) {
   for (const entrada of readdirSync(dir)) {
-    if (IGNORAR.has(entrada)) continue;
+    if (IGNORAR.has(entrada)) {
+      continue;
+    }
     const ruta = join(dir, entrada);
     const info = statSync(ruta);
-    if (info.isDirectory()) archivos(ruta, acc);
-    else if (/\.(mjs|js|ts|tsx)$/.test(entrada)) acc.push(ruta);
+    if (info.isDirectory()) {
+      archivos(ruta, acc);
+    } else if (/\.(mjs|js|ts|tsx)$/.test(entrada)) {
+      acc.push(ruta);
+    }
   }
   return acc;
 }
@@ -51,7 +57,9 @@ function exportsDe(fuente) {
     /^export\s+type\s+([A-Za-z0-9_$]+)/gm,
   ];
   for (const patron of patrones) {
-    for (const m of fuente.matchAll(patron)) salida.push(m[1]);
+    for (const m of fuente.matchAll(patron)) {
+      salida.push(m[1]);
+    }
   }
   // `export { a, b }` y `export { DB_PATH, MANIFEST_PATH }`.
   for (const m of fuente.matchAll(/^export\s*\{([^}]+)\}/gm)) {
@@ -61,7 +69,9 @@ function exportsDe(fuente) {
         .split(/\s+as\s+/)
         .pop()
         ?.trim();
-      if (nombre) salida.push(nombre);
+      if (nombre) {
+        salida.push(nombre);
+      }
     }
   }
   return salida;
@@ -79,9 +89,13 @@ function consumidores(nombre, propio) {
     `\\b${nombre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
   );
   for (const f of ARCHIVOS) {
-    if (f === propio) continue;
+    if (f === propio) {
+      continue;
+    }
     const contenido = leer(f);
-    if (!patron.test(contenido)) continue;
+    if (!patron.test(contenido)) {
+      continue;
+    }
     (TESTS.includes(f) ? usos.test : usos.fuente).push(rel(f));
   }
   return usos;

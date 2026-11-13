@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paginación simple con ventana de páginas. */
 import { useI18n } from "@/lib/i18n";
@@ -12,13 +13,17 @@ function windowedPages(page: number, pageCount: number, span = 2): number[] {
   const start = Math.max(1, Math.min(page - span, pageCount - span * 2));
   const end = Math.min(pageCount, Math.max(page + span, span * 2 + 1));
   const pages: number[] = [];
-  for (let value = start; value <= end; value += 1) pages.push(value);
+  for (let value = start; value <= end; value += 1) {
+    pages.push(value);
+  }
   return pages;
 }
 
 export function Pagination({ page, pageCount, onPage }: PaginationProps) {
   const { t } = useI18n();
-  if (pageCount <= 1) return null;
+  if (pageCount <= 1) {
+    return null;
+  }
   const pages = windowedPages(page, pageCount);
 
   const buttonClass = (active: boolean) =>

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** `POST /api/minecraft/email` — `/vtd email <correo>` en el juego: manda los códigos de vínculo a ese correo (solo el plugin). */
 import { pedirCodigoPorCorreo } from "../../../../lib/minecraft.mjs";
 

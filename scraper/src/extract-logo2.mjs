@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Extrae el logo del VTuber desde la imagen de la CARTA, para las fichas que no
  * tienen página de detalle (el sitio no sirve esos logos por separado).
@@ -84,7 +85,9 @@ export function findLogoBoxInBand(
       band,
       badge,
     );
-    if (found) return found;
+    if (found) {
+      return found;
+    }
   }
   return null;
 }
@@ -118,7 +121,9 @@ function detectWithMask(
   let hits = 0;
   for (let y = y0; y < y1; y += 1) {
     for (let x = x0; x < x1; x += 1) {
-      if (x >= bx0 && x < bx1 && y >= by0 && y < by1) continue;
+      if (x >= bx0 && x < bx1 && y >= by0 && y < by1) {
+        continue;
+      }
       const i = (y * width + x) * channels;
       const r = data[i];
       const g = data[i + 1];
@@ -142,7 +147,9 @@ function detectWithMask(
       }
     }
   }
-  if (hits < 120) return null;
+  if (hits < 120) {
+    return null;
+  }
 
   // Una celda cuenta solo si está MAYORITARIAMENTE cubierta (>=8 de 16 píxeles).
   // Esto funciona como una erosión: el texto del panel tiene trazos finos que no
@@ -164,7 +171,9 @@ function detectWithMask(
   /** Rango [inicio, fin] que contiene el 92% central de las muestras. */
   const coreRange = (hist, from, to) => {
     const total = hist.reduce((s, v) => s + v, 0);
-    if (total === 0) return null;
+    if (total === 0) {
+      return null;
+    }
     const lowThreshold = total * 0.04;
     const highThreshold = total * 0.96;
     let acc = 0;
@@ -193,7 +202,9 @@ function detectWithMask(
     Math.floor(x0 / CELL),
     Math.floor(x1 / CELL),
   );
-  if (!colsRange) return null;
+  if (!colsRange) {
+    return null;
+  }
   const cols = [
     colsRange[0] * CELL,
     Math.min(width - 1, colsRange[1] * CELL + CELL - 1),
@@ -211,7 +222,9 @@ function detectWithMask(
     (_, i) => rowHits[cellY0 + i],
   );
   const peak = Math.max(...rowsBand);
-  if (peak < 3) return null;
+  if (peak < 3) {
+    return null;
+  }
 
   let firstDense = -1;
   for (let i = 0; i < rowsBand.length; i += 1) {
@@ -220,7 +233,9 @@ function detectWithMask(
       break;
     }
   }
-  if (firstDense < 0) return null;
+  if (firstDense < 0) {
+    return null;
+  }
 
   // Fin: última fila que aún supera la mitad del pico, tolerando huecos cortos
   // (los logos caligráficos tienen valles internos).
@@ -233,7 +248,9 @@ function detectWithMask(
       quiet = 0;
     } else {
       quiet += 1;
-      if (quiet > maxQuiet) break;
+      if (quiet > maxQuiet) {
+        break;
+      }
     }
   }
 
@@ -241,7 +258,9 @@ function detectWithMask(
     Math.max(0, (cellY0 + firstDense) * CELL),
     Math.min(height - 1, (cellY0 + lastDense) * CELL + CELL - 1),
   ];
-  if (rows[1] <= rows[0]) return null;
+  if (rows[1] <= rows[0]) {
+    return null;
+  }
 
   const box = {
     left: cols[0],
@@ -253,8 +272,12 @@ function detectWithMask(
   // cortarían. Se borra después, píxel a píxel, solo en la esquina superior
   // derecha del recorte (ver extractLogoFromCard).
   // Descarta cajas degeneradas (una línea, o que cubran toda la banda).
-  if (box.width < 30 || box.height < 24) return null;
-  if (box.width > width * 0.85 && box.height > height * 0.5) return null;
+  if (box.width < 30 || box.height < 24) {
+    return null;
+  }
+  if (box.width > width * 0.85 && box.height > height * 0.5) {
+    return null;
+  }
   return { box, hits, columnas: cols, filas: rows, peak };
 }
 
@@ -279,7 +302,9 @@ export async function extractLogoFromCard(file) {
   const found = edge
     ? { box: edge.box }
     : findLogoBoxInBand(data, info.width, info.height, info.channels);
-  if (!found) return null;
+  if (!found) {
+    return null;
+  }
 
   const pad = 4;
   const crop = {

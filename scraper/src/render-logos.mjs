@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 import sharp from "sharp";
 import fs from "node:fs";
 // Muestra aleatoria determinista amplia: 24 logos

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Rutas de la API del VTuberDex.
  *
@@ -364,14 +365,15 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
         email: await fijarCorreoDeFicha(solicitudes, row.id, parsed.data.email),
       });
     } catch (error) {
-      if (error instanceof SolicitudError)
+      if (error instanceof SolicitudError) {
         res
           .status(error.status)
           .json({ error: error.code, detail: error.detail });
-      else
+      } else {
         res
           .status(503)
           .json({ error: "solicitudes_no_disponibles", detail: error.message });
+      }
     }
   });
 

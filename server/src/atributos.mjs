@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * ATRIBUTOS RPG DE LA FICHA (STR, DEX, CON, INT, WIS, CHA).
  *
@@ -129,9 +130,14 @@ export function bonosDeFacciones(facciones = []) {
   const bono = Object.fromEntries(SLUGS_DE_ATRIBUTO.map((s) => [s, 0]));
   for (const faccion of facciones ?? []) {
     const suyo = BONOS_DE_FACCION[canonico(faccion)];
-    if (!suyo) continue;
-    for (const [slug, puntos] of Object.entries(suyo))
-      if (slug in bono) bono[slug] += puntos;
+    if (!suyo) {
+      continue;
+    }
+    for (const [slug, puntos] of Object.entries(suyo)) {
+      if (slug in bono) {
+        bono[slug] += puntos;
+      }
+    }
   }
   return bono;
 }
@@ -173,12 +179,15 @@ export function aplicarAtributosAStats(stats = [], derivados = []) {
   const nuevos = new Map(derivados.map((d) => [d.slug, d]));
   const salida = (stats ?? []).map((stat) => {
     const nuevo = nuevos.get(stat.slug);
-    if (!nuevo) return stat;
+    if (!nuevo) {
+      return stat;
+    }
     nuevos.delete(stat.slug);
     return { ...stat, value: nuevo.value };
   });
-  for (const { slug, label, value } of nuevos.values())
+  for (const { slug, label, value } of nuevos.values()) {
     salida.push({ slug, label, value });
+  }
   return salida;
 }
 
@@ -243,33 +252,36 @@ export async function estadoDeAtributos(
 
 /** Valida una distribución completa y la devuelve como mapa de enteros (con el tope de cada uno). */
 export function validarDistribucion(puntos, bonos = {}) {
-  if (!puntos || typeof puntos !== "object" || Array.isArray(puntos))
+  if (!puntos || typeof puntos !== "object" || Array.isArray(puntos)) {
     throw new AtributoError(
       400,
       "payload_invalido",
       "Faltan los atributos que quieres guardar.",
     );
+  }
   const limpio = {};
   let suma = 0;
   for (const [slug, valor] of Object.entries(puntos)) {
-    if (!SLUGS_DE_ATRIBUTO.includes(slug))
+    if (!SLUGS_DE_ATRIBUTO.includes(slug)) {
       throw new AtributoError(
         400,
         "atributo_desconocido",
         "Ese atributo no existe.",
       );
+    }
     const n = Number(valor);
-    if (!Number.isInteger(n) || n < 0)
+    if (!Number.isInteger(n) || n < 0) {
       throw new AtributoError(
         400,
         "atributo_invalido",
         "Los puntos de cada atributo tienen que ser un número entero de 0 o más.",
       );
+    }
     // La base y el bono de facción ya gastan parte del tope: a cada atributo solo le caben los
     // puntos que faltan hasta 100 (60 sin bono, 40 con un bono de +20).
     const bono = Math.max(0, Math.trunc(Number(bonos[slug]) || 0));
     const tope = Math.max(0, ATRIBUTO_MAXIMO - ATRIBUTO_BASE - bono);
-    if (n > tope)
+    if (n > tope) {
       throw new AtributoError(
         400,
         "atributo_invalido",
@@ -277,15 +289,17 @@ export function validarDistribucion(puntos, bonos = {}) {
           ? `Con la base de ${ATRIBUTO_BASE} y el bono de ${bono}, ${slug} ya llega a ${ATRIBUTO_MAXIMO}.`
           : `A ${slug} solo le caben ${tope} puntos más (base ${ATRIBUTO_BASE} y bono ${bono} incluidos).`,
       );
+    }
     limpio[slug] = n;
     suma += n;
   }
-  if (suma > PUNTOS_DE_ATRIBUTOS)
+  if (suma > PUNTOS_DE_ATRIBUTOS) {
     throw new AtributoError(
       400,
       "atributos_de_mas",
       `Repartiste ${suma} puntos y solo hay ${PUNTOS_DE_ATRIBUTOS}.`,
     );
+  }
   return limpio;
 }
 
@@ -305,7 +319,7 @@ export async function guardarAtributos(
     stats,
     admin,
   });
-  if (!antes.puedeEditar)
+  if (!antes.puedeEditar) {
     throw new AtributoError(
       409,
       "atributos_bloqueados",
@@ -313,12 +327,15 @@ export async function guardarAtributos(
         ? "Tu ficha ya tiene stats propios: los atributos se rellenan solo en fichas nuevas."
         : "Tus atributos ya están repartidos. Pide al equipo que los ajuste si necesitas cambiarlos.",
     );
+  }
   const limpio = validarDistribucion(puntos, bonosDeFacciones(facciones));
   await e.execute("DELETE FROM atributo_ficha WHERE vtuber_id = ?", [
     Number(vtuberId),
   ]);
   for (const [slug, n] of Object.entries(limpio)) {
-    if (n === 0) continue;
+    if (n === 0) {
+      continue;
+    }
     await e.execute(
       "INSERT INTO atributo_ficha (vtuber_id, slug, puntos) VALUES (?, ?, ?)",
       [Number(vtuberId), slug, n],

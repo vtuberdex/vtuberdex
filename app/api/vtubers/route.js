@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `GET /api/vtubers` — búsqueda facetada del catálogo.
  *
@@ -54,7 +55,9 @@ function splitCsv(value) {
 
 export async function GET(request) {
   const sinSesion = exigirSesion(request);
-  if (sinSesion) return sinSesion;
+  if (sinSesion) {
+    return sinSesion;
+  }
   const db = await dbConDiario({ ttlMs: TTL_DIARIO_MS });
   // `Object.fromEntries` reproduce lo que Express deja en `req.query`: arrays
   // cuando el parámetro se repite. El esquema zod espera esa forma.
@@ -99,7 +102,9 @@ export async function GET(request) {
     redDeLaPeticion(request.headers),
     result.items.map((c) => c.id),
   );
-  if (!cupo.permitido) return respuestaAgotada(cupo);
+  if (!cupo.permitido) {
+    return respuestaAgotada(cupo);
+  }
   const facets = facet ? facetCounts(db, { language, q }) : null;
   /**
    * Las imágenes del mantenedor, al final: viven en Turso por slug y no en la base del catálogo.

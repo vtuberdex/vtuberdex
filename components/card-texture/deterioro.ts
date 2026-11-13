@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Pinta el DETERIORO de una carta degradada sobre sus capas 2D (grados 7…1).
  *
@@ -37,13 +38,14 @@ import { CARD_TEXTURE_HEIGHT, CARD_TEXTURE_WIDTH, HEADER } from "./dimensiones";
  */
 export function planDeCarta(card: VtuberCard): PlanDeDeterioro | null {
   const grado = gradoDeDibujo(card);
-  if (grado && esGradoDegradado(grado))
+  if (grado && esGradoDegradado(grado)) {
     return planDeDeterioro(
       grado,
       card.id,
       CARD_TEXTURE_WIDTH,
       CARD_TEXTURE_HEIGHT,
     );
+  }
   return planDeDesgasteLeve(
     grado,
     card.id,
@@ -59,7 +61,9 @@ export function planDeCarta(card: VtuberCard): PlanDeDeterioro | null {
  */
 export function tarjetaParaTitulo(card: VtuberCard): VtuberCard {
   const grado = gradoDeDibujo(card);
-  if (!grado || !esGradoDegradado(grado)) return card;
+  if (!grado || !esGradoDegradado(grado)) {
+    return card;
+  }
   const plan = planDeDeterioro(
     grado,
     card.id,
@@ -80,7 +84,9 @@ function conLienzo(
   dibujar: (ctx: CanvasRenderingContext2D) => void,
 ) {
   const ctx = canvas.getContext("2d");
-  if (!ctx || canvas.width < 2) return;
+  if (!ctx || canvas.width < 2) {
+    return;
+  }
   const escala = canvas.width / CARD_TEXTURE_WIDTH;
   ctx.save();
   ctx.setTransform(escala, 0, 0, escala, 0, 0);
@@ -97,7 +103,9 @@ function teselaDeRuido(semilla: number): HTMLCanvasElement {
   const lado = DETERIORO.noise.tile;
   const clave = `${semilla}|${lado}`;
   const guardada = teselas.get(clave);
-  if (guardada) return guardada;
+  if (guardada) {
+    return guardada;
+  }
   const tesela = document.createElement("canvas");
   tesela.width = lado;
   tesela.height = lado;
@@ -113,16 +121,22 @@ function teselaDeRuido(semilla: number): HTMLCanvasElement {
     }
     ctx.putImageData(datos, 0, 0);
   }
-  if (teselas.size > 32) teselas.clear();
+  if (teselas.size > 32) {
+    teselas.clear();
+  }
   teselas.set(clave, tesela);
   return tesela;
 }
 
 /** Grano sobre lo que YA está pintado (`source-atop`: no ensucia los huecos transparentes). */
 function aplicarRuido(ctx: CanvasRenderingContext2D, plan: PlanDeDeterioro) {
-  if (plan.ruido <= 0) return;
+  if (plan.ruido <= 0) {
+    return;
+  }
   const patron = ctx.createPattern(teselaDeRuido(plan.semilla), "repeat");
-  if (!patron) return;
+  if (!patron) {
+    return;
+  }
   ctx.save();
   ctx.globalCompositeOperation = "source-atop";
   ctx.globalAlpha = Math.min(1, plan.ruido);
@@ -152,7 +166,9 @@ function perderFoco(
   plan: PlanDeDeterioro,
   exento?: { x: number; y: number; w: number; h: number },
 ) {
-  if (plan.bloque <= 1) return;
+  if (plan.bloque <= 1) {
+    return;
+  }
   const escala = canvas.width / CARD_TEXTURE_WIDTH;
   const chico = document.createElement("canvas");
   chico.width = Math.max(2, Math.round(canvas.width / (plan.bloque * escala)));
@@ -162,7 +178,9 @@ function perderFoco(
   );
   const cctx = chico.getContext("2d");
   const ctx = canvas.getContext("2d");
-  if (!cctx || !ctx) return;
+  if (!cctx || !ctx) {
+    return;
+  }
 
   // La zona exenta se guarda ANTES de estropear nada y se repone después.
   let guardada: HTMLCanvasElement | null = null;

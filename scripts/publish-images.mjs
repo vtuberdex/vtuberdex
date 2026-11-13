@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Publica las imágenes del catálogo en Turso (antes en Vercel Blob).
  *
@@ -81,7 +82,9 @@ function pendientesDelManifiesto(manifest) {
   const lista = [];
   for (const rel of Object.keys(manifest.images ?? {})) {
     const partes = String(rel).split("/");
-    if (!USED_FOLDERS.has(partes[1])) continue;
+    if (!USED_FOLDERS.has(partes[1])) {
+      continue;
+    }
     const abs = path.join(ROOT, "data", rel);
     if (!fs.existsSync(abs)) {
       console.warn(`[publish] ⚠ omitido (no está en disco): ${rel}`);
@@ -173,7 +176,9 @@ async function main() {
    * migración de `origen` se aplica también desde este script.
    */
   process.env.TURSO_DATABASE_URL = URL_TURSO;
-  if (AUTH) process.env.TURSO_AUTH_TOKEN = AUTH;
+  if (AUTH) {
+    process.env.TURSO_AUTH_TOKEN = AUTH;
+  }
   const { asegurarTablas } = await import("../lib/ediciones.mjs");
   await asegurarTablas();
 
@@ -212,7 +217,9 @@ async function main() {
     console.error(
       `  Arréglalo con: rm -rf data/images && npm run download:images, y regenera con npm run build:data`,
     );
-    for (const rel of contaminados.slice(0, 10)) console.error(`   · ${rel}`);
+    for (const rel of contaminados.slice(0, 10)) {
+      console.error(`   · ${rel}`);
+    }
     await db.close();
     process.exit(1);
   }
@@ -287,7 +294,9 @@ async function main() {
         await db.batch(sentencias, "write");
         subidas += sentencias.length;
       } catch (error) {
-        for (const a of lote) fallos.push({ rel: a.rel, error: error.message });
+        for (const a of lote) {
+          fallos.push({ rel: a.rel, error: error.message });
+        }
       }
     }
     const hechos = Math.min(i + LOTE, cola.length);
@@ -324,8 +333,9 @@ async function main() {
   }
   if (fallos.length > 0) {
     console.log("[publish] fallos (muestra):");
-    for (const f of fallos.slice(0, 10))
+    for (const f of fallos.slice(0, 10)) {
       console.log(`   ✖ ${f.rel}: ${f.error}`);
+    }
     console.log(
       "[publish] vuelve a ejecutar el script: reintenta solo lo que falta",
     );

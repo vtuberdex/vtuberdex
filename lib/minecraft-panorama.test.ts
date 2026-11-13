@@ -47,7 +47,9 @@ describe("obtenerPanorama", () => {
     const llamadas: string[] = [];
     const ejecutar = async (a: string) => {
       llamadas.push(a);
-      if (!ok) return { ok: false, status: 502 };
+      if (!ok) {
+        return { ok: false, status: 502 };
+      }
       return {
         ok: true,
         respuesta:

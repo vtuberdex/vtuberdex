@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Premium en la interfaz: la escala (reexportada del servidor, que es su única definición) y lo
  * que la carta 3D, la etiqueta y el mantenedor necesitan para mostrarla.
@@ -77,8 +78,9 @@ export const notaVisible = (grado: PremiumGrade): string =>
 /** Leyenda corta para chips: `GEM MINT 10`, `NM/MT 8`, `PRISTINE 10 · BLACK LABEL`. */
 export function leyendaDePremium(premium: Pick<PremiumInfo, "grade">): string {
   const { grade } = premium;
-  if (esGradoDegradado(grade))
+  if (esGradoDegradado(grade)) {
     return `${nombreDeGrado(grade)} ${grade} · DETERIORADA`;
+  }
   return esBlackLabel(grade)
     ? "PRISTINE 10 · BLACK LABEL"
     : `${nombreDeGrado(grade)} ${grade}`;
@@ -91,7 +93,9 @@ export function leyendaDePremium(premium: Pick<PremiumInfo, "grade">): string {
 export function mesesEntre(desde: string, hasta: string = hoy()): number {
   const [ay, am, ad] = desde.split("-").map(Number);
   const [by, bm, bd] = hasta.split("-").map(Number);
-  if (![ay, am, ad, by, bm, bd].every(Number.isFinite)) return 0;
+  if (![ay, am, ad, by, bm, bd].every(Number.isFinite)) {
+    return 0;
+  }
   const meses = (by - ay) * 12 + (bm - am) - (bd < ad ? 1 : 0);
   return Math.max(0, meses);
 }

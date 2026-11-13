@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Lista lateral del mantenedor: busca y filtra por estado e INCLUYE borradores y
@@ -76,7 +77,9 @@ export function VtuberList({
       })
       .catch(() => undefined)
       .finally(() => {
-        if (!controller.signal.aborted) setBuscando(false);
+        if (!controller.signal.aborted) {
+          setBuscando(false);
+        }
       });
     return () => controller.abort();
   }, [token, query, status, correo, filtrando, refreshKey]);

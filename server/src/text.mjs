@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Normalización de texto compartida por scraper y API.
  * (El servidor no depende del scraper: se duplica a propósito, y un test

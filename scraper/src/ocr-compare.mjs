@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Compara la calidad de OCR entre la carta reducida (720px, la que usa la app)
  * y el original del sitio (~1920px). Sirve para decidir a qué resolución hay que

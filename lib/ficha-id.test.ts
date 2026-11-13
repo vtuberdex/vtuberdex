@@ -41,8 +41,9 @@ describe("idDeFichaPublica", () => {
 
   it("un borrador, una oculta o un slug inexistente no cuentan", async () => {
     const db = base();
-    for (const slug of ["borrador", "oculta", "no-existe"])
+    for (const slug of ["borrador", "oculta", "no-existe"]) {
       expect(await idDeFichaPublica(slug, { db, ahora: T }), slug).toBeNull();
+    }
   });
 
   it("una ficha de BAJA (grado 1) no se confirma ni por su slug ni por su alias", async () => {

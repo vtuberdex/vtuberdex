@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Crea o restablece el usuario del mantenedor.
  * Uso: node src/create-admin.mjs <usuario> <password>

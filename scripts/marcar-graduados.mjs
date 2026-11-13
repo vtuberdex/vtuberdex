@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Marca fichas como GRADUADAS. Uso (desde la raíz, con el mismo entorno del servicio):
  *   TURSO_DATABASE_URL=file:$HOME/data/vtuberdex/turso-local.db npm run marcar:graduados -- drawchii "yeicokp harv"
@@ -37,7 +38,9 @@ for (const nombre of nombres) {
     continue;
   }
   const [f] = hallazgos;
-  if (!seco) await fijarGraduado(e, f.id, !quitar);
+  if (!seco) {
+    await fijarGraduado(e, f.id, !quitar);
+  }
   console.log(
     `✓ ${f.name} (${f.slug}, id ${f.id}) ${seco ? "se marcaría" : quitar ? "desmarcada" : "graduada"}`,
   );

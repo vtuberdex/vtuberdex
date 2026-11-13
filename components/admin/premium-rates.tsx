@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Tarifas de las cartas premium: cuánto hay que donar para llegar a cada grado.

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 // Respaldo de la base local (la única copia de las ediciones y de las imágenes del mantenedor).
 // Uso: node scripts/respaldo-db.mjs [origen.db] [carpeta] [conservar]
 // `VACUUM INTO` da una copia consistente con el servicio encendido y la base en WAL;
@@ -30,8 +31,9 @@ if (ok !== "ok") {
 const copias = readdirSync(carpeta)
   .filter((f) => /^turso-local-.*\.db$/.test(f))
   .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-for (const f of copias.slice(0, Math.max(0, copias.length - conservar)))
+for (const f of copias.slice(0, Math.max(0, copias.length - conservar))) {
   rmSync(join(carpeta, f));
+}
 console.log(
   `✓ ${destino} (${(statSync(destino).size / 1048576).toFixed(0)} MB); ${Math.min(copias.length, conservar)} copias`,
 );

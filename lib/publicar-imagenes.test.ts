@@ -26,8 +26,9 @@ const clienteFalso = (
 ) =>
   ({
     execute: async (sql: string) => {
-      if (!/origen = 'mantenedor'/.test(sql))
+      if (!/origen = 'mantenedor'/.test(sql)) {
         throw new Error(`consulta inesperada: ${sql}`);
+      }
       return { rows: filas };
     },
   }) as never;

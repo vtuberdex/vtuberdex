@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Qué falta en cada paso de la inscripción, como función PURA (sin DOM ni i18n: devuelve claves).
  *
@@ -58,15 +59,22 @@ export function faltasDelPaso(paso: 1 | 2 | 3 | 4 | 5, e: EstadoInscripcion): Fa
   const faltas: Falta[] = [];
 
   if (paso === 1) {
-    if (!lleno(e.name)) faltas.push({ campo: 'name', etiqueta: 'ins.nombreArtistico', motivo: 'vacio' });
-    if (!lleno(e.email)) faltas.push({ campo: 'email', etiqueta: 'ficha.correo', motivo: 'vacio' });
-    else if (!CORREO.test(e.email.trim())) faltas.push({ campo: 'email', etiqueta: 'ficha.correo', motivo: 'invalido' });
+    if (!lleno(e.name)) {
+      faltas.push({ campo: 'name', etiqueta: 'ins.nombreArtistico', motivo: 'vacio' });
+    }
+    if (!lleno(e.email)) {
+      faltas.push({ campo: 'email', etiqueta: 'ficha.correo', motivo: 'vacio' });
+    } else if (!CORREO.test(e.email.trim())) {
+      faltas.push({ campo: 'email', etiqueta: 'ficha.correo', motivo: 'invalido' });
+    }
   }
   if (paso === 2 && e.codigo.trim().length < 20) {
     faltas.push({ campo: 'codigo', etiqueta: 'ficha.codigoEtiqueta', motivo: lleno(e.codigo) ? 'invalido' : 'vacio' });
   }
   if (paso === 3) {
-    if (e.languages.length === 0) faltas.push({ campo: 'languages', etiqueta: 'ficha.leyendaIdiomas', motivo: 'vacio' });
+    if (e.languages.length === 0) {
+      faltas.push({ campo: 'languages', etiqueta: 'ficha.leyendaIdiomas', motivo: 'vacio' });
+    }
     // Hace falta al menos UNA red completa; una fila a medias (plataforma sin enlace o al revés) también molesta.
     const escritas = e.socials.filter((r) => lleno(r.platform) || lleno(r.url));
     const completas = escritas.filter((r) => lleno(r.platform) && esEnlaceHttp(r.url));
@@ -77,14 +85,22 @@ export function faltasDelPaso(paso: 1 | 2 | 3 | 4 | 5, e: EstadoInscripcion): Fa
     }
   }
   if (paso === 4) {
-    if (!lleno(e.imageId)) faltas.push({ campo: 'imageId', etiqueta: 'ficha.avatar', motivo: 'vacio' });
-    if (!lleno(e.logoId)) faltas.push({ campo: 'logoId', etiqueta: 'ficha.logo', motivo: 'vacio' });
+    if (!lleno(e.imageId)) {
+      faltas.push({ campo: 'imageId', etiqueta: 'ficha.avatar', motivo: 'vacio' });
+    }
+    if (!lleno(e.logoId)) {
+      faltas.push({ campo: 'logoId', etiqueta: 'ficha.logo', motivo: 'vacio' });
+    }
     faltas.push(...faltasDePerfil(2, e.perfil));
-    if (!lleno(e.cardText)) faltas.push({ campo: 'cardText', etiqueta: 'ficha.lore', motivo: 'vacio' });
+    if (!lleno(e.cardText)) {
+      faltas.push({ campo: 'cardText', etiqueta: 'ficha.lore', motivo: 'vacio' });
+    }
   }
   if (paso === 5) {
     faltas.push(...faltasDePerfil(3, e.perfil));
-    if (!e.acepta) faltas.push({ campo: 'acepta', etiqueta: 'ins.falta.terminos', motivo: 'vacio' });
+    if (!e.acepta) {
+      faltas.push({ campo: 'acepta', etiqueta: 'ins.falta.terminos', motivo: 'vacio' });
+    }
   }
   return faltas;
 }

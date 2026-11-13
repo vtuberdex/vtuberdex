@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 
 /**
@@ -39,7 +40,9 @@ export function AtributosPanel({
   useEffect(() => setPuntos(estado.puntos), [estado]);
 
   // Una ficha que ya traía stats propios no entra en el reparto: sus valores mandan y no se tocan.
-  if (estado.tieneStatsDeOrigen) return null;
+  if (estado.tieneStatsDeOrigen) {
+    return null;
+  }
 
   const repartidos = Object.values(puntos).reduce(
     (suma, n) => suma + (Number(n) || 0),

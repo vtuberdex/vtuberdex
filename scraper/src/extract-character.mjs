@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Extrae la IMAGEN DEL PERSONAJE desde la imagen de la carta.
  *
@@ -60,7 +61,9 @@ export function hasFlag(data, width, height, channels) {
   for (let y = sy0; y < sy1; y += 1) {
     for (let x = sx0; x < sx1; x += 1) {
       const i = (y * width + x) * channels;
-      if (Math.min(data[i], data[i + 1], data[i + 2]) > 170) claros += 1;
+      if (Math.min(data[i], data[i + 1], data[i + 2]) > 170) {
+        claros += 1;
+      }
     }
   }
   return claros / Math.max(1, (sx1 - sx0) * (sy1 - sy0)) > 0.05;
@@ -108,7 +111,9 @@ export function detectPanelRight(data, width, height, channels) {
         break;
       }
     }
-    if (oscuro) return x / width;
+    if (oscuro) {
+      return x / width;
+    }
   }
   // Sin valle claro (paneles oscuros): se usa el respaldo, que cubre la mediana
   // con margen para no cortar al personaje.
@@ -145,7 +150,9 @@ export async function extractCharacterFromCard(file) {
     height - crop.top,
     Math.round(height * (PANEL.y1 - PANEL.y0)),
   );
-  if (crop.width < 40 || crop.height < 40) return null;
+  if (crop.width < 40 || crop.height < 40) {
+    return null;
+  }
 
   // NOTA sobre la bandera del país: se superpone al arte del personaje en la
   // esquina superior izquierda (FLAG_BOX documenta dónde). Se probó a BORRARLA de
@@ -257,7 +264,9 @@ async function main() {
       }
       await fsP.writeFile(path.join(OUTDIR, `${v.slug}.webp`), r.buffer);
       extraidos += 1;
-      if (r.flag) conBandera += 1;
+      if (r.flag) {
+        conBandera += 1;
+      }
       results.push({
         slug: v.slug,
         status: "extraido",

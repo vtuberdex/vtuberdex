@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Modelo del formulario del editor: de `VtuberDetail` a estado de formulario y de
  * vuelta a un PATCH con SOLO lo que cambió.
@@ -194,37 +195,54 @@ export function toPayload(form: EditorForm): {
 } {
   const errors: PayloadErrors = {};
 
-  if (!form.name.trim()) errors.name = "El nombre es obligatorio.";
-  if (form.slug.trim() && !slugifyUrl(form.slug))
+  if (!form.name.trim()) {
+    errors.name = "El nombre es obligatorio.";
+  }
+  if (form.slug.trim() && !slugifyUrl(form.slug)) {
     errors.slug = "La URL necesita letras o números.";
-  if (!HEX.test(form.themeColor))
+  }
+  if (!HEX.test(form.themeColor)) {
     errors.themeColor = "El color de marca debe ser #rrggbb.";
+  }
 
   let dexNumber: number | "end" | undefined;
-  if (form.dexEnd) dexNumber = "end";
-  else if (form.dexNumber.trim()) {
+  if (form.dexEnd) {
+    dexNumber = "end";
+  } else if (form.dexNumber.trim()) {
     const parsed = Number(form.dexNumber);
-    if (Number.isInteger(parsed) && parsed >= 1) dexNumber = parsed;
-    else errors.dexNumber = "El número debe ser un entero positivo.";
+    if (Number.isInteger(parsed) && parsed >= 1) {
+      dexNumber = parsed;
+    } else {
+      errors.dexNumber = "El número debe ser un entero positivo.";
+    }
   }
 
   let level: number | null = null;
   if (form.level.trim()) {
     const parsed = Number(form.level);
-    if (Number.isInteger(parsed) && parsed >= 0) level = parsed;
-    else errors.level = "El nivel debe ser un entero.";
+    if (Number.isInteger(parsed) && parsed >= 0) {
+      level = parsed;
+    } else {
+      errors.level = "El nivel debe ser un entero.";
+    }
   }
 
-  if (form.factions.length > MAX_FACTIONS)
+  if (form.factions.length > MAX_FACTIONS) {
     errors.factions = `Máximo ${MAX_FACTIONS} facciones.`;
+  }
 
   const profile: ProfileField[] = [];
   for (const field of form.profile) {
     const label = field.label.trim();
     const value = field.value.trim();
-    if (!label && !value) continue;
-    if (!label) errors.profile = "Cada dato del perfil necesita un nombre.";
-    else profile.push({ label, value });
+    if (!label && !value) {
+      continue;
+    }
+    if (!label) {
+      errors.profile = "Cada dato del perfil necesita un nombre.";
+    } else {
+      profile.push({ label, value });
+    }
   }
 
   const stats: StatInput[] = [];
@@ -235,8 +253,9 @@ export function toPayload(form: EditorForm): {
       !stat.value.trim() &&
       !stat.max.trim() &&
       !stat.valueText.trim()
-    )
+    ) {
       continue;
+    }
     if (!label) {
       errors.stats = "Cada atributo necesita un nombre.";
       continue;
@@ -256,7 +275,9 @@ export function toPayload(form: EditorForm): {
       max,
       valueText: orNull(stat.valueText),
     };
-    if (stat.slug.trim()) input.slug = stat.slug.trim();
+    if (stat.slug.trim()) {
+      input.slug = stat.slug.trim();
+    }
     stats.push(input);
   }
 
@@ -267,8 +288,9 @@ export function toPayload(form: EditorForm): {
       !skill.effect.trim() &&
       !skill.section.trim() &&
       !skill.type.trim()
-    )
+    ) {
       continue;
+    }
     skills.push({
       category: skill.category,
       section: orNull(skill.section),
@@ -284,17 +306,21 @@ export function toPayload(form: EditorForm): {
   for (const social of form.socials) {
     const url = social.url.trim();
     const platform = social.platform.trim();
-    if (!url && !platform && !social.label.trim()) continue;
-    if (!platform) errors.socials = "Cada red necesita una plataforma.";
-    else if (!HTTP_URL.test(url))
+    if (!url && !platform && !social.label.trim()) {
+      continue;
+    }
+    if (!platform) {
+      errors.socials = "Cada red necesita una plataforma.";
+    } else if (!HTTP_URL.test(url)) {
       errors.socials = `La URL de «${platform}» debe empezar con http:// o https://.`;
-    else
+    } else {
       socials.push({
         platform,
         label: orNull(social.label),
         url,
         icon: orNull(social.icon),
       });
+    }
   }
 
   const payload: VtuberPatch = {
@@ -321,7 +347,9 @@ export function toPayload(form: EditorForm): {
     skills,
     socials,
   };
-  if (dexNumber !== undefined) payload.dexNumber = dexNumber;
+  if (dexNumber !== undefined) {
+    payload.dexNumber = dexNumber;
+  }
   return { payload, errors };
 }
 
@@ -338,8 +366,9 @@ export function buildPatch(
   const { payload, errors } = toPayload(form);
   const patch: Record<string, unknown> = {};
   for (const key of Object.keys(payload) as Array<keyof VtuberPatch>) {
-    if (JSON.stringify(payload[key]) !== JSON.stringify(base[key]))
+    if (JSON.stringify(payload[key]) !== JSON.stringify(base[key])) {
       patch[key] = payload[key];
+    }
   }
   /**
    * Los errores se miran contra el FORMULARIO crudo, no contra el payload: un elemento
@@ -354,7 +383,9 @@ export function buildPatch(
       key === "dexNumber"
         ? form.dexNumber !== baseForm.dexNumber || form.dexEnd
         : JSON.stringify(form[raw]) !== JSON.stringify(baseForm[raw]);
-    if (touched && errors[key]) messages.push(errors[key] as string);
+    if (touched && errors[key]) {
+      messages.push(errors[key] as string);
+    }
   }
   return { patch: patch as VtuberPatch, errors: messages };
 }
@@ -394,17 +425,23 @@ export function createBody(form: EditorForm): {
   problem: string | null;
 } {
   const name = form.name.trim();
-  if (!name)
+  if (!name) {
     return { body: null, problem: "Escribe un nombre para continuar." };
+  }
   const body: VtuberCreate = { name };
   const slug = slugifyUrl(form.slug);
-  if (slug) body.slug = slug;
+  if (slug) {
+    body.slug = slug;
+  }
   if (!form.dexEnd && form.dexNumber.trim()) {
     const parsed = Number(form.dexNumber);
-    if (!Number.isInteger(parsed) || parsed < 1)
+    if (!Number.isInteger(parsed) || parsed < 1) {
       return { body: null, problem: "El número debe ser un entero positivo." };
+    }
     body.dexNumber = parsed;
   }
-  if (form.countries.length > 0) body.countries = form.countries;
+  if (form.countries.length > 0) {
+    body.countries = form.countries;
+  }
   return { body, problem: null };
 }

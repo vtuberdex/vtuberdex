@@ -129,7 +129,8 @@ describe("quitarPreambuloDeIA", () => {
       "Pensé que debería grabarlas, así que aquí estamos: a jugar.",
       "Aquí tienes a un gamer tranquilo. Por supuesto: me gusta dormir.",
       "Claro, soy un zorro: nada más.",
-    ])
+    ]) {
       expect(quitarPreambuloDeIA(t)).toBe(t);
+    }
   });
 });

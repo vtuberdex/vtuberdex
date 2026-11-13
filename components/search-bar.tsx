@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Barra de búsqueda con debounce y sugerencia de número de dex.
@@ -38,7 +39,9 @@ export function SearchBar({
   }, [value]);
 
   useEffect(() => {
-    if (draft === value) return;
+    if (draft === value) {
+      return;
+    }
     const timer = window.setTimeout(
       () => onChangeRef.current(draft),
       DEBOUNCE_MS,
@@ -84,7 +87,9 @@ export function SearchBar({
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Escape") setDraft("");
+            if (event.key === "Escape") {
+              setDraft("");
+            }
           }}
           placeholder={placeholder ?? t("buscador.placeholder")}
           aria-label={t("buscador.etiqueta")}

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 
 /**
@@ -180,22 +181,32 @@ export function PanelMinecraftAdmin() {
   // Panorama «casi en vivo»: se repregunta cada pocos segundos, solo con la sesión abierta y la
   // pestaña visible (una pestaña olvidada no debe mantener al servidor contestando RCON).
   useEffect(() => {
-    if (sesion !== "dentro") return;
+    if (sesion !== "dentro") {
+      return;
+    }
     let activo = true;
     const consultar = async () => {
-      if (document.visibilityState === "hidden") return;
+      if (document.visibilityState === "hidden") {
+        return;
+      }
       try {
         const r = await fetch("/api/minecraft-admin/panorama", {
           cache: "no-store",
         });
         if (r.status === 401) {
-          if (activo) setSesion("fuera");
+          if (activo) {
+            setSesion("fuera");
+          }
           return;
         }
-        if (!r.ok || !activo) return;
+        if (!r.ok || !activo) {
+          return;
+        }
         const p = (await r.json()) as Panorama;
         // Una respuesta que no es un panorama (proxy, error de otra ruta) no se pinta.
-        if (!p || typeof p.rcon !== "string" || !p.sistema) return;
+        if (!p || typeof p.rcon !== "string" || !p.sistema) {
+          return;
+        }
         setPanorama(p);
         setHace(0);
         setHistorial((h) => {
@@ -224,7 +235,9 @@ export function PanelMinecraftAdmin() {
   // Cuenta atrás del reinicio: da 15 s a los jugadores tras el aviso y luego manda `stop` (acción
   // fija `reiniciar`). El servicio de systemd lo vuelve a levantar solo (`Restart=always`).
   useEffect(() => {
-    if (cuentaReinicio === null) return;
+    if (cuentaReinicio === null) {
+      return;
+    }
     if (cuentaReinicio <= 0) {
       setCuentaReinicio(null);
       void ejecutar("reiniciar", {}, "reiniciar el servidor");
@@ -238,7 +251,9 @@ export function PanelMinecraftAdmin() {
   // El enlace mágico llega en el fragmento (`#t=...`): no viaja al servidor, y aquí se canjea.
   useEffect(() => {
     const trozo = window.location.hash.match(/t=([A-Za-z0-9_-]+)/);
-    if (!trozo) return;
+    if (!trozo) {
+      return;
+    }
     const token = trozo[1];
     window.history.replaceState(null, "", window.location.pathname);
     void (async () => {
@@ -247,8 +262,11 @@ export function PanelMinecraftAdmin() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ token }),
       });
-      if (r.ok) await cargar();
-      else setError("el enlace caducó o ya se usó: pide otro");
+      if (r.ok) {
+        await cargar();
+      } else {
+        setError("el enlace caducó o ya se usó: pide otro");
+      }
     })();
   }, [cargar]);
 
@@ -302,8 +320,9 @@ export function PanelMinecraftAdmin() {
       !window.confirm(
         "¿Reiniciar el servidor de Minecraft? Se avisa a los jugadores, el mundo se guarda y vuelve en ~1 minuto.",
       )
-    )
+    ) {
       return;
+    }
     void ejecutar(
       "anunciar",
       { mensaje: "El servidor se reiniciará en 15 segundos" },
@@ -315,7 +334,9 @@ export function PanelMinecraftAdmin() {
   const anunciar = (evento: React.FormEvent) => {
     evento.preventDefault();
     const limpio = anuncio.trim();
-    if (!limpio) return;
+    if (!limpio) {
+      return;
+    }
     setAnuncio("");
     void ejecutar("anunciar", { mensaje: limpio }, `anunciar: ${limpio}`);
   };
@@ -346,8 +367,9 @@ export function PanelMinecraftAdmin() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      if (!r.ok)
+      if (!r.ok) {
         throw new Error(await leerError(r, "no se pudo enviar el enlace"));
+      }
       setAviso(
         "Si el correo puede administrar el servidor, el enlace va en camino.",
       );
@@ -374,8 +396,9 @@ export function PanelMinecraftAdmin() {
         headers: { "content-type": "application/java-archive" },
         body: archivo,
       });
-      if (!r.ok)
+      if (!r.ok) {
         throw new Error(await leerError(r, "no se pudo subir el plugin"));
+      }
       const meta = (await r.json()) as { plugin?: string };
       setAviso(`Plugin guardado: ${meta.plugin ?? archivo.name}`);
       setArchivo(null);
@@ -391,7 +414,9 @@ export function PanelMinecraftAdmin() {
     setError(null);
     setAviso(null);
     const parametros = new URLSearchParams({ tipo: destino });
-    if (destino === "plugin") parametros.set("archivo", nombreConfig);
+    if (destino === "plugin") {
+      parametros.set("archivo", nombreConfig);
+    }
     const r = await fetch(`/api/minecraft-admin/configuracion?${parametros}`, {
       cache: "no-store",
     });
@@ -418,10 +443,11 @@ export function PanelMinecraftAdmin() {
           contenido: texto,
         }),
       });
-      if (!r.ok)
+      if (!r.ok) {
         throw new Error(
           await leerError(r, "no se pudo guardar la configuración"),
         );
+      }
       setAviso("Configuración guardada.");
       await cargar();
     } catch (e) {

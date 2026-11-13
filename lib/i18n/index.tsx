@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Contexto del idioma de la interfaz.
@@ -61,7 +62,9 @@ export function I18nProvider({
   );
 
   useEffect(() => {
-    if (inicial) return;
+    if (inicial) {
+      return;
+    }
     setLocaleEstado(
       elegirLocale(
         leerGuardado(),
@@ -77,7 +80,9 @@ export function I18nProvider({
   }, [locale]);
 
   const setLocale = useCallback((nuevo: Locale) => {
-    if (!esLocale(nuevo)) return;
+    if (!esLocale(nuevo)) {
+      return;
+    }
     setLocaleEstado(nuevo);
     try {
       window.localStorage.setItem(CLAVE_IDIOMA, nuevo);

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** `POST /api/mi-ficha/misiones` — reclama el grado de una misión de grado completada. Reglas en `lib/mi-ficha.mjs`. */
 import { misionesDeMiFicha } from "../../../../lib/mi-ficha.mjs";
 

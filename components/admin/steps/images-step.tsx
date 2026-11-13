@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paso 2: imágenes — reutiliza el gestor (arrastrar y soltar, vista previa) y avisa de lo que falta. */
 import type { VtuberDetail } from "@/lib/types";

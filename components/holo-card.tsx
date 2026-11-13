@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Carta holográfica 3D del VTuber (react-three-fiber + shaders propios).
@@ -109,7 +110,9 @@ export function usePointerTilt(
 
   useFrame((_, delta) => {
     const group = ref.current;
-    if (!group) return;
+    if (!group) {
+      return;
+    }
     const damp = 1 - Math.pow(amounts.dampingBase, delta);
     group.rotation.y +=
       (target.current.x * amounts.tiltY - group.rotation.y) * damp;
@@ -166,7 +169,9 @@ export function CardMeshes({
       </mesh>
     </>
   );
-  if (!card || !premium) return mallas;
+  if (!card || !premium) {
+    return mallas;
+  }
   return (
     <PremiumSlab
       card={card}

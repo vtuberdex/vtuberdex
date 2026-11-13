@@ -31,8 +31,9 @@ describe("la escala", () => {
   });
 
   test("cada grado tiene nombre y la Black Label se lee como un 10 pristino", () => {
-    for (const grado of GRADOS)
+    for (const grado of GRADOS) {
       expect(nombreDeGrado(grado), grado).not.toBe("");
+    }
     expect(notaVisible("BL")).toBe("10");
     expect(notaVisible("8.5")).toBe("8.5");
     expect(esBlackLabel("BL")).toBe(true);

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Catálogo: buscador + facetas + libro de cartas.
@@ -45,7 +46,9 @@ export function CatalogPage() {
   }, [sheetOpen]);
 
   useEffect(() => {
-    if (!sheetOpen) return;
+    if (!sheetOpen) {
+      return;
+    }
     const alTeclear = (e: KeyboardEvent) =>
       e.key === "Escape" && setSheetOpen(false);
     window.addEventListener("keydown", alTeclear);

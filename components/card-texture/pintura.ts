@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Primitivas de dibujo compartidas por las capas (texto, metal, relieve).
  */
@@ -32,7 +33,9 @@ export function fitText(
   let size = startSize;
   do {
     ctx.font = `${weight} ${size}px ${FONT}`;
-    if (ctx.measureText(text).width <= maxWidth) break;
+    if (ctx.measureText(text).width <= maxWidth) {
+      break;
+    }
     size -= 2;
   } while (size > 16);
   return size;
@@ -64,8 +67,9 @@ export function metalFill(
   brandTint: number,
 ): CanvasGradient {
   const g = ctx.createLinearGradient(x, y, x + w * 0.25, y + h);
-  for (const s of stops)
+  for (const s of stops) {
     g.addColorStop(s.at, mixHex(s.color, brand, brandTint));
+  }
   return g;
 }
 
@@ -87,8 +91,9 @@ export function metalSheen(
   ctx.rect(x, y, w, h);
   ctx.clip();
   const g = ctx.createLinearGradient(x, y, x + w * 0.55, y + h);
-  for (const s of TEXT_FINISH.sheen)
+  for (const s of TEXT_FINISH.sheen) {
     g.addColorStop(s.at, `rgba(255, 255, 255, ${s.alpha})`);
+  }
   ctx.fillStyle = g;
   ctx.fillRect(x, y, w, h);
   ctx.restore();
@@ -213,8 +218,9 @@ export function drawMetalWordmark(
   ctx.fillText(text, left, y + wordmark.bevelLightOffset);
   const width = ctx.measureText(text).width;
   const g = ctx.createLinearGradient(left, y - 16, left + width, y + 16);
-  for (const s of wordmark.stops)
+  for (const s of wordmark.stops) {
     g.addColorStop(s.at, mixHex(s.color, brand, wordmark.brandTint));
+  }
   ctx.fillStyle = g;
   ctx.fillText(text, left, y);
   ctx.restore();

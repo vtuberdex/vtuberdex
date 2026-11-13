@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Detalle del VTuber: carta 3D grande + ficha, stats, habilidades y redes.
@@ -63,18 +64,24 @@ export function DetailPage({ slug }: { slug: string }) {
       .detail(slug, controller.signal)
       .then((response) => setData(response))
       .catch((cause: unknown) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) {
+          return;
+        }
         setError(cause instanceof Error ? cause.message : "error desconocido");
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       });
     return () => controller.abort();
   }, [slug]);
 
   useEffect(() => {
     // `window` solo en un efecto: leerlo durante el render rompe el render del servidor.
-    if (new URLSearchParams(window.location.search).get("tune") !== "1") return;
+    if (new URLSearchParams(window.location.search).get("tune") !== "1") {
+      return;
+    }
     void import("@/components/card3d-tuner").then((m) =>
       setTuner(() => m.Card3dTuner),
     );
@@ -86,13 +93,16 @@ export function DetailPage({ slug }: { slug: string }) {
      * responde con la ficha y su slug actual: se corrige la barra de direcciones sin recargar,
      * para que lo que se comparta desde aquí sea la URL vigente.
      */
-    if (data && data.slug !== slug)
+    if (data && data.slug !== slug) {
       window.history.replaceState(null, "", `/v/${data.slug}`);
+    }
   }, [data, slug]);
 
   // Con datos (o con el error) ya no hace falta el aviso «Accediendo al detalle».
   useEffect(() => {
-    if (!loading) limpiarAbriendo();
+    if (!loading) {
+      limpiarAbriendo();
+    }
   }, [loading]);
 
   useEffect(() => {

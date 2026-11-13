@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Cola de SOLICITUDES del mantenedor: las inscripciones, modificaciones y bajas que llegaron por los formularios
@@ -102,14 +103,19 @@ function Veredicto({
   cargando: boolean;
   solicitud: SolicitudAdmin;
 }) {
-  if (solicitud.estado !== "pendiente") return null;
-  if (cargando && !vista)
+  if (solicitud.estado !== "pendiente") {
+    return null;
+  }
+  if (cargando && !vista) {
     return (
       <p className="rounded-xl border border-dex-line px-3 py-2 text-xs text-dex-muted">
         Comprobando si se puede aprobar…
       </p>
     );
-  if (!vista) return null;
+  }
+  if (!vista) {
+    return null;
+  }
   return (
     <div className="space-y-2" data-testid="solicitud-veredicto">
       {vista.problema ? (
@@ -291,20 +297,27 @@ function ImagenesSubidas({
               solicitud.id,
               i.tipo,
             );
-            if (!blob) return null;
+            if (!blob) {
+              return null;
+            }
             const url = URL.createObjectURL(blob);
             urls.push(url);
             return { ...i, url };
           }),
         );
-        if (vigente)
+        if (vigente) {
           setImagenes(
             listas.filter((i): i is NonNullable<typeof i> => i !== null),
           );
+        }
       } catch {
-        if (vigente) setImagenes([]);
+        if (vigente) {
+          setImagenes([]);
+        }
       } finally {
-        if (vigente) setCargando(false);
+        if (vigente) {
+          setCargando(false);
+        }
       }
     })();
     return () => {
@@ -419,7 +432,9 @@ function Dato({
   ancho?: boolean;
   enlace?: boolean;
 }) {
-  if (!v) return null;
+  if (!v) {
+    return null;
+  }
   const esUrl = enlace && /^https?:\/\//i.test(v);
   return (
     <div className={ancho ? "sm:col-span-2" : ""}>
@@ -470,7 +485,9 @@ function Redes({ s }: { s: SolicitudAdmin }) {
   const redes = Array.isArray(s.datos.socials)
     ? (s.datos.socials as Array<{ platform: string; url: string }>)
     : [];
-  if (!redes.length) return null;
+  if (!redes.length) {
+    return null;
+  }
   return (
     <ul className="flex flex-wrap gap-2">
       {redes.map((r, i) => (
@@ -499,7 +516,9 @@ export function RechazosPanel({ token }: { token: string }) {
   const [datos, setDatos] = useState<ResumenRechazos | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abrir = (abierto: boolean) => {
-    if (!abierto || datos) return;
+    if (!abierto || datos) {
+      return;
+    }
     api
       .rechazosDeSolicitudes(token, 7)
       .then(setDatos)
@@ -698,14 +717,14 @@ export function SolicitudesManager({
           : undefined,
       );
       const fallidas = imagenes?.fallidas ?? [];
-      if (fallidas.length)
+      if (fallidas.length) {
         notify?.(
           "error",
           `La solicitud se aprobó, pero no se pudo copiar: ${fallidas
             .map((f) => (f.tipo === "character" ? "el avatar" : "el logo"))
             .join(" y ")}. Súbelo desde «Imágenes» de la ficha.`,
         );
-      else
+      } else {
         notify?.(
           "ok",
           accion === "aprobar"
@@ -716,8 +735,11 @@ export function SolicitudesManager({
               ? "Baja marcada como procesada"
               : "Solicitud rechazada",
         );
+      }
       await cargar();
-      if (accion === "aprobar") onChanged?.();
+      if (accion === "aprobar") {
+        onChanged?.();
+      }
     } catch (causa) {
       notify?.(
         "error",

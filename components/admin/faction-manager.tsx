@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Mantenedor de emblemas y facciones: una rejilla de tarjetas, cada una con el emblema
@@ -39,7 +40,9 @@ type Notify = (kind: "ok" | "error", text: string) => void;
  * exclusivos siguen bloqueados: es el fallo que se reportó desde el mantenedor.
  */
 export function esSubfaccionHuerfana(faction: FactionRow): boolean {
-  if (faction.parentId) return false;
+  if (faction.parentId) {
+    return false;
+  }
   return /\([^)]*\)\s*$/.test(faction.label.trim());
 }
 
@@ -76,7 +79,9 @@ export function FactionManager({
     try {
       onItems((await action()).items);
       say("ok", okText);
-      if (structural) onStructureChanged?.();
+      if (structural) {
+        onStructureChanged?.();
+      }
       return true;
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "error";
@@ -280,7 +285,9 @@ function FactionCard({
               className="space-y-1"
               onSubmit={(event) => {
                 event.preventDefault();
-                if (!renaming.trim() || clash) return;
+                if (!renaming.trim() || clash) {
+                  return;
+                }
                 void run(
                   faction.id,
                   () =>
@@ -473,7 +480,9 @@ function FactionCard({
                     : `«${faction.label}» se eliminó.`,
                   true,
                 );
-                if (ok) setPending(null);
+                if (ok) {
+                  setPending(null);
+                }
               }}
             >
               {pending.kind === "merge"

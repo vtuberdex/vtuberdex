@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Menú lateral: botón de hamburguesa en la cabecera (arriba a la izquierda) que abre un panel con TODOS
@@ -66,7 +67,9 @@ export function SideMenu() {
   }, [pathname]);
 
   useEffect(() => {
-    if (!abierto) return;
+    if (!abierto) {
+      return;
+    }
     const boton_ = boton.current;
     const anterior = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -78,11 +81,15 @@ export function SideMenu() {
         setAbierto(false);
         return;
       }
-      if (e.key !== "Tab" || !panel.current) return;
+      if (e.key !== "Tab" || !panel.current) {
+        return;
+      }
       const items = [
         ...panel.current.querySelectorAll<HTMLElement>(FOCUSABLES),
       ];
-      if (!items.length) return;
+      if (!items.length) {
+        return;
+      }
       const primero = items[0];
       const ultimo = items[items.length - 1];
       if (e.shiftKey && document.activeElement === primero) {

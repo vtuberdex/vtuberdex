@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Ensambla las 7 capas y publica la info de layout medida.
  */
@@ -63,8 +64,11 @@ export function drawCardLayers({
               0,
             )
           : 0;
-        if (row && used + tw <= W - pad * 2) row.push(label);
-        else chipRows.push([label]);
+        if (row && used + tw <= W - pad * 2) {
+          row.push(label);
+        } else {
+          chipRows.push([label]);
+        }
       }
     }
   }
@@ -132,9 +136,15 @@ export function drawCardLayers({
     drawTitleLayer({ card: tarjetaParaTitulo(card), width });
   const marca = drawWordmarkLayer({ card, width });
   if (plan) {
-    if (!reutilizar?.background) deteriorarArte(fondo, plan);
-    if (!reutilizar?.character) deteriorarArte(personaje, plan);
-    if (!reutilizar?.title) deteriorarCabecera(titulo, plan);
+    if (!reutilizar?.background) {
+      deteriorarArte(fondo, plan);
+    }
+    if (!reutilizar?.character) {
+      deteriorarArte(personaje, plan);
+    }
+    if (!reutilizar?.title) {
+      deteriorarCabecera(titulo, plan);
+    }
     deteriorarCanto(marca, plan);
   }
 
@@ -203,7 +213,9 @@ export function drawCardLayers({
 export function drawCardFront(input: CardDrawInfo): HTMLCanvasElement {
   const width = input.width ?? CARD_TEXTURE_WIDTH;
   const { canvas, ctx, W, H } = createLayer(width);
-  if (!ctx) return canvas;
+  if (!ctx) {
+    return canvas;
+  }
   const layers = drawCardLayers({ ...input, width });
   ctx.drawImage(layers.background, 0, 0, W, H);
   ctx.drawImage(layers.character, 0, 0, W, H);

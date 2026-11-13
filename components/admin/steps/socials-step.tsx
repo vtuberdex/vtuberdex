@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paso 7: redes sociales. Antes compartía paso con atributos y habilidades, y quedaba al fondo de una sábana. */
 import { SocialsEditor } from "@/components/admin/list-sections";

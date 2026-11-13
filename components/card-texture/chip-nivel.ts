@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * El chip de nivel de la carta: «NIV 12 · VETERANO». UNA definición para las dos capas que lo usan (el dibujo de los chips
  * en `capa-textos.ts` y la medida de su extremo en `componer.ts`): si discreparan, las capas que se colocan a partir del
@@ -7,7 +8,9 @@
 import { RANGOS, rangoDeNivel } from "@/server/src/rangos.mjs";
 
 export function chipDeNivel(level: number | null): string | null {
-  if (level === null) return null;
+  if (level === null) {
+    return null;
+  }
   const rango = RANGOS[rangoDeNivel(level).indice] as { nombre: string };
   return `NIV ${level} · ${rango.nombre.toUpperCase()}`;
 }

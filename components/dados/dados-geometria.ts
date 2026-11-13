@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Dados de rol (d4, d6, d8, d10, d12, d20): forma, numeración, bisel, orientación final y azar.
  *
@@ -161,8 +162,9 @@ export function carasDe(
     let edge = face.edge;
     do {
       const p = edge.head().point;
-      if (!grupo.vertices.some((q) => q.distanceToSquared(p) < 1e-10))
+      if (!grupo.vertices.some((q) => q.distanceToSquared(p) < 1e-10)) {
         grupo.vertices.push(p.clone());
+      }
       edge = edge.next;
     } while (edge !== face.edge);
   }
@@ -233,12 +235,16 @@ function numerar(
   const numeros = new Array<number>(crudas.length).fill(0);
   let siguiente = 1;
   crudas.forEach((c, i) => {
-    if (numeros[i]) return;
+    if (numeros[i]) {
+      return;
+    }
     const j = crudas.findIndex(
       (o, k) => k !== i && !numeros[k] && o.normal.dot(c.normal) < -0.9999,
     );
     numeros[i] = siguiente;
-    if (j >= 0) numeros[j] = n + 1 - siguiente;
+    if (j >= 0) {
+      numeros[j] = n + 1 - siguiente;
+    }
     siguiente++;
   });
   const caras = crudas.map((c, i) => ({
@@ -330,8 +336,9 @@ export function geometriaBiselada(tipo: TipoDeDado): BufferGeometry {
     const indice = forma.caras.findIndex(
       (cara) => cara.normal.dot(normal) > 0.9995,
     );
-    for (const p of [a, b, c])
+    for (const p of [a, b, c]) {
       uvs.push(...(indice >= 0 ? uvEnCara(tipo, indice, p) : uvVacia));
+    }
   }
   const geometria = new BufferGeometry();
   geometria.setAttribute("position", pos.clone());
@@ -351,11 +358,15 @@ export function direccionDelResultado(
   const forma = formaDe(tipo);
   if (tipo === "d4") {
     const v = forma.verticesNumerados.find((x) => x.numero === resultado);
-    if (!v) throw new Error(`resultado_invalido: ${tipo} ${resultado}`);
+    if (!v) {
+      throw new Error(`resultado_invalido: ${tipo} ${resultado}`);
+    }
     return v.punto.clone().normalize();
   }
   const cara = forma.caras.find((x) => x.numero === resultado);
-  if (!cara) throw new Error(`resultado_invalido: ${tipo} ${resultado}`);
+  if (!cara) {
+    throw new Error(`resultado_invalido: ${tipo} ${resultado}`);
+  }
   return cara.normal.clone();
 }
 
@@ -380,11 +391,12 @@ export function alturaDeApoyo(
   const forma = formaDe(tipo);
   let minimo = Infinity;
   for (const cara of forma.caras) {
-    for (const p of cara.vertices)
+    for (const p of cara.vertices) {
       minimo = Math.min(
         minimo,
         p.clone().lerp(cara.centro, DADOS.bisel).applyQuaternion(orientacion).y,
       );
+    }
   }
   return -minimo;
 }
@@ -399,7 +411,9 @@ export function tirar(
   const buffer = new Uint32Array(1);
   for (;;) {
     const x = aleatorio(buffer)[0];
-    if (x < limite) return (x % caras) + 1;
+    if (x < limite) {
+      return (x % caras) + 1;
+    }
   }
 }
 

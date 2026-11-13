@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * CAPA 4 — textos: chips de estado, frase y pie.
  */
@@ -19,7 +20,9 @@ export function drawTextsLayer({
   info: CardLayers["info"];
 }): HTMLCanvasElement {
   const { canvas, ctx, W, H } = createLayer(width);
-  if (!ctx) return canvas;
+  if (!ctx) {
+    return canvas;
+  }
   const pad = info.pad;
   const stateY = info.headerTop + info.headerH + 34;
 
@@ -69,10 +72,13 @@ export function drawTextsLayer({
         current = test;
       }
     }
-    if (current) lines.push(current);
+    if (current) {
+      lines.push(current);
+    }
     const visible = lines.slice(0, Math.max(1, maxPhraseLines));
-    if (lines.length > visible.length)
+    if (lines.length > visible.length) {
       visible[visible.length - 1] = `${visible[visible.length - 1]}…`;
+    }
     const total = visible.length;
     let y = phraseBottomLimit - (total - 1) * lineHeight;
     for (const line of visible) {

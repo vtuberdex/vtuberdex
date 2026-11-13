@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Premia con XP a las fichas que están en directo (Twitch / Kick). Ver `lib/premiar-directos.mjs`.
  *
@@ -24,7 +25,9 @@ function fichasPublicadas(db) {
   for (let pagina = 1; ; pagina += 1) {
     const r = searchVtubers(db, { sort: "dex", page: pagina, perPage: 100 });
     todas.push(...r.items);
-    if (pagina >= r.pageCount) break;
+    if (pagina >= r.pageCount) {
+      break;
+    }
   }
   return todas;
 }
@@ -33,8 +36,9 @@ async function pasada() {
   const db = await dbConDiario();
   // El listado no trae las redes: salen del detalle de cada ficha (SQLite síncrono, milisegundos para todas).
   const fichas = fichasPublicadas(db).map((f) => ({ id: f.id, slug: f.slug, socials: getVtuberBySlug(db, f.slug)?.socials ?? [] }));
-  if (!process.env.VTUBERDEX_TWITCH_ID_CLIENT && !process.env.VTUBERDEX_KICK_ID_CLIENT)
+  if (!process.env.VTUBERDEX_TWITCH_ID_CLIENT && !process.env.VTUBERDEX_KICK_ID_CLIENT) {
     console.warn("[premiar-directos] sin credenciales de Twitch ni Kick: no hay nada que revisar");
+  }
   const resumen = await premiarDirectos(fichas, {
     ejecutor: seco ? { execute: async () => ({ rows: [], rowsAffected: 0 }), exec: async () => {} } : await ejecutorDeSolicitudes(),
     dia: diaDeChile(),
@@ -48,7 +52,11 @@ do {
     await pasada();
   } catch (error) {
     console.error(`[premiar-directos] la pasada falló: ${error.message}`);
-    if (!vigilar) process.exitCode = 1;
+    if (!vigilar) {
+      process.exitCode = 1;
+    }
   }
-  if (vigilar) await new Promise((r) => setTimeout(r, CADA_MS));
+  if (vigilar) {
+    await new Promise((r) => setTimeout(r, CADA_MS));
+  }
 } while (vigilar);

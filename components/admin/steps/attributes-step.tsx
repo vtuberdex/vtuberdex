@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Paso 5: atributos. UNA línea por atributo (nombre · valor / máximo · barra) en vez de una tarjeta
@@ -42,7 +43,9 @@ export function AttributesStep({ form, set }: StepProps) {
   const actualizar = (i: number, parche: Partial<StatForm>) =>
     cambiar(stats.map((s, j) => (j === i ? { ...s, ...parche } : s)));
   const mover = (i: number, a: number) => {
-    if (a < 0 || a >= stats.length) return;
+    if (a < 0 || a >= stats.length) {
+      return;
+    }
     const next = stats.slice();
     const [m] = next.splice(i, 1);
     next.splice(a, 0, m);

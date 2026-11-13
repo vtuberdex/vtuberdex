@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Cuerpo de `/terminos` en el idioma de la interfaz. Es cliente porque el idioma se elige en el

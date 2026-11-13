@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Banner de «Primeros pasos», descartable.
@@ -30,7 +31,9 @@ export function GettingStarted({
     }
   }, []);
 
-  if (dismissed !== false) return null;
+  if (dismissed !== false) {
+    return null;
+  }
 
   const dismiss = () => {
     setDismissed(true);

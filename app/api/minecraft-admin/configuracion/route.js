@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/minecraft-admin/configuracion` — lee y guarda la configuración.
  *
@@ -24,7 +25,9 @@ export async function GET(request) {
       archivo: url.searchParams.get("archivo") ?? undefined,
       rol: acceso.sesion.role,
     });
-    if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
     return respuestaJson(resultado);
   });
 }
@@ -41,7 +44,9 @@ export async function PUT(request) {
       contenido: cuerpo.contenido,
       rol: acceso.sesion.role,
     });
-    if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
     return respuestaJson({ ok: true, ruta: resultado.ruta });
   });
 }

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Gestión de las imágenes de un VTuber desde el mantenedor.
@@ -126,7 +127,9 @@ async function preparar(file: File, kind: ManagedKind): Promise<Blob> {
   const target = TARGET[kind];
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-  if (!ctx) return file;
+  if (!ctx) {
+    return file;
+  }
   /**
    * `createImageBitmap` no existe en navegadores antiguos. Se comprueba ANTES de
    * llamarla: sin este guardia, invocarla lanzaría un TypeError SÍNCRONO y el
@@ -135,7 +138,9 @@ async function preparar(file: File, kind: ManagedKind): Promise<Blob> {
    * valida y convierte).
    */
   const bitmap = await cargarBitmap(file);
-  if (!bitmap) return file;
+  if (!bitmap) {
+    return file;
+  }
 
   if (target) {
     canvas.width = target.w;
@@ -163,9 +168,15 @@ interface Props {
 
 /** Formatea bytes para mostrarlos en la ficha. */
 function human(bytes: number | undefined): string {
-  if (!bytes) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (!bytes) {
+    return "—";
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
@@ -300,7 +311,9 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
       const file = event.target.files?.[0];
       // Se limpia el input para poder volver a elegir el MISMO archivo después.
       event.target.value = "";
-      if (file) void upload(kind, file);
+      if (file) {
+        void upload(kind, file);
+      }
     };
 
   return (
@@ -345,7 +358,9 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
                 event.preventDefault();
                 setDragging(null);
                 const file = event.dataTransfer.files?.[0];
-                if (file) void upload(kind, file);
+                if (file) {
+                  void upload(kind, file);
+                }
               }}
             >
               <div className="flex items-center justify-between gap-2">

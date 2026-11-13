@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** `POST /api/minecraft/misiones` — avances de misiones reportados por el plugin (solo con `X-Minecraft-Token`). */
 import { registrarMisiones } from "../../../../lib/minecraft.mjs";
 

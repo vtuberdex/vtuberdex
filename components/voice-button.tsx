@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Voz de la ficha: al entrar, una voz sintética «de aparato» lee el nombre y la historia, y un
@@ -67,7 +68,9 @@ export function VoiceButton({
 
   const reproducir = useCallback(() => {
     const el = audio.current;
-    if (!el) return;
+    if (!el) {
+      return;
+    }
     el.currentTime = 0;
     void el.play().catch(() => setSonando(false));
   }, []);
@@ -75,28 +78,38 @@ export function VoiceButton({
   // Al tener clip y no estar silenciada, suena sola; al salir, se corta.
   useEffect(() => {
     const el = audio.current;
-    if (!disponible || !el) return;
-    if (!silenciada) reproducir();
+    if (!disponible || !el) {
+      return;
+    }
+    if (!silenciada) {
+      reproducir();
+    }
     return () => {
       el.pause();
     };
   }, [disponible, silenciada, reproducir]);
 
-  if (!disponible) return null;
+  if (!disponible) {
+    return null;
+  }
 
   const alPulsar = () => {
     if (sonando) {
       audio.current?.pause();
-      if (audio.current) audio.current.currentTime = 0;
+      if (audio.current) {
+        audio.current.currentTime = 0;
+      }
       setSonando(false);
       setSilenciada(true);
       guardarSilencio(true);
       return;
     }
     guardarSilencio(false);
-    if (silenciada)
+    if (silenciada) {
       setSilenciada(false); // el efecto la reproduce
-    else reproducir();
+    } else {
+      reproducir();
+    }
   };
 
   return (

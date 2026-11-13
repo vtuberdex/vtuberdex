@@ -137,8 +137,9 @@ test("la escala va de 6 a la Black Label en saltos de medio punto", () => {
 
 test("gradoSiguiente recorre la escala y se detiene en la Black Label", () => {
   const recorrido = [];
-  for (let grado = GRADO_INICIAL; grado; grado = gradoSiguiente(grado))
+  for (let grado = GRADO_INICIAL; grado; grado = gradoSiguiente(grado)) {
     recorrido.push(grado);
+  }
   assert.deepEqual(recorrido, [...GRADOS]);
   assert.equal(gradoSiguiente("BL"), null);
   assert.equal(
@@ -656,8 +657,9 @@ test("desgasteLeveDeGrado: la carta suelta lleva el máximo y baja hasta 0 en el
   const leves = ["6", "6.5", "7", "7.5"].map(desgasteLeveDeGrado);
   leves.slice(1).forEach((v, i) => assert.ok(v < leves[i]));
   assert.ok(leves[0] < 1);
-  for (const g of ["8", "10", "BL", "3"])
+  for (const g of ["8", "10", "BL", "3"]) {
     assert.equal(desgasteLeveDeGrado(g), 0, g);
+  }
   const montos = GRADOS.filter((g) => g !== "BL").map(
     (g) => DONACION_POR_GRADO[g],
   );

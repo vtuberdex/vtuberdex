@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Piezas compartidas por los formularios públicos (inscripción y baja): mismas clases, mismo

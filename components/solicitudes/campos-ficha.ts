@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Los campos de la ficha que piden la inscripción y la modificación: una sola lista para que los dos
  * formularios pregunten lo mismo y con las mismas etiquetas. Su espejo en el servidor es `PERFIL_CAMPOS`

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Pestaña «Dados» del mantenedor: el admin tira los dados de la partida (por ejemplo la X de una
@@ -63,7 +64,9 @@ export function DadosPanel() {
   useEffect(() => setMontado(true), []);
   useEffect(
     () => () => {
-      if (temporizador.current) clearTimeout(temporizador.current);
+      if (temporizador.current) {
+        clearTimeout(temporizador.current);
+      }
     },
     [],
   );
@@ -77,7 +80,9 @@ export function DadosPanel() {
   };
 
   const lanzar = (tipos: TipoDeDado[], deAtajo: CarasDelDado | null = null) => {
-    if (!tipos.length) return;
+    if (!tipos.length) {
+      return;
+    }
     const id = ++contador.current;
     const dados: DadoEnMesa[] = tipos.map((tipo, i) => ({
       clave: `${id}-${i}`,
@@ -91,7 +96,9 @@ export function DadosPanel() {
     setAtajo(deAtajo);
     setSemillaMesa(tirar(1000));
     setTirada({ id, dados, revelada: false });
-    if (temporizador.current) clearTimeout(temporizador.current);
+    if (temporizador.current) {
+      clearTimeout(temporizador.current);
+    }
     temporizador.current = setTimeout(
       () => {
         setTirada((actual) =>

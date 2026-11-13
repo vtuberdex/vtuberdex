@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 import { AbriendoDetalle } from "@/components/abriendo-detalle";
 import { AppFooter } from "@/components/app-footer";
 import { AppHeader } from "@/components/app-header";

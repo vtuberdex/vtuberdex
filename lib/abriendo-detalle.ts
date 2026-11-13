@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Estado global mínimo de «Accediendo al detalle».
@@ -23,15 +24,21 @@ function emitir(): void {
 
 export function marcarAbriendo(): void {
   activo = true;
-  if (temporizador) clearTimeout(temporizador);
+  if (temporizador) {
+    clearTimeout(temporizador);
+  }
   temporizador = setTimeout(limpiarAbriendo, ABRIENDO_MAX_MS);
   emitir();
 }
 
 export function limpiarAbriendo(): void {
-  if (temporizador) clearTimeout(temporizador);
+  if (temporizador) {
+    clearTimeout(temporizador);
+  }
   temporizador = null;
-  if (!activo) return;
+  if (!activo) {
+    return;
+  }
   activo = false;
   emitir();
 }

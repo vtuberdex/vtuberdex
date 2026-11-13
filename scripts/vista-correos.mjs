@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Escribe los cuatro correos (inscripción, cambios, baja y acceso) como archivos `.html` y `.txt`
  * para revisarlos en un navegador sin enviar nada. Uso: `npm run correos:vista [carpeta]`.

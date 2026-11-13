@@ -67,8 +67,9 @@ test("sin puntos no se sube, y con puntos el rango tiene tope", async () => {
   assert.ok(error instanceof PuntosError);
   assert.equal(error.code, "sin_puntos");
   // 10 niveles = 30 puntos: sobra para topar una habilidad.
-  for (let i = 0; i < RANGO_MAXIMO; i += 1)
+  for (let i = 0; i < RANGO_MAXIMO; i += 1) {
     await subirHabilidad(e, { ...entrada(10), clave });
+  }
   const tope = await mensajeDe(subirHabilidad(e, { ...entrada(10), clave }));
   assert.equal(tope.code, "rango_maximo");
   assert.equal(

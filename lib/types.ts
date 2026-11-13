@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** Tipos compartidos con la API (contrato único para toda la app). */
 
 export interface CountryRef {

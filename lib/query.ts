@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** Serialización de filtros a querystring y parseo inverso (URL = estado). */
 import { z } from "zod";
 
@@ -41,16 +42,30 @@ const listOf = (values: string[] | undefined) =>
 /** Query string para la API. Solo se envían los filtros activos. */
 export function searchParamsToQuery(params: SearchParams): string {
   const query = new URLSearchParams();
-  if (params.q.trim()) query.set("q", params.q.trim());
-  if (params.countries.length)
+  if (params.q.trim()) {
+    query.set("q", params.q.trim());
+  }
+  if (params.countries.length) {
     query.set("countries", params.countries.join(","));
-  if (params.languages.length)
+  }
+  if (params.languages.length) {
     query.set("languages", params.languages.join(","));
-  if (params.groups.length) query.set("groups", params.groups.join(","));
-  if (params.artists.length) query.set("artists", params.artists.join(","));
-  if (params.factions.length) query.set("factions", params.factions.join(","));
-  if (params.language) query.set("language", params.language);
-  if (params.premium) query.set("premium", "1");
+  }
+  if (params.groups.length) {
+    query.set("groups", params.groups.join(","));
+  }
+  if (params.artists.length) {
+    query.set("artists", params.artists.join(","));
+  }
+  if (params.factions.length) {
+    query.set("factions", params.factions.join(","));
+  }
+  if (params.language) {
+    query.set("language", params.language);
+  }
+  if (params.premium) {
+    query.set("premium", "1");
+  }
   query.set("sort", params.sort);
   query.set("page", String(params.page));
   query.set("perPage", String(params.perPage));
@@ -79,7 +94,9 @@ const asList = (value: string | string[] | undefined) =>
 export function searchParamsFromUrl(search: string): SearchParams {
   const raw = Object.fromEntries(new URLSearchParams(search));
   const parsed = searchParamsSchema.safeParse(raw);
-  if (!parsed.success) return { ...DEFAULT_SEARCH };
+  if (!parsed.success) {
+    return { ...DEFAULT_SEARCH };
+  }
   const data = parsed.data;
   return {
     q: data.q ?? "",
@@ -99,7 +116,9 @@ export function searchParamsFromUrl(search: string): SearchParams {
 /** SearchParams -> URL (para navegación y enlaces compartibles). */
 export function searchParamsToUrl(params: SearchParams): string {
   const query = new URLSearchParams();
-  if (params.q.trim()) query.set("q", params.q.trim());
+  if (params.q.trim()) {
+    query.set("q", params.q.trim());
+  }
   const join = (values: string[]) => (values.length ? values.join(",") : null);
   for (const [key, value] of [
     ["countries", join(params.countries)],
@@ -108,14 +127,25 @@ export function searchParamsToUrl(params: SearchParams): string {
     ["artists", join(params.artists)],
     ["factions", join(params.factions)],
   ] as const) {
-    if (value) query.set(key, value);
+    if (value) {
+      query.set(key, value);
+    }
   }
-  if (params.language) query.set("language", params.language);
-  if (params.sort !== "dex") query.set("sort", params.sort);
-  if (params.premium) query.set("premium", "1");
-  if (params.page > 1) query.set("page", String(params.page));
-  if (params.perPage !== DEFAULT_PER_PAGE)
+  if (params.language) {
+    query.set("language", params.language);
+  }
+  if (params.sort !== "dex") {
+    query.set("sort", params.sort);
+  }
+  if (params.premium) {
+    query.set("premium", "1");
+  }
+  if (params.page > 1) {
+    query.set("page", String(params.page));
+  }
+  if (params.perPage !== DEFAULT_PER_PAGE) {
     query.set("perPage", String(params.perPage));
+  }
   const suffix = query.toString();
   return suffix ? `/?${suffix}` : "/";
 }

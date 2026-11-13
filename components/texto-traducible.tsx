@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Texto libre de una ficha (frase, historia) con traducción al vuelo.
@@ -46,7 +47,9 @@ export function TextoTraducible({
   const traducido = estado.fase === "listo" && !verOriginal;
 
   const traducir = async () => {
-    if (!origen) return;
+    if (!origen) {
+      return;
+    }
     setEstado({ fase: "traduciendo", pct: null });
     try {
       const salida = await traducirTexto(texto, origen, locale, (pct) =>

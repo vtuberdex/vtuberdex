@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Acceso a SQLite y utilidades de esquema.
  *
@@ -143,7 +144,9 @@ const MIGRATIONS = [
       const facciones = db
         .prepare("SELECT id, slug, label, parent_id AS parentId FROM faction")
         .all();
-      if (facciones.length < 2) return;
+      if (facciones.length < 2) {
+        return;
+      }
 
       const porEtiqueta = new Map(
         facciones.map((f) => [String(f.label).trim().toLowerCase(), f]),
@@ -153,7 +156,9 @@ const MIGRATIONS = [
       );
 
       for (const hija of facciones) {
-        if (hija.parentId) continue;
+        if (hija.parentId) {
+          continue;
+        }
         const etiqueta = String(hija.label).trim();
         const entreParentesis = /^(.+?)\s*[([]/.exec(etiqueta);
         let madre = entreParentesis
@@ -171,7 +176,9 @@ const MIGRATIONS = [
             .sort((a, b) => b.slug.length - a.slug.length)[0];
           madre = prefijo;
         }
-        if (!madre || madre.id === hija.id) continue;
+        if (!madre || madre.id === hija.id) {
+          continue;
+        }
         // Una madre que a su vez es hija de la candidata crearía un ciclo: se deja sin madre.
         let subiendo = madre;
         let saltos = 0;
@@ -184,7 +191,9 @@ const MIGRATIONS = [
           subiendo = facciones.find((f) => f.id === subiendo.parentId);
           saltos += 1;
         }
-        if (ciclo) continue;
+        if (ciclo) {
+          continue;
+        }
         enlazar.run(madre.id, hija.id);
         hija.parentId = madre.id;
       }
@@ -236,13 +245,20 @@ function applyMigrations(db) {
   for (const migration of MIGRATIONS) {
     const key = `migration:${migration.id}`;
     const already = db.prepare("SELECT value FROM meta WHERE key = ?").get(key);
-    if (already) continue;
+    if (already) {
+      continue;
+    }
     try {
-      if (migration.run) migration.run(db);
-      else db.exec(migration.sql);
+      if (migration.run) {
+        migration.run(db);
+      } else {
+        db.exec(migration.sql);
+      }
     } catch (error) {
       // Columna ya presente (base creada con el esquema nuevo): no es un fallo.
-      if (!/duplicate column name/i.test(String(error))) throw error;
+      if (!/duplicate column name/i.test(String(error))) {
+        throw error;
+      }
     }
     db.prepare(
       "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",

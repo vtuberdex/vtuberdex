@@ -102,7 +102,9 @@ describe("plugins", () => {
         (p: { archivo: string }) => p.archivo === "vault.jar",
       );
       // Como root (CI en contenedor) chmod 000 no impide leer: solo se comprueba si de verdad falla.
-      if (v.legible === false) expect(v.estado).toBe("sin-leer");
+      if (v.legible === false) {
+        expect(v.estado).toBe("sin-leer");
+      }
     } finally {
       await fs.chmod(ruta, 0o644);
     }

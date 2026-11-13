@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Selección múltiple compacta (países, idiomas): chips quitables más un desplegable para agregar. */
 import { inputClass, labelClass } from "@/components/admin/ui";

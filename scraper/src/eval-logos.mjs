@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Mide el detector de logos contra el GROUND TRUTH de calibración.
  *
@@ -52,7 +53,9 @@ async function main() {
 
   for (const r of pairs) {
     const p = path.join(ROOT, "data", "images", "card", `${r.slug}.webp`);
-    if (!fs.existsSync(p)) continue;
+    if (!fs.existsSync(p)) {
+      continue;
+    }
     const { data, info } = await sharp(p)
       .ensureAlpha()
       .raw()
@@ -81,7 +84,9 @@ async function main() {
       const pre = inter / (box.width * box.height);
       acc.recall.push(rec);
       acc.prec.push(pre);
-      if (rec > 0.85 && pre > 0.7) acc.buenos += 1;
+      if (rec > 0.85 && pre > 0.7) {
+        acc.buenos += 1;
+      }
     }
 
     const boxDet = findLogoBox(
@@ -94,8 +99,9 @@ async function main() {
     if (boxDet) {
       const rec = intersection(boxDet, g) / gArea;
       const pre = intersection(boxDet, g) / (boxDet.width * boxDet.height);
-      if (rec <= 0.85 || pre <= 0.7)
+      if (rec <= 0.85 || pre <= 0.7) {
         fallos.push(`${r.slug}:r${rec.toFixed(2)}/p${pre.toFixed(2)}`);
+      }
     }
   }
 

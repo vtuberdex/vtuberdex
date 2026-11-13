@@ -15,7 +15,9 @@ describe("terminos traducidos", () => {
       expect(t.preambulo.length).toBe(terminosDe("es").preambulo.length);
       for (const c of t.clausulas) {
         expect(c.titulo.trim()).not.toBe("");
-        for (const p of c.parrafos) expect(p.trim()).not.toBe("");
+        for (const p of c.parrafos) {
+          expect(p.trim()).not.toBe("");
+        }
       }
     });
   }

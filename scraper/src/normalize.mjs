@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Normalización de países, idiomas y texto.
  *
@@ -206,7 +207,9 @@ export function parseCountries(rawValue) {
   const seen = new Set();
   for (const part of parts) {
     const canonical = ALIASES.get(part) ?? slugify(part);
-    if (!canonical || seen.has(canonical)) continue;
+    if (!canonical || seen.has(canonical)) {
+      continue;
+    }
     seen.add(canonical);
     out.push(canonical);
   }
@@ -220,7 +223,9 @@ export function languagesForCountries(countrySlugs) {
     const country = COUNTRY_BY_SLUG.get(slug);
     langs.add(country?.lang ?? "es");
   }
-  if (langs.size === 0) langs.add("es");
+  if (langs.size === 0) {
+    langs.add("es");
+  }
   return [...langs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
@@ -236,7 +241,9 @@ export function splitList(rawValue) {
 export function parseDexNumber(...candidates) {
   for (const candidate of candidates) {
     const match = String(candidate ?? "").match(/(\d+)/);
-    if (match) return Number(match[1]);
+    if (match) {
+      return Number(match[1]);
+    }
   }
   return null;
 }

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `POST /api/stats` — latido anónimo de una pestaña abierta (ver `lib/clientes-stats.mjs`).
  *
@@ -20,7 +21,9 @@ const MAX_BYTES = 2048;
 export async function POST(request) {
   try {
     const texto = await request.text();
-    if (texto.length > MAX_BYTES) return new Response(null, { status: 413 });
+    if (texto.length > MAX_BYTES) {
+      return new Response(null, { status: 413 });
+    }
     const cuerpo = JSON.parse(texto);
     if (cuerpo && typeof cuerpo === "object" && !Array.isArray(cuerpo)) {
       const { navegador, so, robot } = clasificarUserAgent(
@@ -31,8 +34,9 @@ export async function POST(request) {
           cuerpo.ruta === "ficha" ? await idDeFichaPublica(cuerpo.ficha) : null;
         // Lo que el cliente diga de sí mismo se IGNORA: estas cuatro claves las pone solo el servidor.
         const resto = { ...cuerpo };
-        for (const clave of ["ficha", "navegador", "so", "fichaId"])
+        for (const clave of ["ficha", "navegador", "so", "fichaId"]) {
           delete resto[clave];
+        }
         registrar({ ...resto, navegador, so, fichaId });
       }
     }

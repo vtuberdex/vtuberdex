@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * La matemática de las máscaras, sin DOM: recorre píxeles RGBA y escribe píxeles RGBA.
  *
@@ -19,7 +20,9 @@ export function mascaraTintaYPiel(
 ): void {
   for (let i = 0; i < a.length; i += 4) {
     const alpha = a[i + 3];
-    if (alpha < 8) continue;
+    if (alpha < 8) {
+      continue;
+    }
     const r = a[i];
     const g = a[i + 1];
     const b = a[i + 2];
@@ -35,7 +38,9 @@ export function mascaraTintaYPiel(
     const skinWeight = 0.55;
 
     const intensidad = Math.max(ink, piel * skinWeight);
-    if (intensidad <= 0) continue;
+    if (intensidad <= 0) {
+      continue;
+    }
 
     const v = Math.round(Math.min(255, intensidad * 255));
     o[i] = v;
@@ -66,6 +71,9 @@ export function calcularMascara(
   a: Uint8ClampedArray,
   o: Uint8ClampedArray,
 ): void {
-  if (tipo === "tinta") mascaraTintaYPiel(a, o);
-  else mascaraCobertura(a, o);
+  if (tipo === "tinta") {
+    mascaraTintaYPiel(a, o);
+  } else {
+    mascaraCobertura(a, o);
+  }
 }

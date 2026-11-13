@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Equilibrio de los stats base: UNA regla para todas las fichas, sin retoques a mano.
  *
@@ -36,13 +37,16 @@ const NO_SON_STATS = new Set(["level", "exp"]);
 
 /** La lista de stats sin nivel/EXP y con cada valor base limitado; el máximo de HP/MP baja con él. No muta. */
 export function equilibrarStats(stats) {
-  if (!Array.isArray(stats)) return stats;
+  if (!Array.isArray(stats)) {
+    return stats;
+  }
   return stats
     .filter((s) => !NO_SON_STATS.has(s.slug))
     .map((s) => {
       const tope = topeDeStatBase(s.slug);
-      if (tope === null || typeof s.value !== "number" || s.value <= tope)
+      if (tope === null || typeof s.value !== "number" || s.value <= tope) {
         return s;
+      }
       const baja = s.value - tope;
       return {
         ...s,

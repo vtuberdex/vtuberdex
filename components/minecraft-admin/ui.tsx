@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Piezas visuales del mantenedor de Minecraft, con los tokens del sistema de diseño de la web
  * (`docs/sistema-de-diseno.md`: `dex-void`, `dex-panel`, `dex-line`, `dex-accent`…). Antes el
@@ -123,7 +124,9 @@ export function Tendencia({
   valores: number[];
   tono?: Tono;
 }) {
-  if (valores.length < 2) return <div className="h-9" aria-hidden="true" />;
+  if (valores.length < 2) {
+    return <div className="h-9" aria-hidden="true" />;
+  }
   const min = Math.min(...valores);
   const max = Math.max(...valores);
   const rango = max - min || 1;

@@ -68,8 +68,9 @@ test("sin puntos no se puede subir y no se pasa de lo ganado", async () => {
     (await fallo(subirStat(e, { ...entrada(0), slug: "attack" }))).code,
     "sin_puntos_stats",
   );
-  for (let i = 0; i < PUNTOS_STATS_POR_NIVEL; i += 1)
+  for (let i = 0; i < PUNTOS_STATS_POR_NIVEL; i += 1) {
     await subirStat(e, { ...entrada(1), slug: "attack" });
+  }
   const error = await fallo(subirStat(e, { ...entrada(1), slug: "attack" }));
   assert.ok(error instanceof PuntosError);
   assert.equal(error.code, "sin_puntos_stats");

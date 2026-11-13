@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Localiza el logo dentro de la carta por BORDES (gradiente) + componentes conexos.
  *
@@ -53,7 +54,9 @@ export function buildEdgeGrid(data, width, height, channels, options = {}) {
   // Gradiente por diferencias entre píxeles contiguos (sin dependencias).
   for (let y = Math.max(1, y0); y < y1 - 1; y += 1) {
     for (let x = Math.max(1, x0); x < x1 - 1; x += 1) {
-      if (x >= bx0 && x < bx1 && y >= by0 && y < by1) continue;
+      if (x >= bx0 && x < bx1 && y >= by0 && y < by1) {
+        continue;
+      }
       const i = (y * width + x) * channels;
       const r = data[i];
       const g = data[i + 1];
@@ -61,7 +64,9 @@ export function buildEdgeGrid(data, width, height, channels, options = {}) {
       const cell = Math.floor(y / CELL) * cols + Math.floor(x / CELL);
       const max = Math.max(r, g, b);
       const min = Math.min(r, g, b);
-      if (max !== 0 && ((max - min) / max) * 255 > minSat) satCounts[cell] += 1;
+      if (max !== 0 && ((max - min) / max) * 255 > minSat) {
+        satCounts[cell] += 1;
+      }
       // Vecino derecho, abajo y diagonal: suma de diferencias absolutas.
       const ir = i + channels;
       const ib = i + width * channels;
@@ -72,7 +77,9 @@ export function buildEdgeGrid(data, width, height, channels, options = {}) {
         Math.abs(r - data[ib]) +
         Math.abs(g - data[ib + 1]) +
         Math.abs(b - data[ib + 2]);
-      if (d > edgeMin) counts[cell] += 1;
+      if (d > edgeMin) {
+        counts[cell] += 1;
+      }
     }
   }
 
@@ -81,7 +88,9 @@ export function buildEdgeGrid(data, width, height, channels, options = {}) {
     // del panel sobre fondo plano, que tiene bordes pero no saturación.
     const okEdge = counts[i] >= cellMinEdge;
     const okSat = !options.requireSat || satCounts[i] >= cellMinSat;
-    if (okEdge && okSat) on[i] = 1;
+    if (okEdge && okSat) {
+      on[i] = 1;
+    }
   }
   return { on, cols, rows, x0, y0 };
 }
@@ -109,14 +118,18 @@ export function findLogoBox(data, width, height, channels, options = {}) {
   for (let cy = 0; cy < rows; cy += 1) {
     for (let cx = 0; cx < cols; cx += 1) {
       const idx = cy * cols + cx;
-      if (!on[idx]) continue;
+      if (!on[idx]) {
+        continue;
+      }
       const up = cy > 0 ? labels[idx - cols] : 0;
       const left = cx > 0 ? labels[idx - 1] : 0;
       let label;
       if (up && left) {
         label = Math.min(up, left);
         const other = Math.max(up, left);
-        if (other !== label) mergeLabels(stats, labels, label, other);
+        if (other !== label) {
+          mergeLabels(stats, labels, label, other);
+        }
       } else {
         label = up || left;
       }
@@ -128,10 +141,18 @@ export function findLogoBox(data, width, height, channels, options = {}) {
       labels[idx] = label;
       const st = stats[label];
       st.size += 1;
-      if (cx < st.minX) st.minX = cx;
-      if (cx > st.maxX) st.maxX = cx;
-      if (cy < st.minY) st.minY = cy;
-      if (cy > st.maxY) st.maxY = cy;
+      if (cx < st.minX) {
+        st.minX = cx;
+      }
+      if (cx > st.maxX) {
+        st.maxX = cx;
+      }
+      if (cy < st.minY) {
+        st.minY = cy;
+      }
+      if (cy > st.maxY) {
+        st.maxY = cy;
+      }
     }
   }
 
@@ -139,9 +160,13 @@ export function findLogoBox(data, width, height, channels, options = {}) {
     .map((st, label) => (st ? { label, st } : null))
     .filter(Boolean)
     .sort((a, b) => b.st.size - a.st.size);
-  if (!reales.length) return null;
+  if (!reales.length) {
+    return null;
+  }
   const mayor = reales[0];
-  if (mayor.st.size < minCells) return null;
+  if (mayor.st.size < minCells) {
+    return null;
+  }
 
   let minX = mayor.st.minX;
   let maxX = mayor.st.maxX;
@@ -150,7 +175,9 @@ export function findLogoBox(data, width, height, channels, options = {}) {
   let total = mayor.st.size;
   let blobs = 1;
   for (let i = 1; i < reales.length; i += 1) {
-    if (reales[i].st.size < mayor.st.size * ratio) break;
+    if (reales[i].st.size < mayor.st.size * ratio) {
+      break;
+    }
     minX = Math.min(minX, reales[i].st.minX);
     maxX = Math.max(maxX, reales[i].st.maxX);
     minY = Math.min(minY, reales[i].st.minY);
@@ -163,9 +190,12 @@ export function findLogoBox(data, width, height, channels, options = {}) {
   const top = minY * CELL;
   const w = (maxX - minX + 1) * CELL;
   const h = (maxY - minY + 1) * CELL;
-  if (w < 24 || h < 20) return null;
-  if (w > width * (options.maxWidthRatio ?? 0.9) && h > height * 0.6)
+  if (w < 24 || h < 20) {
     return null;
+  }
+  if (w > width * (options.maxWidthRatio ?? 0.9) && h > height * 0.6) {
+    return null;
+  }
 
   return {
     box: {
@@ -183,7 +213,9 @@ export function findLogoBox(data, width, height, channels, options = {}) {
 function mergeLabels(stats, labels, label, other) {
   const a = stats[other];
   const b = stats[label];
-  if (!a || !b) return;
+  if (!a || !b) {
+    return;
+  }
   b.size += a.size;
   b.minX = Math.min(b.minX, a.minX);
   b.maxX = Math.max(b.maxX, a.maxX);
@@ -191,6 +223,8 @@ function mergeLabels(stats, labels, label, other) {
   b.maxY = Math.max(b.maxY, a.maxY);
   stats[other] = null;
   for (let i = 0; i < labels.length; i += 1) {
-    if (labels[i] === other) labels[i] = label;
+    if (labels[i] === other) {
+      labels[i] = label;
+    }
   }
 }

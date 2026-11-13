@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Ficha personal (cumpleaños, altura, gustos…). */
 import { useI18n } from "@/lib/i18n";

@@ -30,11 +30,12 @@ const clienteFalso = {
     const sql = typeof arg === "string" ? arg : arg.sql;
     const args = (typeof arg === "string" ? [] : (arg.args ?? [])) as never[];
     const sentencia = turso.prepare(sql);
-    if (/^\s*(select|pragma)/i.test(sql))
+    if (/^\s*(select|pragma)/i.test(sql)) {
       return {
         rows: sentencia.all(...args).map((f) => ({ ...f })),
         rowsAffected: 0,
       };
+    }
     const info = sentencia.run(...args);
     return {
       rows: [],
@@ -130,7 +131,9 @@ beforeEach(async () => {
   correo = await import("@/lib/correo.mjs");
   correo.__usarTransporte({
     sendMail: async (m: { to: string; subject: string; text: string }) => {
-      if (fallaElCorreo) throw new Error("buzón inexistente");
+      if (fallaElCorreo) {
+        throw new Error("buzón inexistente");
+      }
       enviados.push({ to: m.to, subject: m.subject, text: m.text });
       return { messageId: "x" };
     },
@@ -585,7 +588,7 @@ describe("enlace mágico del mantenedor", () => {
   });
 
   test("freno por red: a la décima petición seguida responde 429", async () => {
-    for (let i = 0; i < 10; i += 1)
+    for (let i = 0; i < 10; i += 1) {
       expect(
         (
           await enlace.pedirEnlaceDeAcceso(
@@ -594,6 +597,7 @@ describe("enlace mágico del mantenedor", () => {
           )
         ).status,
       ).toBe(200);
+    }
     expect(
       (
         await enlace.pedirEnlaceDeAcceso(
@@ -713,8 +717,9 @@ describe("inscripción: código, sesión y borrador", () => {
       phrase: "Hola de nuevo",
       paso: 3,
     });
-    for (const sobra of ["intruso", "email", "aceptaTerminos", "website"])
+    for (const sobra of ["intruso", "email", "aceptaTerminos", "website"]) {
       expect(datos).not.toHaveProperty(sobra);
+    }
     expect(turso.prepare("SELECT COUNT(*) n FROM borrador").get()).toEqual({
       n: 1,
     });

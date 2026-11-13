@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Zona para elegir un archivo de emblema: arrastrar y soltar, o botón. Solo entrega el
@@ -35,7 +36,9 @@ export function EmblemDropzone({
         event.preventDefault();
         setOver(false);
         const file = event.dataTransfer.files?.[0];
-        if (file && !busy) onFile(file);
+        if (file && !busy) {
+          onFile(file);
+        }
       }}
       className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-4 text-center text-xs transition ${
         over
@@ -54,7 +57,9 @@ export function EmblemDropzone({
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = "";
-          if (file) onFile(file);
+          if (file) {
+            onFile(file);
+          }
         }}
       />
       <button
@@ -76,8 +81,9 @@ export function useObjectUrl(file: Blob | null): string | null {
   // Se deriva durante el render (patrón de React para estado dependiente de props) y no en un efecto.
   if (file !== lastFile) {
     setLastFile(file);
-    if (url && typeof URL.revokeObjectURL === "function")
+    if (url && typeof URL.revokeObjectURL === "function") {
       URL.revokeObjectURL(url);
+    }
     setUrl(
       file && typeof URL.createObjectURL === "function"
         ? URL.createObjectURL(file)

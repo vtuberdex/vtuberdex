@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Descarga los logos de FACCIÓN que el sitio sirve en `facciones/<Nombre>.png`.
  *
@@ -30,13 +31,19 @@ let indexSize = 0;
 export function collectFactionFiles(cacheDir = CACHE) {
   const files = new Set();
   for (const f of fs.readdirSync(cacheDir)) {
-    if (!f.endsWith(".html")) continue;
+    if (!f.endsWith(".html")) {
+      continue;
+    }
     const $ = cheerio.load(fs.readFileSync(path.join(cacheDir, f), "utf8"));
     $("img").each((_, el) => {
       const src = $(el).attr("src") ?? "";
-      if (!src.includes("facciones/")) return;
+      if (!src.includes("facciones/")) {
+        return;
+      }
       const name = src.split("facciones/")[1];
-      if (name) files.add(name);
+      if (name) {
+        files.add(name);
+      }
     });
   }
   return [...files];

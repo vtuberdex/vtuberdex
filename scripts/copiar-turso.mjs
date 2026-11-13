@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 // Copia TODAS las tablas de Turso a un archivo SQLite local (libsql `file:`), para
 // dejar de depender del servicio. Uso:
 //   TURSO_DATABASE_URL=libsql://... TURSO_AUTH_TOKEN=... node scripts/copiar-turso.mjs [-- --salida data/turso-local.db]
@@ -15,7 +16,9 @@ if (!url) {
 }
 
 mkdirSync(dirname(salida), { recursive: true });
-for (const s of ["", "-wal", "-shm"]) rmSync(salida + s, { force: true });
+for (const s of ["", "-wal", "-shm"]) {
+  rmSync(salida + s, { force: true });
+}
 
 const origen = createClient({ url, authToken });
 const destino = createClient({ url: `file:${salida}` });
@@ -25,7 +28,9 @@ async function conReintentos(fn, intentos = 5) {
     try {
       return await fn();
     } catch (e) {
-      if (k >= intentos) throw e;
+      if (k >= intentos) {
+        throw e;
+      }
       await new Promise((r) => setTimeout(r, 1000 * k));
     }
   }
@@ -35,7 +40,9 @@ const { rows: objetos } = await origen.execute(
   "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'libsql_%' ORDER BY CASE type WHEN 'table' THEN 0 ELSE 1 END, name",
 );
 const tablas = objetos.filter((o) => o.type === "table");
-for (const t of tablas) await destino.execute(String(t.sql));
+for (const t of tablas) {
+  await destino.execute(String(t.sql));
+}
 
 for (const t of tablas) {
   const nombre = String(t.name);
@@ -48,7 +55,9 @@ for (const t of tablas) {
         `SELECT * FROM ${q} ORDER BY rowid LIMIT ${lote} OFFSET ${off}`,
       ),
     );
-    if (!rows.length) break;
+    if (!rows.length) {
+      break;
+    }
     const sql = `INSERT INTO ${q} (${columns.map((c) => `"${c}"`).join(",")}) VALUES (${columns.map(() => "?").join(",")})`;
     await destino.batch(
       rows.map((r) => ({ sql, args: columns.map((c) => r[c]) })),

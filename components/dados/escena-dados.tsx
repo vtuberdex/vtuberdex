@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * La bandeja de dados en 3D (UN solo canvas, regla 7): tapete, dados de cristal y su tumbo.
@@ -112,8 +113,12 @@ export function posicionesEnMesa(
 const GEOMETRIAS = new Map<TipoDeDado, ReturnType<typeof geometriaBiselada>>();
 const ATLAS = new Map<TipoDeDado, CanvasTexture>();
 function recursosDe(tipo: TipoDeDado) {
-  if (!GEOMETRIAS.has(tipo)) GEOMETRIAS.set(tipo, geometriaBiselada(tipo));
-  if (!ATLAS.has(tipo)) ATLAS.set(tipo, crearAtlas(tipo));
+  if (!GEOMETRIAS.has(tipo)) {
+    GEOMETRIAS.set(tipo, geometriaBiselada(tipo));
+  }
+  if (!ATLAS.has(tipo)) {
+    ATLAS.set(tipo, crearAtlas(tipo));
+  }
   return { geometria: GEOMETRIAS.get(tipo)!, atlas: ATLAS.get(tipo)! };
 }
 
@@ -201,9 +206,13 @@ function Dado({ dado, x, z }: { dado: DadoEnMesa; x: number; z: number }) {
 
   useFrame((state) => {
     const g = grupo.current;
-    if (!g) return;
+    if (!g) {
+      return;
+    }
     const ahora = state.clock.elapsedTime;
-    if (inicio.current === null) inicio.current = ahora;
+    if (inicio.current === null) {
+      inicio.current = ahora;
+    }
     const t = dado.animar
       ? Math.min(1, (ahora - inicio.current) / plan.duracion)
       : 1;
@@ -232,7 +241,9 @@ function Dado({ dado, x, z }: { dado: DadoEnMesa; x: number; z: number }) {
 
     const material = humo.current?.material as
       ReturnType<typeof crearMaterialDeHumo> | undefined;
-    if (material) material.uniforms.uTiempo.value = ahora;
+    if (material) {
+      material.uniforms.uTiempo.value = ahora;
+    }
     if (luz.current) {
       luz.current.color.copy(colorDelHumo(dado.semilla, ahora, color));
       luz.current.intensity =

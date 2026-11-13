@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Geometría del libro de cartas: dónde va cada funda, cómo gira la hoja y a qué
  * distancia se pone la cámara. Es matemática pura (sin React ni WebGL) para que
@@ -177,8 +178,12 @@ export type RevealRule = "none" | "uncover" | "cover";
 
 export function isStaticCardVisible(rule: RevealRule, theta: number): boolean {
   const turned = Math.abs(theta);
-  if (rule === "uncover") return turned > BINDER.revealAngle;
-  if (rule === "cover") return Math.PI - turned > BINDER.revealAngle;
+  if (rule === "uncover") {
+    return turned > BINDER.revealAngle;
+  }
+  if (rule === "cover") {
+    return Math.PI - turned > BINDER.revealAngle;
+  }
   return true;
 }
 

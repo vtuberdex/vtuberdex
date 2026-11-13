@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * HABILIDADES del RPG de VTubers: el catálogo de estados y las reglas del kit. UNA sola definición.
  *
@@ -650,7 +651,9 @@ export function buscarEstado(nombre) {
 /** El estilo oficial del `<span>` de un estado (o de su evolución, que hereda el de la base). */
 export function estiloDeEstado(nombre) {
   const hallado = buscarEstado(nombre);
-  if (!hallado) return null;
+  if (!hallado) {
+    return null;
+  }
   const { estado } = hallado;
   return estado.estilo ?? `color:${estado.color}; font-weight:bold;`;
 }
@@ -658,7 +661,9 @@ export function estiloDeEstado(nombre) {
 /** El `<span>` oficial de un estado, con su nombre canónico. */
 export function spanDeEstado(nombre) {
   const hallado = buscarEstado(nombre);
-  if (!hallado) throw new Error(`estado_desconocido: ${nombre}`);
+  if (!hallado) {
+    throw new Error(`estado_desconocido: ${nombre}`);
+  }
   return `<span style="${estiloDeEstado(nombre)}">${hallado.canonico}</span>`;
 }
 
@@ -668,7 +673,9 @@ export function spanDeEstado(nombre) {
  */
 export function bloqueDeEvolucion(nombre) {
   const hallado = buscarEstado(nombre);
-  if (!hallado) throw new Error(`estado_desconocido: ${nombre}`);
+  if (!hallado) {
+    throw new Error(`estado_desconocido: ${nombre}`);
+  }
   const { evolucion } = hallado.estado;
   const span = spanDeEstado(evolucion.nombre);
   return `<br>Mientras ${span} esté activo:<br>\n${evolucion.efecto.map((l) => `${l}<br>`).join("\n")}`;
@@ -704,7 +711,9 @@ export function estadosEntregados(html) {
     const verbo = m[1].toLowerCase().startsWith("obtien")
       ? "obtienes"
       : "aplicas";
-    for (const s of spansDe(m[2])) salida.push({ verbo, texto: s.texto });
+    for (const s of spansDe(m[2])) {
+      salida.push({ verbo, texto: s.texto });
+    }
   }
   return salida;
 }
@@ -727,10 +736,11 @@ function colorDelEstilo(estilo) {
 }
 
 function estiloCoincide(estiloReal, estado) {
-  if (estado.estilo)
+  if (estado.estilo) {
     return /linear-gradient\(\s*#fff 0%\s*,\s*#fff 45%\s*,\s*#aaa 85%\s*,\s*#555 100%\s*\)/i.test(
       estiloReal,
     );
+  }
   return colorDelEstilo(estiloReal) === estado.color.toLowerCase();
 }
 
@@ -744,7 +754,9 @@ function estiloCoincide(estiloReal, estado) {
  */
 
 function etiquetaDePieza(category, posicion) {
-  if (category === "ultimate") return "Ultimate";
+  if (category === "ultimate") {
+    return "Ultimate";
+  }
   return `${category === "active" ? "Activa" : "Pasiva"} ${posicion + 1}`;
 }
 
@@ -776,20 +788,26 @@ export function tieneFaccion(facciones, slug, subfacciones = {}) {
       .replace(/-+$/, "")
       .replace("lecagy", "legacy");
   const buscada = canonico(slug);
-  if (!buscada) return false;
+  if (!buscada) {
+    return false;
+  }
   // El mapa se compara canónico también: sus dos lados vienen de la base y de la interfaz.
   const madreDe = new Map();
   for (const [hija, madre] of Object.entries(subfacciones ?? {})) {
     const claveHija = canonico(hija);
     const claveMadre = canonico(madre);
-    if (claveHija && claveMadre) madreDe.set(claveHija, claveMadre);
+    if (claveHija && claveMadre) {
+      madreDe.set(claveHija, claveMadre);
+    }
   }
   /** La facción y todas sus madres. Con tope y sin repetir: un ciclo en los datos no cuelga esto. */
   const conMadres = (inicial) => {
     const ascendencia = new Set();
     let actual = inicial;
     for (let saltos = 0; actual && saltos < 32; saltos += 1) {
-      if (ascendencia.has(actual)) break;
+      if (ascendencia.has(actual)) {
+        break;
+      }
       ascendencia.add(actual);
       actual = madreDe.get(actual);
     }
@@ -825,8 +843,9 @@ export function validarKit({ habilidades, facciones = null, subfacciones = {} })
         (p) =>
           p.codigo === codigo && p.pieza === pieza && p.detalle === detalle,
       )
-    )
+    ) {
       return;
+    }
     problemas.push({
       codigo,
       gravedad,
@@ -902,10 +921,13 @@ export function validarKit({ habilidades, facciones = null, subfacciones = {} })
     const entregados = [];
     for (const { verbo, texto } of estadosEntregados(html)) {
       const hallado = buscarEstado(texto);
-      if (!hallado) continue;
+      if (!hallado) {
+        continue;
+      }
       const { estado } = hallado;
-      if (!entregados.some((e) => e.hallado.estado === estado))
+      if (!entregados.some((e) => e.hallado.estado === estado)) {
         entregados.push({ hallado, verbo });
+      }
 
       if (estado.polaridad === "positivo" && verbo === "aplicas") {
         anotar(
@@ -953,7 +975,9 @@ export function validarKit({ habilidades, facciones = null, subfacciones = {} })
         `entrega ${entregados.length} estados (${entregados.map((e) => e.hallado.canonico).join(", ")}); el máximo es 1`,
       );
     }
-    if (h.category === "ultimate") ultimates.push({ pieza, html, entregados });
+    if (h.category === "ultimate") {
+      ultimates.push({ pieza, html, entregados });
+    }
   }
 
   for (const { pieza, html, entregados } of ultimates) {
@@ -1055,7 +1079,9 @@ export function escaparHtml(texto) {
  * @returns {string}
  */
 export function htmlDeEfecto(habilidad) {
-  if (habilidad?.effectHtml) return habilidad.effectHtml;
+  if (habilidad?.effectHtml) {
+    return habilidad.effectHtml;
+  }
   return escaparHtml(habilidad?.effect ?? "").replace(/\r?\n/g, "<br>");
 }
 
@@ -1072,14 +1098,25 @@ export function htmlDeHabilidadSeguro(html) {
   const texto = String(html ?? "");
   for (const m of texto.matchAll(/<[^>]*>?/g)) {
     const etiqueta = m[0];
-    if (/^<br\s*\/?>$/i.test(etiqueta)) continue;
-    if (/^<\/?(b|strong|i|em)>$/i.test(etiqueta)) continue;
-    if (/^<!--[^>]*-->$/.test(etiqueta)) continue;
-    if (/^<\/(span|div)>$/i.test(etiqueta)) continue;
-    if (/^<div class="skill-effect-content">$/i.test(etiqueta)) continue;
-    const span = /^<span style="([^"<>]*)">$/i.exec(etiqueta);
-    if (span && !/url\s*\(|expression|javascript:|@import|\\/i.test(span[1]))
+    if (/^<br\s*\/?>$/i.test(etiqueta)) {
       continue;
+    }
+    if (/^<\/?(b|strong|i|em)>$/i.test(etiqueta)) {
+      continue;
+    }
+    if (/^<!--[^>]*-->$/.test(etiqueta)) {
+      continue;
+    }
+    if (/^<\/(span|div)>$/i.test(etiqueta)) {
+      continue;
+    }
+    if (/^<div class="skill-effect-content">$/i.test(etiqueta)) {
+      continue;
+    }
+    const span = /^<span style="([^"<>]*)">$/i.exec(etiqueta);
+    if (span && !/url\s*\(|expression|javascript:|@import|\\/i.test(span[1])) {
+      continue;
+    }
     return false;
   }
   return true;

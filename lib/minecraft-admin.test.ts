@@ -333,7 +333,9 @@ describe("saneado de rutas antes de escribir en disco", () => {
         base: dir,
         carpeta: "plugins",
       });
-      if (!destino.ok) continue;
+      if (!destino.ok) {
+        continue;
+      }
       expect(path.dirname(destino.ruta)).toBe(path.join(dir, "plugins"));
       expect(path.relative(dir, destino.ruta).startsWith("..")).toBe(false);
     }

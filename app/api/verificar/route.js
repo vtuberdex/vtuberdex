@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `POST /api/verificar` — gasta el token que llegó al correo y confirma la solicitud.
  *
@@ -11,11 +12,12 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request) {
   const cabeceras = { "cache-control": "no-store" };
-  if (!origenPermitido(request.headers))
+  if (!origenPermitido(request.headers)) {
     return Response.json(
       { error: "origen_no_permitido" },
       { status: 403, headers: cabeceras },
     );
+  }
   const cuerpo = await request.json().catch(() => null);
   try {
     const { status, cuerpo: respuesta } = await confirmarVerificacion(

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Invitación a VRTon 2026. Escritorio (`xl`, 1280 px): un pendón vertical a cada lado de la
@@ -157,7 +158,9 @@ export function VrtonBanners({
   visible?: boolean;
 }) {
   // Mismo `grid gap-3` que con los pendones: los hijos conservan su separación vertical.
-  if (!visible) return <div className="grid gap-3">{children}</div>;
+  if (!visible) {
+    return <div className="grid gap-3">{children}</div>;
+  }
   return (
     <div className="grid gap-3 xl:gap-6 xl:grid-cols-[9.5rem_minmax(0,1fr)_9.5rem] xl:items-start">
       <Estandarte />

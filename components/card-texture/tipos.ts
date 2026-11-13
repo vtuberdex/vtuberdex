@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Contrato de datos: lo que entra a dibujar y las 7 capas que salen.
  */

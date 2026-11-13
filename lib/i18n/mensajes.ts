@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** Resolución de textos: pura (sin React ni DOM), para poder probarla y usarla desde cualquier lado. */
 import { en } from "./en";
 import { es, type Mensajes } from "./es";
@@ -38,7 +39,9 @@ export function traducir(
     const dic = DICCIONARIOS[idioma] as Record<string, string>;
     if (n !== null) {
       const plural = dic[`${clave}_${categoriaPlural(idioma, n)}`];
-      if (plural !== undefined) return plural;
+      if (plural !== undefined) {
+        return plural;
+      }
     }
     return dic[clave];
   };

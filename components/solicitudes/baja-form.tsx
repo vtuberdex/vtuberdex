@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Formulario PÚBLICO de baja, en DOS pasos y sin pedir la ficha ni «cómo comprobamos»:
@@ -86,7 +87,9 @@ export function BajaForm() {
     }
   };
 
-  if (resultado) return <ResultadoDeLaVerificacion resultado={resultado} />;
+  if (resultado) {
+    return <ResultadoDeLaVerificacion resultado={resultado} />;
+  }
 
   if (paso === 2) {
     return (

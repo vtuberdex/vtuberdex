@@ -17,8 +17,9 @@ describe("categoriaDeRuta", () => {
     expect(categoriaDeRuta("/")).toBe("catalogo");
     expect(categoriaDeRuta("/v/madkoding")).toBe("ficha");
     expect(categoriaDeRuta("/v/madkoding/")).toBe("ficha");
-    for (const otra of ["/admin", "/inscripcion", "/v", "/v/a/b", "/baja"])
+    for (const otra of ["/admin", "/inscripcion", "/v", "/v/a/b", "/baja"]) {
       expect(categoriaDeRuta(otra), otra).toBe("otra");
+    }
   });
   it("el resultado es solo la categoría, nunca el slug", () => {
     expect(categoriaDeRuta("/v/una-ficha-privada")).not.toContain("privada");
@@ -37,8 +38,9 @@ describe("fichaDeRuta", () => {
       "/inscripcion",
       "/admin",
       "/api/vtubers/x",
-    ])
+    ]) {
       expect(fichaDeRuta(otra), otra).toBeNull();
+    }
   });
   it("decodifica, acota el largo y no se rompe con un % mal formado", () => {
     expect(fichaDeRuta("/v/ni%C3%B1a")).toBe("niña");

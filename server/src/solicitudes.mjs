@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * SOLICITUDES: las inscripciones de fichas y las bajas que llegan desde el formulario PÚBLICO.
  *
@@ -116,11 +117,12 @@ export function ejecutorSqlite(db) {
   return {
     async execute(sql, args = []) {
       const sentencia = db.prepare(sql);
-      if (/^\s*select/i.test(sql))
+      if (/^\s*select/i.test(sql)) {
         return {
           rows: sentencia.all(...args).map((fila) => ({ ...fila })),
           rowsAffected: 0,
         };
+      }
       const info = sentencia.run(...args);
       return {
         rows: [],
@@ -378,8 +380,9 @@ export async function crearSolicitud(
     propositoPermiso = "permiso",
   },
 ) {
-  if (!TIPOS.includes(tipo))
+  if (!TIPOS.includes(tipo)) {
     throw new SolicitudError(400, "tipo_invalido", tipo);
+  }
   const esquema = ESQUEMAS[tipo];
   // Con `permiso` el correo YA está verificado (lo canjeó por un código): sale del permiso, no de lo que
   // diga el cuerpo, y la solicitud nace `pendiente` sin segundo correo. Se mira sin gastarlo: un error de
@@ -428,7 +431,9 @@ export async function crearSolicitud(
   } = parsed.data;
   // Un bot rellena el campo oculto. Se responde como si todo fuera bien (sin pista de qué lo delató)
   // pero no se guarda nada.
-  if (website) return { id: null, descartada: true };
+  if (website) {
+    return { id: null, descartada: true };
+  }
   if (terminosVersion !== TERMINOS_VERSION) {
     throw new SolicitudError(
       409,
@@ -600,10 +605,13 @@ export async function fichasDelTitular(
     if (
       String(deJson(fila.contacto)?.email ?? "").toLowerCase() !==
       String(email).toLowerCase()
-    )
+    ) {
       continue;
+    }
     const ficha = resolverFicha(fila.vtuber_slug);
-    if (!ficha || vistas.has(ficha.id)) continue;
+    if (!ficha || vistas.has(ficha.id)) {
+      continue;
+    }
     vistas.add(ficha.id);
     salida.push({ inscripcion: Number(fila.id), ficha });
   }
@@ -616,9 +624,13 @@ export async function fichasDelTitular(
     );
     for (const m of manuales) {
       const id = Number(m.vtuber_id);
-      if (vistas.has(id)) continue;
+      if (vistas.has(id)) {
+        continue;
+      }
       const ficha = resolverPorId(id);
-      if (!ficha) continue;
+      if (!ficha) {
+        continue;
+      }
       vistas.add(id);
       salida.push({ inscripcion: null, ficha });
     }
@@ -637,14 +649,20 @@ export async function correoDeLaFicha(ejecutor, { fichaId, resolverFicha }) {
     "SELECT email FROM ficha_correo WHERE vtuber_id = ?",
     [Number(fichaId)],
   );
-  if (manual.rows[0]?.email) return String(manual.rows[0].email);
+  if (manual.rows[0]?.email) {
+    return String(manual.rows[0].email);
+  }
   const { rows } = await e.execute(
     "SELECT contacto, vtuber_slug FROM solicitud WHERE tipo = 'inscripcion' AND estado = 'aprobada' AND vtuber_slug IS NOT NULL ORDER BY id",
   );
   for (const fila of rows) {
     const email = deJson(fila.contacto)?.email;
-    if (!email) continue;
-    if (resolverFicha(fila.vtuber_slug)?.id === fichaId) return String(email);
+    if (!email) {
+      continue;
+    }
+    if (resolverFicha(fila.vtuber_slug)?.id === fichaId) {
+      return String(email);
+    }
   }
   return null;
 }
@@ -664,13 +682,16 @@ export async function correosDeFichas(ejecutor, { resolverFicha }) {
   for (const fila of rows) {
     const email = deJson(fila.contacto)?.email;
     const id = email ? resolverFicha(fila.vtuber_slug)?.id : null;
-    if (id != null) mapa.set(id, String(email));
+    if (id != null) {
+      mapa.set(id, String(email));
+    }
   }
   const { rows: manuales } = await e.execute(
     "SELECT vtuber_id, email FROM ficha_correo",
   );
-  for (const fila of manuales)
+  for (const fila of manuales) {
     mapa.set(Number(fila.vtuber_id), String(fila.email));
+  }
   return mapa;
 }
 
@@ -684,12 +705,16 @@ export async function correoTieneFicha(ejecutor, email) {
   const limpio = String(email ?? "")
     .trim()
     .toLowerCase();
-  if (!limpio) return false;
+  if (!limpio) {
+    return false;
+  }
   const manual = await e.execute(
     "SELECT 1 AS ok FROM ficha_correo WHERE email = ? LIMIT 1",
     [limpio],
   );
-  if (manual.rows.length) return true;
+  if (manual.rows.length) {
+    return true;
+  }
   const inscrita = await e.execute(
     "SELECT 1 AS ok FROM solicitud WHERE tipo = 'inscripcion' AND estado = 'aprobada' AND json_extract(contacto, '$.email') = ? LIMIT 1",
     [limpio],
@@ -732,8 +757,9 @@ export async function fijarGraduado(
 /** Valida y normaliza un correo (minúsculas); lanza `SolicitudError` 400 si no lo es. */
 export function normalizarCorreo(valor) {
   const parsed = correo.safeParse(valor);
-  if (!parsed.success)
+  if (!parsed.success) {
     throw new SolicitudError(400, "correo_invalido", "El correo no es válido.");
+  }
   return parsed.data;
 }
 
@@ -814,7 +840,9 @@ export async function listarSolicitudes(
     "SELECT tipo, COUNT(*) AS n FROM solicitud WHERE estado = 'pendiente' GROUP BY tipo",
   );
   const pendientes = { inscripcion: 0, baja: 0, modificacion: 0 };
-  for (const c of cuentas) pendientes[c.tipo] = Number(c.n);
+  for (const c of cuentas) {
+    pendientes[c.tipo] = Number(c.n);
+  }
   return { items: rows.map(mapear), pendientes };
 }
 
@@ -841,16 +869,18 @@ export async function resolverSolicitud(
   id,
   { estado, actor, nota = "", vtuberSlug = null, ahora = new Date() },
 ) {
-  if (!["aprobada", "rechazada", "procesada"].includes(estado))
+  if (!["aprobada", "rechazada", "procesada"].includes(estado)) {
     throw new SolicitudError(400, "estado_invalido", estado);
+  }
   const e = await conTablas(ejecutor);
   const actual = await leerSolicitud(e, id);
-  if (!actual)
+  if (!actual) {
     throw new SolicitudError(
       404,
       "no_encontrado",
       `no existe la solicitud ${id}`,
     );
+  }
   const permitido =
     actual.tipo === "baja"
       ? ["procesada", "rechazada"]
@@ -878,15 +908,18 @@ export async function resolverSolicitud(
       Number(id),
     ],
   );
-  if (cambio.rowsAffected === 0)
+  if (cambio.rowsAffected === 0) {
     throw new SolicitudError(
       409,
       "ya_resuelta",
       "esta solicitud ya fue resuelta",
     );
+  }
   // Rechazada: lo subido se borra en el acto. Aprobada: quien aprueba las copia a la ficha y las borra
   // después (si no pudo, caducan solas: `LIMITES.vidaResueltaMs`).
-  if (estado !== "aprobada") await borrarImagenesDeSolicitud(e, id);
+  if (estado !== "aprobada") {
+    await borrarImagenesDeSolicitud(e, id);
+  }
   return leerSolicitud(e, id);
 }
 
@@ -908,8 +941,12 @@ export function fichaDesdeInscripcion(solicitud) {
   };
   const { columnas, modeler, perfil } = camposDeFicha(d);
   Object.assign(ficha, columnas);
-  if (modeler) ficha.artists = [modeler];
-  if (perfil.length) ficha.profile = perfil;
+  if (modeler) {
+    ficha.artists = [modeler];
+  }
+  if (perfil.length) {
+    ficha.profile = perfil;
+  }
   return ficha;
 }
 
@@ -928,7 +965,9 @@ export function camposDeFicha(d) {
     "hashtag",
     "favoriteColor",
   ]) {
-    if (d[clave]) columnas[clave] = d[clave];
+    if (d[clave]) {
+      columnas[clave] = d[clave];
+    }
   }
   const perfil = PERFIL_ETIQUETAS.filter(([, clave]) => d[clave]).map(
     ([label, clave]) => ({ label, value: d[clave] }),

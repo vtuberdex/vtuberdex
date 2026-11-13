@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Utilidades HTTP compartidas por el scraper.
  *
@@ -73,9 +74,13 @@ export async function fetchBinary(
         signal: AbortSignal.timeout(timeoutMs),
         headers: { "user-agent": "vtuberdex-refresh/0.1 (+scraper)" },
       });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        return null;
+      }
       const buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.length === 0) return null;
+      if (buffer.length === 0) {
+        return null;
+      }
       // El soft-404 también aplica a recursos inexistentes servidos como HTML.
       if (
         buffer
@@ -108,7 +113,9 @@ export async function mapLimit(items, limit, worker) {
       while (true) {
         const index = cursor;
         cursor += 1;
-        if (index >= items.length) return;
+        if (index >= items.length) {
+          return;
+        }
         results[index] = await worker(items[index], index);
       }
     },

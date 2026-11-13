@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `GET /api/vtubers/:slug/directo` — si el VTuber está en directo y qué publica, según sus redes.
  *
@@ -25,13 +26,19 @@ const CACHE_PUBLICA = "public, max-age=0, s-maxage=30, stale-while-revalidate=30
 
 export async function GET(request, { params }) {
   const sinSesion = exigirSesion(request);
-  if (sinSesion) return sinSesion;
+  if (sinSesion) {
+    return sinSesion;
+  }
   const { slug } = await params;
   const db = await dbConDiario({ ttlMs: 2000 });
   const card = getVtuberBySlug(db, slug);
-  if (!card) return Response.json({ error: "no_encontrado" }, { status: 404 });
+  if (!card) {
+    return Response.json({ error: "no_encontrado" }, { status: 404 });
+  }
   const cupo = gastarFichas(redDeLaPeticion(request.headers), [card.id]);
-  if (!cupo.permitido) return respuestaAgotada(cupo);
+  if (!cupo.permitido) {
+    return respuestaAgotada(cupo);
+  }
 
   const canales = await estadoDeRedes(card.socials);
   return Response.json(

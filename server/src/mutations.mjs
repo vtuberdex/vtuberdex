@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Mutaciones del catálogo: UNA definición de cómo se edita, se crea y se reordena una ficha.
  *
@@ -102,16 +103,20 @@ const POWERS = {
  * tienen que dar lo mismo para que editar un stat no cambie el orden por poder de forma extraña.
  */
 export function calcularPoder(stats) {
-  if (!stats || stats.length === 0) return 0;
+  if (!stats || stats.length === 0) {
+    return 0;
+  }
   const porSlug = new Map(
     stats.map((stat) => [stat.slug, Number(stat.value) || 0]),
   );
   let total = 0;
-  for (const [slug, peso] of Object.entries(POWERS))
+  for (const [slug, peso] of Object.entries(POWERS)) {
     total += valorEquilibrado(slug, porSlug.get(slug) ?? 0) * peso;
+  }
   for (const stat of stats) {
-    if (!(stat.slug in POWERS) && !FUERA_DEL_PODER.has(stat.slug))
+    if (!(stat.slug in POWERS) && !FUERA_DEL_PODER.has(stat.slug)) {
       total += valorEquilibrado(stat.slug, stat.value) * 0.3;
+    }
   }
   return Math.round(total);
 }
@@ -197,7 +202,9 @@ export function refreshSearchIndex(db, vtuberId) {
          FROM vtuber v WHERE v.id = ?`,
     )
     .get(vtuberId);
-  if (!row) return;
+  if (!row) {
+    return;
+  }
   const tags = [row.tagText, row.countryText, row.factionText]
     .filter(Boolean)
     .join(" ");
@@ -214,7 +221,9 @@ export function refreshSearchIndex(db, vtuberId) {
  */
 export function slugOCodigo(valor, prefijo) {
   const slug = slugify(valor).slice(0, 80).replace(/-+$/, "");
-  if (slug) return slug;
+  if (slug) {
+    return slug;
+  }
   const codigo = [...String(valor ?? "").trim()]
     .map((c) => c.codePointAt(0).toString(16))
     .join("")
@@ -240,7 +249,9 @@ function upsertTag(db, kind, label) {
  */
 export function buscarFaccion(db, valor) {
   const clave = String(valor ?? "").trim();
-  if (!clave) return null;
+  if (!clave) {
+    return null;
+  }
   return (
     db
       .prepare(
@@ -265,12 +276,13 @@ export function replaceRelations(db, vtuberId, patch) {
       const country = db
         .prepare("SELECT id FROM country WHERE slug = ?")
         .get(slug);
-      if (!country)
+      if (!country) {
         throw new MutationError(
           422,
           "pais_desconocido",
           `país desconocido: ${slug}`,
         );
+      }
       insert.run(vtuberId, country.id, index);
     });
   }
@@ -308,13 +320,16 @@ export function replaceRelations(db, vtuberId, patch) {
     const resueltas = [];
     for (const valor of patch.factions) {
       const faccion = buscarFaccion(db, valor);
-      if (!faccion)
+      if (!faccion) {
         throw new MutationError(
           422,
           "faccion_desconocida",
           `facción desconocida: ${valor}`,
         );
-      if (!resueltas.some((f) => f.id === faccion.id)) resueltas.push(faccion);
+      }
+      if (!resueltas.some((f) => f.id === faccion.id)) {
+        resueltas.push(faccion);
+      }
     }
     if (resueltas.length > MAX_FACCIONES) {
       throw new MutationError(
@@ -439,7 +454,9 @@ export function ultimoDex(db) {
  * avisar cambiaría su URL de referencia (`#777`) por un efecto colateral que nadie pidió.
  */
 export function resolverDex(db, pedido, { excluirId = null } = {}) {
-  if (pedido === "end") return ultimoDex(db) + 1;
+  if (pedido === "end") {
+    return ultimoDex(db) + 1;
+  }
   const numero = Number(pedido);
   if (!Number.isInteger(numero) || numero < 1) {
     throw new MutationError(
@@ -473,18 +490,20 @@ function slugDesdeNombre(nombre, dex) {
 /** Valida y normaliza un slug explícito. */
 function slugValido(valor) {
   const slug = slugify(valor);
-  if (!slug)
+  if (!slug) {
     throw new MutationError(
       400,
       "slug_invalido",
       "la URL no puede quedar vacía",
     );
-  if (slug.length > 80)
+  }
+  if (slug.length > 80) {
     throw new MutationError(
       400,
       "slug_invalido",
       "la URL admite como máximo 80 caracteres",
     );
+  }
   return slug;
 }
 
@@ -496,11 +515,15 @@ function slugValido(valor) {
  */
 function cambiarSlug(db, id, actual, nuevo) {
   const slug = slugValido(nuevo);
-  if (slug === actual) return;
+  if (slug === actual) {
+    return;
+  }
   const choque = db
     .prepare("SELECT id FROM vtuber WHERE slug = ? AND id != ?")
     .get(slug, id);
-  if (choque) throw new MutationError(409, "slug_duplicado", slug);
+  if (choque) {
+    throw new MutationError(409, "slug_duplicado", slug);
+  }
   // Un alias de OTRA carta con ese nombre pierde frente a un slug real; el de ESTA ya no hace falta.
   db.prepare("DELETE FROM slug_alias WHERE slug = ?").run(slug);
   db.prepare(
@@ -524,7 +547,9 @@ function cambiarSlug(db, id, actual, nuevo) {
  * fecha de alta cada vez que se sube de grado, porque esta función no ve la base.
  */
 export function sellarPremium(patch, ahora = hoy()) {
-  if (!patch || !patch.premium) return patch;
+  if (!patch || !patch.premium) {
+    return patch;
+  }
   return {
     ...patch,
     premium: { ...patch.premium, ahora: patch.premium.ahora ?? ahora },
@@ -608,13 +633,16 @@ export function aplicarParche(db, id, patch) {
   const actual = db
     .prepare("SELECT id, slug, dex_number AS dex FROM vtuber WHERE id = ?")
     .get(id);
-  if (!actual)
+  if (!actual) {
     throw new MutationError(404, "no_encontrado", `no existe la ficha ${id}`);
+  }
 
   const sets = [];
   const args = [];
   for (const [campo, columna] of Object.entries(COLUMNAS)) {
-    if (patch[campo] === undefined) continue;
+    if (patch[campo] === undefined) {
+      continue;
+    }
     sets.push(`${columna} = ?`);
     args.push(patch[campo]);
   }
@@ -634,7 +662,9 @@ export function aplicarParche(db, id, patch) {
     args.push(resolverDex(db, patch.dexNumber, { excluirId: id }));
   }
   // Cambiar el slug antes del UPDATE general: puede lanzar y la transacción lo deshace todo.
-  if (patch.slug !== undefined) cambiarSlug(db, id, actual.slug, patch.slug);
+  if (patch.slug !== undefined) {
+    cambiarSlug(db, id, actual.slug, patch.slug);
+  }
   if (sets.length > 0) {
     db.prepare(
       `UPDATE vtuber SET ${sets.join(", ")}, updated_at = datetime('now') WHERE id = ?`,
@@ -642,7 +672,9 @@ export function aplicarParche(db, id, patch) {
   }
   replaceRelations(db, id, patch);
   replaceChildren(db, id, patch);
-  if (patch.premium !== undefined) aplicarPremium(db, id, patch.premium);
+  if (patch.premium !== undefined) {
+    aplicarPremium(db, id, patch.premium);
+  }
   refreshSearchIndex(db, id);
   refreshFacetCounters(db);
   return db.prepare("SELECT slug FROM vtuber WHERE id = ?").get(id).slug;
@@ -660,16 +692,18 @@ export function aplicarParche(db, id, patch) {
  */
 export function crearFicha(db, datos, { id = null } = {}) {
   const nombre = String(datos.name ?? "").trim();
-  if (!nombre)
+  if (!nombre) {
     throw new MutationError(400, "nombre_requerido", "falta el nombre");
+  }
   const dex = resolverDex(db, datos.dexNumber ?? "end");
   // Un slug EXPLÍCITO se valida y no se toca. El que sale del NOMBRE se slugifica sin quejarse: los
   // VTubers escriben «ミク», «★Luna★» o nombres de 100 letras, y rechazarlos por la URL dejaba la
   // inscripción sin poder aprobarse (`slug_invalido`) por algo que la persona no controla.
   const slug =
     datos.slug != null ? slugValido(datos.slug) : slugDesdeNombre(nombre, dex);
-  if (db.prepare("SELECT 1 FROM vtuber WHERE slug = ?").get(slug))
+  if (db.prepare("SELECT 1 FROM vtuber WHERE slug = ?").get(slug)) {
     throw new MutationError(409, "slug_duplicado", slug);
+  }
 
   const columnas = [
     "dex_number",
@@ -720,7 +754,9 @@ export function consolidarFacciones(db) {
       const variante = db
         .prepare("SELECT id FROM faction WHERE slug = ?")
         .get(slugVariante);
-      if (!variante) continue;
+      if (!variante) {
+        continue;
+      }
       const canonica = db
         .prepare("SELECT id FROM faction WHERE lower(label) = lower(?)")
         .get(etiqueta);
@@ -776,10 +812,16 @@ export function consolidarFacciones(db) {
  * pasar guardaría una hija huérfana que después nadie podría arreglar desde la interfaz.
  */
 function resolverFaccionMadre(db, parent) {
-  if (parent === undefined) return undefined;
-  if (parent === null || parent === "") return null;
+  if (parent === undefined) {
+    return undefined;
+  }
+  if (parent === null || parent === "") {
+    return null;
+  }
   const texto = String(parent).trim();
-  if (!texto) return null;
+  if (!texto) {
+    return null;
+  }
   const comoId = /^\d+$/.test(texto) ? Number(texto) : -1;
   const fila = db
     .prepare(
@@ -788,12 +830,13 @@ function resolverFaccionMadre(db, parent) {
         LIMIT 1`,
     )
     .get(comoId, texto, texto);
-  if (!fila)
+  if (!fila) {
     throw new MutationError(
       404,
       "madre_no_encontrada",
       `no existe la facción madre ${texto}`,
     );
+  }
   return fila.id;
 }
 
@@ -802,25 +845,29 @@ function resolverFaccionMadre(db, parent) {
  * la herencia de estados sube por la cadena y sin tope se quedaría dando vueltas.
  */
 function validarMadre(db, id, madreId) {
-  if (madreId === null || madreId === undefined) return;
-  if (madreId === id)
+  if (madreId === null || madreId === undefined) {
+    return;
+  }
+  if (madreId === id) {
     throw new MutationError(
       400,
       "madre_ciclica",
       "una facción no puede ser su propia madre",
     );
+  }
   let actual = madreId;
   for (let saltos = 0; actual !== null && saltos < 32; saltos += 1) {
     const fila = db
       .prepare("SELECT parent_id AS parentId FROM faction WHERE id = ?")
       .get(actual);
     actual = fila?.parentId ?? null;
-    if (actual === id)
+    if (actual === id) {
       throw new MutationError(
         400,
         "madre_ciclica",
         "esa facción ya depende de esta: la relación sería circular",
       );
+    }
   }
 }
 
@@ -881,12 +928,13 @@ export function crearFaccion(
   { id = null } = {},
 ) {
   const etiqueta = String(label ?? "").trim();
-  if (!etiqueta)
+  if (!etiqueta) {
     throw new MutationError(
       400,
       "nombre_requerido",
       "falta el nombre de la facción",
     );
+  }
   const slug = slugOCodigo(etiqueta, "faccion");
   if (
     db
@@ -929,31 +977,35 @@ export function editarFaccion(db, id, { label, icon, parent }) {
   const actual = db
     .prepare("SELECT id, label FROM faction WHERE id = ?")
     .get(id);
-  if (!actual)
+  if (!actual) {
     throw new MutationError(404, "no_encontrado", `no existe la facción ${id}`);
+  }
   if (label !== undefined) {
     const etiqueta = String(label).trim();
-    if (!etiqueta)
+    if (!etiqueta) {
       throw new MutationError(
         400,
         "nombre_requerido",
         "falta el nombre de la facción",
       );
+    }
     const choque = db
       .prepare(
         "SELECT id FROM faction WHERE lower(label) = lower(?) AND id != ?",
       )
       .get(etiqueta, id);
-    if (choque)
+    if (choque) {
       throw new MutationError(
         409,
         "faccion_duplicada",
         `ya existe la facción ${etiqueta}`,
       );
+    }
     db.prepare("UPDATE faction SET label = ? WHERE id = ?").run(etiqueta, id);
   }
-  if (icon !== undefined)
+  if (icon !== undefined) {
     db.prepare("UPDATE faction SET icon = ? WHERE id = ?").run(icon, id);
+  }
   if (parent !== undefined) {
     const madreId = resolverFaccionMadre(db, parent) ?? null;
     validarMadre(db, id, madreId);
@@ -980,24 +1032,27 @@ export function editarFaccion(db, id, { label, icon, parent }) {
  */
 export function eliminarFaccion(db, id, { fusionarEn = null } = {}) {
   const faccion = db.prepare("SELECT id FROM faction WHERE id = ?").get(id);
-  if (!faccion)
+  if (!faccion) {
     throw new MutationError(404, "no_encontrado", `no existe la facción ${id}`);
+  }
   if (fusionarEn !== null) {
-    if (fusionarEn === id)
+    if (fusionarEn === id) {
       throw new MutationError(
         400,
         "fusion_invalida",
         "no se puede fusionar una facción consigo misma",
       );
+    }
     const destino = db
       .prepare("SELECT id FROM faction WHERE id = ?")
       .get(fusionarEn);
-    if (!destino)
+    if (!destino) {
       throw new MutationError(
         404,
         "no_encontrado",
         `no existe la facción destino ${fusionarEn}`,
       );
+    }
     const afectadas = db
       .prepare(
         "SELECT vtuber_id AS id, position FROM vtuber_faction WHERE faction_id = ?",

@@ -65,8 +65,9 @@ describe("kit de habilidades: armado", () => {
       "passive",
       "ultimate",
     ]);
-    for (const h of habilidades)
+    for (const h of habilidades) {
       expect(htmlDeHabilidadSeguro(h.effectHtml)).toBe(true);
+    }
   });
 
   it("la activa pone el verbo por la polaridad, no por lo que se elija", () => {

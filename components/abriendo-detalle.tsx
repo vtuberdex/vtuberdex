@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Aviso «Accediendo al detalle»: cubre la pantalla desde que se pulsa una carta hasta que la
@@ -10,7 +11,9 @@ import { useI18n } from "@/lib/i18n";
 export function AbriendoDetalle() {
   const { t } = useI18n();
   const abierto = useAbriendoDetalle();
-  if (!abierto) return null;
+  if (!abierto) {
+    return null;
+  }
   return (
     <div
       role="dialog"

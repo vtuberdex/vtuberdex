@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * SEO: URL del sitio, descripciones y datos estructurados (JSON-LD).
  *
@@ -27,10 +28,13 @@ export function siteUrl(
   env: Record<string, string | undefined> = process.env,
 ): string {
   const explicita = env.SITE_URL?.trim();
-  if (explicita) return explicita.replace(/\/+$/, "");
+  if (explicita) {
+    return explicita.replace(/\/+$/, "");
+  }
   const vercel = env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (vercel)
+  if (vercel) {
     return `https://${vercel.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
+  }
   return `http://localhost:${env.PORT ?? 3000}`;
 }
 
@@ -46,7 +50,9 @@ const MAX_DESCRIPCION = 160;
 
 function recortar(texto: string, max = MAX_DESCRIPCION): string {
   const limpio = texto.replace(/\s+/g, " ").trim();
-  if (limpio.length <= max) return limpio;
+  if (limpio.length <= max) {
+    return limpio;
+  }
   // Se corta en el último espacio para no partir una palabra, y se marca con puntos suspensivos.
   const corte = limpio.slice(0, max - 1);
   const espacio = corte.lastIndexOf(" ");
@@ -76,14 +82,18 @@ export function descripcionDeFicha(card: FichaSeo): string {
   partes.push(
     `${card.name}, VTuber${pais ? ` de ${pais}` : ""}, carta #${String(card.dexNumber).padStart(3, "0")} de la ${NOMBRE_SITIO}.`,
   );
-  if (card.phrase?.trim()) partes.push(`«${card.phrase.trim()}»`);
-  if (card.factions.length)
+  if (card.phrase?.trim()) {
+    partes.push(`«${card.phrase.trim()}»`);
+  }
+  if (card.factions.length) {
     partes.push(`Facciones: ${card.factions.join(", ")}.`);
+  }
   const habilidades = (card.skills ?? [])
     .map((s) => s.name)
     .filter((n): n is string => Boolean(n));
-  if (habilidades.length)
+  if (habilidades.length) {
     partes.push(`Habilidades: ${habilidades.slice(0, 3).join(", ")}.`);
+  }
   return recortar(partes.join(" "));
 }
 

@@ -172,14 +172,21 @@ function contextoGrabador() {
   const objetivo: Record<string, unknown> = {};
   const ctx = new Proxy(objetivo, {
     get(destino, propiedad: string) {
-      if (propiedad === "fillText")
+      if (propiedad === "fillText") {
         return (texto: string) => void textos.push(texto);
-      if (propiedad === "fillRect") return () => void (rellenos += 1);
-      if (propiedad === "measureText")
+      }
+      if (propiedad === "fillRect") {
+        return () => void (rellenos += 1);
+      }
+      if (propiedad === "measureText") {
         return (texto: string) => ({ width: texto.length * 5 });
-      if (propiedad === "createLinearGradient")
+      }
+      if (propiedad === "createLinearGradient") {
         return () => ({ addColorStop: () => undefined });
-      if (propiedad in destino) return destino[propiedad];
+      }
+      if (propiedad in destino) {
+        return destino[propiedad];
+      }
       return () => undefined;
     },
     set(destino, propiedad: string, valor) {
@@ -272,8 +279,9 @@ describe("hoja interior y etiqueta", () => {
   });
 
   test("todos los grados tienen su banda de color", () => {
-    for (const grado of GRADOS)
+    for (const grado of GRADOS) {
       expect(PREMIUM.label.bands[grado], grado).toHaveLength(2);
+    }
   });
 });
 
@@ -291,8 +299,9 @@ describe("utilidades de la etiqueta", () => {
     expect(barrasDeCertificado("VTD-000017")).not.toEqual(
       barrasDeCertificado("VTD-000018"),
     );
-    for (const ancho of barrasDeCertificado("VTD-123456"))
+    for (const ancho of barrasDeCertificado("VTD-123456")) {
       expect(ancho).toBeGreaterThanOrEqual(1);
+    }
   });
 });
 
@@ -380,7 +389,9 @@ describe("PremiumManager", () => {
   const filaDe = async (nombre: string) => {
     const filas = await screen.findAllByTestId("premium-row");
     const fila = filas.find((f) => within(f).queryByText(nombre));
-    if (!fila) throw new Error(`no hay fila para ${nombre}`);
+    if (!fila) {
+      throw new Error(`no hay fila para ${nombre}`);
+    }
     return fila;
   };
   const abrirMas = async (nombre: string) => {

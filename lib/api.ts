@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Cliente de la API. Única puerta de salida a la red: el resto de la app
  * consume funciones tipadas y nunca arma URLs a mano.
@@ -153,11 +154,14 @@ export function motivoDeError(status: number, payload: unknown): string {
     detail?: string;
     issues?: unknown;
   };
-  if (typeof datos.detail === "string" && datos.detail.trim())
+  if (typeof datos.detail === "string" && datos.detail.trim()) {
     return datos.detail;
+  }
   const codigo = typeof datos.error === "string" ? datos.error : "";
   const explicado = EXPLICACIONES[codigo];
-  if (explicado) return explicado;
+  if (explicado) {
+    return explicado;
+  }
   // Un 400 de validación traía `issues` (qué campo y por qué) y se perdía: la pantalla solo decía
   // «payload_invalido» y nadie sabía qué corregir. Se añade el primero al mensaje.
   const primero = Array.isArray(datos.issues)
@@ -521,13 +525,22 @@ export const api = {
     signal?: AbortSignal,
   ) {
     const query = new URLSearchParams();
-    if (params.q) query.set("q", params.q);
+    if (params.q) {
+      query.set("q", params.q);
+    }
     query.set("status", params.status ?? "all");
-    if (params.premium) query.set("premium", "1");
-    if (params.correo && params.correo !== "todos")
+    if (params.premium) {
+      query.set("premium", "1");
+    }
+    if (params.correo && params.correo !== "todos") {
       query.set("correo", params.correo);
-    if (params.page) query.set("page", String(params.page));
-    if (params.perPage) query.set("perPage", String(params.perPage));
+    }
+    if (params.page) {
+      query.set("page", String(params.page));
+    }
+    if (params.perPage) {
+      query.set("perPage", String(params.perPage));
+    }
     return request<AdminListResponse>(`/api/admin/vtubers?${query}`, {
       headers: bearer(token),
       signal,

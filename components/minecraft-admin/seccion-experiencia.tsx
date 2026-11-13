@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 
 /**
@@ -64,7 +65,9 @@ export function SeccionExperiencia() {
           `/api/minecraft-admin/experiencia?q=${encodeURIComponent(q)}`,
           { cache: "no-store" },
         );
-        if (!r.ok) return;
+        if (!r.ok) {
+          return;
+        }
         const cuerpo = (await r.json()) as { fichas?: Resumen[] };
         setResultados(cuerpo.fichas ?? []);
       } catch {
@@ -91,14 +94,18 @@ export function SeccionExperiencia() {
     };
     setFicha(cuerpo.ficha);
     setHistorial(cuerpo.historial);
-    if (cuerpo.maximo) setMaximo(cuerpo.maximo);
+    if (cuerpo.maximo) {
+      setMaximo(cuerpo.maximo);
+    }
     setResultados([]);
     setTexto("");
   };
 
   const enviar = async (evento: React.FormEvent) => {
     evento.preventDefault();
-    if (!ficha) return;
+    if (!ficha) {
+      return;
+    }
     setError(null);
     setAviso(null);
     const n = Number(cantidad);

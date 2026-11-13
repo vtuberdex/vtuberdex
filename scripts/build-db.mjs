@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Prepara los artefactos que viajan en el deploy de Vercel.
  *
@@ -153,7 +154,9 @@ function buildDatabase() {
   // `VACUUM INTO` produce un archivo único y autocontenido: sin él, el destino
   // heredaría el modo WAL y el deploy llevaría una base que necesita escribir
   // los .wal/.shm al abrir, imposible con el FS de solo lectura.
-  if (fs.existsSync(OUT_DB)) fs.rmSync(OUT_DB);
+  if (fs.existsSync(OUT_DB)) {
+    fs.rmSync(OUT_DB);
+  }
   src.exec(`VACUUM INTO '${OUT_DB.replace(/'/g, "''")}'`);
   const paths = assetPaths(src);
   const counts = {
@@ -230,7 +233,9 @@ function buildManifest(paths, blobBase) {
   for (const rel of paths) {
     // `images/<carpeta>/<archivo>.webp` -> carpeta y ruta en disco bajo data/.
     const folder = rel.split("/")[1];
-    if (!USED_FOLDERS.includes(folder)) continue;
+    if (!USED_FOLDERS.includes(folder)) {
+      continue;
+    }
     const abs = path.join(ROOT, "data", rel);
     if (!fs.existsSync(abs)) {
       missing.push(rel);

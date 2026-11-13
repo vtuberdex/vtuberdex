@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Humo espectral del centro de cada dado: un cuadro que siempre mira a la cámara con ruido fbm
  * animado, que se suma como luz y cuyo color recorre el espectro poco a poco.

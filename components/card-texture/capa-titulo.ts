@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * CAPA 3 — cabecera: número de dex, nombre, país.
  */
@@ -25,7 +26,9 @@ export function drawTitleLayer({
   width: number;
 }): HTMLCanvasElement {
   const { canvas, ctx, W } = createLayer(width);
-  if (!ctx) return canvas;
+  if (!ctx) {
+    return canvas;
+  }
   const { pad, top: headerTop, height: headerH } = HEADER;
   const headerW = W - pad * 2;
   const headerRadius = 22;

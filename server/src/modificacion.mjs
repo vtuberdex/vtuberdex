@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Aprobar una solicitud de MODIFICACIÓN: de los datos del formulario al parche de la ficha.
  *
@@ -48,8 +49,9 @@ export function fichaDeLaSolicitud(db, referencia) {
         "SELECT slug FROM vtuber WHERE dex_number = ? AND search_name = ?",
       )
       .all(Number(dex), nombre);
-    if (exactas.length === 1)
+    if (exactas.length === 1) {
       return getVtuberBySlug(db, exactas[0].slug, { includeHidden: true });
+    }
   }
 
   const candidatos = [delEnlace, slugify(sinDex), slugify(texto)].filter(
@@ -64,14 +66,17 @@ export function fichaDeLaSolicitud(db, referencia) {
     } catch {
       /* un %xx mal formado en el enlace no debe tumbar la resolución */
     }
-    if (ficha) return ficha;
+    if (ficha) {
+      return ficha;
+    }
   }
 
   const porNombre = nombre
     ? db.prepare("SELECT slug FROM vtuber WHERE search_name = ?").all(nombre)
     : [];
-  if (porNombre.length === 1)
+  if (porNombre.length === 1) {
     return getVtuberBySlug(db, porNombre[0].slug, { includeHidden: true });
+  }
 
   if (dex !== null && dex !== undefined) {
     const porDex = db
@@ -84,8 +89,9 @@ export function fichaDeLaSolicitud(db, referencia) {
         : nombre
           ? []
           : porDex;
-    if (pool.length === 1)
+    if (pool.length === 1) {
       return getVtuberBySlug(db, pool[0].slug, { includeHidden: true });
+    }
   }
 
   const detalle =
@@ -111,8 +117,12 @@ export function prepararModificacion(db, solicitud, { ficha = null } = {}) {
   const { columnas, modeler, perfil } = camposDeFicha(d);
   const patch = { ...columnas };
 
-  if (d.country) patch.countries = [d.country];
-  if (d.languages?.length) patch.languages = d.languages;
+  if (d.country) {
+    patch.countries = [d.country];
+  }
+  if (d.languages?.length) {
+    patch.languages = d.languages;
+  }
 
   if (
     modeler &&
@@ -128,8 +138,11 @@ export function prepararModificacion(db, solicitud, { ficha = null } = {}) {
     }));
     for (const nueva of perfil) {
       const indice = filas.findIndex((fila) => igual(fila.label, nueva.label));
-      if (indice >= 0) filas[indice] = nueva;
-      else filas.push(nueva);
+      if (indice >= 0) {
+        filas[indice] = nueva;
+      } else {
+        filas.push(nueva);
+      }
     }
     patch.profile = filas;
   }
@@ -147,15 +160,22 @@ export function prepararModificacion(db, solicitud, { ficha = null } = {}) {
       const indice = redes.findIndex((red) =>
         igual(red.platform, nueva.platform),
       );
-      if (indice >= 0) redes[indice] = { ...redes[indice], url: nueva.url };
-      else redes.push({ platform: nueva.platform, url: nueva.url });
+      if (indice >= 0) {
+        redes[indice] = { ...redes[indice], url: nueva.url };
+      } else {
+        redes.push({ platform: nueva.platform, url: nueva.url });
+      }
     }
     patch.socials = redes;
   }
 
   const imagenes = {};
   // Ids de las imágenes ya subidas; se copian a la ficha al aprobar (`imagenes-solicitud.mjs`).
-  if (d.imageId) imagenes.imageId = d.imageId;
-  if (d.logoId) imagenes.logoId = d.logoId;
+  if (d.imageId) {
+    imagenes.imageId = d.imageId;
+  }
+  if (d.logoId) {
+    imagenes.logoId = d.logoId;
+  }
   return { id: actual.id, slug: actual.slug, patch, imagenes };
 }

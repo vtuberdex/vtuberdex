@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Mantenedor: orquestador. Login y las pestañas (Fichas, Emblemas y facciones, Premium, Tarifas,
@@ -87,7 +88,9 @@ export function AdminPage() {
   // `localStorage`. Este efecto corre solo en el cliente.
   useEffect(() => {
     const stored = window.localStorage.getItem(TOKEN_KEY);
-    if (stored) setToken(stored);
+    if (stored) {
+      setToken(stored);
+    }
     // El enlace del correo se gasta con un BOTÓN, no al abrirlo: los antivirus y clientes de correo
     // abren los enlaces y lo quemarían. El fragmento se borra de la barra en cuanto se lee.
     const deEnlace = new URLSearchParams(
@@ -101,7 +104,9 @@ export function AdminPage() {
 
   // Sesión guardada -> validar contra la API.
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     api
       .session(token)
       .then((response) => setUser(response.user))
@@ -112,7 +117,9 @@ export function AdminPage() {
   }, [token]);
 
   const loadAdmin = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     try {
       const [statsResponse, auditResponse] = await Promise.all([
         api.adminStats(token),
@@ -131,7 +138,9 @@ export function AdminPage() {
 
   // Catálogo de facciones y opciones de país/idioma para los selectores del asistente.
   const loadFactions = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     try {
       setFactions((await api.factions(token)).items);
     } catch {
@@ -140,7 +149,9 @@ export function AdminPage() {
   }, [token]);
 
   useEffect(() => {
-    if (!user || !token) return;
+    if (!user || !token) {
+      return;
+    }
     void loadFactions();
     // Las facetas salen de la API pública (`facet=all`): una página de 1 ficha basta.
     api
@@ -179,7 +190,9 @@ export function AdminPage() {
   };
 
   const entrarConEnlace = async () => {
-    if (!tokenDeEnlace) return;
+    if (!tokenDeEnlace) {
+      return;
+    }
     setError(null);
     try {
       const response = await api.entrarConEnlace(tokenDeEnlace);
@@ -213,7 +226,9 @@ export function AdminPage() {
   };
 
   const openEditor = async (id: number) => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     setError(null);
     try {
       // Por id y por la ruta del mantenedor: `api.detail(slug)` da 404 en borradores y ocultos.

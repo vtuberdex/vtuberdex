@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Panel del mantenedor: indicadores (medidores semicirculares) y gráficos del catálogo.
@@ -130,8 +131,9 @@ function Barras({
   color?: string;
 }) {
   const max = Math.max(1, ...filas.map((fila) => fila.value));
-  if (filas.length === 0)
+  if (filas.length === 0) {
     return <p className="text-xs text-dex-muted">Sin datos.</p>;
+  }
   return (
     <ul className="space-y-1.5">
       {filas.map((fila) => (
@@ -303,9 +305,11 @@ function Indicador({
 /** Suma por bandera de calidad (una ficha puede tener varias). */
 export function resumenDeCalidad(quality: AdminStats["quality"]) {
   const suma: Record<string, number> = {};
-  for (const bucket of quality)
-    for (const flag of bucket.flags)
+  for (const bucket of quality) {
+    for (const flag of bucket.flags) {
       suma[flag] = (suma[flag] ?? 0) + bucket.count;
+    }
+  }
   return Object.entries(suma)
     .map(([flag, value]) => ({ label: FLAG_LABELS[flag] ?? flag, value }))
     .sort((a, b) => b.value - a.value);

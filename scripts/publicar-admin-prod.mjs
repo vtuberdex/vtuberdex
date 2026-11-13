@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Publica la contraseña del mantenedor en producción y COMPRUEBA que entra de verdad.
  *
@@ -227,7 +228,9 @@ if (SIN_VERIFICAR) {
             "  tiene el valor nuevo. Vuelve a correr sin `--sin-redeploy`.",
           );
         } else {
-          for (const p of d.hash?.problemas ?? []) console.log(`    · ${p}`);
+          for (const p of d.hash?.problemas ?? []) {
+            console.log(`    · ${p}`);
+          }
         }
       }
     } else {
@@ -243,4 +246,6 @@ if (SIN_VERIFICAR) {
 
 const fallos = pasos.filter((ok) => !ok).length;
 console.log(`\n${pasos.length - fallos}/${pasos.length} pasos correctos`);
-if (fallos) process.exitCode = 1;
+if (fallos) {
+  process.exitCode = 1;
+}

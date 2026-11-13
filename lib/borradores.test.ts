@@ -30,8 +30,9 @@ describe("sanearBorrador", () => {
     expect(limpio.name).toHaveLength(160);
     expect(limpio.cardText).toHaveLength(4000);
     expect(limpio.favoriteFood).toBe("pizza");
-    for (const sobra of ["email", "aceptaTerminos", "website"])
+    for (const sobra of ["email", "aceptaTerminos", "website"]) {
       expect(limpio).not.toHaveProperty(sobra);
+    }
   });
 
   test("lo que no es texto queda vacío, las listas se acotan y el paso solo puede ser 3, 4 o 5", () => {

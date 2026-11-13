@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Geometría y reglas PURAS del deterioro de una carta degradada (grados 7…1).
  *
@@ -26,7 +27,9 @@ export function crearAzar(semilla: number): () => number {
 /** Semilla estable de una carta y su grado (id + grado), para que el daño sea reproducible. */
 export function semillaDeCarta(id: number, grado: string): number {
   let h = 2166136261 ^ id;
-  for (const c of grado) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  for (const c of grado) {
+    h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  }
   return h >>> 0;
 }
 
@@ -96,9 +99,15 @@ export function mordidaEnLado(
   const puntos: Array<[number, number]> = [[inicio, 0], ...interior, [fin, 0]];
   return {
     puntos: puntos.map(([a, d]) => {
-      if (lado === "arriba") return [a, d] as [number, number];
-      if (lado === "abajo") return [a, H - d] as [number, number];
-      if (lado === "izquierda") return [d, a] as [number, number];
+      if (lado === "arriba") {
+        return [a, d] as [number, number];
+      }
+      if (lado === "abajo") {
+        return [a, H - d] as [number, number];
+      }
+      if (lado === "izquierda") {
+        return [d, a] as [number, number];
+      }
       return [W - d, a] as [number, number];
     }),
   };
@@ -178,7 +187,9 @@ export function planDeDeterioro(
     oscuridad: 0,
     canto: 0,
   };
-  if (s <= 0 || !grado) return vacio;
+  if (s <= 0 || !grado) {
+    return vacio;
+  }
 
   const semilla = semillaDeCarta(cartaId, grado);
   const azar = crearAzar(semilla);
@@ -190,9 +201,9 @@ export function planDeDeterioro(
     const lados: Lado[] = ["arriba", "abajo", "izquierda", "derecha"];
     for (let i = 0; i < cuantas; i += 1) {
       const profundidad = W * chips.depth * s * (0.25 + 0.75 * azar());
-      if (i < 4 && s > 0.3)
+      if (i < 4 && s > 0.3) {
         mordidas.push(mordidaEnEsquina(i, profundidad * 1.4, azar, W, H));
-      else {
+      } else {
         const lado = lados[Math.floor(azar() * lados.length)];
         const ancho =
           (lado === "arriba" || lado === "abajo" ? W : H) *
@@ -206,8 +217,9 @@ export function planDeDeterioro(
 
   const rayones: Rayon[] = [];
   const cuantosRayones = Math.round(interpolar(scratches.count, s));
-  for (let i = 0; i < cuantosRayones; i += 1)
+  for (let i = 0; i < cuantosRayones; i += 1) {
     rayones.push(rayonAleatorio(s, azar, W, H));
+  }
 
   const bloque =
     s < blur.minSeverity
@@ -245,7 +257,9 @@ export function planDeDesgasteLeve(
   H: number,
 ): PlanDeDeterioro | null {
   const factor = desgasteLeveDeGrado(grado);
-  if (factor <= 0) return null;
+  if (factor <= 0) {
+    return null;
+  }
   const s = DESGASTE_LEVE.severidad * factor;
   const semilla = semillaDeCarta(cartaId, grado || "suelta");
   const azar = crearAzar(semilla);
@@ -285,16 +299,22 @@ export function corromperTexto(
   severidad: number,
   semilla: number,
 ): string {
-  if (severidad <= 0) return texto;
+  if (severidad <= 0) {
+    return texto;
+  }
   const { from, gain, unreadableFrom, glyphs } = DETERIORO.text;
   const prob =
     severidad >= unreadableFrom
       ? 1
       : Math.min(1, Math.max(0, (severidad - from) * gain));
-  if (prob <= 0) return texto;
+  if (prob <= 0) {
+    return texto;
+  }
   const azar = crearAzar(semilla);
   return Array.from(texto, (c) => {
-    if (/[\s\d#]/.test(c)) return c;
+    if (/[\s\d#]/.test(c)) {
+      return c;
+    }
     return azar() < prob ? glyphs[Math.floor(azar() * glyphs.length)] : c;
   }).join("");
 }

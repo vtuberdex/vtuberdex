@@ -688,8 +688,9 @@ describe("misiones", () => {
     expect((await antes.json()).error).toBe("mision_incompleta");
     expect(APLICAR).not.toHaveBeenCalled();
 
-    for (const [contador, meta] of [["mobs", 1000], ["mineria", 1000], ["mineria", 500], ["entregas", 10]] as const)
+    for (const [contador, meta] of [["mobs", 1000], ["mineria", 1000], ["mineria", 500], ["entregas", 10]] as const) {
       expect((await reportar({ [contador]: meta })).status).toBe(200);
+    }
     const ok = await reclamar();
     expect(ok.status).toBe(200);
     const cuerpo = await ok.json();
@@ -704,8 +705,9 @@ describe("misiones", () => {
 
   test("si el diario falla, el reclamo se suelta y se puede reintentar", async () => {
     const enlace = await vinculada();
-    for (const [contador, meta] of [["mobs", 1000], ["mineria", 1000], ["mineria", 500], ["entregas", 10]] as const)
+    for (const [contador, meta] of [["mobs", 1000], ["mineria", 1000], ["mineria", 500], ["entregas", 10]] as const) {
       await reportar({ [contador]: meta });
+    }
     const reclamar = () =>
       miFicha.misionesDeMiFicha(
         pedir("/api/mi-ficha/misiones", { cuerpo: { token: enlace, slug: "luna", accion: "reclamar-grado", mision: "grado-6" }, token: null }),

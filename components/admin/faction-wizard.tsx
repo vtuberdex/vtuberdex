@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Asistente de 3 pasos para crear una facción: nombre -> emblema -> confirmar.
@@ -38,7 +39,9 @@ export function buscarFaccionDuplicada(
   factions: FactionRow[],
 ): FactionRow | undefined {
   const slug = slugifyUrl(label);
-  if (!slug) return undefined;
+  if (!slug) {
+    return undefined;
+  }
   return factions.find(
     (faction) => faction.slug === slug || slugifyUrl(faction.label) === slug,
   );
@@ -52,13 +55,18 @@ export function buscarFaccionDuplicada(
 export function nombreDeSubfaccion(madreLabel: string, propio: string): string {
   const madre = madreLabel.trim();
   const texto = propio.trim();
-  if (!madre) return texto;
-  if (!texto) return `${madre} ()`;
+  if (!madre) {
+    return texto;
+  }
+  if (!texto) {
+    return `${madre} ()`;
+  }
   if (
     texto.toLowerCase().startsWith(`${madre.toLowerCase()} (`) &&
     texto.endsWith(")")
-  )
+  ) {
     return texto;
+  }
   const resto = texto.toLowerCase().startsWith(madre.toLowerCase())
     ? texto
         .slice(madre.length)
@@ -248,10 +256,13 @@ export function FactionWizard({
       data-testid="faction-wizard"
       onSubmit={(event) => {
         event.preventDefault();
-        if (step === 0 && !nameProblem && !faltaMadre(conMadre, parentId))
+        if (step === 0 && !nameProblem && !faltaMadre(conMadre, parentId)) {
           setStep(1);
-        else if (step === 1 && (file || skipped)) setStep(2);
-        else if (step === 2 && !busy) void create();
+        } else if (step === 1 && (file || skipped)) {
+          setStep(2);
+        } else if (step === 2 && !busy) {
+          void create();
+        }
       }}
     >
       <header>
@@ -353,10 +364,11 @@ export function FactionWizard({
                   const etiqueta = factions.find(
                     (faction) => faction.id === siguiente,
                   )?.label;
-                  if (etiqueta)
+                  if (etiqueta) {
                     setName((actual) =>
                       nombreDeSubfaccion(etiqueta, actual),
                     );
+                  }
                 }}
                 className={inputClass}
               >

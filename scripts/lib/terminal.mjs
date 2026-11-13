@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Utilidades de terminal compartidas por los scripts: leer opciones `--nombre valor`, pedir la
  * contraseña sin mostrarla (`admin-hash`, `verificar-admin-prod`, `aplicar-ficha-prod`) y hablar
@@ -18,11 +19,15 @@ export function ejecutable(nombre) {
       ? (process.env.PATHEXT ?? ".EXE;.CMD;.BAT").split(";")
       : [""];
   for (const carpeta of (process.env.PATH ?? "").split(path.delimiter)) {
-    if (!path.isAbsolute(carpeta)) continue;
+    if (!path.isAbsolute(carpeta)) {
+      continue;
+    }
     for (const extension of extensiones) {
       const candidato = path.join(carpeta, nombre + extension.toLowerCase());
       try {
-        if (fs.statSync(candidato).isFile()) return candidato;
+        if (fs.statSync(candidato).isFile()) {
+          return candidato;
+        }
       } catch {
         // no está en esta carpeta
       }
@@ -46,7 +51,9 @@ export function leerOpciones(
       const enLinea = conIgual
         ? args.find((a) => a.startsWith(`${bandera}=`))
         : undefined;
-      if (enLinea) return enLinea.slice(bandera.length + 1) || porDefecto;
+      if (enLinea) {
+        return enLinea.slice(bandera.length + 1) || porDefecto;
+      }
       const i = args.indexOf(bandera);
       return i >= 0 && args[i + 1] ? args[i + 1] : porDefecto;
     },
@@ -65,8 +72,9 @@ export function preguntarOculto(prompt) {
     // Se oculta el eco: sin esto la contraseña se ve mientras se escribe.
     const escribirOriginal = rl._writeToOutput?.bind(rl);
     rl._writeToOutput = function _oculto(texto) {
-      if (escribirOriginal && texto !== "\r\n" && texto !== "\n")
+      if (escribirOriginal && texto !== "\r\n" && texto !== "\n") {
         return escribirOriginal("");
+      }
       return escribirOriginal ? escribirOriginal(texto) : undefined;
     };
     rl.question("", (respuesta) => {

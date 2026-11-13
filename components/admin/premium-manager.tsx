@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Mantenedor de las cartas PREMIUM: quién la tiene, en qué grado y cuándo subió por última vez.
@@ -86,7 +87,9 @@ async function cargarTodas(
       signal,
     );
     todas.push(...response.items);
-    if (page >= (response.pageCount ?? 1)) break;
+    if (page >= (response.pageCount ?? 1)) {
+      break;
+    }
   }
   return todas;
 }
@@ -96,18 +99,24 @@ function avisoDeGrado(
   premium: NonNullable<VtuberCard["premium"]>,
   siguiente: ReturnType<typeof gradoSiguiente>,
 ): { texto: string; clase: string } | null {
-  if (esGradoDegradado(premium.grade)) return null;
-  if (siguiente === null)
+  if (esGradoDegradado(premium.grade)) {
+    return null;
+  }
+  if (siguiente === null) {
     return { texto: "grado máximo", clase: "text-dex-muted" };
-  if (mismoMes(premium.gradedAt))
+  }
+  if (mismoMes(premium.gradedAt)) {
     return { texto: "✓ subió este mes", clase: "text-emerald-300" };
+  }
   return { texto: "por revisar", clase: "text-amber-200" };
 }
 
 /** Cuándo se cambió el grado por última vez y si toca revisarla este mes. */
 function UltimoCambio({ row }: { row: VtuberCard }) {
   const premium = row.premium;
-  if (!premium) return null;
+  if (!premium) {
+    return null;
+  }
   const siguiente = gradoSiguiente(premium.grade);
   const aviso = avisoDeGrado(premium, siguiente);
   return (
@@ -345,7 +354,9 @@ function Fila({
   setConfirmando: (valor: boolean) => void;
 }) {
   const premium = row.premium;
-  if (!premium) return null;
+  if (!premium) {
+    return null;
+  }
   const degradada = esGradoDegradado(premium.grade);
   const siguiente = gradoSiguiente(premium.grade);
   const racha = textoDeRacha(premium);

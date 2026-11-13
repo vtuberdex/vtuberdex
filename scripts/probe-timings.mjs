@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Sonda de tiempos: cuánto cuesta cada pieza del camino de lectura.
  *

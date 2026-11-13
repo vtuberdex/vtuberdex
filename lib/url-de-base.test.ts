@@ -15,8 +15,11 @@ afterEach(() => {
     ["VTUBERDEX_DB_URL", guardado.nueva],
     ["TURSO_DATABASE_URL", guardado.vieja],
   ] as const) {
-    if (v === undefined) delete process.env[k];
-    else process.env[k] = v;
+    if (v === undefined) {
+      delete process.env[k];
+    } else {
+      process.env[k] = v;
+    }
   }
 });
 

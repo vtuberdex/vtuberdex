@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Panel de facetas: países, idiomas, grupos, artistas y facciones.
@@ -38,7 +39,9 @@ function FacetGroup({
   const { t } = useI18n();
   const [open, setOpen] = useState(initialOpen);
   const [showAll, setShowAll] = useState(false);
-  if (buckets.length === 0) return null;
+  if (buckets.length === 0) {
+    return null;
+  }
   const visible = showAll ? buckets : buckets.slice(0, max);
 
   return (

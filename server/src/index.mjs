@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Servidor VTuberDex: API JSON + estáticos de imágenes y (opcional) build web.
  */

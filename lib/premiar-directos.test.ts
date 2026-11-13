@@ -14,13 +14,17 @@ const json = (c: unknown) => new Response(JSON.stringify(c));
 /** Twitch: solo `ana_vt` está en vivo. Kick: `bea_k` y `ana_k` lo están. */
 const red = vi.fn(async (url: string) => {
   const u = String(url);
-  if (u.includes("/token")) return json({ access_token: "T", expires_in: 3600 });
+  if (u.includes("/token")) {
+    return json({ access_token: "T", expires_in: 3600 });
+  }
   if (u.includes("helix/streams")) {
     // Como Helix: responde solo los que están en vivo, con su `user_login`.
     const pedidos = new URL(u).searchParams.getAll("user_login");
     return json({ data: pedidos.includes("ana_vt") ? [{ type: "live", user_login: "ana_vt", title: "x", viewer_count: 1 }] : [] });
   }
-  if (u.includes("api.kick.com")) return json({ data: [{ stream_title: "k", stream: { is_live: true, viewer_count: 2 } }] });
+  if (u.includes("api.kick.com")) {
+    return json({ data: [{ stream_title: "k", stream: { is_live: true, viewer_count: 2 } }] });
+  }
   throw new Error(`inesperada ${u}`);
 });
 

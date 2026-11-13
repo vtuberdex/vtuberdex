@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Texto de la página «Cómo funcionan los niveles» (`/niveles`): experiencia, niveles, EXP total y puntos
  * de habilidad. es / en / ja con las mismas claves. Las CIFRAS no se escriben aquí: llegan como `{xp}`,

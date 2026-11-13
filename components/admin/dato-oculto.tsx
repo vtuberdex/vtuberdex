@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Datos personales OCULTOS por defecto en el mantenedor (correos, nombre civil).

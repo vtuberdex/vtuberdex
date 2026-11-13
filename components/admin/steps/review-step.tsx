@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paso 6: revisar y publicar — checklist con saltos directos a lo que falta. */
 import Link from "next/link";

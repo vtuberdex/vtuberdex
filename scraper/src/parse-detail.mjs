@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Parser de las fichas de detalle (`/NombreSlug`).
  *
@@ -62,7 +63,9 @@ export function parseDetail(html) {
   $(".socials a[href]").each((_, el) => {
     const anchor = $(el);
     const url = anchor.attr("href")?.trim();
-    if (!url) return;
+    if (!url) {
+      return;
+    }
     const icon = anchor.find("img").attr("src")?.trim() ?? null;
     socials.push({
       platform: platformFromIcon(icon),
@@ -83,7 +86,9 @@ export function parseDetail(html) {
       .replace(/[:：]\s*$/, "")
       .trim();
     const value = textWithBreaks($, row.find(".contenido"));
-    if (label && value) profile.push({ label, value });
+    if (label && value) {
+      profile.push({ label, value });
+    }
   });
   const birthday =
     profile.find((row) => /cumplea/i.test(row.label))?.value ?? null;
@@ -98,15 +103,20 @@ export function parseDetail(html) {
   const factions = [];
   $(".tabla-facciones thead th").each((_, el) => {
     const name = $(el).text().replace(/\s+/g, " ").trim();
-    if (name) factions.push(name);
+    if (name) {
+      factions.push(name);
+    }
   });
   const looksLikeFilename = (value) =>
     value.includes("%") || /\.(png|jpe?g|webp|gif)$/i.test(value);
   $('img[src*="facciones"]').each((_, el) => {
     const alt = $(el).attr("alt")?.trim();
-    if (!alt || looksLikeFilename(alt)) return;
-    if (!factions.some((name) => name.toLowerCase() === alt.toLowerCase()))
+    if (!alt || looksLikeFilename(alt)) {
+      return;
+    }
+    if (!factions.some((name) => name.toLowerCase() === alt.toLowerCase())) {
       factions.push(alt);
+    }
   });
 
   // --- Stats ----------------------------------------------------------------
@@ -119,7 +129,9 @@ export function parseDetail(html) {
       .replace(/\s+/g, " ")
       .replace(/[:：]\s*$/, "")
       .trim();
-    if (!label) return;
+    if (!label) {
+      return;
+    }
     const cell = row.find(".valor-col");
     if (cell.find(".stat-bar-wrapper").length > 0 || cell.attr("data-max")) {
       stats[label] = {
@@ -131,7 +143,9 @@ export function parseDetail(html) {
       return;
     }
     const value = cell.text().replace(/\s+/g, " ").trim();
-    if (value) stats[label] = toNumber(value) ?? value;
+    if (value) {
+      stats[label] = toNumber(value) ?? value;
+    }
   });
 
   const expText = $("#expText").text().trim();
@@ -194,7 +208,9 @@ export function parseDetail(html) {
       .find("table tbody tr")
       .each((index, row) => {
         const cells = $(row).find("td");
-        if (cells.length < 3) return;
+        if (cells.length < 3) {
+          return;
+        }
         const factionIcons = cells
           .eq(0)
           .find("img")
@@ -214,7 +230,9 @@ export function parseDetail(html) {
         const effectNode = cells.eq(offset + 2);
         const effectHtml = (effectNode.html() ?? "").trim();
         const effect = textWithBreaks($, effectNode);
-        if (!name && !effect) return;
+        if (!name && !effect) {
+          return;
+        }
         skills.push({
           category,
           section: section || null,

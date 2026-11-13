@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * ¿El catálogo va en modo de UNA hoja (celular)?
@@ -18,7 +19,9 @@ import { BINDER } from "@/components/card3d-config";
 export function useSingleSheet(): boolean {
   const [single, setSingle] = useState(false);
   useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
+    if (typeof window === "undefined" || !window.matchMedia) {
+      return;
+    }
     const query = window.matchMedia(
       `(max-width: ${BINDER.singleMaxWidth - 1}px)`,
     );

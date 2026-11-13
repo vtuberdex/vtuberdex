@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paso 3: color de marca y facciones (hasta 2, con emblema). */
 import type { FactionRow } from "@/lib/types";

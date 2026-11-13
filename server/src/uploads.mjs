@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Subida y reemplazo de las imágenes de un VTuber desde el mantenedor.
  *
@@ -112,14 +113,24 @@ export function alphaBounds(data, width, height, channels) {
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       if (data[(y * width + x) * channels + 3] > 8) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
+        if (x < minX) {
+          minX = x;
+        }
+        if (x > maxX) {
+          maxX = x;
+        }
+        if (y < minY) {
+          minY = y;
+        }
+        if (y > maxY) {
+          maxY = y;
+        }
       }
     }
   }
-  if (maxX < minX || maxY < minY) return null;
+  if (maxX < minX || maxY < minY) {
+    return null;
+  }
   return {
     left: minX,
     top: minY,
@@ -143,10 +154,16 @@ export function alphaBounds(data, width, height, channels) {
  * Las comprobaciones de tamaño usan este número, no `buffer.length` repetido en cada sitio.
  */
 function tamanoDeSubida(buffer) {
-  if (!Buffer.isBuffer(buffer)) throw new Error("archivo_vacio");
+  if (!Buffer.isBuffer(buffer)) {
+    throw new Error("archivo_vacio");
+  }
   const tamano = buffer.byteLength;
-  if (tamano === 0) throw new Error("archivo_vacio");
-  if (tamano > MAX_UPLOAD_BYTES) throw new Error("archivo_demasiado_grande");
+  if (tamano === 0) {
+    throw new Error("archivo_vacio");
+  }
+  if (tamano > MAX_UPLOAD_BYTES) {
+    throw new Error("archivo_demasiado_grande");
+  }
   return tamano;
 }
 
@@ -158,7 +175,9 @@ export async function saveUploadedImage({
   sharp,
 }) {
   const spec = specDeKind(kind);
-  if (!spec) throw new Error("kind_invalido");
+  if (!spec) {
+    throw new Error("kind_invalido");
+  }
   assertSlug(slug);
   const tamanoOriginal = tamanoDeSubida(buffer);
 
@@ -172,7 +191,9 @@ export async function saveUploadedImage({
   if (!meta.format || !ACCEPTED_FORMATS.includes(meta.format)) {
     throw new Error(`formato_no_soportado:${meta.format ?? "desconocido"}`);
   }
-  if (!meta.width || !meta.height) throw new Error("imagen_sin_dimensiones");
+  if (!meta.width || !meta.height) {
+    throw new Error("imagen_sin_dimensiones");
+  }
 
   const dir = path.join(imageRoot, spec.folder);
   await fsP.mkdir(dir, { recursive: true });
@@ -265,7 +286,9 @@ export async function saveUploadedImage({
     )
       .webp({ quality: hasAlpha ? 92 : 86, alphaQuality: 100, effort: 6 })
       .toBuffer();
-    if (alt.length < converted.length) converted = alt;
+    if (alt.length < converted.length) {
+      converted = alt;
+    }
   }
 
   await fsP.writeFile(file, converted);
@@ -292,10 +315,14 @@ export async function saveUploadedImage({
 /** Borra la imagen de un asset (deja el VTuber sin esa imagen). */
 export async function removeUploadedImage({ kind, slug, imageRoot }) {
   const spec = specDeKind(kind);
-  if (!spec) throw new Error("kind_invalido");
+  if (!spec) {
+    throw new Error("kind_invalido");
+  }
   assertSlug(slug);
   const file = path.join(imageRoot, spec.folder, `${slug}.webp`);
-  if (fs.existsSync(file)) await fsP.unlink(file);
+  if (fs.existsSync(file)) {
+    await fsP.unlink(file);
+  }
   return { path: `images/${spec.folder}/${slug}.webp` };
 }
 

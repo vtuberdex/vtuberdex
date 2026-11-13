@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Donaciones: el enlace de pago de PayPal de la ficha.
  *
@@ -36,7 +37,9 @@ export function urlDeDonacion(
   card?: { dexNumber: number; name: string } | null,
   merchantId: string = PAYPAL_MERCHANT_ID,
 ): string {
-  if (!card || !merchantId) return PAYPAL_DONATE_URL;
+  if (!card || !merchantId) {
+    return PAYPAL_DONATE_URL;
+  }
   const codigo = codigoDeReferencia(card.dexNumber);
   const consulta = new URLSearchParams({
     business: merchantId,

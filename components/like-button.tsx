@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Botón de like de la ficha: uno por día y por VTuber, y cada like suma experiencia.
@@ -43,7 +44,9 @@ export function LikeButton({
       })
       // Sin estado fiable el botón queda deshabilitado con su motivo: mejor eso que dejar votar a ciegas.
       .catch(() => {
-        if (!controller.signal.aborted) setMensaje(t("like.noDisponible"));
+        if (!controller.signal.aborted) {
+          setMensaje(t("like.noDisponible"));
+        }
       });
     return () => controller.abort();
     // `onChange` cambia de identidad en cada render del padre: no debe reiniciar la consulta.
@@ -61,7 +64,9 @@ export function LikeButton({
       setMensaje(t("like.gracias", { xp: resumen.xpPorLike }));
       onChange?.(resumen);
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 409) setLiked(true);
+      if (cause instanceof ApiError && cause.status === 409) {
+        setLiked(true);
+      }
       setMensaje(cause instanceof Error ? cause.message : t("like.fallo"));
     } finally {
       setBusy(false);

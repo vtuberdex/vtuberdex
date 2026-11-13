@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Distintivo de una carta premium para el DOM: la misma nota que lleva la etiqueta de la placa
  * 3D, para las vistas que no son 3D (ficha, respaldo sin WebGL, mantenedor).

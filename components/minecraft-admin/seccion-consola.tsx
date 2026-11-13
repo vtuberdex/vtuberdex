@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 
 /**
@@ -21,7 +22,9 @@ export function SeccionConsola({ esAdmin }: { esAdmin: boolean }) {
   const enviar = async (evento: React.FormEvent) => {
     evento.preventDefault();
     const texto = comando.trim();
-    if (!texto || ocupado) return;
+    if (!texto || ocupado) {
+      return;
+    }
     setOcupado(true);
     try {
       const r = await fetch("/api/minecraft-admin/consola", {
@@ -52,7 +55,9 @@ export function SeccionConsola({ esAdmin }: { esAdmin: boolean }) {
   };
 
   const teclas = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
+      return;
+    }
     e.preventDefault();
     const h = historial.current;
     posicion.current =

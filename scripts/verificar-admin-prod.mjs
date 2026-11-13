@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Comprueba que el mantenedor de PRODUCCIÓN acepta de verdad la credencial nueva.
  *
@@ -123,8 +124,9 @@ if (!okLogin) {
       } else {
         for (const p of d.hash?.problemas ?? [
           "el hash guardado no se pudo leer",
-        ])
+        ]) {
           console.log(`    · ${p}`);
+        }
       }
     }
   } else {
@@ -182,4 +184,6 @@ const fallos = resultados.filter((r) => !r.ok).length;
 console.log(
   `\n${resultados.length - fallos}/${resultados.length} comprobaciones pasan`,
 );
-if (fallos) process.exitCode = 1;
+if (fallos) {
+  process.exitCode = 1;
+}

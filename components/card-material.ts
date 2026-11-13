@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Texturas, uniforms y materiales de UNA carta holográfica, como hook reutilizable.
@@ -103,7 +104,9 @@ export function useSharedCardEnv(): SharedCardEnv {
     let cancelled = false;
     loadImage(metalEnvUrl)
       .then((img) => {
-        if (cancelled || !img) return;
+        if (cancelled || !img) {
+          return;
+        }
         const tex = new THREE.CanvasTexture(img);
         tex.colorSpace = THREE.SRGBColorSpace;
         tex.anisotropy = 8;
@@ -117,7 +120,9 @@ export function useSharedCardEnv(): SharedCardEnv {
   }, []);
 
   const bodyEnvMap = useMemo(() => {
-    if (!envMap) return null;
+    if (!envMap) {
+      return null;
+    }
     const pmrem = new THREE.PMREMGenerator(gl);
     const prefiltrada = pmrem.fromEquirectangular(envMap).texture;
     pmrem.dispose();
@@ -273,20 +278,26 @@ export function useCardMaterials(
      * caché de la fábrica, llega completa de una vez y sin pasar por la cola.
      */
     const publicar = (t: TexturasDeCarta, envMap: HTMLImageElement | null) => {
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
       const siguiente = aTexturasThree(t, envMap, texturasActuales.current);
       texturasActuales.current = siguiente;
       setTextures(siguiente);
     };
     entorno.then((envMap) => {
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
       void generarTexturas(card, {
         width,
         prioridad: "alta",
         cancelada: () => cancelled,
         alRapida: (rapida) => publicar(rapida, envMap),
       }).then((completa) => {
-        if (!completa || cancelled) return;
+        if (!completa || cancelled) {
+          return;
+        }
         soltar = anclar(card, completa.width);
         publicar(completa, envMap);
       });
@@ -308,19 +319,21 @@ export function useCardMaterials(
           ? todasLasTexturas(texturasActuales.current)
           : [],
       );
-      if (textures)
+      if (textures) {
         todasLasTexturas(textures).forEach(
           (tex) => !vigentes.has(tex) && tex.dispose(),
         );
+      }
     },
     [textures],
   );
   useEffect(
     () => () => {
-      if (texturasActuales.current)
+      if (texturasActuales.current) {
         todasLasTexturas(texturasActuales.current).forEach((tex) =>
           tex.dispose(),
         );
+      }
     },
     [],
   );
@@ -331,9 +344,13 @@ export function useCardMaterials(
     // La MISMA lista que usa la textura del título para pintar los engarces.
     const icons = iconosDeFaccion(card);
     setFactionTextures([]);
-    if (icons.length === 0) return undefined;
+    if (icons.length === 0) {
+      return undefined;
+    }
     Promise.all(icons.map((src) => loadImage(src))).then((imgs) => {
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
       const texs = imgs
         .filter((img): img is HTMLImageElement => Boolean(img))
         .map((img) => {
@@ -467,7 +484,9 @@ export function useCardMaterials(
    * efecto de layout corre antes de que el navegador pinte, así que no hay hueco.
    */
   useLayoutEffect(() => {
-    if (!textures) return;
+    if (!textures) {
+      return;
+    }
     LAYER_UNIFORM_NAMES.forEach((name, i) => {
       (uniforms.front[name] as { value: THREE.Texture | null }).value =
         textures.layers[i] ?? null;
@@ -587,8 +606,12 @@ export function useCardMaterials(
         uniforms.front.uBgFoilViewAngle.value = live.bgFoilViewAngle;
         uniforms.front.uBgFoilDesaturation.value = live.bgFoilDesaturation;
         uniforms.front.uBgDominantMix.value = live.bgDominantMix;
-        if (tocada("holo")) uniforms.front.uHolo.value = live.holo * boost.holo;
-        if (tocada("gloss")) uniforms.front.uGloss.value = live.gloss;
+        if (tocada("holo")) {
+          uniforms.front.uHolo.value = live.holo * boost.holo;
+        }
+        if (tocada("gloss")) {
+          uniforms.front.uGloss.value = live.gloss;
+        }
         uniforms.front.uEdgeStrength.value = live.edge * boost.edge;
         uniforms.front.uFactionStrength.value = live.faction * boost.faction;
         uniforms.glow.uGlowStrength.value = live.glow * boost.glow;

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Escritura de ficheros del scraper CONFINADA a un directorio base.
  *

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `GET /api/vtubers/:slug` — detalle de una carta.
  *
@@ -58,14 +59,20 @@ const TTL_DIARIO_MS = 2000;
 
 export async function GET(request, { params }) {
   const sinSesion = exigirSesion(request);
-  if (sinSesion) return sinSesion;
+  if (sinSesion) {
+    return sinSesion;
+  }
   const { slug } = await params;
   const db = await dbConDiario({ ttlMs: TTL_DIARIO_MS });
   const card = getVtuberBySlug(db, slug);
-  if (!card) return Response.json({ error: "no_encontrado" }, { status: 404 });
+  if (!card) {
+    return Response.json({ error: "no_encontrado" }, { status: 404 });
+  }
   // Mismo presupuesto de fichas distintas que el listado (lib/anti-scraping.mjs).
   const cupo = gastarFichas(redDeLaPeticion(request.headers), [card.id]);
-  if (!cupo.permitido) return respuestaAgotada(cupo);
+  if (!cupo.permitido) {
+    return respuestaAgotada(cupo);
+  }
 
   /**
    * Las IMÁGENES del mantenedor también ganan al catálogo, no solo los campos de texto.
@@ -101,7 +108,7 @@ export async function GET(request, { params }) {
   // ficha sale sin rangos: es un adorno, no puede tumbarla.
   try {
     const rangos = await leerRangos(await ejecutorDeSolicitudes(), card.id);
-    if (rangos.size)
+    if (rangos.size) {
       conLikes = {
         ...conLikes,
         skills: conLikes.skills.map((s) => ({
@@ -109,6 +116,7 @@ export async function GET(request, { params }) {
           rank: rangos.get(claveDeHabilidad(s)) ?? 0,
         })),
       };
+    }
   } catch (error) {
     console.error(
       `[mi-ficha] la ficha ${slug} sale sin rangos: ${error.message}`,
@@ -143,11 +151,12 @@ export async function GET(request, { params }) {
       facciones: card.factions ?? [],
       stats: card.stats,
     });
-    if (derivados.length)
+    if (derivados.length) {
       conLikes = {
         ...conLikes,
         stats: aplicarAtributosAStats(conLikes.stats, derivados),
       };
+    }
   } catch (error) {
     console.error(
       `[mi-ficha] la ficha ${slug} sale sin atributos: ${error.message}`,

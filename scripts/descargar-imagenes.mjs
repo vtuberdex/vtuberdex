@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Baja a `data/mantenedor/` los reemplazos de imagen que solo existen en Turso.
  *
@@ -107,7 +108,9 @@ export function leerEnvFile(ruta) {
   const env = {};
   for (const linea of fs.readFileSync(ruta, "utf8").split("\n")) {
     const m = linea.match(/^([A-Z0-9_]+)="?(.*?)"?$/);
-    if (m) env[m[1]] = m[2];
+    if (m) {
+      env[m[1]] = m[2];
+    }
   }
   return env;
 }
@@ -138,8 +141,9 @@ export function motivoDestinoInseguro(destino) {
     },
   ];
   for (const { ruta, porque } of prohibidos) {
-    if (destino === ruta || destino.startsWith(`${ruta}${path.sep}`))
+    if (destino === ruta || destino.startsWith(`${ruta}${path.sep}`)) {
       return `${path.relative(ROOT, ruta)} (${porque})`;
+    }
   }
   return null;
 }
@@ -167,12 +171,13 @@ export function planDeDescarga(
     const abs = path.join(raiz, rel);
     const local = stat(abs);
     const size = Number(fila.size);
-    if (forzar)
+    if (forzar) {
       plan.push({ ...fila, abs, rel, size, motivo: "forzado", local });
-    else if (local === null)
+    } else if (local === null) {
       plan.push({ ...fila, abs, rel, size, motivo: "falta", local });
-    else if (local !== size)
+    } else if (local !== size) {
       plan.push({ ...fila, abs, rel, size, motivo: "distinto", local });
+    }
   }
   return plan;
 }
@@ -339,7 +344,9 @@ async function main() {
       `   · ${p.kind}/${p.slug} ${p.motivo} (${p.local ?? "—"} -> ${p.size})`,
     );
   }
-  if (plan.length > 30) console.log(`   · ... y ${plan.length - 30} más`);
+  if (plan.length > 30) {
+    console.log(`   · ... y ${plan.length - 30} más`);
+  }
 
   if (DRY_RUN) {
     console.log("[bajar] dry-run: no se escribe nada");
@@ -404,13 +411,15 @@ async function main() {
     const ext = EXTENSION_DE_CARPETA[fila.kind] ?? "webp";
     const abs = path.join(DESTINO, fila.kind, `${fila.slug}.${ext}`);
     const local = tamanoDe(abs);
-    if (local === fila.size) verificadas++;
-    else
+    if (local === fila.size) {
+      verificadas++;
+    } else {
       discrepantes.push({
         rel: `${fila.kind}/${fila.slug}`,
         local,
         turso: fila.size,
       });
+    }
   }
 
   await db.close();
@@ -422,9 +431,12 @@ async function main() {
   console.log(
     `[bajar] verificación en disco: ${verificadas}/${indice.length} con el tamaño de Turso`,
   );
-  for (const d of discrepantes.slice(0, 10))
+  for (const d of discrepantes.slice(0, 10)) {
     console.log(`   ✖ ${d.rel}: disco ${d.local} vs Turso ${d.turso}`);
-  for (const f of fallos.slice(0, 10)) console.log(`   ✖ ${f.rel}: ${f.error}`);
+  }
+  for (const f of fallos.slice(0, 10)) {
+    console.log(`   ✖ ${f.rel}: ${f.error}`);
+  }
   if (fallos.length > 0 || discrepantes.length > 0) {
     console.log("[bajar] vuelve a ejecutarlo: reintenta solo lo que falta");
     process.exitCode = 1;

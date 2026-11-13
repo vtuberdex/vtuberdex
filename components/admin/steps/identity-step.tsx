@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paso 1: identidad — nombre, dirección de la página, país y número en la dex. */
 import { CampoCorreoOculto } from "@/components/admin/dato-oculto";

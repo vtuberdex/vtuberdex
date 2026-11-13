@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Importa el dataset del scraper a SQLite.
  *
@@ -86,7 +87,9 @@ const POWERS = {
 
 /** Puntaje de "poder" usado para ordenar; 0 si la ficha no trae stats. */
 function powerScore(stats) {
-  if (!stats || stats.length === 0) return 0;
+  if (!stats || stats.length === 0) {
+    return 0;
+  }
   const bySlug = new Map(
     stats.map((stat) => [stat.slug, Number(stat.value) || 0]),
   );
@@ -95,24 +98,36 @@ function powerScore(stats) {
     total += valorEquilibrado(slug, bySlug.get(slug) ?? 0) * weight;
   }
   for (const stat of stats) {
-    if (!(stat.slug in POWERS) && !FUERA_DEL_PODER.has(stat.slug))
+    if (!(stat.slug in POWERS) && !FUERA_DEL_PODER.has(stat.slug)) {
       total += valorEquilibrado(stat.slug, stat.value) * 0.3;
+    }
   }
   return Math.round(total);
 }
 
 function detectQualityFlags(card, detail) {
   const flags = [];
-  if (!card.assets.card) flags.push("sin-imagen-carta");
-  if (!detail || detail.profile?.length === 0) flags.push("sin-ficha");
-  if (!detail || Object.keys(detail.stats ?? {}).length === 0)
+  if (!card.assets.card) {
+    flags.push("sin-imagen-carta");
+  }
+  if (!detail || detail.profile?.length === 0) {
+    flags.push("sin-ficha");
+  }
+  if (!detail || Object.keys(detail.stats ?? {}).length === 0) {
     flags.push("sin-stats");
-  if (!detail || (detail.skills?.length ?? 0) === 0) flags.push("sin-skills");
-  if (!card.themeColor) flags.push("sin-color");
+  }
+  if (!detail || (detail.skills?.length ?? 0) === 0) {
+    flags.push("sin-skills");
+  }
+  if (!card.themeColor) {
+    flags.push("sin-color");
+  }
   // El logo se cuenta por el ASSET generado, no por `detail.logo`: el sitio solo
   // sirve el logo en 211 fichas, pero el resto se recorta de la carta, así que
   // había 785 logos en disco y el panel informaba "sin logo: 631".
-  if (!card.assets.logo) flags.push("sin-logo");
+  if (!card.assets.logo) {
+    flags.push("sin-logo");
+  }
   return flags;
 }
 
@@ -122,7 +137,9 @@ function buildStats(payload) {
   for (const [label, rawValue] of Object.entries(raw)) {
     const slug = STAT_SLUGS[normalizeText(label)] ?? slugify(label);
     if (typeof rawValue === "object" && rawValue !== null) {
-      if (rawValue.current === null && rawValue.max === null) continue;
+      if (rawValue.current === null && rawValue.max === null) {
+        continue;
+      }
       stats.push({
         label,
         slug,
@@ -132,7 +149,9 @@ function buildStats(payload) {
       });
       continue;
     }
-    if (rawValue === null || rawValue === "") continue;
+    if (rawValue === null || rawValue === "") {
+      continue;
+    }
     if (typeof rawValue === "number") {
       stats.push({ label, slug, value: rawValue, valueText: null, max: null });
     } else {
@@ -225,7 +244,9 @@ function replaceChildren(db, vtuberId, payload) {
   const kinds = ["card", "thumb", "logo", "character", "radar", "background"];
   for (const kind of kinds) {
     const assetPath = assets[kind];
-    if (!assetPath) continue;
+    if (!assetPath) {
+      continue;
+    }
     // Las rutas del dataset vienen como `images/<carpeta>/<slug>.webp`; se guardan
     // con barra inicial para que el cliente las use como URL absoluta tal cual.
     const publicPath = assetPath.startsWith("/") ? assetPath : `/${assetPath}`;
@@ -293,16 +314,22 @@ function upsertTag(db, kind, label) {
  */
 function factionIcon(slug) {
   const dir = path.join(ROOT, "data", "images", "faction");
-  if (!fs.existsSync(dir)) return null;
+  if (!fs.existsSync(dir)) {
+    return null;
+  }
   const direct = path.join(dir, `${slug}.png`);
-  if (fs.existsSync(direct)) return `images/faction/${slug}.png`;
+  if (fs.existsSync(direct)) {
+    return `images/faction/${slug}.png`;
+  }
 
   const files = fs.readdirSync(dir);
   // Variantes con sufijo numérico: primal-monarch4, netherbane2, ...
   const withSuffix = files.find((f) =>
     new RegExp(`^${slug}\\d*\\.png$`).test(f),
   );
-  if (withSuffix) return `images/faction/${withSuffix}`;
+  if (withSuffix) {
+    return `images/faction/${withSuffix}`;
+  }
 
   // El sitio tiene erratas en los nombres de archivo (`apex-dualist` para la
   // facción "Apex Duelist"), así que se prueba por prefijo común más largo.
@@ -328,12 +355,15 @@ function factionIcon(slug) {
  */
 export function readWebpSize(buf) {
   const none = { width: null, height: null };
-  if (!buf || buf.length < 30) return none;
+  if (!buf || buf.length < 30) {
+    return none;
+  }
   if (
     buf.toString("ascii", 0, 4) !== "RIFF" ||
     buf.toString("ascii", 8, 12) !== "WEBP"
-  )
+  ) {
     return none;
+  }
   const type = buf.toString("ascii", 12, 16);
   try {
     if (type === "VP8 ") {
@@ -406,8 +436,9 @@ export function seedDatabase({ db, dataset, reset = false }) {
   const langStmt = db.prepare(
     "INSERT INTO language (code, name) VALUES (?, ?) ON CONFLICT (code) DO UPDATE SET name = excluded.name",
   );
-  for (const [code, name] of Object.entries(LANGUAGE_NAMES))
+  for (const [code, name] of Object.entries(LANGUAGE_NAMES)) {
     langStmt.run(code, name);
+  }
 
   const findStmt = db.prepare("SELECT id FROM vtuber WHERE dex_number = ?");
   const insertStmt = db.prepare(
@@ -558,7 +589,9 @@ export function seedDatabase({ db, dataset, reset = false }) {
         "INSERT OR IGNORE INTO vtuber_language (vtuber_id, code) VALUES (?, ?)",
       );
       for (const code of payload.languages ?? ["es"]) {
-        if (!LANGUAGE_NAMES[code]) langStmt.run(code, code);
+        if (!LANGUAGE_NAMES[code]) {
+          langStmt.run(code, code);
+        }
         languageStmt.run(vtuberId, code);
       }
 
@@ -662,5 +695,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const meta = { generatedAt: getMeta(db, "dataset_generated_at") };
   console.log(`[seed] dataset del ${meta.generatedAt}`);
   db.close();
-  if (!check.ok) process.exit(2);
+  if (!check.ok) {
+    process.exit(2);
+  }
 }

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Directo y contenido del VTuber: «en directo ahora» (título y espectadores) en Twitch, YouTube y Kick, y
@@ -29,7 +30,9 @@ export function DirectoEnVivo({
   useEffect(() => {
     const control = new AbortController();
     const cargar = () => {
-      if (document.visibilityState === "hidden") return;
+      if (document.visibilityState === "hidden") {
+        return;
+      }
       api
         .directo(slug, control.signal)
         .then((r) => setCanales(r.canales))
@@ -44,7 +47,9 @@ export function DirectoEnVivo({
     };
   }, [slug]);
 
-  if (canales.length === 0) return null;
+  if (canales.length === 0) {
+    return null;
+  }
   const n = (valor: number) => valor.toLocaleString(locale);
   const youtube = canales.find((c) => c.plataforma === "youtube");
   const stats = youtube?.estadisticas;

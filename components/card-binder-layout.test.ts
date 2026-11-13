@@ -168,20 +168,28 @@ describe("giro de la hoja", () => {
 
   it("el giro se detiene en pie mientras no hay datos y sigue cuando llegan", () => {
     let p = 0;
-    for (let i = 0; i < 200; i += 1) p = advanceFlip(p, 0.016, false);
+    for (let i = 0; i < 200; i += 1) {
+      p = advanceFlip(p, 0.016, false);
+    }
     expect(p).toBe(BINDER.holdProgress);
     p = advanceFlip(p, 0.016, true);
     expect(p).toBeGreaterThan(BINDER.holdProgress);
-    for (let i = 0; i < 200; i += 1) p = advanceFlip(p, 0.016, true);
+    for (let i = 0; i < 200; i += 1) {
+      p = advanceFlip(p, 0.016, true);
+    }
     expect(p).toBe(1);
   });
 
   it("dura lo que dice la config", () => {
     const frames = Math.ceil(BINDER.flipMs / 16);
     let p = 0;
-    for (let i = 0; i < frames - 2; i += 1) p = advanceFlip(p, 0.016, true);
+    for (let i = 0; i < frames - 2; i += 1) {
+      p = advanceFlip(p, 0.016, true);
+    }
     expect(p).toBeLessThan(1);
-    for (let i = 0; i < 3; i += 1) p = advanceFlip(p, 0.016, true);
+    for (let i = 0; i < 3; i += 1) {
+      p = advanceFlip(p, 0.016, true);
+    }
     expect(p).toBe(1);
   });
 });

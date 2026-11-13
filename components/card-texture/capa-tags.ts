@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * CAPA 5 — tags, facciones, grupos y la barra de stats.
  */
@@ -19,7 +20,9 @@ export function drawTagsLayer({
   info: CardLayers["info"];
 }): HTMLCanvasElement {
   const { canvas, ctx, W } = createLayer(width);
-  if (!ctx) return canvas;
+  if (!ctx) {
+    return canvas;
+  }
   const { accent, secondary } = cardPalette(
     card.themeColor,
     card.secondaryColor,
@@ -68,8 +71,11 @@ export function drawTagsLayer({
             0,
           )
         : 0;
-      if (row && used + tw <= W - pad * 2) row.push(label);
-      else chipRows.push([label]);
+      if (row && used + tw <= W - pad * 2) {
+        row.push(label);
+      } else {
+        chipRows.push([label]);
+      }
     }
     ctx.restore();
 

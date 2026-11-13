@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Compila en reposo los programas de shader que, sin esto, nacen en mitad del primer giro.
@@ -75,9 +76,13 @@ export function ShaderWarmup() {
   useEffect(() => {
     let vivo = true;
     const cancelar = enReposo(() => {
-      if (!vivo) return;
+      if (!vivo) {
+        return;
+      }
       const dibujar = () => {
-        if (!vivo || fase.current !== "espera") return;
+        if (!vivo || fase.current !== "espera") {
+          return;
+        }
         fase.current = "dibujando";
         invalidate();
       };
@@ -91,7 +96,9 @@ export function ShaderWarmup() {
 
   useFrame(() => {
     const g = grupo.current;
-    if (!g || fase.current === "espera") return;
+    if (!g || fase.current === "espera") {
+      return;
+    }
     if (fase.current === "dibujando") {
       if (framesDibujando.current === 0) {
         // Detrás del libro, centrado donde mira la cámara: la profundidad lo esconde.

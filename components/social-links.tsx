@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Redes sociales del VTuber, con icono por plataforma. */
 import { SocialIcon } from "@/components/social-icon";

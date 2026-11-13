@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 import { formulariosEs } from "./textos/formularios";
 import { miFichaEs } from "./textos/mificha";
 import { nivelesEs } from "./textos/niveles";

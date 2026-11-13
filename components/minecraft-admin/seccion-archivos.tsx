@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 
 /**
@@ -41,9 +42,13 @@ const leerError = async (r: Response, porDefecto: string) => {
     error?: string;
     detail?: string;
   } | null;
-  if (!c?.error) return porDefecto;
+  if (!c?.error) {
+    return porDefecto;
+  }
   const amable = MENSAJES[c.error];
-  if (amable) return amable;
+  if (amable) {
+    return amable;
+  }
   return c.detail ? `${c.error}: ${c.detail}` : c.error;
 };
 
@@ -117,7 +122,9 @@ export function SeccionArchivos() {
 
   const guardar = async (evento: React.FormEvent) => {
     evento.preventDefault();
-    if (!ruta) return;
+    if (!ruta) {
+      return;
+    }
     setError(null);
     setAviso(null);
     setOcupado(true);
@@ -127,7 +134,9 @@ export function SeccionArchivos() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ruta, contenido: texto }),
       });
-      if (!r.ok) throw new Error(await leerError(r, "no se pudo guardar"));
+      if (!r.ok) {
+        throw new Error(await leerError(r, "no se pudo guardar"));
+      }
       setOriginal(texto);
       setAviso(
         `Guardado ${ruta} (copia anterior en .bak). Recarga el plugin o reinicia para aplicar.`,

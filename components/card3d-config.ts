@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Valores de la carta holográfica 3D. **Este archivo es el mando del efecto.**
  *

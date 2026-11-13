@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** Rangos por nivel en la interfaz: la tabla vive en el servidor (JS puro) y se reexporta, como `lib/premium.ts`. */
 import { RANGOS, rangoDeNivel } from "@/server/src/rangos.mjs";
 

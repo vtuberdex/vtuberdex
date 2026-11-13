@@ -51,13 +51,16 @@ describe("trocear", () => {
   it("respeta el máximo, no pierde texto y conserva los saltos de línea", () => {
     const texto = `${"Una frase de prueba. ".repeat(40).trim()}\n\nSegundo párrafo.`;
     const tramos = trocear(texto, 120);
-    for (const tramo of tramos) expect(tramo.length).toBeLessThanOrEqual(120);
+    for (const tramo of tramos) {
+      expect(tramo.length).toBeLessThanOrEqual(120);
+    }
     expect(tramos.join("").replace(/\s+/g, "")).toBe(texto.replace(/\s+/g, ""));
     expect(tramos.filter((t) => t === "\n")).toHaveLength(2);
   });
   it("una palabra interminable se corta en vez de pasarse", () => {
-    for (const tramo of trocear("a".repeat(50) + " " + "b".repeat(50), 60))
+    for (const tramo of trocear("a".repeat(50) + " " + "b".repeat(50), 60)) {
       expect(tramo.length).toBeLessThanOrEqual(60);
+    }
   });
 });
 

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Nombres de países, idiomas y etiquetas de ficha en el idioma activo.
  *
@@ -39,9 +40,13 @@ export function isoDeBandera(
   bandera: string | null | undefined,
 ): string | null {
   const simbolos = [...(bandera ?? "").trim()];
-  if (simbolos.length !== 2) return null;
+  if (simbolos.length !== 2) {
+    return null;
+  }
   const letras = simbolos.map((s) => (s.codePointAt(0) ?? 0) - 0x1f1e6);
-  if (letras.some((l) => l < 0 || l > 25)) return null;
+  if (letras.some((l) => l < 0 || l > 25)) {
+    return null;
+  }
   return letras.map((l) => String.fromCharCode(65 + l)).join("");
 }
 
@@ -49,9 +54,13 @@ export function nombreDePais(
   locale: Locale,
   pais: { name: string; flag?: string | null },
 ): string {
-  if (locale === "es") return pais.name;
+  if (locale === "es") {
+    return pais.name;
+  }
   const iso = isoDeBandera(pais.flag);
-  if (!iso) return pais.name;
+  if (!iso) {
+    return pais.name;
+  }
   try {
     return nombresDe(locale, "region")?.of(iso) ?? pais.name;
   } catch {
@@ -64,7 +73,9 @@ export function nombreDeIdioma(
   codigo: string,
   respaldo: string,
 ): string {
-  if (locale === "es") return respaldo;
+  if (locale === "es") {
+    return respaldo;
+  }
   try {
     return nombresDe(locale, "language")?.of(codigo) ?? respaldo;
   } catch {
@@ -104,7 +115,9 @@ const CLAVE_DE_ETIQUETA: Record<string, Clave> = {
 
 /** Etiqueta de la ficha personal; si no es una conocida, tal cual viene. En español no se toca. */
 export function etiquetaDePerfil(locale: Locale, etiqueta: string): string {
-  if (locale === "es") return etiqueta;
+  if (locale === "es") {
+    return etiqueta;
+  }
   const clave = CLAVE_DE_ETIQUETA[sinTildes(etiqueta)];
   return clave ? traducir(locale, clave) : etiqueta;
 }
@@ -130,7 +143,9 @@ export function etiquetaDeStat(
   slug: string,
   etiqueta: string,
 ): string {
-  if (locale === "es" || !STATS_CONOCIDOS.has(slug)) return etiqueta;
+  if (locale === "es" || !STATS_CONOCIDOS.has(slug)) {
+    return etiqueta;
+  }
   return traducir(locale, `stat.${slug}` as Clave);
 }
 
@@ -144,7 +159,9 @@ const TIPOS_DE_HABILIDAD = new Set([
 ]);
 
 export function tipoDeHabilidad(locale: Locale, tipo: string): string {
-  if (locale === "es") return tipo;
+  if (locale === "es") {
+    return tipo;
+  }
   const clave = sinTildes(tipo);
   return TIPOS_DE_HABILIDAD.has(clave)
     ? traducir(locale, `habilidad.tipo.${clave}` as Clave)

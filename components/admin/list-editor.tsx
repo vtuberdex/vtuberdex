@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Editor genérico de listas ordenadas (perfil, atributos, habilidades, redes).
@@ -40,7 +41,9 @@ export function ListEditor<T>({
   max,
 }: ListEditorProps<T>) {
   const move = (from: number, to: number) => {
-    if (to < 0 || to >= items.length) return;
+    if (to < 0 || to >= items.length) {
+      return;
+    }
     const next = items.slice();
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);

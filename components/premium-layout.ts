@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Geometría de la placa premium: dónde va cada pieza dentro de la placa y a qué escala entra la
  * carta. Matemática pura (sin React ni WebGL) para que `premium-layout.test.ts` la fije sin

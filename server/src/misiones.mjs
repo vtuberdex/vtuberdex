@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * MISIONES de Minecraft: secundarias que dan experiencia y misiones DIFÍCILES que desbloquean un grado de carta.
  * JS puro sobre un EJECUTOR `{ execute, exec }` (como `minecraft.mjs`); el plugin solo REPORTA contadores y la web decide
@@ -135,17 +136,24 @@ const periodoDe = (mision, dia) => (mision.repetible === 'diaria' ? dia : mision
 
 /** Avances válidos: solo contadores conocidos, enteros 1…`AVANCE_POR_LOTE_MAX`. Lanza si no cuadra. */
 function avancesValidos(avances) {
-  if (!avances || typeof avances !== 'object' || Array.isArray(avances))
+  if (!avances || typeof avances !== 'object' || Array.isArray(avances)) {
     throw new MisionError(400, 'payload_invalido', 'Faltan los avances.');
+  }
   const limpio = {};
   for (const [contador, cantidad] of Object.entries(avances)) {
-    if (!(contador in CONTADORES))
+    if (!(contador in CONTADORES)) {
       throw new MisionError(400, 'contador_invalido', `Contador desconocido: ${contador}.`);
-    if (!Number.isInteger(cantidad) || cantidad < 0 || cantidad > AVANCE_POR_LOTE_MAX)
+    }
+    if (!Number.isInteger(cantidad) || cantidad < 0 || cantidad > AVANCE_POR_LOTE_MAX) {
       throw new MisionError(400, 'payload_invalido', `Un avance es un entero entre 0 y ${AVANCE_POR_LOTE_MAX}.`);
-    if (cantidad > 0) limpio[contador] = cantidad;
+    }
+    if (cantidad > 0) {
+      limpio[contador] = cantidad;
+    }
   }
-  if (!Object.keys(limpio).length) throw new MisionError(400, 'payload_invalido', 'El lote no trae avances.');
+  if (!Object.keys(limpio).length) {
+    throw new MisionError(400, 'payload_invalido', 'El lote no trae avances.');
+  }
   return limpio;
 }
 
@@ -155,8 +163,12 @@ function avancesValidos(avances) {
  * @returns {Promise<{ duplicado: boolean, completadas: Array<{ id: string, nombre: string, tipo: string, xp: number, grado?: string }> }>}
  */
 export async function registrarAvances(ejecutor, { vtuberId, idLote, avances, dia, ahora = Date.now() }) {
-  if (!uuidValido(idLote)) throw new MisionError(400, 'payload_invalido', 'El lote necesita un id (UUID).');
-  if (!DIA.test(String(dia))) throw new Error(`día inválido: ${dia}`);
+  if (!uuidValido(idLote)) {
+    throw new MisionError(400, 'payload_invalido', 'El lote necesita un id (UUID).');
+  }
+  if (!DIA.test(String(dia))) {
+    throw new Error(`día inválido: ${dia}`);
+  }
   const limpio = avancesValidos(avances);
   const id = Number(vtuberId);
   const e = await conTablas(ejecutor);
@@ -167,18 +179,24 @@ export async function registrarAvances(ejecutor, { vtuberId, idLote, avances, di
     'INSERT INTO mision_lote (id_lote, creado) VALUES (?, ?) ON CONFLICT (id_lote) DO NOTHING',
     [idLote.toLowerCase(), ahora],
   );
-  if (!Number(nuevo.rowsAffected ?? 0)) return { duplicado: true, completadas: [] };
+  if (!Number(nuevo.rowsAffected ?? 0)) {
+    return { duplicado: true, completadas: [] };
+  }
 
   const completadas = [];
   for (const mision of MISIONES) {
     const tocados = Object.keys(mision.requisitos).filter((c) => c in limpio);
-    if (!tocados.length) continue;
+    if (!tocados.length) {
+      continue;
+    }
     const periodo = periodoDe(mision, dia);
     const hecha = await e.execute(
       'SELECT 1 FROM mision_estado WHERE vtuber_id = ? AND mision_id = ? AND periodo = ?',
       [id, mision.id, periodo],
     );
-    if (hecha.rows.length) continue;
+    if (hecha.rows.length) {
+      continue;
+    }
     for (const contador of tocados) {
       // MIN en la misma sentencia: el progreso nunca pasa de la meta, aunque lleguen dos lotes a la vez.
       const meta = mision.requisitos[contador];
@@ -194,17 +212,22 @@ export async function registrarAvances(ejecutor, { vtuberId, idLote, avances, di
     );
     const actual = new Map(rows.map((r) => [r.contador, Number(r.progreso)]));
     const cumple = Object.entries(mision.requisitos).every(([c, meta]) => (actual.get(c) ?? 0) >= meta);
-    if (!cumple) continue;
+    if (!cumple) {
+      continue;
+    }
     const gano = await e.execute(
       'INSERT INTO mision_estado (vtuber_id, mision_id, periodo, completada) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
       [id, mision.id, periodo, new Date(ahora).toISOString()],
     );
-    if (!Number(gano.rowsAffected ?? 0)) continue;
-    if (mision.xp > 0)
+    if (!Number(gano.rowsAffected ?? 0)) {
+      continue;
+    }
+    if (mision.xp > 0) {
       await e.execute(
         'INSERT INTO xp_mision (id_mision, vtuber_id, cantidad, dia, creado) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
         [`${id}:${mision.id}:${periodo}`, id, mision.xp, dia, new Date(ahora).toISOString()],
       );
+    }
     completadas.push({ id: mision.id, nombre: mision.nombre, tipo: mision.tipo, xp: mision.xp, ...(mision.grado ? { grado: mision.grado } : {}) });
   }
   return { duplicado: false, completadas };
@@ -217,11 +240,19 @@ export async function registrarAvances(ejecutor, { vtuberId, idLote, avances, di
 export function elegibilidadDeGrado(gradoActual, gradoMision) {
   const tope = GRADOS.indexOf(GRADO_MAXIMO_POR_MISIONES);
   const objetivo = GRADOS.indexOf(String(gradoMision));
-  if (objetivo < 0 || objetivo > tope) return { ok: false, motivo: 'grado_no_ganable' };
+  if (objetivo < 0 || objetivo > tope) {
+    return { ok: false, motivo: 'grado_no_ganable' };
+  }
   const actual = gradoActual == null || gradoActual === '' ? null : String(gradoActual);
-  if (actual === null) return { ok: true };
-  if (esGradoDegradado(actual)) return { ok: false, motivo: 'ficha_deteriorada' };
-  if (GRADOS.indexOf(actual) >= objetivo) return { ok: false, motivo: 'ya_tiene_igual_o_mayor' };
+  if (actual === null) {
+    return { ok: true };
+  }
+  if (esGradoDegradado(actual)) {
+    return { ok: false, motivo: 'ficha_deteriorada' };
+  }
+  if (GRADOS.indexOf(actual) >= objetivo) {
+    return { ok: false, motivo: 'ya_tiene_igual_o_mayor' };
+  }
   return { ok: true };
 }
 
@@ -230,7 +261,9 @@ export function elegibilidadDeGrado(gradoActual, gradoMision) {
  * @param {{ vtuberId: number, dia: string, gradoActual?: string | null }} entrada
  */
 export async function misionesDeFicha(ejecutor, { vtuberId, dia, gradoActual = null }) {
-  if (!DIA.test(String(dia))) throw new Error(`día inválido: ${dia}`);
+  if (!DIA.test(String(dia))) {
+    throw new Error(`día inválido: ${dia}`);
+  }
   const id = Number(vtuberId);
   const e = await conTablas(ejecutor);
   const [progresos, estados] = await Promise.all([
@@ -279,9 +312,13 @@ export async function misionesDeFicha(ejecutor, { vtuberId, dia, gradoActual = n
  */
 export async function reclamarGrado(ejecutor, { vtuberId, misionId, gradoActual = null, ahora = Date.now() }) {
   const mision = misionPorId(misionId);
-  if (!mision || mision.tipo !== 'grado') throw new MisionError(404, 'mision_no_encontrada', 'Esa misión no existe o no da un grado.');
+  if (!mision || mision.tipo !== 'grado') {
+    throw new MisionError(404, 'mision_no_encontrada', 'Esa misión no existe o no da un grado.');
+  }
   const elegible = elegibilidadDeGrado(gradoActual, mision.grado);
-  if (!elegible.ok) throw new MisionError(409, elegible.motivo, 'Tu carta ya no puede reclamar este grado.');
+  if (!elegible.ok) {
+    throw new MisionError(409, elegible.motivo, 'Tu carta ya no puede reclamar este grado.');
+  }
   const e = await conTablas(ejecutor);
   const r = await e.execute(
     `UPDATE mision_estado SET reclamada = ? WHERE vtuber_id = ? AND mision_id = ? AND periodo = 'unica' AND reclamada IS NULL`,
@@ -292,7 +329,9 @@ export async function reclamarGrado(ejecutor, { vtuberId, misionId, gradoActual 
       `SELECT reclamada FROM mision_estado WHERE vtuber_id = ? AND mision_id = ? AND periodo = 'unica'`,
       [Number(vtuberId), mision.id],
     );
-    if (!hecha.rows.length) throw new MisionError(409, 'mision_incompleta', 'Aún no completas esta misión.');
+    if (!hecha.rows.length) {
+      throw new MisionError(409, 'mision_incompleta', 'Aún no completas esta misión.');
+    }
     throw new MisionError(409, 'ya_reclamada', 'Este grado ya se reclamó.');
   }
   // El rastro del reclamo (con el grado que tenía antes) es lo que permite al mantenedor revisarlo y revocarlo.
@@ -332,7 +371,9 @@ export async function revocarReclamo(ejecutor, { vtuberId, misionId, ahora = Dat
     'UPDATE mision_reclamo SET revocado = ? WHERE vtuber_id = ? AND mision_id = ? AND revocado IS NULL',
     [new Date(ahora).toISOString(), Number(vtuberId), String(misionId)],
   );
-  if (!Number(r.rowsAffected ?? 0)) throw new MisionError(404, 'reclamo_no_encontrado', 'No hay un reclamo vigente de esa misión.');
+  if (!Number(r.rowsAffected ?? 0)) {
+    throw new MisionError(404, 'reclamo_no_encontrado', 'No hay un reclamo vigente de esa misión.');
+  }
   const { rows } = await e.execute('SELECT grado, grado_previo FROM mision_reclamo WHERE vtuber_id = ? AND mision_id = ?', [Number(vtuberId), String(misionId)]);
   return { grado: String(rows[0].grado), gradoPrevio: rows[0].grado_previo == null ? null : String(rows[0].grado_previo) };
 }
@@ -366,9 +407,13 @@ export async function resumenDeMisiones(ejecutor) {
     const fila = estados.rows.find((r) => r.mision_id === m.id);
     const avances = new Map();
     for (const r of progresos.rows) {
-      if (r.mision_id !== m.id || hechas.has(`${r.vtuber_id}:${m.id}`)) continue;
+      if (r.mision_id !== m.id || hechas.has(`${r.vtuber_id}:${m.id}`)) {
+        continue;
+      }
       const meta = m.requisitos[r.contador];
-      if (meta) avances.set(Number(r.vtuber_id), (avances.get(Number(r.vtuber_id)) ?? 0) + Math.min(1, Number(r.progreso) / meta));
+      if (meta) {
+        avances.set(Number(r.vtuber_id), (avances.get(Number(r.vtuber_id)) ?? 0) + Math.min(1, Number(r.progreso) / meta));
+      }
     }
     const porcentajes = [...avances.values()].map((suma) => Math.round((100 * suma) / Object.keys(m.requisitos).length));
     return {

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Paso 6: habilidades.
@@ -43,9 +44,15 @@ const GRUPOS: Array<{ category: SkillForm["category"]; titulo: string }> = [
 
 /** El nombre de la pieza tal como lo usa `validarKit` («Activa 2», «Ultimate»). */
 function piezaDe(category: SkillForm["category"], posicion: number): string {
-  if (category === "ultimate") return "Ultimate";
-  if (category === "active") return `Activa ${posicion + 1}`;
-  if (category === "passive") return `Pasiva ${posicion + 1}`;
+  if (category === "ultimate") {
+    return "Ultimate";
+  }
+  if (category === "active") {
+    return `Activa ${posicion + 1}`;
+  }
+  if (category === "passive") {
+    return `Pasiva ${posicion + 1}`;
+  }
   return "";
 }
 
@@ -53,8 +60,12 @@ function mpDe(
   category: SkillForm["category"],
   posicion: number,
 ): number | null {
-  if (category === "active") return MP_ACTIVA[posicion] ?? null;
-  if (category === "ultimate") return MP_ULTIMATE;
+  if (category === "active") {
+    return MP_ACTIVA[posicion] ?? null;
+  }
+  if (category === "ultimate") {
+    return MP_ULTIMATE;
+  }
   return null;
 }
 
@@ -75,7 +86,9 @@ export function SkillsStep({ form, set, factions }: StepProps) {
 
   const problemas: Problema[] = useMemo(() => {
     const kit = skills.filter((s) => s.category !== "other");
-    if (!kit.length) return [];
+    if (!kit.length) {
+      return [];
+    }
     return validarKit({
       habilidades: kit.map((s) => ({
         category: s.category as "active" | "passive" | "ultimate",
@@ -173,7 +186,9 @@ export function SkillsStep({ form, set, factions }: StepProps) {
         const filas = skills
           .map((s, i) => ({ s, i }))
           .filter(({ s }) => s.category === g.category);
-        if (!filas.length) return null;
+        if (!filas.length) {
+          return null;
+        }
         return (
           <section key={g.category} className="space-y-1.5">
             <h4 className="text-xs font-bold uppercase tracking-[0.14em] text-dex-muted">

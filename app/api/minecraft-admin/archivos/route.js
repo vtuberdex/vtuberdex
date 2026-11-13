@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/minecraft-admin/archivos` — explorador de archivos del servidor.
  *
@@ -36,7 +37,9 @@ export async function GET(request) {
       return respuestaJson(resultado);
     }
     const resultado = await leerArchivo({ ruta, rol: acceso.sesion.role });
-    if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
     return respuestaJson(resultado);
   });
 }
@@ -59,7 +62,9 @@ export async function PUT(request) {
       detalle: String(cuerpo.ruta ?? ""),
       ok: resultado.ok,
     });
-    if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
     return respuestaJson({
       ok: true,
       ruta: resultado.ruta,

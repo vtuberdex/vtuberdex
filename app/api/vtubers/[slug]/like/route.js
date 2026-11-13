@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `GET|POST /api/vtubers/:slug/like` — el like diario a un VTuber.
  *
@@ -42,7 +43,9 @@ function identificar(request) {
   const existente = visitanteValido(
     leerCookie(request.headers.get("cookie"), COOKIE_VISITANTE),
   );
-  if (existente) return { visitante: existente, cabeceras: {} };
+  if (existente) {
+    return { visitante: existente, cabeceras: {} };
+  }
   const visitante = randomUUID();
   const seguro =
     (request.headers.get("x-forwarded-proto") ??
@@ -61,7 +64,9 @@ async function fichaPublica(slug) {
 export async function GET(request, { params }) {
   const { slug } = await params;
   const card = await fichaPublica(slug);
-  if (!card) return responder({ error: "no_encontrado" }, 404);
+  if (!card) {
+    return responder({ error: "no_encontrado" }, 404);
+  }
   const { visitante, cabeceras } = identificar(request);
   try {
     const [likes, liked, xpJuego] = await Promise.all([
@@ -83,11 +88,14 @@ export async function GET(request, { params }) {
 }
 
 export async function POST(request, { params }) {
-  if (!origenPermitido(request.headers))
+  if (!origenPermitido(request.headers)) {
     return responder({ error: "origen_no_permitido" }, 403);
+  }
   const { slug } = await params;
   const card = await fichaPublica(slug);
-  if (!card) return responder({ error: "no_encontrado" }, 404);
+  if (!card) {
+    return responder({ error: "no_encontrado" }, 404);
+  }
   const { visitante, cabeceras } = identificar(request);
   try {
     const resultado = await darLike({

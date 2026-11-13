@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 'use client';
 /**
  * Piezas visuales compartidas por el mantenedor. Viven aparte para que cada
@@ -28,21 +29,31 @@ export function Field({ label, hint, children }: { label: string; hint?: ReactNo
 
 /** Ruta pública de un emblema (`images/faction/x.png` -> `/images/faction/x.png`). */
 export function emblemSrc(icon: string | null | undefined): string | null {
-  if (!icon) return null;
+  if (!icon) {
+    return null;
+  }
   return safeImageSrc(icon.startsWith('/') || /^https?:/i.test(icon) ? icon : `/${icon}`);
 }
 
 /** Solo deja pasar URLs de imagen inocuas (relativas, http(s), blob: o data:image/); el resto se descarta. */
 export function safeImageSrc(src: string | null | undefined): string | null {
-  if (!src) return null;
-  if (src.startsWith('//')) return null;
-  if (/^(https?:|blob:|data:image\/(png|jpe?g|webp|gif|avif);)/i.test(src) || src.startsWith('/')) return src;
+  if (!src) {
+    return null;
+  }
+  if (src.startsWith('//')) {
+    return null;
+  }
+  if (/^(https?:|blob:|data:image\/(png|jpe?g|webp|gif|avif);)/i.test(src) || src.startsWith('/')) {
+    return src;
+  }
   return /^[a-z][a-z0-9+.-]*:/i.test(src) ? null : src;
 }
 
 export function Emblem({ icon, className = 'h-5 w-5' }: { icon: string | null | undefined; className?: string }) {
   const src = emblemSrc(icon);
-  if (!src) return <span className={`${className} inline-block rounded bg-white/5`} aria-hidden />;
+  if (!src) {
+    return <span className={`${className} inline-block rounded bg-white/5`} aria-hidden />;
+  }
   return <img src={src} alt="" className={`${className} object-contain`} />;
 }
 

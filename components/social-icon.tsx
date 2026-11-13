@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Icono de una red social. UNA sola definición: la ficha, la cola del mantenedor, el editor y los
  * formularios públicos lo usan, así una plataforma nueva se añade aquí y aparece en todas partes.
@@ -62,9 +63,13 @@ export function redDe(platform: string, url = ""): RedConocida | null {
     }
   })();
   for (const fuente of [nombre, host]) {
-    if (!fuente) continue;
+    if (!fuente) {
+      continue;
+    }
     const hallada = PISTAS.find(([, patron]) => patron.test(fuente));
-    if (hallada) return hallada[0];
+    if (hallada) {
+      return hallada[0];
+    }
   }
   return null;
 }

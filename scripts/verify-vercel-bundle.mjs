@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Verifica el artefacto desplegable SIN depender de Vercel.
  *
@@ -109,12 +110,16 @@ function auditArtifact() {
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (/\.(db|sqlite|sqlite3|wal|shm)$/i.test(entry.name))
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (/\.(db|sqlite|sqlite3|wal|shm)$/i.test(entry.name)) {
         leaked.push(path.relative(publicDir, full));
+      }
     }
   };
-  if (fs.existsSync(publicDir)) walk(publicDir);
+  if (fs.existsSync(publicDir)) {
+    walk(publicDir);
+  }
   check(
     "la base NO quedó en la carpeta pública",
     leaked.length === 0,
@@ -124,14 +129,18 @@ function auditArtifact() {
   // La traza de la función sí debe incluirla: sin esto el deploy arranca vacío.
   const traced = [];
   const scanNft = (dir) => {
-    if (!fs.existsSync(dir)) return;
+    if (!fs.existsSync(dir)) {
+      return;
+    }
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) scanNft(full);
-      else if (entry.name.endsWith(".nft.json")) {
+      if (entry.isDirectory()) {
+        scanNft(full);
+      } else if (entry.name.endsWith(".nft.json")) {
         const raw = fs.readFileSync(full, "utf8");
-        if (raw.includes("vtuberdex.db"))
+        if (raw.includes("vtuberdex.db")) {
           traced.push(path.relative(ROOT, full));
+        }
       }
     }
   };
@@ -165,12 +174,16 @@ function stage() {
     "deploy",
   ]);
   for (const entry of fs.readdirSync(ROOT)) {
-    if (skip.has(entry)) continue;
+    if (skip.has(entry)) {
+      continue;
+    }
     const from = path.join(ROOT, entry);
     const to = path.join(STAGE, entry);
-    if (fs.statSync(from).isDirectory())
+    if (fs.statSync(from).isDirectory()) {
       fs.cpSync(from, to, { recursive: true });
-    else fs.copyFileSync(from, to);
+    } else {
+      fs.copyFileSync(from, to);
+    }
   }
   fs.cpSync(path.join(ROOT, "deploy"), path.join(STAGE, "deploy"), {
     recursive: true,
@@ -251,7 +264,9 @@ async function main() {
       ? ""
       : "sin base de desarrollo: se reutiliza deploy/ (igual que Vercel)",
   );
-  if (built.status !== 0) return finish();
+  if (built.status !== 0) {
+    return finish();
+  }
   auditArtifact();
 
   // 2. El build de Next, del que depende todo lo demás.
@@ -261,7 +276,9 @@ async function main() {
       stdio: "inherit",
     });
     check("build de Next disponible", build.status === 0);
-    if (build.status !== 0) return finish();
+    if (build.status !== 0) {
+      return finish();
+    }
   } else {
     check("build de Next disponible", true, "reutiliza .next existente");
   }
@@ -554,10 +571,13 @@ function finish(output = "") {
   console.log(
     `\n${results.length - failed.length}/${results.length} comprobaciones pasan`,
   );
-  if (output && failed.length > 0)
+  if (output && failed.length > 0) {
     console.log(`\nsalida del servidor:\n${output.slice(-900)}`);
+  }
   // El escenario se deja a propósito para poder inspeccionarlo si algo falla.
-  if (failed.length === 0) unstage();
+  if (failed.length === 0) {
+    unstage();
+  }
   if (failed.length) {
     console.log(`\nFALLAN: ${failed.map((f) => f.name).join(" | ")}`);
     process.exitCode = 1;
@@ -573,7 +593,9 @@ function unstage() {
     for (const link of ["node_modules", ".next"]) {
       const target = path.join(STAGE, link);
       try {
-        if (fs.lstatSync(target).isSymbolicLink()) fs.unlinkSync(target);
+        if (fs.lstatSync(target).isSymbolicLink()) {
+          fs.unlinkSync(target);
+        }
       } catch {
         /* no existía */
       }
