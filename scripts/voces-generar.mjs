@@ -160,7 +160,7 @@ const resumen = new Map();
 const contar = (r) => resumen.set(r, (resumen.get(r) ?? 0) + 1);
 const hora = () => new Date().toLocaleTimeString("es-CL");
 
-async function lote(db, fichas, etiqueta) {
+async function lote(fichas, etiqueta) {
   let n = 0;
   for (const f of fichas) {
     n += 1;
@@ -174,8 +174,10 @@ async function lote(db, fichas, etiqueta) {
     }
     contar(r);
     if (r !== "sin_cambios" || n % 50 === 0) {
+      const segundos = ((Date.now() - t0) / 1000).toFixed(1);
+      const duracion = r === "generada" ? ` (${segundos} s)` : "";
       console.log(
-        `[${hora()}] ${etiqueta} ${n}/${fichas.length} ${f.slug}: ${r}${r === "generada" ? ` (${((Date.now() - t0) / 1000).toFixed(1)} s)` : ""}`,
+        `[${hora()}] ${etiqueta} ${n}/${fichas.length} ${f.slug}: ${r}${duracion}`,
       );
     }
   }
@@ -227,6 +229,62 @@ async function procesarCola() {
   return trabajos.length;
 }
 
+/** `--vigilar`: procesa la cola cada `SONDEO_COLA_MS` hasta recibir SIGTERM/SIGINT. */
+async function vigilar() {
+  console.log(
+    `[${hora()}] vigilando ${path.join(CARPETA, ".cola")} cada ${SONDEO_COLA_MS / 1000} s`,
+  );
+  // La señal llega por un manejador: un AbortController deja ver que el bucle SÍ tiene salida.
+  const corte = new AbortController();
+  for (const senal of ["SIGTERM", "SIGINT"]) {
+    process.on(senal, () => corte.abort());
+  }
+  while (!corte.signal.aborted) {
+    try {
+      await procesarCola();
+    } catch (e) {
+      console.error(`[${hora()}] ✖ cola: ${e.message}`);
+    }
+    await new Promise((r) => setTimeout(r, SONDEO_COLA_MS));
+  }
+}
+
+/** `--todas` (con `--limite` opcional): todas las fichas publicadas. */
+async function todas(db) {
+  let fichas = await fichasPublicadas(db);
+  if (valor("limite")) {
+    fichas = fichas.slice(0, Number(valor("limite")));
+  }
+  const extras = `${SECO ? " (seco)" : ""}${FORZAR ? " (forzando)" : ""}`;
+  console.log(`[${hora()}] ${fichas.length} fichas publicadas${extras}`);
+  await lote(fichas, "lote");
+}
+
+/** Una pasada: `--cola`, `--slug=x` o `--todas` (y `--limpiar`). */
+async function unaPasada() {
+  const db = await dbConDiario();
+  if (flag("cola")) {
+    await procesarCola();
+  } else if (valor("slug")) {
+    const f = getVtuberBySlug(db, valor("slug"), { includeHidden: true });
+    if (!f) {
+      throw new Error(`no existe la ficha ${valor("slug")}`);
+    }
+    await lote([f], "ficha");
+  } else if (flag("todas")) {
+    await todas(db);
+  } else {
+    // sin modo: solo puede quedar `--limpiar` (abajo) o nada que hacer
+  }
+  if (flag("limpiar") || flag("todas")) {
+    await limpiar(db);
+  }
+  if (resumen.size) {
+    const cuentas = [...resumen].map(([k, v]) => `${k}=${v}`).join(", ");
+    console.log(`[${hora()}] RESUMEN: ${cuentas}`);
+  }
+}
+
 async function main() {
   if (!CARPETA) {
     console.error(
@@ -237,57 +295,16 @@ async function main() {
   if (!SECO) {
     fs.mkdirSync(CARPETA, { recursive: true });
   }
-
   if (flag("vigilar")) {
-    console.log(
-      `[${hora()}] vigilando ${path.join(CARPETA, ".cola")} cada ${SONDEO_COLA_MS / 1000} s`,
-    );
-    // La señal llega por un manejador: un AbortController deja ver que el bucle SÍ tiene salida.
-    const corte = new AbortController();
-    for (const senal of ["SIGTERM", "SIGINT"]) {
-      process.on(senal, () => corte.abort());
-    }
-    while (!corte.signal.aborted) {
-      try {
-        await procesarCola();
-      } catch (e) {
-        console.error(`[${hora()}] ✖ cola: ${e.message}`);
-      }
-      await new Promise((r) => setTimeout(r, SONDEO_COLA_MS));
-    }
+    await vigilar();
     return;
   }
-
-  const db = await dbConDiario();
-  if (flag("cola")) {
-    await procesarCola();
-  } else if (valor("slug")) {
-    const f = getVtuberBySlug(db, valor("slug"), { includeHidden: true });
-    if (!f) {
-      throw new Error(`no existe la ficha ${valor("slug")}`);
-    }
-    await lote(db, [f], "ficha");
-  } else if (flag("todas")) {
-    let fichas = await fichasPublicadas(db);
-    if (valor("limite")) {
-      fichas = fichas.slice(0, Number(valor("limite")));
-    }
-    console.log(
-      `[${hora()}] ${fichas.length} fichas publicadas${SECO ? " (seco)" : ""}${FORZAR ? " (forzando)" : ""}`,
-    );
-    await lote(db, fichas, "lote");
-  }
-  if (flag("limpiar") || flag("todas")) {
-    await limpiar(db);
-  }
-  if (resumen.size) {
-    console.log(
-      `[${hora()}] RESUMEN: ${[...resumen].map(([k, v]) => `${k}=${v}`).join(", ")}`,
-    );
-  }
+  await unaPasada();
 }
 
-main().catch((e) => {
+try {
+  await main();
+} catch (e) {
   console.error(`✖ ${e.message}`);
   process.exit(1);
-});
+}
