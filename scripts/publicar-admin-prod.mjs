@@ -48,7 +48,8 @@ const COMO_SECRETO = tiene("sensitive");
 const pasos = [];
 const paso = (nombre, ok, detalle = "") => {
   pasos.push(ok);
-  console.log(`${ok ? "✔" : "✖"} ${nombre}${detalle ? ` — ${detalle}` : ""}`);
+  const sufijo = detalle ? ` — ${detalle}` : "";
+  console.log(`${ok ? "✔" : "✖"} ${nombre}${sufijo}`);
 };
 
 /** Ejecuta el CLI de Vercel sin heredar la salida (puede contener el valor). */
@@ -79,7 +80,7 @@ function ultimoDeploymentDeProduccion() {
 async function pedir(ruta, init = {}) {
   const respuesta = await fetch(`${URL}${ruta}`, {
     ...init,
-    headers: { "content-type": "application/json", ...(init.headers ?? {}) },
+    headers: { "content-type": "application/json", ...init.headers },
   });
   const texto = await respuesta.text();
   let cuerpo;
@@ -178,6 +179,20 @@ if (SIN_REDEPLOY) {
 }
 
 // --- 4. comprobar el resultado, no la intención ---------------------------
+/** Con la contraseña rechazada: ¿falta redeployar o el hash guardado está mal formado? */
+function explicarHash(hash) {
+  if (hash?.valido) {
+    console.log(
+      "  El hash está bien formado, así que el despliegue que sirve todavía no",
+    );
+    console.log("  tiene el valor nuevo. Vuelve a correr sin `--sin-redeploy`.");
+    return;
+  }
+  for (const p of hash?.problemas ?? []) {
+    console.log(`    · ${p}`);
+  }
+}
+
 if (SIN_VERIFICAR) {
   console.log("· verificación omitida (--sin-verificar)");
 } else {
@@ -220,18 +235,7 @@ if (SIN_VERIFICAR) {
         console.log(
           "  La CONTRASEÑA no corresponde al hash que quedó en producción.",
         );
-        if (d.hash?.valido) {
-          console.log(
-            "  El hash está bien formado, así que el despliegue que sirve todavía no",
-          );
-          console.log(
-            "  tiene el valor nuevo. Vuelve a correr sin `--sin-redeploy`.",
-          );
-        } else {
-          for (const p of d.hash?.problemas ?? []) {
-            console.log(`    · ${p}`);
-          }
-        }
+        explicarHash(d.hash);
       }
     } else {
       console.log(

@@ -40,13 +40,21 @@ const { rows: objetos } = await origen.execute(
   "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'libsql_%' ORDER BY CASE type WHEN 'table' THEN 0 ELSE 1 END, name",
 );
 const tablas = objetos.filter((o) => o.type === "table");
+
+/** Las columnas de `sqlite_master` son TEXTO; cualquier otra cosa es una base que no se entiende. */
+function texto(valor) {
+  if (typeof valor !== "string") {
+    throw new TypeError(`se esperaba texto en sqlite_master, llegó ${typeof valor}`);
+  }
+  return valor;
+}
 for (const t of tablas) {
-  await destino.execute(String(t.sql));
+  await destino.execute(texto(t.sql));
 }
 
 for (const t of tablas) {
-  const nombre = String(t.name);
-  const q = `"${nombre.replace(/"/g, '""')}"`;
+  const nombre = texto(t.name);
+  const q = `"${nombre.replaceAll('"', '""')}"`;
   let n = 0;
   const lote = nombre === "asset_remoto" ? 5 : 200; // cada fila de asset lleva una imagen entera
   for (let off = 0; ; off += lote) {
@@ -58,7 +66,9 @@ for (const t of tablas) {
     if (!rows.length) {
       break;
     }
-    const sql = `INSERT INTO ${q} (${columns.map((c) => `"${c}"`).join(",")}) VALUES (${columns.map(() => "?").join(",")})`;
+    const nombres = columns.map((c) => `"${c}"`).join(",");
+    const huecos = columns.map(() => "?").join(",");
+    const sql = `INSERT INTO ${q} (${nombres}) VALUES (${huecos})`;
     await destino.batch(
       rows.map((r) => ({ sql, args: columns.map((c) => r[c]) })),
       "write",
@@ -67,11 +77,11 @@ for (const t of tablas) {
   }
   console.log(`${nombre}: ${n} filas`);
 }
-for (const o of objetos.filter((o) => o.type !== "table")) {
+for (const o of objetos.filter((obj) => obj.type !== "table")) {
   try {
-    await destino.execute(String(o.sql));
+    await destino.execute(texto(o.sql));
   } catch (e) {
-    console.warn(`aviso ${o.name}: ${e.message}`);
+    console.warn(`aviso ${texto(o.name)}: ${e.message}`);
   }
 }
 console.log(`✓ copia en ${salida}`);

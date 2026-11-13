@@ -17,7 +17,7 @@ const sello = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
 const destino = join(carpeta, `turso-local-${sello}.db`);
 
 const db = new DatabaseSync(origen, { readOnly: true });
-db.exec(`VACUUM INTO '${destino.replace(/'/g, "''")}'`);
+db.exec(`VACUUM INTO '${destino.replaceAll("'", "''")}'`);
 db.close();
 
 const check = new DatabaseSync(destino, { readOnly: true });
@@ -28,9 +28,17 @@ if (ok !== "ok") {
   process.exit(1);
 }
 
+/** Orden por unidades de código (el de `<`), no `localeCompare`: los sellos ISO ordenan así por fecha. */
+function compararTexto(a, b) {
+  if (a < b) {
+    return -1;
+  }
+  return a > b ? 1 : 0;
+}
+
 const copias = readdirSync(carpeta)
   .filter((f) => /^turso-local-.*\.db$/.test(f))
-  .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  .sort(compararTexto);
 for (const f of copias.slice(0, Math.max(0, copias.length - conservar))) {
   rmSync(join(carpeta, f));
 }

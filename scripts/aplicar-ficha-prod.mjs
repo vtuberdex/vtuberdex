@@ -62,10 +62,10 @@ console.log(
 );
 
 /* ------------------------------------------------------------ credenciales */
-function pedir(ruta, { token, ...init } = {}) {
+function pedir(ruta, { token: sesion, ...init } = {}) {
   const cabeceras = { "content-type": "application/json" };
-  if (token) {
-    cabeceras.authorization = ["Bearer", token].join(" ");
+  if (sesion) {
+    cabeceras.authorization = ["Bearer", sesion].join(" ");
   }
   return pedirJson(`${URL_BASE}${ruta}`, { ...init, headers: cabeceras });
 }
@@ -79,12 +79,11 @@ if (actual.status !== 200) {
   process.exit(1);
 }
 const hoy = actual.cuerpo;
-const resumir = (valor) =>
+const estaVacio = (valor) =>
   valor === null ||
   valor === undefined ||
-  (Array.isArray(valor) && valor.length === 0)
-    ? "(vacío)"
-    : JSON.stringify(valor);
+  (Array.isArray(valor) && valor.length === 0);
+const resumir = (valor) => (estaVacio(valor) ? "(vacío)" : JSON.stringify(valor));
 const proyeccion = {
   phrase: hoy.phrase,
   birthday: hoy.birthday,

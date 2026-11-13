@@ -330,20 +330,21 @@ const sinVersion = (images) =>
 
 let iguales = 0;
 let versionadas = 0;
-for (let i = 0; i < a.length; i += 1) {
+for (const [i, va] of a.entries()) {
+  const vb = b[i];
   const mismaImagen =
-    JSON.stringify(sinVersion(a[i].images)) ===
-    JSON.stringify(sinVersion(b[i].images));
+    JSON.stringify(sinVersion(va.images)) ===
+    JSON.stringify(sinVersion(vb.images));
   const mismosAssets =
-    JSON.stringify(a[i].assets) === JSON.stringify(b[i].assets);
+    JSON.stringify(va.assets) === JSON.stringify(vb.assets);
   if (mismaImagen && mismosAssets) {
     iguales += 1;
   } else {
-    console.log(`  ✖ difiere ${a[i].slug}`);
+    console.log(`  ✖ difiere ${va.slug}`);
   }
   if (
-    JSON.stringify(b[i].images).includes("?v=") &&
-    !JSON.stringify(a[i].images).includes("?v=")
+    JSON.stringify(vb.images).includes("?v=") &&
+    !JSON.stringify(va.images).includes("?v=")
   ) {
     versionadas += 1;
   }
