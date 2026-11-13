@@ -6,7 +6,7 @@
  * data-artist>` con una imagen `fichas/vtuberN.jpg`, un `<h2>` y, a veces, un
  * enlace a la ficha de detalle. No hay paginación ni buscador real.
  */
-import * as cheerio from "cheerio";
+import { load } from "cheerio";
 
 import { parseCountries, parseDexNumber, splitList } from "./normalize.mjs";
 
@@ -17,14 +17,14 @@ const NUMBER_IN_ALT = /VTuber\s+(\d+)/i;
  * @returns {Array<object>} una entrada por carta, con el enlace de detalle si existe
  */
 export function parseIndex(html) {
-  const $ = cheerio.load(html);
+  const $ = load(html);
   const entries = [];
 
   $(".vtuber-card").each((_, element) => {
     const card = $(element);
     const classes = card.attr("class") ?? "";
     const cardClass =
-      classes.split(/\s+/).find((name) => /^card\d+$/.test(name)) ?? null;
+      classes.split(/\s+/).find((cls) => /^card\d+$/.test(cls)) ?? null;
     const image = card.find("img").first();
     const imageSrc = image.attr("src")?.trim() ?? null;
     const alt = image.attr("alt")?.trim() ?? "";

@@ -23,7 +23,7 @@ function textBox(width, height) {
   };
 }
 
-async function ocr(worker, input, label) {
+async function ocr(ocrWorker, input, label) {
   const meta = await sharp(input).metadata();
   const box = textBox(meta.width, meta.height);
   const buf = await sharp(input)
@@ -33,7 +33,7 @@ async function ocr(worker, input, label) {
     .normalize()
     .png()
     .toBuffer();
-  const { data } = await worker.recognize(buf);
+  const { data } = await ocrWorker.recognize(buf);
   const text = data.text.replace(/\s+/g, " ").trim();
   console.log(
     `  [${label}] ${meta.width}x${meta.height} -> conf ${Math.round(data.confidence)}`,

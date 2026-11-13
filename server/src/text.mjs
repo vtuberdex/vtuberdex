@@ -20,5 +20,7 @@ export function slugify(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    // Tras el paso anterior no puede haber dos guiones seguidos, así que basta
+    // con quitar UNO por extremo (y la regex queda lineal, sin `-+$`).
+    .replace(/^-|-$/g, "");
 }

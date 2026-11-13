@@ -8,6 +8,13 @@
  * pipeline trabaje con claves estables (slug ASCII).
  */
 
+// Slugs que aparecen en el catálogo Y como destino de varios alias: una sola
+// definición para que un typo en una de las copias no cree un país fantasma.
+const COREA_DEL_SUR = "corea-del-sur";
+const ESTADOS_UNIDOS = "estados-unidos";
+const REPUBLICA_DOMINICANA = "republica-dominicana";
+const REINO_UNIDO = "reino-unido";
+
 /** Catálogo de países conocido, derivado del propio mapeo del sitio + extras. */
 export const COUNTRIES = [
   {
@@ -29,7 +36,7 @@ export const COUNTRIES = [
   { slug: "chile", es: "Chile", en: "Chile", flag: "🇨🇱", lang: "es" },
   { slug: "colombia", es: "Colombia", en: "Colombia", flag: "🇨🇴", lang: "es" },
   {
-    slug: "corea-del-sur",
+    slug: COREA_DEL_SUR,
     es: "Corea del Sur",
     en: "South Korea",
     flag: "🇰🇷",
@@ -53,7 +60,7 @@ export const COUNTRIES = [
   },
   { slug: "espana", es: "España", en: "Spain", flag: "🇪🇸", lang: "es" },
   {
-    slug: "estados-unidos",
+    slug: ESTADOS_UNIDOS,
     es: "Estados Unidos",
     en: "United States",
     flag: "🇺🇸",
@@ -91,7 +98,7 @@ export const COUNTRIES = [
     lang: "es",
   },
   {
-    slug: "republica-dominicana",
+    slug: REPUBLICA_DOMINICANA,
     es: "República Dominicana",
     en: "Dominican Republic",
     flag: "🇩🇴",
@@ -114,7 +121,7 @@ export const COUNTRIES = [
     lang: "en",
   },
   {
-    slug: "reino-unido",
+    slug: REINO_UNIDO,
     es: "Reino Unido",
     en: "United Kingdom",
     flag: "🇬🇧",
@@ -147,14 +154,14 @@ const ALIASES = new Map(
     argelia: "argentina",
     mexico: "mexico",
     peru: "peru",
-    "corea del sur": "corea-del-sur",
-    "republica dominicana": "republica-dominicana",
-    "estados unidos de america": "estados-unidos",
-    usa: "estados-unidos",
-    us: "estados-unidos",
-    eeuu: "estados-unidos",
-    uk: "reino-unido",
-    "reino unido": "reino-unido",
+    "corea del sur": COREA_DEL_SUR,
+    "republica dominicana": REPUBLICA_DOMINICANA,
+    "estados unidos de america": ESTADOS_UNIDOS,
+    usa: ESTADOS_UNIDOS,
+    us: ESTADOS_UNIDOS,
+    eeuu: ESTADOS_UNIDOS,
+    uk: REINO_UNIDO,
+    "reino unido": REINO_UNIDO,
     inglaterra: "inglaterra",
     "nueva zelanda": "nueva-zelanda",
     holanda: "holanda",
@@ -162,13 +169,13 @@ const ALIASES = new Map(
     "el salvador": "el-salvador",
     "costa rica": "costa-rica",
     "puerto rico": "puerto-rico",
-    "republica dominicana ": "republica-dominicana",
+    "republica dominicana ": REPUBLICA_DOMINICANA,
     cataluna: "cataluna",
     espana: "espana",
     japon: "japon",
     panama: "panama",
     canada: "canada",
-    "corea del sur ": "corea-del-sur",
+    "corea del sur ": COREA_DEL_SUR,
   }),
 );
 
@@ -179,7 +186,9 @@ export function slugify(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    // Tras el paso anterior no puede haber dos guiones seguidos, así que basta
+    // con quitar UNO por extremo (y la regex queda lineal, sin `-+$`).
+    .replace(/^-|-$/g, "");
 }
 
 /** Normalización suave usada para comparar texto (conserva espacios). */
@@ -226,7 +235,15 @@ export function languagesForCountries(countrySlugs) {
   if (langs.size === 0) {
     langs.add("es");
   }
-  return [...langs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return [...langs].sort(compararCodigos);
+}
+
+/** Orden por unidades de código (el de `<`), no por locale: estable entre máquinas. */
+function compararCodigos(a, b) {
+  if (a < b) {
+    return -1;
+  }
+  return a > b ? 1 : 0;
 }
 
 /** Listas separadas por coma dentro de un atributo (grupos, artistas). */
@@ -240,7 +257,7 @@ export function splitList(rawValue) {
 /** Extrae el número de dex desde `vtuber16.jpg`, `card16` o `VTuber 16`. */
 export function parseDexNumber(...candidates) {
   for (const candidate of candidates) {
-    const match = String(candidate ?? "").match(/(\d+)/);
+    const match = /(\d+)/.exec(String(candidate ?? ""));
     if (match) {
       return Number(match[1]);
     }

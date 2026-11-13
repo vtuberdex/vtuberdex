@@ -181,7 +181,8 @@ async function main() {
   };
 
   const results = await mapLimit(pending, CONCURRENCY, async (card) => {
-    const worker = workers[cursor++ % workers.length];
+    const worker = workers[cursor % workers.length];
+    cursor += 1;
     const src = card.source.indexImage;
     try {
       const original = await fetchBinary(src);
@@ -281,8 +282,10 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error("[ocr] ERROR", error);
     process.exit(1);
-  });
+  }
 }

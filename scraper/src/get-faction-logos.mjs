@@ -10,11 +10,10 @@
  * así que se descarta la respuesta comparando su tamaño con el del index.
  */
 
-import fs from "node:fs";
-import { promises as fsP } from "node:fs";
+import fs, { promises as fsP } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import * as cheerio from "cheerio";
+import { load } from "cheerio";
 import sharp from "sharp";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -34,7 +33,7 @@ export function collectFactionFiles(cacheDir = CACHE) {
     if (!f.endsWith(".html")) {
       continue;
     }
-    const $ = cheerio.load(fs.readFileSync(path.join(cacheDir, f), "utf8"));
+    const $ = load(fs.readFileSync(path.join(cacheDir, f), "utf8"));
     $("img").each((_, el) => {
       const src = $(el).attr("src") ?? "";
       if (!src.includes("facciones/")) {
@@ -110,8 +109,10 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error("[faction] ERROR", error);
     process.exit(1);
-  });
+  }
 }
