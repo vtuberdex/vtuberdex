@@ -179,9 +179,7 @@ describe("CatalogPage", () => {
     );
     renderCatalog("/?q=zzzz");
 
-    await waitFor(() =>
-      expect(screen.getByText("Sin resultados")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("Sin resultados")).toBeInTheDocument();
     expect(
       screen.getByText(/otro nombre, un número de dex/),
     ).toBeInTheDocument();
@@ -190,11 +188,9 @@ describe("CatalogPage", () => {
   it("reporta el error de la API sin romper la página", async () => {
     mockedApi.list.mockRejectedValue(new Error("HTTP 500"));
     renderCatalog();
-    await waitFor(() =>
-      expect(
-        screen.getByText(/No se pudo cargar el catálogo/),
-      ).toBeInTheDocument(),
-    );
+    expect(
+      await screen.findByText(/No se pudo cargar el catálogo/),
+    ).toBeInTheDocument();
   });
 
   it("no dibuja preloader ni libro mientras carga la primera página", () => {
@@ -246,9 +242,7 @@ describe("CatalogPage", () => {
       ),
     );
     renderCatalog();
-    await waitFor(() =>
-      expect(screen.getByText("Siguiente →")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("Siguiente →")).toBeInTheDocument();
 
     await user.click(screen.getByText("Siguiente →"));
     // La página 2 se pide (directamente o por la precarga de vecinas) y la UI la muestra.
@@ -517,9 +511,7 @@ describe("DetailPage", () => {
     renderDetail("no-existe");
 
     expect(screen.getByTestId("detail-loading")).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByText("VTuber no encontrado")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("VTuber no encontrado")).toBeInTheDocument();
     expect(
       screen.getByText("Ese slug no existe en el catálogo."),
     ).toBeInTheDocument();
@@ -538,9 +530,7 @@ describe("DetailPage", () => {
       neighbors: { prev: null, next: null },
     });
     render(<DetailPage slug="gkuro-monochrome" />);
-    await waitFor(() =>
-      expect(screen.getByTestId("premium-info")).toBeInTheDocument(),
-    );
+    expect(await screen.findByTestId("premium-info")).toBeInTheDocument();
     // La carta es el canvas 3D (la placa lleva su etiqueta en la textura): el DOM solo tiene el distintivo de la info.
     const info = screen.getByTestId("premium-info");
     expect(within(info).getByTestId("premium-badge")).toHaveAttribute(
@@ -595,9 +585,7 @@ describe("DetailPage", () => {
     );
     await user.click(screen.getByTestId("like-button"));
     // El like sube el nivel de la ficha sin recargarla.
-    await waitFor(() =>
-      expect(screen.getByText("NIVEL 2")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("NIVEL 2")).toBeInTheDocument();
     expect(screen.getByTestId("like-count")).toHaveTextContent("10");
   });
 
@@ -607,9 +595,9 @@ describe("DetailPage", () => {
       neighbors: { prev: null, next: null },
     });
     render(<DetailPage slug="gkuro-monochrome" />);
-    await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument(),
-    );
+    expect(
+      await screen.findByRole("heading", { level: 1 }),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("premium-info")).not.toBeInTheDocument();
   });
 

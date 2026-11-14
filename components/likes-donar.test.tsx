@@ -84,11 +84,9 @@ describe("DonatePayPal", () => {
       "madKoding",
     );
     fireEvent.click(screen.getByRole("button", { name: "Copiar código" }));
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Copiado ✓" }),
-      ).toBeInTheDocument(),
-    );
+    expect(
+      await screen.findByRole("button", { name: "Copiado ✓" }),
+    ).toBeInTheDocument();
     expect(escribir).toHaveBeenCalledWith("VTD-016");
   });
 
@@ -147,11 +145,9 @@ describe("DonatePayPal", () => {
     });
     render(<DonatePayPal card={{ dexNumber: 16, name: "madKoding" }} />);
     fireEvent.click(screen.getByRole("button", { name: "Copiar código" }));
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Copiado ✓" }),
-      ).toBeInTheDocument(),
-    );
+    expect(
+      await screen.findByRole("button", { name: "Copiado ✓" }),
+    ).toBeInTheDocument();
     expect(execCommand).toHaveBeenCalledWith("copy");
     expect(document.querySelector("textarea")).toBeNull(); // no deja basura en la página
   });
@@ -168,11 +164,9 @@ describe("DonatePayPal", () => {
     });
     render(<DonatePayPal card={{ dexNumber: 16, name: "madKoding" }} />);
     fireEvent.click(screen.getByRole("button", { name: "Copiar código" }));
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Copiado ✓" }),
-      ).toBeInTheDocument(),
-    );
+    expect(
+      await screen.findByRole("button", { name: "Copiado ✓" }),
+    ).toBeInTheDocument();
   });
 
   test("si no se puede copiar, avisa y el código sigue a la vista", async () => {
@@ -186,9 +180,7 @@ describe("DonatePayPal", () => {
     });
     render(<DonatePayPal card={{ dexNumber: 16, name: "madKoding" }} />);
     fireEvent.click(screen.getByRole("button", { name: "Copiar código" }));
-    await waitFor(() =>
-      expect(screen.getByText(/No se pudo copiar/)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/No se pudo copiar/)).toBeInTheDocument();
     expect(screen.getByTestId("donate-code")).toBeInTheDocument();
   });
 

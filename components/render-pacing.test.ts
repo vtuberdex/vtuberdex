@@ -17,7 +17,7 @@ describe("shouldRender", () => {
         ultimo = t;
       }
     }
-    expect(gaps.length).toBe(142);
+    expect(gaps).toHaveLength(142);
     expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(0.01);
   });
 

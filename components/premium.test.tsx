@@ -682,11 +682,9 @@ describe("PremiumManager", () => {
         true,
       ),
     );
-    await waitFor(() =>
-      expect(
-        screen.getByText(/Ninguna ficha sin premium coincide/),
-      ).toBeInTheDocument(),
-    );
+    expect(
+      await screen.findByText(/Ninguna ficha sin premium coincide/),
+    ).toBeInTheDocument();
   });
 
   test("un código que no existe no rompe nada", async () => {
@@ -697,11 +695,9 @@ describe("PremiumManager", () => {
       screen.getByLabelText("Buscar ficha para hacerla premium"),
       { target: { value: "VTD-999" } },
     );
-    await waitFor(() =>
-      expect(
-        screen.getByText(/Ninguna ficha sin premium coincide/),
-      ).toBeInTheDocument(),
-    );
+    expect(
+      await screen.findByText(/Ninguna ficha sin premium coincide/),
+    ).toBeInTheDocument();
   });
 
   test("un error del servidor llega como aviso, no rompe la lista", async () => {
