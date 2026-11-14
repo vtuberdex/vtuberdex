@@ -17,7 +17,7 @@ import {
   useMemo,
   useState,
   type Dispatch,
-  type FormEvent,
+  type SubmitEvent,
   type SetStateAction,
 } from "react";
 
@@ -646,7 +646,7 @@ export function FactionWizard({
   }
 
   /** «Siguiente» / «Crear facción»: cada paso avanza solo si lo suyo está completo. */
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (step === 0) {
       if (!nameProblem && !sinMadre) {

@@ -19,7 +19,7 @@
  * formulario público que recibe archivos es una puerta abierta a subir basura; el mantenedor lo descarga y lo
  * sube por su gestor de imágenes.
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
 import type { Clave } from "@/lib/i18n/mensajes";
@@ -89,13 +89,15 @@ function EstadoDelBorrador({
   if (paso < 3 || !borrador) {
     return null;
   }
-  let texto = t("ins.borradorError");
+  let texto: string;
   if (borrador.estado === "guardando") {
     texto = t("ins.borradorGuardando");
   } else if (borrador.estado === "guardado") {
     texto = borrador.hora
       ? t("ins.borradorGuardadoHora", { hora: borrador.hora })
       : t("ins.borradorGuardado");
+  } else {
+    texto = t("ins.borradorError");
   }
   return (
     <p
@@ -209,25 +211,31 @@ export function InscripcionForm() {
   const [borrador, setBorrador] = useState<EstadoBorrador | null>(null);
   const [recuperado, setRecuperado] = useState<string | null>(null);
 
-  const faltas: Falta[] =
-    intento === paso
-      ? faltasDelPaso(paso, { name, email, codigo, languages, socials, imageId, logoId, cardText, perfil, acepta })
-      : [];
+  const faltas: Falta[] = useMemo(
+    () =>
+      intento === paso
+        ? faltasDelPaso(paso, { name, email, codigo, languages, socials, imageId, logoId, cardText, perfil, acepta })
+        : [],
+    [intento, paso, name, email, codigo, languages, socials, imageId, logoId, cardText, perfil, acepta],
+  );
   /** `aria-invalid` de un campo: lo pinta de rojo (ver `claseInput`) y avisa a lectores de pantalla. */
-  const malo = (campo: string) => (faltas.some((f) => f.campo === campo) ? true : undefined);
+  const malo = useCallback(
+    (campo: string) => (faltas.some((f) => f.campo === campo) ? true : undefined),
+    [faltas],
+  );
   const hayFalta = (campo: string) => faltas.some((f) => f.campo === campo);
 
   /** Lleva el foco al control (o al primero del grupo) que falta. */
-  const irAlCampo = (campo: string) => {
+  const irAlCampo = useCallback((campo: string) => {
     const destino = formulario.current?.querySelector<HTMLElement>(`[data-campo="${campo}"]`);
     if (!destino) {
       return;
     }
     destino.scrollIntoView?.({ block: "center", behavior: "smooth" });
     (destino.matches("input,select,textarea,button") ? destino : destino.querySelector<HTMLElement>("input,button"))?.focus({ preventScroll: true });
-  };
+  }, []);
 
-  const textoDeFalta = (f: Falta) => {
+  const textoDeFalta = useCallback((f: Falta) => {
     if (f.campo === "acepta") {
       return t("ins.falta.terminos");
     }
@@ -238,7 +246,7 @@ export function InscripcionForm() {
       return `${t("ins.redes")}: ${t("ins.falta.redes")}`;
     }
     return t(f.motivo === "vacio" ? "ins.falta.vacio" : "ins.falta.invalido", { campo: t(f.etiqueta as Clave) });
-  };
+  }, [t]);
 
   useCodigoDelEnlace((deEnlace) => {
     setCodigo(deEnlace);
@@ -402,10 +410,10 @@ export function InscripcionForm() {
     setPhrase(e.target.value);
   const cambiarLore = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
     setCardText(e.target.value);
-  const volver = () => {
+  const volver = useCallback(() => {
     setError(null);
     setPaso((paso - 1) as Paso);
-  };
+  }, [paso, setError]);
 
   if (enviada) {
     return (

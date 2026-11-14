@@ -167,56 +167,30 @@ export function SubidaImagen({
     }
   };
 
-  const quitar = () => {
+  const quitar = useCallback(() => {
     setError(null);
     vistaDe.current = "";
     setVista(null);
     setFase("vacia");
     onId("");
-  };
+  }, [onId]);
 
   const ocupado = fase === "preparando" || fase === "subiendo";
-  const abrirSelector = () => entrada.current?.click();
+  const abrirSelector = useCallback(() => entrada.current?.click(), []);
   const alElegirArchivo = (e: React.ChangeEvent<HTMLInputElement>) =>
     void elegir(e.target.files?.[0]);
   const borde = invalido ? "border-rose-400 bg-rose-400/5" : "border-dex-line";
-  const tienePreview = vista !== null;
   const requisitos =
     tipo === "character" ? "img.requisitosPersonaje" : "img.requisitosLogo";
 
   return (
     <div data-campo={campo} aria-invalid={invalido ? true : undefined}>
-      <span className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-        {etiqueta}
-        {obligatorio && (
-          <span className="ml-1 text-rose-300" aria-hidden>
-            *
-          </span>
-        )}
-      </span>
+      <Etiqueta etiqueta={etiqueta} obligatorio={obligatorio} />
 
       <div
         className={`mt-1 flex items-start gap-3 rounded-lg border bg-dex-void p-3 ${borde}`}
       >
-        <div
-          data-testid={`vista-${campo}`}
-          className="flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-dex-line"
-          style={{
-            ...MEDIDAS_VISTA[tipo],
-            // Tablero: deja ver la transparencia del recorte.
-            backgroundImage:
-              "conic-gradient(#2a3140 25%, #1b212d 0 50%, #2a3140 0 75%, #1b212d 0)",
-            backgroundSize: "12px 12px",
-          }}
-        >
-          {tienePreview ? (
-            <img
-              src={vista}
-              alt={t("img.vista", { nombre: etiqueta })}
-              className="h-full w-full object-contain"
-            />
-          ) : null}
-        </div>
+        <VistaPrevia campo={campo} tipo={tipo} vista={vista} etiqueta={etiqueta} />
 
         <div className="min-w-0 flex-1 space-y-2">
           <p
@@ -227,26 +201,12 @@ export function SubidaImagen({
           >
             {textoDeFase(t, fase)}
           </p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={ocupado}
-              onClick={abrirSelector}
-              className="rounded-lg border border-dex-line bg-dex-panel px-3 py-1.5 text-xs text-dex-ink hover:border-dex-accent/60 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {id ? t("img.cambiar") : t("img.elegir")}
-            </button>
-            {id && (
-              <button
-                type="button"
-                disabled={ocupado}
-                onClick={quitar}
-                className="rounded-lg border border-dex-line px-3 py-1.5 text-xs text-dex-muted hover:text-dex-ink disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {t("img.quitar")}
-              </button>
-            )}
-          </div>
+          <BotonesDeSubida
+            conImagen={Boolean(id)}
+            ocupado={ocupado}
+            alElegir={abrirSelector}
+            alQuitar={quitar}
+          />
           <input
             ref={entrada}
             type="file"
@@ -260,6 +220,109 @@ export function SubidaImagen({
         </div>
       </div>
 
+      <PieDeSubida error={error} ayuda={ayuda} requisitos={t(requisitos)} />
+    </div>
+  );
+}
+
+/** Rótulo del campo, con el asterisco si es obligatorio. */
+function Etiqueta({
+  etiqueta,
+  obligatorio,
+}: Readonly<{ etiqueta: string; obligatorio: boolean }>) {
+  return (
+    <span className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
+      {etiqueta}
+      {obligatorio && (
+        <span className="ml-1 text-rose-300" aria-hidden>
+          *
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Recuadro con la imagen ya preparada, sobre un tablero que deja ver la transparencia. */
+function VistaPrevia({
+  campo,
+  tipo,
+  vista,
+  etiqueta,
+}: Readonly<{
+  campo: string;
+  tipo: TipoImagenSolicitud;
+  vista: string | null;
+  etiqueta: string;
+}>) {
+  const { t } = useI18n();
+  return (
+    <div
+      data-testid={`vista-${campo}`}
+      className="flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-dex-line"
+      style={{
+        ...MEDIDAS_VISTA[tipo],
+        // Tablero: deja ver la transparencia del recorte.
+        backgroundImage:
+          "conic-gradient(#2a3140 25%, #1b212d 0 50%, #2a3140 0 75%, #1b212d 0)",
+        backgroundSize: "12px 12px",
+      }}
+    >
+      {vista === null ? null : (
+        <img
+          src={vista}
+          alt={t("img.vista", { nombre: etiqueta })}
+          className="h-full w-full object-contain"
+        />
+      )}
+    </div>
+  );
+}
+
+/** Elegir (o cambiar) la imagen y, si ya hay una, quitarla. */
+function BotonesDeSubida({
+  conImagen,
+  ocupado,
+  alElegir,
+  alQuitar,
+}: Readonly<{
+  conImagen: boolean;
+  ocupado: boolean;
+  alElegir: () => void;
+  alQuitar: () => void;
+}>) {
+  const { t } = useI18n();
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        disabled={ocupado}
+        onClick={alElegir}
+        className="rounded-lg border border-dex-line bg-dex-panel px-3 py-1.5 text-xs text-dex-ink hover:border-dex-accent/60 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {conImagen ? t("img.cambiar") : t("img.elegir")}
+      </button>
+      {conImagen && (
+        <button
+          type="button"
+          disabled={ocupado}
+          onClick={alQuitar}
+          className="rounded-lg border border-dex-line px-3 py-1.5 text-xs text-dex-muted hover:text-dex-ink disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t("img.quitar")}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Error de la última subida (si lo hay), la ayuda del campo y los requisitos de la imagen. */
+function PieDeSubida({
+  error,
+  ayuda,
+  requisitos,
+}: Readonly<{ error: string | null; ayuda?: string; requisitos: string }>) {
+  return (
+    <>
       {error && (
         <p
           role="alert"
@@ -270,8 +333,8 @@ export function SubidaImagen({
       )}
       <span className="mt-1 block text-[11px] normal-case tracking-normal text-dex-muted">
         {ayuda ? `${ayuda} ` : ""}
-        {t(requisitos)}
+        {requisitos}
       </span>
-    </div>
+    </>
   );
 }

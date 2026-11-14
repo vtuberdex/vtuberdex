@@ -165,7 +165,7 @@ export function AdminPage() {
       .catch(() => undefined);
   }, [user, token, loadFactions]);
 
-  const pedirEnlace = async (event: React.SubmitEvent<HTMLFormElement>) => {
+  const pedirEnlace = useCallback(async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
     setEnviandoEnlace(true);
@@ -177,9 +177,9 @@ export function AdminPage() {
     } finally {
       setEnviandoEnlace(false);
     }
-  };
+  }, [correo]);
 
-  const entrarConEnlace = async () => {
+  const entrarConEnlace = useCallback(async () => {
     if (!tokenDeEnlace) {
       return;
     }
@@ -194,7 +194,7 @@ export function AdminPage() {
       setTokenDeEnlace(null);
       setError(mensajeDeError(cause, "el enlace no es válido"));
     }
-  };
+  }, [tokenDeEnlace]);
 
   const logout = () => {
     window.localStorage.removeItem(TOKEN_KEY);

@@ -19,7 +19,7 @@
  * Las preguntas salen de la misma lista que la inscripción (`campos-ficha.ts`). El avatar y el logo se piden como ENLACE
  * (un formulario público que recibe archivos es una puerta a subir basura).
  */
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
 import type { Clave } from "@/lib/i18n/mensajes";
@@ -265,10 +265,10 @@ export function ModificacionForm() {
     setThemeColor(e.target.value);
   const cambiarNota = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
     setNota(e.target.value);
-  const volver = () => {
+  const volver = useCallback(() => {
     setError(null);
     setPaso((paso - 1) as Paso);
-  };
+  }, [paso, setError]);
 
   if (enviada) {
     return (
