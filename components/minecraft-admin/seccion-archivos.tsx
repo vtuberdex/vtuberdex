@@ -28,6 +28,8 @@ type Contenido = {
   migas: Migaja[];
   carpetas: Carpeta[];
   archivos: Archivo[];
+  /** Solo aparecen dentro de `plugins/`: son los `.zip` que se pueden subir y reemplazar. */
+  comprimidos?: Archivo[];
   escribible: boolean;
   legible: boolean;
 };
@@ -36,6 +38,8 @@ const MENSAJES: Record<string, string> = {
   sin_permiso_escritura:
     "El panel puede leer esta carpeta pero no guardar: al servicio web le falta permiso de escritura en ella.",
   sin_espacio: "No queda espacio en disco.",
+  extension_no_permitida: "Solo se pueden subir archivos .zip.",
+  archivo_demasiado_grande: "El zip pasa de los 50 MB.",
 };
 const leerError = async (r: Response, porDefecto: string) => {
   const c = (await r.json().catch(() => null)) as {
@@ -126,11 +130,30 @@ function FilaDeArchivo({
   );
 }
 
+/** Un .zip de la carpeta: solo se muestra (no se abre ni se descomprime). */
+function FilaDeComprimido({ comprimido }: Readonly<{ comprimido: Archivo }>) {
+  return (
+    <li>
+      <span
+        className={`flex items-center gap-1.5 rounded-lg px-2 py-1 ${MONO} text-dex-muted`}
+        title={`${comprimido.ruta} · ${tamano(comprimido.bytes)} · se reemplaza subiendo otro con el mismo nombre`}
+      >
+        <span aria-hidden>📦</span>
+        <span className="truncate">{comprimido.nombre}</span>
+        <span className="ml-auto shrink-0 text-[10px]">
+          {tamano(comprimido.bytes)}
+        </span>
+      </span>
+    </li>
+  );
+}
+
 /** Columna izquierda: migas, filtro y el contenido (ya filtrado) de la carpeta. */
 function Explorador({
   migas,
   carpetas,
   archivos,
+  comprimidos,
   ruta,
   filtro,
   alFiltrar,
@@ -140,6 +163,7 @@ function Explorador({
   migas: Migaja[];
   carpetas: Carpeta[];
   archivos: Archivo[];
+  comprimidos: Archivo[];
   ruta: string | null;
   filtro: string;
   alFiltrar: (filtro: string) => void;
@@ -176,7 +200,9 @@ function Explorador({
         aria-label="Contenido de la carpeta"
         className="max-h-[32rem] overflow-auto rounded-xl border border-dex-line bg-dex-void/60 p-1 text-xs"
       >
-        {carpetas.length === 0 && archivos.length === 0 ? (
+        {carpetas.length === 0 &&
+        archivos.length === 0 &&
+        comprimidos.length === 0 ? (
           <li className="p-2 text-dex-muted">Carpeta vacía.</li>
         ) : null}
         {carpetas.map((c) => (
@@ -190,10 +216,16 @@ function Explorador({
             alAbrir={alAbrir}
           />
         ))}
+        {comprimidos.map((c) => (
+          <FilaDeComprimido key={c.ruta} comprimido={c} />
+        ))}
       </ul>
     </div>
   );
 }
+
+/** Mismo tope que un jar de plugin (50 MB): el servidor lo vuelve a comprobar. */
+const LIMITE_ZIP_BYTES = 50 * 1024 * 1024;
 
 export function SeccionArchivos() {
   const [datos, setDatos] = useState<Contenido | null>(null);
@@ -204,6 +236,7 @@ export function SeccionArchivos() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [zip, setZip] = useState<File | null>(null);
 
   const cargar = useCallback(async (destino: string) => {
     setError(null);
@@ -292,6 +325,80 @@ export function SeccionArchivos() {
   const cambiarTexto = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
     setTexto(e.target.value);
 
+  /**
+   * Sube el `.zip` elegido a la carpeta abierta. Si el nombre ya está, el servidor responde
+   * «ya existe» y aquí se pregunta: al confirmar se reemplaza de una vez, sin copia del anterior
+   * (así lo pidió el equipo). Nunca se descomprime: el zip se queda como archivo.
+   */
+  const subirZip = async (evento: React.FormEvent) => {
+    evento.preventDefault();
+    setError(null);
+    setAviso(null);
+    if (!zip) {
+      setError("elige un archivo .zip");
+      return;
+    }
+    if (!/\.zip$/i.test(zip.name)) {
+      setError("solo se pueden subir archivos .zip");
+      return;
+    }
+    if (zip.size === 0) {
+      setError("el archivo llegó vacío");
+      return;
+    }
+    if (zip.size > LIMITE_ZIP_BYTES) {
+      setError("el zip pasa de los 50 MB");
+      return;
+    }
+    const carpeta = datos?.ruta ?? "";
+    setOcupado(true);
+    try {
+      const enviar = (sobrescribir: boolean) => {
+        const consulta = new URLSearchParams({
+          carpeta,
+          nombre: zip.name,
+        });
+        if (sobrescribir) {
+          consulta.set("sobrescribir", "1");
+        }
+        return fetch(`/api/minecraft-admin/archivos?${consulta}`, {
+          method: "POST",
+          headers: { "content-type": "application/zip" },
+          body: zip,
+        });
+      };
+      let r = await enviar(false);
+      if (r.status === 409) {
+        const cuerpo = (await r.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        if (cuerpo?.error !== "ya_existe") {
+          throw new Error("no se pudo subir el zip");
+        }
+        const reemplaza = window.confirm(
+          `Ya hay un «${zip.name}» en esta carpeta. ¿Reemplazarlo? No se guarda copia del anterior.`,
+        );
+        if (!reemplaza) {
+          return;
+        }
+        r = await enviar(true);
+      }
+      if (!r.ok) {
+        throw new Error(await leerError(r, "no se pudo subir el zip"));
+      }
+      const guardado = (await r.json()) as { nombre?: string };
+      setAviso(
+        `Zip guardado: ${guardado.nombre ?? zip.name}. Se queda en la carpeta tal cual; no se descomprime solo.`,
+      );
+      setZip(null);
+      await cargar(carpeta);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "no se pudo subir el zip");
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   const f = filtro.trim().toLowerCase();
   const carpetas = useMemo(
     () =>
@@ -305,6 +412,16 @@ export function SeccionArchivos() {
       ),
     [datos, f],
   );
+  const comprimidos = useMemo(
+    () =>
+      (datos?.comprimidos ?? []).filter(
+        (a) => !f || a.nombre.toLowerCase().includes(f),
+      ),
+    [datos, f],
+  );
+  // La subida de zip solo tiene sentido dentro de `plugins/` (el servidor lo vuelve a exigir).
+  const enPlugins =
+    datos?.ruta === "plugins" || (datos?.ruta ?? "").startsWith("plugins/");
 
   const abierto = datos?.archivos.find((a) => a.ruta === ruta);
   const soloLectura =
@@ -330,6 +447,7 @@ export function SeccionArchivos() {
           migas={datos?.migas ?? []}
           carpetas={carpetas}
           archivos={archivos}
+          comprimidos={comprimidos}
           ruta={ruta}
           filtro={filtro}
           alFiltrar={setFiltro}
@@ -337,7 +455,41 @@ export function SeccionArchivos() {
           alAbrir={abrirSinEsperar}
         />
 
-        <form onSubmit={guardar} className="space-y-3">
+        <div className="space-y-3">
+          {enPlugins ? (
+            <form
+              onSubmit={subirZip}
+              className="space-y-2 rounded-xl border border-dex-line bg-dex-void/60 p-3"
+            >
+              <p className="text-xs text-dex-muted">
+                Subir un <strong>.zip</strong> a esta carpeta (máximo 50 MB, igual que
+                un jar). Solo se aceptan comprimidos y no se descomprimen solos: si
+                ya hay uno con ese nombre, se pregunta antes de reemplazarlo.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="file"
+                  accept=".zip,application/zip"
+                  aria-label="Zip para subir"
+                  onChange={(e) => setZip(e.target.files?.[0] ?? null)}
+                  className="text-xs text-dex-ink"
+                />
+                <button
+                  type="submit"
+                  disabled={ocupado || !zip || datos?.escribible === false}
+                  className={CLASE_BOTON.primario}
+                >
+                  Subir zip
+                </button>
+                {zip ? (
+                  <span className={`text-[11px] text-dex-muted ${MONO}`}>
+                    {tamano(zip.size)}
+                  </span>
+                ) : null}
+              </div>
+            </form>
+          ) : null}
+          <form onSubmit={guardar} className="space-y-3">
           {soloLectura ? (
             <p
               role="alert"
@@ -388,7 +540,8 @@ export function SeccionArchivos() {
               {error}
             </p>
           ) : null}
-        </form>
+          </form>
+        </div>
       </div>
     </Seccion>
   );
