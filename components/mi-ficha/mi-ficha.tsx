@@ -35,6 +35,7 @@ import { useI18n } from "@/lib/i18n";
 import type { Clave } from "@/lib/i18n/mensajes";
 import { miFichaEs } from "@/lib/i18n/textos/mificha";
 import { XP_JUEGO_MAX_DIA } from "@/server/src/experiencia.mjs";
+import { AtributosPanel } from "./atributos";
 
 const CATEGORIAS: Array<HabilidadMejorable["category"]> = [
   "active",
@@ -645,7 +646,12 @@ export function MiFicha() {
   };
 
   const aplicar = async (
-    accion: "subir" | "reiniciar" | "subir-stat" | "reiniciar-stats",
+    accion:
+      | "subir"
+      | "reiniciar"
+      | "subir-stat"
+      | "reiniciar-stats"
+      | "convertir-sobrantes",
     ficha: VistaMiFicha,
     clave?: string,
     nombre?: string,
@@ -653,6 +659,9 @@ export function MiFicha() {
     if (!token) return;
     setOcupada(clave ?? "reiniciar");
     setAviso(null);
+    // El sobrante se lee ANTES de convertir: después ya es 0 y el aviso diría «pasaste 0».
+    const convertidos =
+      accion === "convertir-sobrantes" ? (ficha.puntos.sobrantes ?? 0) : 0;
     try {
       const r = await api.repartirPuntos(token, ficha.slug, accion, clave);
       setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
@@ -674,10 +683,39 @@ export function MiFicha() {
             valor: nuevo?.valor ?? 0,
           }),
         });
+      } else if (accion === "convertir-sobrantes") {
+        setAviso({
+          tipo: "ok",
+          texto: t("mificha.sobrantesListo", { n: convertidos }),
+        });
       } else {
         setConfirmando(false);
         setConfirmandoStats(false);
       }
+    } catch (causa) {
+      avisarFallo(causa);
+    } finally {
+      setOcupada(null);
+    }
+  };
+
+  // Los seis atributos se guardan de una vez (la distribución completa): el servidor valida el tope
+  // de 200 puntos y de 100 por atributo antes de escribirlos.
+  const guardarAtributos = async (
+    ficha: VistaMiFicha,
+    atributos: Record<string, number>,
+  ) => {
+    if (!token) return;
+    setOcupada("atributos");
+    setAviso(null);
+    try {
+      const r = await api.guardarAtributosDeMiFicha(
+        token,
+        ficha.slug,
+        atributos,
+      );
+      setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
+      setAviso({ tipo: "ok", texto: t("mificha.atrGuardado") });
     } catch (causa) {
       avisarFallo(causa);
     } finally {
@@ -761,6 +799,10 @@ export function MiFicha() {
         void aplicar("subir", datos.ficha, clave, nombre)
       }
       alReiniciar={() => void aplicar("reiniciar", datos.ficha)}
+      alConvertir={() => void aplicar("convertir-sobrantes", datos.ficha)}
+      alGuardarAtributos={(ficha, atributos) =>
+        void guardarAtributos(ficha, atributos)
+      }
       alConfirmar={setConfirmando}
     />
   );
@@ -787,6 +829,8 @@ export function MiFichaVista({
   alSubir = () => {},
   alReiniciar = () => {},
   alConfirmar = () => {},
+  alConvertir = () => {},
+  alGuardarAtributos = () => {},
 }: {
   datos: RespuestaMiFicha;
   ocupada?: string | null;
@@ -804,6 +848,11 @@ export function MiFichaVista({
   alSubir?: (clave: string, nombre: string) => void;
   alReiniciar?: () => void;
   alConfirmar?: (abierto: boolean) => void;
+  alConvertir?: () => void;
+  alGuardarAtributos?: (
+    ficha: VistaMiFicha,
+    atributos: Record<string, number>,
+  ) => void;
 }) {
   const { t } = useI18n();
   const { ficha, fichas } = datos;
@@ -899,6 +948,23 @@ export function MiFichaVista({
 
       {aviso && <Aviso tipo={aviso.tipo}>{aviso.texto}</Aviso>}
 
+      {(puntos.sobrantes ?? 0) > 0 && (
+        <section className="rounded-2xl border border-dex-accent/40 bg-dex-panel/60 p-5">
+          <p className="text-sm text-dex-ink/85">
+            {t("mificha.sobrantesTexto", { n: puntos.sobrantes ?? 0 })}
+          </p>
+          <button
+            type="button"
+            onClick={alConvertir}
+            disabled={ocupada !== null}
+            className={`mt-3 ${claseSecundario}`}
+            data-testid="mificha-sobrantes"
+          >
+            {t("mificha.sobrantesBoton", { n: puntos.sobrantes ?? 0 })}
+          </button>
+        </section>
+      )}
+
       {ficha.statsPuntos && (
         <SeccionStats
           estado={ficha.statsPuntos}
@@ -907,6 +973,14 @@ export function MiFichaVista({
           alSubir={alSubirStat}
           alReiniciar={alReiniciarStats}
           alConfirmar={alConfirmarStats}
+        />
+      )}
+
+      {ficha.atributos && (
+        <AtributosPanel
+          estado={ficha.atributos}
+          ocupada={ocupada}
+          alGuardar={(atributos) => alGuardarAtributos(ficha, atributos)}
         />
       )}
 

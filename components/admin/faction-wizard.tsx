@@ -68,6 +68,19 @@ export function nombreDeSubfaccion(madreLabel: string, propio: string): string {
   return resto ? `${madre} (${resto})` : `${madre} ()`;
 }
 
+/**
+ * ¿Falta decir DE QUIÉN es la subfacción? Al marcar «sí, pertenece a otra facción» hay que elegir la
+ * madre: una hija sin madre no acredita los estados exclusivos de nadie —el nombre «Madre (Propia)»
+ * parece una subfacción, pero para el validador es una facción raíz con paréntesis—. Vive aparte de
+ * la pantalla para poder probarlo sin montar el asistente.
+ */
+export function faltaMadre(
+  conMadre: boolean,
+  parentId: number | null,
+): boolean {
+  return conMadre && parentId === null;
+}
+
 export function FactionWizard({
   token,
   factions,
@@ -88,6 +101,8 @@ export function FactionWizard({
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [parentId, setParentId] = useState<number | null>(null);
+  /** Elección explícita: ¿la facción nueva cuelga de otra (subfacción) o es raíz? */
+  const [conMadre, setConMadre] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [skipped, setSkipped] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -122,6 +137,7 @@ export function FactionWizard({
     setStep(0);
     setName("");
     setParentId(null);
+    setConMadre(false);
     setFile(null);
     setSkipped(false);
     setError(null);
@@ -232,7 +248,8 @@ export function FactionWizard({
       data-testid="faction-wizard"
       onSubmit={(event) => {
         event.preventDefault();
-        if (step === 0 && !nameProblem) setStep(1);
+        if (step === 0 && !nameProblem && !faltaMadre(conMadre, parentId))
+          setStep(1);
         else if (step === 1 && (file || skipped)) setStep(2);
         else if (step === 2 && !busy) void create();
       }}
@@ -286,11 +303,45 @@ export function FactionWizard({
           {trimmed && !nameProblem && (
             <p className="text-xs text-emerald-300">✓ Nombre disponible.</p>
           )}
-          {madres.length > 0 && (
-            <Field
-              label="Facción madre (opcional)"
-              hint="Solo para una subfacción: se elige en la ficha como cualquier otra y ocupa uno de sus 2 cupos, pero acredita los estados exclusivos de su madre. El nombre se escribe «Madre (Propia)»."
-            >
+          <fieldset className="space-y-1 rounded-xl border border-dex-line p-3">
+            <legend className="px-1 text-xs uppercase tracking-[0.14em] text-dex-muted">
+              ¿Pertenece a otra facción?
+            </legend>
+            <label className="flex items-center gap-2 text-sm text-dex-ink">
+              <input
+                type="radio"
+                name="madre-eleccion"
+                aria-label="No pertenece a ninguna: facción raíz"
+                checked={!conMadre}
+                onChange={() => {
+                  setConMadre(false);
+                  setParentId(null);
+                }}
+                disabled={busy}
+              />
+              No, es una facción raíz
+            </label>
+            <label className="flex items-center gap-2 text-sm text-dex-ink">
+              <input
+                type="radio"
+                name="madre-eleccion"
+                aria-label="Sí: pertenece a una facción madre"
+                checked={conMadre}
+                onChange={() => setConMadre(true)}
+                disabled={busy || madres.length === 0}
+              />
+              Sí, es subfacción de otra facción
+            </label>
+            {madres.length === 0 && (
+              <p className="text-[11px] text-dex-muted">
+                No hay facciones raíz a las que colgarla: crea primero la madre.
+              </p>
+            )}
+            {conMadre && (
+              <Field
+                label="Facción madre"
+                hint="Se elige en la ficha como cualquier otra y ocupa uno de sus 2 cupos, pero acredita los estados exclusivos de su madre. El nombre se escribe «Madre (Propia)»."
+              >
               <select
                 aria-label="Facción madre"
                 value={parentId === null ? "" : String(parentId)}
@@ -309,15 +360,16 @@ export function FactionWizard({
                 }}
                 className={inputClass}
               >
-                <option value="">Ninguna (facción raíz)</option>
+                <option value="">Elige la facción madre…</option>
                 {madres.map((faction) => (
                   <option key={faction.id} value={faction.id}>
                     {faction.label}
                   </option>
                 ))}
               </select>
-            </Field>
-          )}
+              </Field>
+            )}
+          </fieldset>
           {madre && !trimmed.includes("(") && (
             <button
               type="button"
@@ -420,6 +472,10 @@ export function FactionWizard({
         <div className="flex flex-col items-end gap-1">
           {step === 0 && !trimmed ? (
             <Reason>Escribe un nombre para continuar.</Reason>
+          ) : step === 0 && faltaMadre(conMadre, parentId) ? (
+            <Reason>
+              Elige la facción madre, o marca que no pertenece a ninguna.
+            </Reason>
           ) : step === 1 && !file && !skipped ? (
             <Reason>Elige un archivo u omite este paso.</Reason>
           ) : null}
@@ -427,7 +483,11 @@ export function FactionWizard({
             <button
               type="submit"
               className={primaryButton}
-              disabled={step === 0 ? Boolean(nameProblem) : !file && !skipped}
+              disabled={
+                step === 0
+                  ? Boolean(nameProblem) || faltaMadre(conMadre, parentId)
+                  : !file && !skipped
+              }
             >
               Siguiente
             </button>

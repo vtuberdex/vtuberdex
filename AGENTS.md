@@ -313,6 +313,11 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   campo** (`socials.0.url`). **Nunca** correo, contenido, red ni mensaje (puede citar lo escrito); se poda a los 30 días y no lanza jamás.
   Se ve en el mantenedor, «Envíos rechazados (últimos 7 días)» (`GET /api/admin/solicitudes/rechazos?dias=`, Next y Express). Si añades
   un formulario público, estrénalo con `responderRegistrando`.
+- **El fallo se cuenta en palabras** (`motivoDeError` en `lib/api.ts`): el cliente prefiere el `detail` del servidor; si solo llega un
+  `error` lo traduce con su tabla (`origen_no_permitido`, `demasiados_correos`…, un código desconocido va dentro de una frase, nunca a
+  pelo); si `fetch` falla (sin red) o la respuesta no es JSON (la página de error del proxy) también se convierte en `ApiError` con el
+  motivo, porque antes lanzaba un error suelto y el formulario lo tapaba con su aviso genérico: varios fallos distintos parecían uno.
+  Al añadir un código de error nuevo que ve la persona, añádelo a `EXPLICACIONES`.
 
 ## Correo saliente, verificación de solicitudes y acceso por enlace mágico
 
@@ -533,6 +538,11 @@ calcula ni «procesar» una baja los aplica solo**.
   `ganados − repartidos` (`server/src/mi-ficha.mjs`, tabla `punto_habilidad` por **nombre** de habilidad, no por id: el mantenedor
   reescribe las filas). Gastar es UNA sentencia condicional (dos clics a la vez no gastan un punto inexistente). El rango sale
   público en la ficha (`skills[].rank`, insignia en `SkillList`).
+- **Puntos sobrantes → stats**: con todas las habilidades en su rango máximo los puntos quedarían muertos, así que el sobrante
+  (`sobrantes` = disponibles − hueco libre en las habilidades) se puede pasar a la bolsa de stats: `convertirPuntosSobrantes`,
+  tabla `punto_convertido`, acción `convertir-sobrantes` de `POST /api/mi-ficha/puntos`. Solo se convierte el SOBRANTE (mientras
+  quepa un rango, el punto se queda en habilidades) y lo convertido NO vuelve ni al reiniciar rangos: por eso `gastables` resta lo
+  convertido en las dos bolsas, y la escritura es un UPSERT condicional (dos clics a la vez no convierten dos veces).
 - **Aviso de subida de nivel** (`lib/mi-ficha.mjs`, `avisarSubidaDeNivel`, llamado en segundo plano desde el POST del like):
   `reclamarAvisoDeNivel` (tabla `aviso_nivel`) es un UPSERT condicional, así que solo UN like gana el derecho a mandar el correo; si
   el envío falla se suelta y el siguiente like lo reintenta. Va al correo de la inscripción APROBADA (`correoDeLaFicha`); las fichas

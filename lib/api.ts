@@ -123,6 +123,57 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Los códigos de error de la API que llegan SIN explicación (`detail`) y que la persona puede entender. Sin esto
+ * la pantalla enseñaba el código crudo o, peor, el aviso genérico del formulario, que ocultaba la causa real.
+ */
+const EXPLICACIONES: Record<string, string> = {
+  origen_no_permitido:
+    "El envío se bloqueó por seguridad. Recarga la página e inténtalo de nuevo.",
+  demasiados_correos:
+    "Pediste códigos demasiadas veces. Espera unos minutos (o hasta mañana) antes de pedir otro.",
+  correo_no_disponible:
+    "No pudimos enviar el correo. Revisa la dirección e inténtalo de nuevo en unos minutos.",
+  solicitudes_no_disponibles:
+    "La web no pudo atender el envío. Inténtalo de nuevo en unos minutos.",
+  correo_no_registrado:
+    "Ese correo no tiene ninguna ficha. Si crees que es un error, habla con el mantenedor.",
+  falta_verificacion:
+    "Tu correo ya no está verificado. Vuelve al paso 1 y pide un código nuevo.",
+};
+
+/**
+ * El mensaje que lee quien rellena un formulario cuando la API dice que no: primero lo que explica el
+ * servidor (`detail`), después lo que se sabe de su código y, si la respuesta no era ni JSON (la página de
+ * error del proxy), el estado. Un código técnico a pelo no se enseña nunca.
+ */
+export function motivoDeError(status: number, payload: unknown): string {
+  const datos = (payload ?? {}) as {
+    error?: string;
+    detail?: string;
+    issues?: unknown;
+  };
+  if (typeof datos.detail === "string" && datos.detail.trim())
+    return datos.detail;
+  const codigo = typeof datos.error === "string" ? datos.error : "";
+  const explicado = EXPLICACIONES[codigo];
+  if (explicado) return explicado;
+  // Un 400 de validación traía `issues` (qué campo y por qué) y se perdía: la pantalla solo decía
+  // «payload_invalido» y nadie sabía qué corregir. Se añade el primero al mensaje.
+  const primero = Array.isArray(datos.issues)
+    ? (datos.issues[0] as { path?: string; message?: string } | undefined)
+    : undefined;
+  const que = primero?.path
+    ? ` (${primero.path}: ${primero.message ?? "no válido"})`
+    : "";
+  if (!codigo) {
+    return status >= 500
+      ? "La web no pudo atender el envío. Inténtalo de nuevo en unos minutos."
+      : "No se pudo completar el envío. Inténtalo de nuevo.";
+  }
+  return `No se pudo completar (${codigo}). Inténtalo de nuevo.${que}`;
+}
+
 /** Formularios públicos que suben imágenes y su carpeta en `/api`. */
 export type FormularioConImagenes = "inscripcion" | "modificacion";
 const RUTA_DE_FORMULARIO: Record<FormularioConImagenes, string> = {
@@ -142,12 +193,30 @@ async function request<T>(
   // Al llamar SIEMPRE al cliente con cuerpo JSON, el valor por defecto es JSON y
   // solo lo sobreescribe un llamador que lo pida explícitamente.
   const { headers: extraHeaders, ...rest } = init ?? {};
-  const response = await fetch(`${BASE}${path}`, {
-    ...rest,
-    headers: { "content-type": "application/json", ...(extraHeaders ?? {}) },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}${path}`, {
+      ...rest,
+      headers: { "content-type": "application/json", ...(extraHeaders ?? {}) },
+    });
+  } catch {
+    // Sin red (o la web caída) `fetch` lanza un TypeError que NO es `ApiError`: el formulario lo tapaba con su
+    // aviso genérico y parecía un fallo de los datos. Aquí se dice lo que de verdad pasó.
+    throw new ApiError(
+      "No pudimos conectar con la web. Revisa tu conexión e inténtalo de nuevo.",
+      0,
+    );
+  }
   const text = await response.text();
-  const payload = text ? (JSON.parse(text) as unknown) : null;
+  let payload: unknown = null;
+  try {
+    payload = text ? (JSON.parse(text) as unknown) : null;
+  } catch {
+    // Una respuesta que NO es JSON (la página de error del proxy, un 502 en texto) hacía que `JSON.parse`
+    // lanzara un SyntaxError, que tampoco era ApiError y se tapaba igual. Se queda `null` y el mensaje lo
+    // pone `motivoDeError`, que sí sabe el estado.
+    payload = null;
+  }
   // La API pública del catálogo exige una sesión de visitante (prueba de trabajo): se abre sola
   // y la petición se repite UNA vez. Ver `lib/sesion-visitante.mjs`.
   if (
@@ -159,23 +228,10 @@ async function request<T>(
     return request<T>(path, init, true);
   }
   if (!response.ok) {
-    const detail = payload as {
-      error?: string;
-      detail?: string;
-      issues?: unknown;
-    } | null;
-    // Un 400 de validación traía `issues` (qué campo y por qué) y se perdía: la pantalla solo decía
-    // «payload_invalido» y nadie sabía qué corregir. Se añade el primero al mensaje.
-    const primero = Array.isArray(detail?.issues)
-      ? (detail.issues[0] as { path?: string; message?: string } | undefined)
-      : undefined;
-    const que = primero?.path
-      ? ` (${primero.path}: ${primero.message ?? "no válido"})`
-      : "";
     throw new ApiError(
-      `${detail?.detail ?? detail?.error ?? `HTTP ${response.status}`}${detail?.detail ? "" : que}`,
+      motivoDeError(response.status, payload),
       response.status,
-      detail?.issues,
+      (payload as { issues?: unknown } | null)?.issues,
     );
   }
   return payload as T;
@@ -221,8 +277,12 @@ export interface EstadoDeStats {
   stats: StatMejorable[];
   automaticos: StatAutomatico[];
   ganados: number;
+  /** Puntos de habilidad pasados a esta bolsa (ya no cuentan en la de habilidades). */
+  convertidos?: number;
   repartidos: number;
   disponibles: number;
+  /** Tope de lo que se puede repartir: lo del nivel más lo pasado de habilidades. */
+  gastables?: number;
   puntosPorNivel: number;
 }
 
@@ -238,11 +298,17 @@ export interface VistaMiFicha {
     ganados: number;
     repartidos: number;
     disponibles: number;
+    /** Puntos que ya no caben en ninguna habilidad (todas al máximo): se pueden pasar a stats. */
+    sobrantes?: number;
+    /** Puntos que ya se pasaron a la bolsa de stats. */
+    convertidos?: number;
     rangoMaximo: number;
     puntosPorNivel: number;
   };
   /** Puntos de stats (bolsa aparte de las habilidades). Opcional: la maqueta de /niveles no lo trae. */
   statsPuntos?: EstadoDeStats;
+  /** Los seis atributos RPG y los stats que salen de ellos. Opcional: falta en la maqueta de /niveles. */
+  atributos?: EstadoDeAtributos;
   /** Cuenta de Minecraft vinculada y XP traída del juego. Opcional: la maqueta de /niveles no lo trae. */
   minecraft?: EstadoMinecraft;
   /** Misiones de Minecraft con su progreso. `null` si el almacén falló; ausente en la maqueta de /niveles. */
@@ -289,6 +355,33 @@ export interface EstadoMinecraft {
   jugador: string | null;
   desde: string | null;
   xpJuego: number;
+}
+
+/** Un atributo RPG de la ficha: puntos repartidos, bono de facción y valor final (tope 100). */
+export interface AtributoDeFicha {
+  slug: string;
+  label: string;
+  puntos: number;
+  bono: number;
+  valor: number;
+  maximo: number;
+}
+
+/** «Mi ficha»: los seis atributos (STR, DEX, CON, INT, WIS, CHA) y los stats que salen de ellos. */
+export interface EstadoDeAtributos {
+  catalogo: Array<{ slug: string; label: string }>;
+  puntos: Record<string, number>;
+  bonos: Record<string, number>;
+  finales: AtributoDeFicha[];
+  derivados: Array<{ slug: string; label: string; value: number }>;
+  total: number;
+  maximo: number;
+  repartidos: number;
+  disponibles: number;
+  /** La ficha ya traía stats propios: no reparte atributos y sus valores no se tocan. */
+  tieneStatsDeOrigen: boolean;
+  puedeEditar: boolean;
+  estado: "vacio" | "repartido" | "origen";
 }
 
 export interface RespuestaMiFicha {
@@ -696,12 +789,28 @@ export const api = {
   repartirPuntos(
     token: string,
     slug: string,
-    accion: "subir" | "reiniciar" | "subir-stat" | "reiniciar-stats",
+    accion:
+      | "subir"
+      | "reiniciar"
+      | "subir-stat"
+      | "reiniciar-stats"
+      | "convertir-sobrantes",
     clave?: string,
   ) {
     return request<{ ok: true; ficha: VistaMiFicha }>("/api/mi-ficha/puntos", {
       method: "POST",
       body: JSON.stringify({ token, slug, accion, clave }),
+    });
+  },
+  /** Guarda la distribución de los seis atributos (200 puntos) de una ficha. */
+  guardarAtributosDeMiFicha(
+    token: string,
+    slug: string,
+    puntos: Record<string, number>,
+  ) {
+    return request<{ ok: true; ficha: VistaMiFicha }>("/api/mi-ficha/puntos", {
+      method: "POST",
+      body: JSON.stringify({ token, slug, accion: "atributos", puntos }),
     });
   },
   /** Código de un uso para vincular la cuenta de Minecraft (`codigo`) o soltar el vínculo (`desvincular`). */

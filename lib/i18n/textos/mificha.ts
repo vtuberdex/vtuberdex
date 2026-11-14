@@ -54,6 +54,18 @@ export const miFichaEs = {
     "Ganas {por} puntos de stats con cada nivel (aparte de los de habilidades). Sirven para HP, MP, ataques y defensas.",
   "mificha.statsDisponibles": "{n} para repartir · {a} de {b} usados",
   "mificha.statsPaso": "+{paso} por punto",
+  "mificha.atrTitulo": "Atributos RPG",
+  "mificha.atrTexto":
+    "Reparte tus {total} puntos entre los seis atributos: de ahí salen tu vida, tu maná, tus ataques y tus defensas.",
+  "mificha.atrDisponibles": "Te quedan {n} de {total} puntos",
+  "mificha.atrBono": "+{n} por facción",
+  "mificha.atrSuma":
+    "Repartidos {a} de {b}: los bonos de tus facciones no gastan puntos.",
+  "mificha.atrDerivados": "Lo que sale de tus atributos",
+  "mificha.atrGuardar": "Guardar atributos",
+  "mificha.atrBloqueado":
+    "Tus atributos ya están guardados. Si necesitas cambiarlos, pide al equipo que los ajuste.",
+  "mificha.atrGuardado": "Atributos guardados.",
   "mificha.statsSubioA": "¡{nombre} subió a {valor}!",
   "mificha.statsReiniciar": "Repartir stats de nuevo",
   "mificha.statsReiniciarConfirma":
@@ -63,6 +75,10 @@ export const miFichaEs = {
     "Estos stats crecen con tus niveles, sin gastar puntos.",
   "mificha.statsAutoCada": "+{suma} cada {cada} niveles",
   "mificha.statsAutoTope": "máx. {tope}",
+  "mificha.sobrantesTexto":
+    "Tus habilidades están al máximo: te quedan {n} puntos que ya no caben en ninguna. Puedes pasarlos a la bolsa de stats.",
+  "mificha.sobrantesBoton": "Pasar {n} a stats",
+  "mificha.sobrantesListo": "¡Pasaste {n} puntos a la bolsa de stats!",
   "mificha.verFicha": "Ver mi ficha pública",
   "mificha.errorSinPuntos": "No te quedan puntos. Ganas más al subir de nivel.",
   "mificha.errorGeneral": "No se pudo guardar. Inténtalo de nuevo.",
@@ -197,6 +213,18 @@ export const miFichaEn: { [K in keyof typeof miFichaEs]: string } = {
     "You earn {por} stat points per level (separate from skill points). Spend them on HP, MP, attacks and defenses.",
   "mificha.statsDisponibles": "{n} to spend · {a} of {b} used",
   "mificha.statsPaso": "+{paso} per point",
+  "mificha.atrTitulo": "RPG attributes",
+  "mificha.atrTexto":
+    "Split your {total} points between the six attributes: your HP, MP, attacks and defenses come from them.",
+  "mificha.atrDisponibles": "You have {n} of {total} points left",
+  "mificha.atrBono": "+{n} from factions",
+  "mificha.atrSuma":
+    "Spent {a} of {b}: your faction bonuses cost no points.",
+  "mificha.atrDerivados": "What your attributes give you",
+  "mificha.atrGuardar": "Save attributes",
+  "mificha.atrBloqueado":
+    "Your attributes are already saved. If you need them changed, ask the team.",
+  "mificha.atrGuardado": "Attributes saved.",
   "mificha.statsSubioA": "{nombre} rose to {valor}!",
   "mificha.statsReiniciar": "Respec stats",
   "mificha.statsReiniciarConfirma":
@@ -206,6 +234,10 @@ export const miFichaEn: { [K in keyof typeof miFichaEs]: string } = {
     "These stats grow with your levels, no points needed.",
   "mificha.statsAutoCada": "+{suma} every {cada} levels",
   "mificha.statsAutoTope": "max {tope}",
+  "mificha.sobrantesTexto":
+    "Your skills are all maxed out: you have {n} points that no longer fit anywhere. You can move them to the stats pool.",
+  "mificha.sobrantesBoton": "Move {n} to stats",
+  "mificha.sobrantesListo": "You moved {n} points to the stats pool!",
   "mificha.verFicha": "See my public profile",
   "mificha.errorSinPuntos": "No points left. You earn more by leveling up.",
   "mificha.errorGeneral": "It could not be saved. Please try again.",
@@ -340,6 +372,18 @@ export const miFichaJa: { [K in keyof typeof miFichaEs]: string } = {
     "レベルごとに {por} ポイントを獲得します（スキルポイントとは別）。HP・MP・攻撃・防御に使えます。",
   "mificha.statsDisponibles": "残り {n} · 使用 {a} / {b}",
   "mificha.statsPaso": "1ポイントで +{paso}",
+  "mificha.atrTitulo": "RPG 属性",
+  "mificha.atrTexto":
+    "6 つの属性に {total} ポイントを振り分けましょう。HP・MP・攻撃・防御はここから決まります。",
+  "mificha.atrDisponibles": "残り {n} / {total} ポイント",
+  "mificha.atrBono": "勢力ボーナス +{n}",
+  "mificha.atrSuma":
+    "{b} のうち {a} を配分済み。勢力ボーナスはポイントを使いません。",
+  "mificha.atrDerivados": "属性から決まるステータス",
+  "mificha.atrGuardar": "属性を保存",
+  "mificha.atrBloqueado":
+    "属性は保存済みです。変更が必要なら運営にご相談ください。",
+  "mificha.atrGuardado": "属性を保存しました。",
   "mificha.statsSubioA": "{nombre} が {valor} に上がりました！",
   "mificha.statsReiniciar": "ステータスを振り直す",
   "mificha.statsReiniciarConfirma":
@@ -349,6 +393,10 @@ export const miFichaJa: { [K in keyof typeof miFichaEs]: string } = {
     "これらのステータスはレベルに応じて自動で上がります。",
   "mificha.statsAutoCada": "{cada} レベルごとに +{suma}",
   "mificha.statsAutoTope": "最大 {tope}",
+  "mificha.sobrantesTexto":
+    "スキルがすべて最大です。どこにも入らないポイントが {n} あります。ステータスのポイントに回せます。",
+  "mificha.sobrantesBoton": "{n} をステータスへ",
+  "mificha.sobrantesListo": "{n} ポイントをステータスに回しました！",
   "mificha.verFicha": "公開カードを見る",
   "mificha.errorSinPuntos":
     "ポイントがありません。レベルアップするともらえます。",

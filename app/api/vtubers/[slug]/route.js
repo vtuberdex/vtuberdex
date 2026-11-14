@@ -35,6 +35,10 @@ import { ejecutorDeSolicitudes } from "../../../../lib/solicitudes.mjs";
 import { marcarSinCorreo } from "../../../../lib/sin-correo.mjs";
 import { equilibrarStats } from "../../../../server/src/equilibrio.mjs";
 import {
+  aplicarAtributosAStats,
+  statsDeAtributosDe,
+} from "../../../../server/src/atributos.mjs";
+import {
   aplicarPuntosAStats,
   claveDeHabilidad,
   leerPuntosDeStats,
@@ -129,6 +133,24 @@ export async function GET(request, { params }) {
   } catch (error) {
     console.error(
       `[mi-ficha] la ficha ${slug} sale sin puntos de stats: ${error.message}`,
+    );
+  }
+  // Si la ficha repartió sus seis atributos (STR, DEX, CON…), los stats que ve el juego salen de
+  // ahí: se calculan, no se guardan. Si el almacén falla, la ficha sale con lo que tenía.
+  try {
+    const derivados = await statsDeAtributosDe(await ejecutorDeSolicitudes(), {
+      vtuberId: card.id,
+      facciones: card.factions ?? [],
+      stats: card.stats,
+    });
+    if (derivados.length)
+      conLikes = {
+        ...conLikes,
+        stats: aplicarAtributosAStats(conLikes.stats, derivados),
+      };
+  } catch (error) {
+    console.error(
+      `[mi-ficha] la ficha ${slug} sale sin atributos: ${error.message}`,
     );
   }
   return Response.json(
