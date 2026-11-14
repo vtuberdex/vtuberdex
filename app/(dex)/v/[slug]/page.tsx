@@ -74,7 +74,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function DetailRoute({ params }: Props) {
+export default async function DetailRoute({ params }: Readonly<Props>) {
   const { slug } = await params;
   const card = await fichaPublica(slug).catch(() => undefined);
   // `undefined` = la lectura falló: se deja pasar al cliente (que pedirá la API) en vez de

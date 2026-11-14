@@ -8,6 +8,15 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 
+/** ¿Existe `ruta` y es un archivo? (no lanza si no existe). */
+function esArchivo(ruta) {
+  try {
+    return fs.statSync(ruta).isFile();
+  } catch {
+    return false; // no está en esta carpeta
+  }
+}
+
 /**
  * Ruta absoluta de un CLI (`git`, `vercel`) buscada en el PATH una sola vez, con las extensiones
  * de Windows. El proceso hijo arranca ese archivo concreto y no vuelve a resolver por el PATH.
@@ -24,12 +33,8 @@ export function ejecutable(nombre) {
     }
     for (const extension of extensiones) {
       const candidato = path.join(carpeta, nombre + extension.toLowerCase());
-      try {
-        if (fs.statSync(candidato).isFile()) {
-          return candidato;
-        }
-      } catch {
-        // no está en esta carpeta
+      if (esArchivo(candidato)) {
+        return candidato;
       }
     }
   }
@@ -111,7 +116,7 @@ export function pedirCredencial(prompt = "Contraseña del mantenedor: ") {
  * `fetch` que devuelve `{ status, cuerpo }` sin lanzar por un status no-2xx: el status es el
  * dato. El cuerpo va como JSON; si no lo es, `siNoEsJson(texto)` decide qué guardar.
  */
-export async function pedirJson(url, init = {}, siNoEsJson = (texto) => texto) {
+export async function pedirJson(url, init = {}, siNoEsJson = (crudo) => crudo) {
   const respuesta = await fetch(url, init);
   const texto = await respuesta.text();
   let cuerpo;

@@ -34,6 +34,8 @@ function archivos(dir, acc = []) {
       archivos(ruta, acc);
     } else if (/\.(mjs|js|ts|tsx)$/.test(entrada)) {
       acc.push(ruta);
+    } else {
+      // ni carpeta ni código (json, css, imágenes…): no cuenta para el barrido
     }
   }
   return acc;
@@ -41,7 +43,9 @@ function archivos(dir, acc = []) {
 
 const ARCHIVOS = archivos(RAIZ);
 const FUENTES = ARCHIVOS.filter((f) => !/\.test\.(ts|tsx|mjs|js)$/.test(f));
-const TESTS = ARCHIVOS.filter((f) => /\.test\.(ts|tsx|mjs|js)$/.test(f));
+const TESTS = new Set(
+  ARCHIVOS.filter((f) => /\.test\.(ts|tsx|mjs|js)$/.test(f)),
+);
 
 const leer = (f) => readFileSync(f, "utf8");
 const rel = (f) => relative(RAIZ, f);
@@ -66,7 +70,9 @@ function exportsDe(fuente) {
     for (const trozo of m[1].split(",")) {
       const nombre = trozo
         .trim()
-        .split(/\s+as\s+/)
+        // Un solo blanco a cada lado basta: lo que sobra lo quita el `trim` de después (y así la
+        // regex no retrocede sobre `\s+` repetidos).
+        .split(/\sas\s/)
         .pop()
         ?.trim();
       if (nombre) {
@@ -86,7 +92,7 @@ function consumidores(nombre, propio) {
   const usos = { fuente: [], test: [] };
   // Se escapan TODOS los metacaracteres (no solo `$`): un nombre con `\` o `.` rompía o ensanchaba el patrón.
   const patron = new RegExp(
-    `\\b${nombre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
+    String.raw`\b${nombre.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}\b`,
   );
   for (const f of ARCHIVOS) {
     if (f === propio) {
@@ -96,7 +102,7 @@ function consumidores(nombre, propio) {
     if (!patron.test(contenido)) {
       continue;
     }
-    (TESTS.includes(f) ? usos.test : usos.fuente).push(rel(f));
+    (TESTS.has(f) ? usos.test : usos.fuente).push(rel(f));
   }
   return usos;
 }
@@ -110,8 +116,8 @@ for (const f of FUENTES) {
     const total = usos.fuente.length + usos.test.length;
     if (total === 0) {
       // ¿se usa DENTRO de su propio archivo? Entonces el export sobra, no la función.
-      const interno = new RegExp(`\\b${nombre}\\b`, "g");
-      const dentro = (fuente.match(interno) ?? []).length;
+      const interno = new RegExp(String.raw`\b${nombre}\b`, "g");
+      const dentro = [...fuente.matchAll(interno)].length;
       muertos.push({ archivo: rel(f), nombre, interno: dentro > 1, usos });
     }
   }

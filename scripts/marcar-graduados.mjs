@@ -24,25 +24,37 @@ if (!nombres.length) {
 const db = await dbConDiario();
 const e = await ejecutorDeSolicitudes();
 const filas = db.prepare("SELECT id, slug, name FROM vtuber").all();
+/** Por qué un nombre no marca nada: ninguna ficha o varias (se listan para elegir a mano). */
+function describirFallo(hallazgos) {
+  if (!hallazgos.length) {
+    return "sin coincidencia exacta";
+  }
+  const lista = hallazgos.map((fila) => `${fila.name} (${fila.slug})`);
+  return `ambiguo → ${lista.join(", ")}`;
+}
+
+let accion = "graduada";
+if (seco) {
+  accion = "se marcaría";
+} else if (quitar) {
+  accion = "desmarcada";
+}
+
 let problemas = 0;
 for (const nombre of nombres) {
   const q = normalizeText(nombre);
   const hallazgos = filas.filter(
-    (f) => normalizeText(f.slug) === q || normalizeText(f.name) === q,
+    (fila) => normalizeText(fila.slug) === q || normalizeText(fila.name) === q,
   );
   if (hallazgos.length !== 1) {
     problemas += 1;
-    console.log(
-      `✗ «${nombre}»: ${hallazgos.length ? "ambiguo → " + hallazgos.map((f) => `${f.name} (${f.slug})`).join(", ") : "sin coincidencia exacta"}`,
-    );
+    console.log(`✗ «${nombre}»: ${describirFallo(hallazgos)}`);
     continue;
   }
   const [f] = hallazgos;
   if (!seco) {
     await fijarGraduado(e, f.id, !quitar);
   }
-  console.log(
-    `✓ ${f.name} (${f.slug}, id ${f.id}) ${seco ? "se marcaría" : quitar ? "desmarcada" : "graduada"}`,
-  );
+  console.log(`✓ ${f.name} (${f.slug}, id ${f.id}) ${accion}`);
 }
 process.exit(problemas ? 2 : 0);

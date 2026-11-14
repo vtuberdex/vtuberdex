@@ -27,14 +27,14 @@ export async function GET(request) {
     // Sin `ruta` es navegar: `?carpeta=plugins/MythicMobs` abre esa carpeta y sin `carpeta`
     // se abre la raíz (archivos de Paper/Bukkit/Spigot y las carpetas navegables).
     if (!ruta) {
-      const resultado = await listarCarpeta({
+      const listado = await listarCarpeta({
         ruta: params.get("carpeta"),
         rol: acceso.sesion.role,
       });
-      if (!resultado.ok) {
-        return respuestaJson(resultado.cuerpo, resultado.status);
+      if (!listado.ok) {
+        return respuestaJson(listado.cuerpo, listado.status);
       }
-      return respuestaJson(resultado);
+      return respuestaJson(listado);
     }
     const resultado = await leerArchivo({ ruta, rol: acceso.sesion.role });
     if (!resultado.ok) {

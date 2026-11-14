@@ -4,7 +4,7 @@
  *
  * En Vercel el sistema de archivos es de SOLO LECTURA, así que nada de lo que
  * la app necesita puede depender de escribir en disco. Por eso el build deja
- * todo listo ANTES de subir:
+ * cada pieza lista ANTES de subir:
  *
  *   1. `deploy/data/vtuberdex.db` — copia AUTOCONTENIDA del catálogo (sin WAL)
  *      y con las tablas de credenciales VACÍAS. La base de local guarda el hash
@@ -157,7 +157,7 @@ function buildDatabase() {
   if (fs.existsSync(OUT_DB)) {
     fs.rmSync(OUT_DB);
   }
-  src.exec(`VACUUM INTO '${OUT_DB.replace(/'/g, "''")}'`);
+  src.exec(`VACUUM INTO '${OUT_DB.replaceAll("'", "''")}'`);
   const paths = assetPaths(src);
   const counts = {
     vtubers: src.prepare("SELECT COUNT(*) AS n FROM vtuber").get().n,
@@ -280,22 +280,24 @@ if (IF_MISSING && fs.existsSync(OUT_DB) && fs.existsSync(OUT_MANIFEST)) {
 }
 
 const BLOB_BASE = value("blob-base", process.env.VTUBERDEX_BLOB_BASE ?? "");
-const { counts, removed, paths, integrity, bytes } = buildDatabase();
-const { manifest, missing } = buildManifest(paths, BLOB_BASE);
+const base = buildDatabase();
+const { manifest, missing: ausentes } = buildManifest(base.paths, BLOB_BASE);
 fs.writeFileSync(OUT_MANIFEST, JSON.stringify(manifest, null, 1));
 
 console.log(
-  `[build-db] base -> ${path.relative(ROOT, OUT_DB)} (${(bytes / 1024 / 1024).toFixed(1)} MB)`,
+  `[build-db] base -> ${path.relative(ROOT, OUT_DB)} (${(base.bytes / 1024 / 1024).toFixed(1)} MB)`,
 );
 console.log(
-  `[build-db] integridad: ${integrity} | vtubers: ${counts.vtubers} | assets: ${counts.assets}`,
+  `[build-db] integridad: ${base.integrity} | vtubers: ${base.counts.vtubers} | assets: ${base.counts.assets}`,
 );
-console.log(`[build-db] credenciales eliminadas: ${JSON.stringify(removed)}`);
+console.log(
+  `[build-db] credenciales eliminadas: ${JSON.stringify(base.removed)}`,
+);
 console.log(
   `[build-db] imágenes publicables: ${manifest.count} (${(manifest.totalBytes / 1024 / 1024).toFixed(1)} MB) ${JSON.stringify(manifest.folders)}`,
 );
-if (missing.length > 0) {
+if (ausentes.length > 0) {
   console.log(
-    `[build-db] ⚠ ${missing.length} rutas de asset referenciadas pero ausentes en disco (muestra): ${missing.slice(0, 5).join(", ")}`,
+    `[build-db] ⚠ ${ausentes.length} rutas de asset referenciadas pero ausentes en disco (muestra): ${ausentes.slice(0, 5).join(", ")}`,
   );
 }
