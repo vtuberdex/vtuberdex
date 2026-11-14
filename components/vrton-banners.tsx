@@ -12,11 +12,11 @@
  * `public/` está en .gitignore, así que no viajarían al deploy).
  */
 import { useI18n } from "@/lib/i18n";
-import logoImport from "@/components/vrton/logo.webp";
-import teletonImport from "@/components/vrton/teleton.webp";
-import fondoIzqImport from "@/components/vrton/fondo-izq.webp";
-import fondoHImport from "@/components/vrton/fondo-h.webp";
-import fondoDerImport from "@/components/vrton/fondo-der.webp";
+import logoImport from "./vrton/logo.webp";
+import teletonImport from "./vrton/teleton.webp";
+import fondoIzqImport from "./vrton/fondo-izq.webp";
+import fondoHImport from "./vrton/fondo-h.webp";
+import fondoDerImport from "./vrton/fondo-der.webp";
 
 /** Next entrega `{ src }` y vitest una cadena (ver la trampa de `metalEnvUrl` en `card-material.ts`). */
 const urlDe = (m: unknown): string =>

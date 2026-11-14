@@ -141,16 +141,15 @@ export function drawTextsLayer({
   info: CardLayers["info"];
 }): HTMLCanvasElement {
   const { canvas, ctx, W, H } = createLayer(width);
-  if (!ctx) {
-    return canvas;
+  // Sin contexto 2D la capa queda vacía (transparente): se devuelve igual, el compositor la tolera.
+  if (ctx) {
+    const pad = info.pad;
+    const stateY = info.headerTop + info.headerH + 34;
+
+    ctx.textBaseline = "middle";
+    drawStateChips(ctx, stateChipsFor(card), pad, stateY);
+    drawPhrase(ctx, card, { pad, textWidth: W - pad * 2, info });
+    drawFooter(ctx, card, { pad, W, H });
   }
-  const pad = info.pad;
-  const stateY = info.headerTop + info.headerH + 34;
-
-  ctx.textBaseline = "middle";
-  drawStateChips(ctx, stateChipsFor(card), pad, stateY);
-  drawPhrase(ctx, card, { pad, textWidth: W - pad * 2, info });
-  drawFooter(ctx, card, { pad, W, H });
-
   return canvas;
 }

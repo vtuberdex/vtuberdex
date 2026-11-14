@@ -250,26 +250,7 @@ export function DetailPage({ slug }: Readonly<{ slug: string }>) {
                   />
                 </div>
 
-                {data.phrase && (
-                  <div className="mt-4 max-w-3xl">
-                    <TextoTraducible
-                      texto={data.phrase}
-                      className="text-sm leading-relaxed text-dex-ink/90"
-                      acento={palette.accent}
-                    />
-                  </div>
-                )}
-
-                {/* Texto personalizado impreso en la carta (OCR). Suele ser una
-                historia larga que NO está en el HTML: es el único sitio donde
-                existe para las 574 fichas sin página de detalle. */}
-                {data.cardText && (
-                  <HistoriaDeLaFicha
-                    texto={data.cardText}
-                    confianza={data.cardTextConfidence}
-                    acento={palette.accent}
-                  />
-                )}
+                <TextosDeLaFicha data={data} acento={palette.accent} />
 
                 {/* Tipos: facciones + grupos + artistas */}
                 <TiposDeLaFicha data={data} palette={palette} />
@@ -287,13 +268,7 @@ export function DetailPage({ slug }: Readonly<{ slug: string }>) {
 
               <SkillList skills={data.skills} palette={palette} />
 
-              {data.socials.length > 0 && (
-                <DirectoEnVivo slug={data.slug} palette={palette} />
-              )}
-
-              {data.socials.length > 0 && (
-                <SocialLinks socials={data.socials} palette={palette} />
-              )}
+              <RedesDeLaFicha data={data} palette={palette} />
 
               {/* Navegación entre vecinos de la dex. */}
               <VecinosDeLaFicha neighbors={data.neighbors} />
@@ -453,6 +428,53 @@ function HistoriaDeLaFicha({
         acento={acento}
       />
     </section>
+  );
+}
+
+/** Frase y historia de la ficha: cada una solo si existe. */
+function TextosDeLaFicha({
+  data,
+  acento,
+}: Readonly<{ data: Ficha; acento: string }>) {
+  return (
+    <>
+      {data.phrase && (
+        <div className="mt-4 max-w-3xl">
+          <TextoTraducible
+            texto={data.phrase}
+            className="text-sm leading-relaxed text-dex-ink/90"
+            acento={acento}
+          />
+        </div>
+      )}
+
+      {/* Texto personalizado impreso en la carta (OCR). Suele ser una
+      historia larga que NO está en el HTML: es el único sitio donde
+      existe para las 574 fichas sin página de detalle. */}
+      {data.cardText && (
+        <HistoriaDeLaFicha
+          texto={data.cardText}
+          confianza={data.cardTextConfidence}
+          acento={acento}
+        />
+      )}
+    </>
+  );
+}
+
+/** Directo y enlaces a redes: sin redes no hay ni lo uno ni lo otro. */
+function RedesDeLaFicha({
+  data,
+  palette,
+}: Readonly<{ data: Ficha; palette: ReturnType<typeof cardPalette> }>) {
+  if (data.socials.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      <DirectoEnVivo slug={data.slug} palette={palette} />
+      <SocialLinks socials={data.socials} palette={palette} />
+    </>
   );
 }
 

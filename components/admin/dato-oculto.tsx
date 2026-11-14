@@ -29,9 +29,11 @@ const esEspacio = (c: string | undefined) => c === undefined || /\s/.test(c);
  * vecinos de cada «@»: la regex sin anclar reintentaba desde cada carácter (coste cuadrático).
  */
 export const pareceCorreo = (texto: string | null | undefined): boolean => {
-  const t = texto ?? "";
-  for (let at = t.indexOf("@"); at !== -1; at = t.indexOf("@", at + 1)) {
-    if (!esEspacio(t[at - 1]) && !esEspacio(t[at + 1])) {
+  if (!texto) {
+    return false;
+  }
+  for (let at = texto.indexOf("@"); at !== -1; at = texto.indexOf("@", at + 1)) {
+    if (!esEspacio(texto[at - 1]) && !esEspacio(texto[at + 1])) {
       return true;
     }
   }

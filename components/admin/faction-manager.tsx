@@ -13,7 +13,7 @@
  * El emblema se convierte a PNG ≤512 px aquí, en el navegador (ver `lib/imagen-cliente`):
  * en producción no hay `sharp` y el servidor solo valida y limita el peso.
  */
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useState, type SubmitEvent } from "react";
 
 import { api } from "@/lib/api";
 import { aPngCuadrado } from "@/lib/imagen-cliente";
@@ -294,7 +294,7 @@ function FormularioDeNombre({
       other.id !== faction.id &&
       other.label.toLowerCase() === nuevo.toLowerCase(),
   );
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!nuevo || clash) {
       return;
