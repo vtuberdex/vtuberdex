@@ -62,21 +62,35 @@ function zoneInPixels(zone, width, height) {
  * banda (fuera del badge del número).
  */
 function countEdges(data, width, channels, grid, area, badgePx, thresholds) {
-  const { counts, satCounts, cols } = grid;
+  const image = { data, width, channels };
   for (let y = Math.max(1, area.y0); y < area.y1 - 1; y += 1) {
     const inBadgeRows = y >= badgePx.y0 && y < badgePx.y1;
-    for (let x = Math.max(1, area.x0); x < area.x1 - 1; x += 1) {
-      if (!(inBadgeRows && x >= badgePx.x0 && x < badgePx.x1)) {
-        const i = (y * width + x) * channels;
-        const cell = Math.floor(y / CELL) * cols + Math.floor(x / CELL);
-        if (isSaturated(data[i], data[i + 1], data[i + 2], thresholds.minSat)) {
-          satCounts[cell] += 1;
-        }
-        if (gradientAt(data, i, width, channels) > thresholds.edgeMin) {
-          counts[cell] += 1;
-        }
-      }
+    countRow(image, grid, y, area, inBadgeRows ? badgePx : null, thresholds);
+  }
+}
+
+/**
+ * Una fila de la banda. `badge` es la caja del número solo si la fila la cruza (`null` si no): sus
+ * columnas se saltan.
+ */
+function countRow(image, grid, y, area, badge, thresholds) {
+  for (let x = Math.max(1, area.x0); x < area.x1 - 1; x += 1) {
+    const inBadge = badge !== null && x >= badge.x0 && x < badge.x1;
+    if (!inBadge) {
+      countPixel(image, grid, x, y, thresholds);
     }
+  }
+}
+
+/** Suma el píxel (x, y) a los contadores de su celda: saturado y/o con borde fuerte. */
+function countPixel({ data, width, channels }, grid, x, y, thresholds) {
+  const i = (y * width + x) * channels;
+  const cell = Math.floor(y / CELL) * grid.cols + Math.floor(x / CELL);
+  if (isSaturated(data[i], data[i + 1], data[i + 2], thresholds.minSat)) {
+    grid.satCounts[cell] += 1;
+  }
+  if (gradientAt(data, i, width, channels) > thresholds.edgeMin) {
+    grid.counts[cell] += 1;
   }
 }
 
@@ -88,8 +102,6 @@ function countEdges(data, width, channels, grid, area, badgePx, thresholds) {
 export function buildEdgeGrid(data, width, height, channels, options = {}) {
   const area = zoneInPixels(options.band ?? BAND, width, height);
   const badgePx = zoneInPixels(options.badge ?? BADGE, width, height);
-  const cellMinEdge = options.cellMinEdge ?? 5;
-  const cellMinSat = options.cellMinSat ?? 6;
 
   const cols = Math.ceil(width / CELL);
   const rows = Math.ceil(height / CELL);
@@ -98,23 +110,34 @@ export function buildEdgeGrid(data, width, height, channels, options = {}) {
     satCounts: new Uint16Array(cols * rows),
     cols,
   };
-  const on = new Uint8Array(cols * rows);
 
   countEdges(data, width, channels, grid, area, badgePx, {
     edgeMin: options.edgeMin ?? 90,
     minSat: options.minSat ?? 45,
   });
 
+  const on = cellsOn(grid, {
+    cellMinEdge: options.cellMinEdge ?? 5,
+    cellMinSat: options.cellMinSat ?? 6,
+    requireSat: Boolean(options.requireSat),
+  });
+  return { on, cols, rows, x0: area.x0, y0: area.y0 };
+}
+
+/**
+ * Celdas encendidas: bastantes píxeles con borde y, con `requireSat`, además color: descarta el
+ * texto claro del panel sobre fondo plano, que tiene bordes pero no saturación.
+ */
+function cellsOn(grid, { cellMinEdge, cellMinSat, requireSat }) {
+  const on = new Uint8Array(grid.counts.length);
   for (const [i, count] of grid.counts.entries()) {
-    // Con `requireSat` una celda debe tener además color: descarta el texto claro
-    // del panel sobre fondo plano, que tiene bordes pero no saturación.
     const okEdge = count >= cellMinEdge;
-    const okSat = !options.requireSat || grid.satCounts[i] >= cellMinSat;
+    const okSat = !requireSat || grid.satCounts[i] >= cellMinSat;
     if (okEdge && okSat) {
       on[i] = 1;
     }
   }
-  return { on, cols, rows, x0: area.x0, y0: area.y0 };
+  return on;
 }
 
 /** Amplía la caja de un componente para incluir la celda (cx, cy). */
@@ -144,27 +167,34 @@ function labelFromNeighbours(stats, labels, labelUp, labelLeft) {
 
 /** Componentes conexos (4-vecindad) de las celdas encendidas, con su caja. */
 function labelComponents(on, cols, rows) {
-  const labels = new Int32Array(cols * rows);
-  const stats = [];
-  let next = 0;
+  const state = { labels: new Int32Array(cols * rows), stats: [], next: 0, cols };
   for (let cy = 0; cy < rows; cy += 1) {
     for (let cx = 0; cx < cols; cx += 1) {
-      const idx = cy * cols + cx;
-      if (on[idx]) {
-        const labelUp = cy > 0 ? labels[idx - cols] : 0;
-        const labelLeft = cx > 0 ? labels[idx - 1] : 0;
-        let label = labelFromNeighbours(stats, labels, labelUp, labelLeft);
-        if (!label) {
-          next += 1;
-          label = next;
-          stats[label] = { size: 0, minX: cx, maxX: cx, minY: cy, maxY: cy };
-        }
-        labels[idx] = label;
-        growStats(stats[label], cx, cy);
+      if (on[cy * cols + cx]) {
+        labelCell(state, cx, cy);
       }
     }
   }
-  return stats;
+  return state.stats;
+}
+
+/**
+ * Etiqueta una celda encendida: hereda la de sus vecinas (fundiéndolas si difieren) o abre un
+ * componente nuevo, y amplía la caja de ese componente.
+ */
+function labelCell(state, cx, cy) {
+  const { labels, stats, cols } = state;
+  const idx = cy * cols + cx;
+  const labelUp = cy > 0 ? labels[idx - cols] : 0;
+  const labelLeft = cx > 0 ? labels[idx - 1] : 0;
+  let label = labelFromNeighbours(stats, labels, labelUp, labelLeft);
+  if (!label) {
+    state.next += 1;
+    label = state.next;
+    stats[label] = { size: 0, minX: cx, maxX: cx, minY: cy, maxY: cy };
+  }
+  labels[idx] = label;
+  growStats(stats[label], cx, cy);
 }
 
 /** Caja del mayor componente fusionada con los secundarios comparables. */

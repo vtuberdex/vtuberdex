@@ -8,7 +8,7 @@
  * descarga ni cálculo ocurre por el simple hecho de abrir la ficha. Si el motor es el de
  * respaldo (modelo propio de ~100 MB) se avisa ANTES de pulsar, no después.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
 import { NOMBRE_PROPIO } from "@/lib/i18n/locales";
@@ -46,7 +46,7 @@ export function TextoTraducible({
   const origen = idiomaDelTexto(texto);
   const traducido = estado.fase === "listo" && !verOriginal;
 
-  const traducir = async () => {
+  const traducir = useCallback(async () => {
     if (!origen) {
       return;
     }
@@ -60,9 +60,9 @@ export function TextoTraducible({
     } catch {
       setEstado({ fase: "fallo" });
     }
-  };
+  }, [origen, texto, locale]);
 
-  const alternarOriginal = () => setVerOriginal((v) => !v);
+  const alternarOriginal = useCallback(() => setVerOriginal((v) => !v), []);
 
   return (
     <div data-testid="texto-traducible">

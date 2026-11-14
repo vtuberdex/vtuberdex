@@ -15,7 +15,12 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
 import { activeFilterCount } from "@/lib/query";
-import type { Facets, SearchParams, SortKey } from "@/lib/types";
+import type {
+  ApiListResponse,
+  Facets,
+  SearchParams,
+  SortKey,
+} from "@/lib/types";
 import { CardBinder } from "@/components/card-binder";
 import { BINDER } from "@/components/card3d-config";
 import { FilterPanel } from "@/components/filter-panel";
@@ -27,7 +32,6 @@ import { useSingleSheet } from "@/components/use-single-sheet";
 import { useVtuberSearch } from "@/components/use-vtuber-search";
 
 export function CatalogPage() {
-  const { t } = useI18n();
   // En celular el libro es UNA hoja de 4 fundas: cada página son 4 cartas (ver `useSingleSheet`).
   const single = useSingleSheet();
   const { params, data, loading, error, setParams, reset, goToPage } =
@@ -56,8 +60,7 @@ export function CatalogPage() {
     return () => window.removeEventListener("keydown", alTeclear);
   }, [sheetOpen]);
 
-  const items = data?.items ?? [];
-  const total = data?.total ?? 0;
+  const { total, facets } = resumenDe(data);
 
   const buscar = useCallback(
     (value: string) => setParams({ q: value, page: 1 }),
@@ -68,6 +71,7 @@ export function CatalogPage() {
     [setParams],
   );
   const cerrarFiltros = useCallback(() => setSheetOpen(false), []);
+  const abrirFiltros = useCallback(() => setSheetOpen(true), []);
 
   return (
     <div
@@ -92,19 +96,7 @@ export function CatalogPage() {
               </div>
 
               <div className="flex shrink-0 flex-wrap items-center gap-2 md:ml-auto md:h-[50px]">
-                <button
-                  type="button"
-                  onClick={() => setSheetOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-dex-line bg-dex-panel px-3 py-1.5 text-xs text-dex-muted hover:border-dex-accent/60 hover:text-dex-ink"
-                  aria-haspopup="dialog"
-                >
-                  {t("filtros.titulo")}
-                  {filterCount > 0 && (
-                    <span className="rounded-full bg-dex-accent/20 px-1.5 py-0.5 font-mono text-[10px] text-dex-accent">
-                      {filterCount}
-                    </span>
-                  )}
-                </button>
+                <BotonFiltros cuenta={filterCount} onAbrir={abrirFiltros} />
                 <SortSelect value={params.sort} onChange={ordenar} />
                 {/*
                   Sección premium: las cartas gradeadas (en placa de acrílico). Es un filtro más,
@@ -121,46 +113,22 @@ export function CatalogPage() {
             )}
           </div>
 
-          {error && (
-            <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-              {t("catalogo.error", { error: error ?? "" })}
-            </p>
-          )}
-
-          {/* Sin preloader: mientras llega la primera página no se dibuja nada en lugar del libro. */}
-          {!(loading && items.length === 0) &&
-            (items.length === 0 ? (
-              <SinResultados onReset={reset} />
-            ) : (
-              /*
-                `page` sale de la URL (cambia al instante) y `pageCount` de la respuesta: el
-                libro necesita saber hacia dónde gira ANTES de que lleguen los datos de la
-                página nueva, y mientras tanto mantiene la hoja en pie.
-              */
-              <CardBinder
-                items={items}
-                single={single}
-                page={params.page}
-                pageCount={data?.pageCount ?? 1}
-                loading={loading}
-                onPage={goToPage}
-              />
-            ))}
-
-          {data && (
-            <Pagination
-              page={data.page}
-              pageCount={data.pageCount}
-              onPage={goToPage}
-            />
-          )}
+          <ResultadosDelCatalogo
+            data={data}
+            error={error}
+            loading={loading}
+            single={single}
+            page={params.page}
+            onPage={goToPage}
+            onReset={reset}
+          />
         </main>
       </VrtonBanners>
 
       {/* Panel de filtros: hoja inferior en celular, cajón lateral en escritorio. */}
       {sheetOpen && (
         <HojaDeFiltros
-          facets={data?.facets ?? null}
+          facets={facets}
           params={params}
           setParams={setParams}
           reset={reset}
@@ -174,6 +142,100 @@ export function CatalogPage() {
 }
 
 type SetParams = (patch: Partial<SearchParams>) => void;
+
+/** Lo que el catálogo lee de la respuesta, con sus valores mientras aún no llega ninguna. */
+function resumenDe(data: ApiListResponse | null): {
+  items: ApiListResponse["items"];
+  total: number;
+  facets: Facets | null;
+} {
+  if (!data) {
+    return { items: [], total: 0, facets: null };
+  }
+  return { items: data.items, total: data.total, facets: data.facets ?? null };
+}
+
+/** Abre la hoja de filtros; lleva cuántos hay activos. */
+function BotonFiltros({
+  cuenta,
+  onAbrir,
+}: Readonly<{ cuenta: number; onAbrir: () => void }>) {
+  const { t } = useI18n();
+  return (
+    <button
+      type="button"
+      onClick={onAbrir}
+      className="inline-flex items-center gap-2 rounded-lg border border-dex-line bg-dex-panel px-3 py-1.5 text-xs text-dex-muted hover:border-dex-accent/60 hover:text-dex-ink"
+      aria-haspopup="dialog"
+    >
+      {t("filtros.titulo")}
+      {cuenta > 0 && (
+        <span className="rounded-full bg-dex-accent/20 px-1.5 py-0.5 font-mono text-[10px] text-dex-accent">
+          {cuenta}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** Error, libro (o «sin resultados») y paginación. */
+function ResultadosDelCatalogo({
+  data,
+  error,
+  loading,
+  single,
+  page,
+  onPage,
+  onReset,
+}: Readonly<{
+  data: ApiListResponse | null;
+  error: string | null;
+  loading: boolean;
+  single: boolean;
+  page: number;
+  onPage: (page: number) => void;
+  onReset: () => void;
+}>) {
+  const { t } = useI18n();
+  const { items } = resumenDe(data);
+  return (
+    <>
+      {error && (
+        <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {t("catalogo.error", { error })}
+        </p>
+      )}
+
+      {/* Sin preloader: mientras llega la primera página no se dibuja nada en lugar del libro. */}
+      {!(loading && items.length === 0) &&
+        (items.length === 0 ? (
+          <SinResultados onReset={onReset} />
+        ) : (
+          /*
+            `page` sale de la URL (cambia al instante) y `pageCount` de la respuesta: el
+            libro necesita saber hacia dónde gira ANTES de que lleguen los datos de la
+            página nueva, y mientras tanto mantiene la hoja en pie.
+          */
+          <CardBinder
+            items={items}
+            single={single}
+            page={page}
+            pageCount={data?.pageCount ?? 1}
+            loading={loading}
+            onPage={onPage}
+          />
+        ))}
+
+      {data && (
+        <Pagination
+          page={data.page}
+          pageCount={data.pageCount}
+          onPage={onPage}
+        />
+      )}
+    </>
+  );
+}
 
 /** Un chip por filtro activo (la búsqueda y cada valor de faceta); pulsarlo quita ese filtro. */
 function ChipsDeFiltros({

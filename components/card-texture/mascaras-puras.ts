@@ -11,6 +11,21 @@
  */
 
 /**
+ * ¿El píxel tiene tono de piel? Cálido (rojo > verde ≥ azul, con una diferencia rojo-azul
+ * moderada), ni muy oscuro ni quemado y poco saturado. Aparte del bucle para que la
+ * condición se lea de una vez; el JIT la inserta en línea, así que el bucle no paga la llamada.
+ */
+function esPiel(r: number, g: number, b: number, maxCh: number, minCh: number): boolean {
+  const esCalido = r > g && g >= b && r - b > 12 && r - b < 120;
+  if (!esCalido) {
+    return false;
+  }
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const sat = maxCh === 0 ? 0 : (maxCh - minCh) / maxCh;
+  return lum > 70 && lum < 250 && sat < 0.62;
+}
+
+/**
  * Máscara de TINTA y PIEL del arte: lineart oscuro a 1, piel a `skinWeight`, el resto 0.
  * El alfa de salida es el del arte, así que la máscara no existe fuera de la silueta.
  */
@@ -32,11 +47,7 @@ export function mascaraTintaYPiel(
     // Tinta: 1 en el negro, bajando hasta 0 en un canal máximo de 92 (más claro ya no es lineart).
     const ink = Math.max(0, 1 - maxCh / 92);
 
-    const esCalido = r > g && g >= b && r - b > 12 && r - b < 120;
-    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    const sat = maxCh === 0 ? 0 : (maxCh - minCh) / maxCh;
-    const luzDePiel = lum > 70 && lum < 250 && sat < 0.62;
-    const piel = esCalido && luzDePiel ? 1 : 0;
+    const piel = esPiel(r, g, b, maxCh, minCh) ? 1 : 0;
     const skinWeight = 0.55;
 
     const intensidad = Math.max(ink, piel * skinWeight);

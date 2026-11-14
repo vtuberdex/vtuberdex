@@ -227,6 +227,224 @@ function Explorador({
 /** Mismo tope que un jar de plugin (50 MB): el servidor lo vuelve a comprobar. */
 const LIMITE_ZIP_BYTES = 50 * 1024 * 1024;
 
+const ERROR_SUBIR_ZIP = "no se pudo subir el zip";
+
+/** Lo que se pinta mientras la primera carpeta no ha llegado: nada que filtrar, nada abierto. */
+const CONTENIDO_VACIO: Contenido = {
+  ruta: "",
+  migas: [],
+  carpetas: [],
+  archivos: [],
+  comprimidos: [],
+  escribible: true,
+  legible: true,
+};
+
+/** Navegar o abrir otro archivo con cambios sin guardar pide confirmación antes de tirarlos. */
+const puedeDescartar = (sinGuardar: boolean) =>
+  !sinGuardar || window.confirm("Hay cambios sin guardar. ¿Descartarlos?");
+
+const filtrarPorNombre = <T extends { nombre: string }>(
+  lista: T[] | undefined,
+  f: string,
+) => (lista ?? []).filter((x) => !f || x.nombre.toLowerCase().includes(f));
+
+// La subida de zip solo tiene sentido dentro de `plugins/` (el servidor lo vuelve a exigir).
+const estaEnPlugins = (ruta: string) =>
+  ruta === "plugins" || ruta.startsWith("plugins/");
+
+/** La carpeta o el archivo abierto no se pueden escribir: «Guardar» queda desactivado. */
+const esSoloLectura = (carpetaSoloLectura: boolean, abierto?: Archivo) =>
+  carpetaSoloLectura || abierto?.escribible === false;
+
+/** Lo que impide subir el zip elegido (antes de gastar la subida), o null si se puede intentar. */
+function problemaDelZip(zip: File): string | null {
+  if (!/\.zip$/i.test(zip.name)) {
+    return "solo se pueden subir archivos .zip";
+  }
+  if (zip.size === 0) {
+    return "el archivo llegó vacío";
+  }
+  if (zip.size > LIMITE_ZIP_BYTES) {
+    return "el zip pasa de los 50 MB";
+  }
+  return null;
+}
+
+function enviarZip(zip: File, carpeta: string, sobrescribir: boolean) {
+  const consulta = new URLSearchParams({ carpeta, nombre: zip.name });
+  if (sobrescribir) {
+    consulta.set("sobrescribir", "1");
+  }
+  return fetch(`/api/minecraft-admin/archivos?${consulta}`, {
+    method: "POST",
+    headers: { "content-type": "application/zip" },
+    body: zip,
+  });
+}
+
+/**
+ * Sube el zip y, si el nombre ya está (409 `ya_existe`), pregunta antes de reemplazarlo de una
+ * vez, sin copia del anterior (así lo pidió el equipo). Devuelve null si se canceló.
+ */
+async function subirZipConfirmando(
+  zip: File,
+  carpeta: string,
+): Promise<Response | null> {
+  const r = await enviarZip(zip, carpeta, false);
+  if (r.status !== 409) {
+    return r;
+  }
+  const cuerpo = (await r.json().catch(() => null)) as {
+    error?: string;
+  } | null;
+  if (cuerpo?.error !== "ya_existe") {
+    throw new Error(ERROR_SUBIR_ZIP);
+  }
+  const reemplaza = window.confirm(
+    `Ya hay un «${zip.name}» en esta carpeta. ¿Reemplazarlo? No se guarda copia del anterior.`,
+  );
+  return reemplaza ? enviarZip(zip, carpeta, true) : null;
+}
+
+/** Formulario para subir un `.zip` a la carpeta abierta (solo dentro de `plugins/`). */
+function FormularioZip({
+  zip,
+  deshabilitado,
+  alElegir,
+  alSubir,
+}: Readonly<{
+  zip: File | null;
+  deshabilitado: boolean;
+  alElegir: (zip: File | null) => void;
+  alSubir: (evento: React.SubmitEvent) => void;
+}>) {
+  const elegir = (e: React.ChangeEvent<HTMLInputElement>) =>
+    alElegir(e.target.files?.[0] ?? null);
+  return (
+    <form
+      onSubmit={alSubir}
+      className="space-y-2 rounded-xl border border-dex-line bg-dex-void/60 p-3"
+    >
+      <p className="text-xs text-dex-muted">
+        Subir un <strong>.zip</strong> a esta carpeta (máximo 50 MB, igual que
+        un jar). Solo se aceptan comprimidos y no se descomprimen solos: si
+        ya hay uno con ese nombre, se pregunta antes de reemplazarlo.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="file"
+          accept=".zip,application/zip"
+          aria-label="Zip para subir"
+          onChange={elegir}
+          className="text-xs text-dex-ink"
+        />
+        <button
+          type="submit"
+          disabled={deshabilitado || !zip}
+          className={CLASE_BOTON.primario}
+        >
+          Subir zip
+        </button>
+        {zip ? (
+          <span className={`text-[11px] text-dex-muted ${MONO}`}>
+            {tamano(zip.size)}
+          </span>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
+function MensajesDeArchivo({
+  aviso,
+  error,
+}: Readonly<{ aviso: string | null; error: string | null }>) {
+  return (
+    <>
+      {aviso ? <p className="text-sm text-emerald-400">{aviso}</p> : null}
+      {error ? (
+        <p role="alert" className="text-sm text-red-400">
+          {error}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/** Columna derecha: el archivo abierto, su texto y el botón de guardar. */
+function EditorDeArchivo({
+  ruta,
+  abierto,
+  texto,
+  sinGuardar,
+  soloLectura,
+  ocupado,
+  alCambiarTexto,
+  alGuardar,
+  children,
+}: Readonly<{
+  ruta: string | null;
+  abierto: Archivo | undefined;
+  texto: string;
+  sinGuardar: boolean;
+  soloLectura: boolean;
+  ocupado: boolean;
+  alCambiarTexto: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  alGuardar: (evento: React.SubmitEvent) => void;
+  children: React.ReactNode;
+}>) {
+  return (
+    <form onSubmit={alGuardar} className="space-y-3">
+      {soloLectura ? (
+        <p
+          role="alert"
+          className="rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-xs text-amber-300"
+        >
+          Esta carpeta se puede leer pero no guardar: al servicio web le falta
+          permiso de escritura en el servidor. Se puede abrir el archivo, pero
+          «Guardar» está desactivado hasta que se arregle ese permiso.
+        </p>
+      ) : null}
+      <input
+        readOnly
+        value={ruta ?? ""}
+        placeholder="Elige un archivo de la carpeta"
+        aria-label="Archivo abierto"
+        className={CLASE_CAMPO_MONO}
+      />
+      {abierto ? (
+        <p className="text-[11px] text-dex-muted">
+          {tamano(abierto.bytes)} · modificado{" "}
+          {new Date(abierto.modificado).toLocaleString("es")}
+        </p>
+      ) : null}
+      <textarea
+        value={texto}
+        onChange={alCambiarTexto}
+        rows={22}
+        disabled={!ruta}
+        spellCheck={false}
+        aria-label="Contenido del archivo"
+        className={`${CLASE_CAMPO} ${MONO} text-xs leading-relaxed`}
+      />
+      <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={ocupado || !ruta || !sinGuardar || soloLectura}
+          className={CLASE_BOTON.primario}
+        >
+          Guardar archivo
+        </button>
+        {sinGuardar ? (
+          <span className="text-xs text-amber-400">Cambios sin guardar</span>
+        ) : null}
+      </div>
+      {children}
+    </form>
+  );
+}
+
 export function SeccionArchivos() {
   const [datos, setDatos] = useState<Contenido | null>(null);
   const [filtro, setFiltro] = useState("");
@@ -258,181 +476,160 @@ export function SeccionArchivos() {
   }, [cargar]);
 
   const sinGuardar = texto !== original;
+  // Mientras no llega la primera carpeta se pinta una vacía: evita una pregunta `?.` por campo.
+  const contenido = datos ?? CONTENIDO_VACIO;
 
-  const navegar = async (destino: string) => {
-    if (sinGuardar && !window.confirm("Hay cambios sin guardar. ¿Descartarlos?")) {
-      return;
-    }
-    setAviso(null);
-    setRuta(null);
-    setTexto("");
-    setOriginal("");
-    setFiltro("");
-    await cargar(destino);
-  };
-
-  const abrir = async (destino: string) => {
-    if (sinGuardar && !window.confirm("Hay cambios sin guardar. ¿Descartarlos?")) {
-      return;
-    }
-    setError(null);
-    setAviso(null);
-    const r = await fetch(
-      `/api/minecraft-admin/archivos?${new URLSearchParams({ ruta: destino })}`,
-      { cache: "no-store" },
-    );
-    if (!r.ok) {
-      setError(await leerError(r, "no se pudo abrir el archivo"));
-      return;
-    }
-    const c = (await r.json()) as { contenido: string };
-    setRuta(destino);
-    setTexto(c.contenido);
-    setOriginal(c.contenido);
-  };
-
-  const guardar = async (evento: React.SubmitEvent) => {
-    evento.preventDefault();
-    if (!ruta) {
-      return;
-    }
-    setError(null);
-    setAviso(null);
-    setOcupado(true);
-    try {
-      const r = await fetch("/api/minecraft-admin/archivos", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ruta, contenido: texto }),
-      });
-      if (!r.ok) {
-        throw new Error(await leerError(r, "no se pudo guardar"));
+  const navegar = useCallback(
+    async (destino: string) => {
+      if (!puedeDescartar(sinGuardar)) {
+        return;
       }
-      setOriginal(texto);
-      setAviso(
-        `Guardado ${ruta} (copia anterior en .bak). Recarga el plugin o reinicia para aplicar.`,
-      );
-      await cargar(datos?.ruta ?? "");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "no se pudo guardar");
-    } finally {
-      setOcupado(false);
-    }
-  };
+      setAviso(null);
+      setRuta(null);
+      setTexto("");
+      setOriginal("");
+      setFiltro("");
+      await cargar(destino);
+    },
+    [sinGuardar, cargar],
+  );
 
-  const navegarSinEsperar = (destino: string) => void navegar(destino);
-  const abrirSinEsperar = (destino: string) => void abrir(destino);
-  const cambiarTexto = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
-    setTexto(e.target.value);
+  const abrir = useCallback(
+    async (destino: string) => {
+      if (!puedeDescartar(sinGuardar)) {
+        return;
+      }
+      setError(null);
+      setAviso(null);
+      const r = await fetch(
+        `/api/minecraft-admin/archivos?${new URLSearchParams({ ruta: destino })}`,
+        { cache: "no-store" },
+      );
+      if (!r.ok) {
+        setError(await leerError(r, "no se pudo abrir el archivo"));
+        return;
+      }
+      const c = (await r.json()) as { contenido: string };
+      setRuta(destino);
+      setTexto(c.contenido);
+      setOriginal(c.contenido);
+    },
+    [sinGuardar],
+  );
+
+  const guardar = useCallback(
+    async (evento: React.SubmitEvent) => {
+      evento.preventDefault();
+      if (!ruta) {
+        return;
+      }
+      setError(null);
+      setAviso(null);
+      setOcupado(true);
+      try {
+        const r = await fetch("/api/minecraft-admin/archivos", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ruta, contenido: texto }),
+        });
+        if (!r.ok) {
+          throw new Error(await leerError(r, "no se pudo guardar"));
+        }
+        setOriginal(texto);
+        setAviso(
+          `Guardado ${ruta} (copia anterior en .bak). Recarga el plugin o reinicia para aplicar.`,
+        );
+        await cargar(contenido.ruta);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "no se pudo guardar");
+      } finally {
+        setOcupado(false);
+      }
+    },
+    [ruta, texto, contenido.ruta, cargar],
+  );
+
+  const navegarSinEsperar = useCallback(
+    (destino: string) => void navegar(destino),
+    [navegar],
+  );
+  const abrirSinEsperar = useCallback(
+    (destino: string) => void abrir(destino),
+    [abrir],
+  );
+  const cambiarTexto = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => setTexto(e.target.value),
+    [],
+  );
 
   /**
    * Sube el `.zip` elegido a la carpeta abierta. Si el nombre ya está, el servidor responde
-   * «ya existe» y aquí se pregunta: al confirmar se reemplaza de una vez, sin copia del anterior
-   * (así lo pidió el equipo). Nunca se descomprime: el zip se queda como archivo.
+   * «ya existe» y se pregunta antes de reemplazarlo (`subirZipConfirmando`). Nunca se
+   * descomprime: el zip se queda como archivo.
    */
-  const subirZip = async (evento: React.FormEvent) => {
-    evento.preventDefault();
-    setError(null);
-    setAviso(null);
-    if (!zip) {
-      setError("elige un archivo .zip");
-      return;
-    }
-    if (!/\.zip$/i.test(zip.name)) {
-      setError("solo se pueden subir archivos .zip");
-      return;
-    }
-    if (zip.size === 0) {
-      setError("el archivo llegó vacío");
-      return;
-    }
-    if (zip.size > LIMITE_ZIP_BYTES) {
-      setError("el zip pasa de los 50 MB");
-      return;
-    }
-    const carpeta = datos?.ruta ?? "";
-    setOcupado(true);
-    try {
-      const enviar = (sobrescribir: boolean) => {
-        const consulta = new URLSearchParams({
-          carpeta,
-          nombre: zip.name,
-        });
-        if (sobrescribir) {
-          consulta.set("sobrescribir", "1");
-        }
-        return fetch(`/api/minecraft-admin/archivos?${consulta}`, {
-          method: "POST",
-          headers: { "content-type": "application/zip" },
-          body: zip,
-        });
-      };
-      let r = await enviar(false);
-      if (r.status === 409) {
-        const cuerpo = (await r.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        if (cuerpo?.error !== "ya_existe") {
-          throw new Error("no se pudo subir el zip");
-        }
-        const reemplaza = window.confirm(
-          `Ya hay un «${zip.name}» en esta carpeta. ¿Reemplazarlo? No se guarda copia del anterior.`,
-        );
-        if (!reemplaza) {
+  const subirZip = useCallback(
+    async (evento: React.SubmitEvent) => {
+      evento.preventDefault();
+      setError(null);
+      setAviso(null);
+      if (!zip) {
+        setError("elige un archivo .zip");
+        return;
+      }
+      const problema = problemaDelZip(zip);
+      if (problema) {
+        setError(problema);
+        return;
+      }
+      const carpeta = contenido.ruta;
+      setOcupado(true);
+      try {
+        const r = await subirZipConfirmando(zip, carpeta);
+        if (r === null) {
           return;
         }
-        r = await enviar(true);
+        if (!r.ok) {
+          throw new Error(await leerError(r, ERROR_SUBIR_ZIP));
+        }
+        const guardado = (await r.json()) as { nombre?: string };
+        setAviso(
+          `Zip guardado: ${guardado.nombre ?? zip.name}. Se queda en la carpeta tal cual; no se descomprime solo.`,
+        );
+        setZip(null);
+        await cargar(carpeta);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : ERROR_SUBIR_ZIP);
+      } finally {
+        setOcupado(false);
       }
-      if (!r.ok) {
-        throw new Error(await leerError(r, "no se pudo subir el zip"));
-      }
-      const guardado = (await r.json()) as { nombre?: string };
-      setAviso(
-        `Zip guardado: ${guardado.nombre ?? zip.name}. Se queda en la carpeta tal cual; no se descomprime solo.`,
-      );
-      setZip(null);
-      await cargar(carpeta);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "no se pudo subir el zip");
-    } finally {
-      setOcupado(false);
-    }
-  };
+    },
+    [zip, contenido.ruta, cargar],
+  );
 
   const f = filtro.trim().toLowerCase();
   const carpetas = useMemo(
-    () =>
-      (datos?.carpetas ?? []).filter((c) => !f || c.nombre.toLowerCase().includes(f)),
-    [datos, f],
+    () => filtrarPorNombre(contenido.carpetas, f),
+    [contenido, f],
   );
   const archivos = useMemo(
-    () =>
-      (datos?.archivos ?? []).filter(
-        (a) => !f || a.nombre.toLowerCase().includes(f),
-      ),
-    [datos, f],
+    () => filtrarPorNombre(contenido.archivos, f),
+    [contenido, f],
   );
   const comprimidos = useMemo(
-    () =>
-      (datos?.comprimidos ?? []).filter(
-        (a) => !f || a.nombre.toLowerCase().includes(f),
-      ),
-    [datos, f],
+    () => filtrarPorNombre(contenido.comprimidos, f),
+    [contenido, f],
   );
-  // La subida de zip solo tiene sentido dentro de `plugins/` (el servidor lo vuelve a exigir).
-  const enPlugins =
-    datos?.ruta === "plugins" || (datos?.ruta ?? "").startsWith("plugins/");
 
-  const abierto = datos?.archivos.find((a) => a.ruta === ruta);
-  const soloLectura =
-    datos?.escribible === false || abierto?.escribible === false;
+  const abierto = contenido.archivos.find((a) => a.ruta === ruta);
+  const carpetaSoloLectura = contenido.escribible === false;
+  const soloLectura = esSoloLectura(carpetaSoloLectura, abierto);
 
   return (
     <Seccion
       titulo="Archivos"
       bajada="Se navega carpeta por carpeta: plugins (cada uno con lo suyo), config/ y los yml de la raíz. Se valida al guardar y queda una copia .bak."
     >
-      {datos?.legible === false ? (
+      {contenido.legible === false ? (
         <p
           role="alert"
           className="rounded-xl border border-red-400/40 bg-red-400/10 p-3 text-sm text-red-400"
@@ -444,7 +641,7 @@ export function SeccionArchivos() {
 
       <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
         <Explorador
-          migas={datos?.migas ?? []}
+          migas={contenido.migas}
           carpetas={carpetas}
           archivos={archivos}
           comprimidos={comprimidos}
@@ -456,91 +653,26 @@ export function SeccionArchivos() {
         />
 
         <div className="space-y-3">
-          {enPlugins ? (
-            <form
-              onSubmit={subirZip}
-              className="space-y-2 rounded-xl border border-dex-line bg-dex-void/60 p-3"
-            >
-              <p className="text-xs text-dex-muted">
-                Subir un <strong>.zip</strong> a esta carpeta (máximo 50 MB, igual que
-                un jar). Solo se aceptan comprimidos y no se descomprimen solos: si
-                ya hay uno con ese nombre, se pregunta antes de reemplazarlo.
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="file"
-                  accept=".zip,application/zip"
-                  aria-label="Zip para subir"
-                  onChange={(e) => setZip(e.target.files?.[0] ?? null)}
-                  className="text-xs text-dex-ink"
-                />
-                <button
-                  type="submit"
-                  disabled={ocupado || !zip || datos?.escribible === false}
-                  className={CLASE_BOTON.primario}
-                >
-                  Subir zip
-                </button>
-                {zip ? (
-                  <span className={`text-[11px] text-dex-muted ${MONO}`}>
-                    {tamano(zip.size)}
-                  </span>
-                ) : null}
-              </div>
-            </form>
+          {estaEnPlugins(contenido.ruta) ? (
+            <FormularioZip
+              zip={zip}
+              deshabilitado={ocupado || carpetaSoloLectura}
+              alElegir={setZip}
+              alSubir={subirZip}
+            />
           ) : null}
-          <form onSubmit={guardar} className="space-y-3">
-          {soloLectura ? (
-            <p
-              role="alert"
-              className="rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-xs text-amber-300"
-            >
-              Esta carpeta se puede leer pero no guardar: al servicio web le falta
-              permiso de escritura en el servidor. Se puede abrir el archivo, pero
-              «Guardar» está desactivado hasta que se arregle ese permiso.
-            </p>
-          ) : null}
-          <input
-            readOnly
-            value={ruta ?? ""}
-            placeholder="Elige un archivo de la carpeta"
-            aria-label="Archivo abierto"
-            className={CLASE_CAMPO_MONO}
-          />
-          {abierto ? (
-            <p className="text-[11px] text-dex-muted">
-              {tamano(abierto.bytes)} · modificado{" "}
-              {new Date(abierto.modificado).toLocaleString("es")}
-            </p>
-          ) : null}
-          <textarea
-            value={texto}
-            onChange={cambiarTexto}
-            rows={22}
-            disabled={!ruta}
-            spellCheck={false}
-            aria-label="Contenido del archivo"
-            className={`${CLASE_CAMPO} ${MONO} text-xs leading-relaxed`}
-          />
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={ocupado || !ruta || !sinGuardar || soloLectura}
-              className={CLASE_BOTON.primario}
-            >
-              Guardar archivo
-            </button>
-            {sinGuardar ? (
-              <span className="text-xs text-amber-400">Cambios sin guardar</span>
-            ) : null}
-          </div>
-          {aviso ? <p className="text-sm text-emerald-400">{aviso}</p> : null}
-          {error ? (
-            <p role="alert" className="text-sm text-red-400">
-              {error}
-            </p>
-          ) : null}
-          </form>
+          <EditorDeArchivo
+            ruta={ruta}
+            abierto={abierto}
+            texto={texto}
+            sinGuardar={sinGuardar}
+            soloLectura={soloLectura}
+            ocupado={ocupado}
+            alCambiarTexto={cambiarTexto}
+            alGuardar={guardar}
+          >
+            <MensajesDeArchivo aviso={aviso} error={error} />
+          </EditorDeArchivo>
         </div>
       </div>
     </Seccion>

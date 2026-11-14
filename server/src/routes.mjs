@@ -154,17 +154,17 @@ const ESTADO_TRAS_RESOLVER = {
 function aprobarSolicitud(db, solicitud, actor) {
   if (solicitud.tipo === "modificacion") {
     const { id, slug, patch } = prepararModificacion(db, solicitud);
-    const datos = vtuberUpdateSchema.safeParse(patch);
-    if (!datos.success) {
+    const parche = vtuberUpdateSchema.safeParse(patch);
+    if (!parche.success) {
       return {
-        rechazo: { error: "payload_invalido", issues: formatIssues(datos.error) },
+        rechazo: { error: "payload_invalido", issues: formatIssues(parche.error) },
       };
     }
     let vtuberSlug = slug;
-    if (Object.keys(datos.data).length) {
+    if (Object.keys(parche.data).length) {
       vtuberSlug = enTransaccion(db, () => {
-        const resultado = aplicarParche(db, id, datos.data);
-        audit(db, actor, "vtuber", id, "update", datos.data);
+        const resultado = aplicarParche(db, id, parche.data);
+        audit(db, actor, "vtuber", id, "update", parche.data);
         return resultado;
       });
     }

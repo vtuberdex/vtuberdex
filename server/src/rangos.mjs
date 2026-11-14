@@ -28,8 +28,8 @@ export const RANGOS = Object.freeze([
 export function rangoDeNivel(nivel) {
   const n = Number.isFinite(Number(nivel)) ? Math.max(1, Math.trunc(Number(nivel))) : 1;
   let indice = 0;
-  for (let i = 0; i < RANGOS.length; i += 1) {
-    if (n >= RANGOS[i].desde) {
+  for (const [i, rango] of RANGOS.entries()) {
+    if (n >= rango.desde) {
       indice = i;
     }
   }

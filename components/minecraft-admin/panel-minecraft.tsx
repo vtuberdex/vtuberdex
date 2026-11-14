@@ -564,6 +564,40 @@ export function PanelMinecraftAdmin() {
     };
   }, [sesion]);
 
+  // Los manejadores van en `useCallback`: se pasan a las pestañas y, recreados en cada render (el
+  // panorama se refresca cada pocos segundos), obligaban a repintar todos sus hijos sin motivo.
+
+  /** Pide una acción al servidor y la anota en el registro con su respuesta (o su error). */
+  const ejecutar = useCallback(
+    async (
+      accion: string,
+      datos: Record<string, string> = {},
+      etiqueta: string = accion,
+    ) => {
+      setError(null);
+      setAviso(null);
+      setOcupado(true);
+      try {
+        const resultado = await pedirAccion(accion, datos);
+        if (resultado === "fuera") {
+          setSesion("fuera");
+          return;
+        }
+        const id = siguienteLinea.current;
+        siguienteLinea.current += 1;
+        setConsola((c) => [...c, { id, comando: etiqueta, ...resultado }]);
+      } finally {
+        setOcupado(false);
+      }
+    },
+    [],
+  );
+  const ejecutarSinEsperar = useCallback(
+    (accion: string, datos?: Record<string, string>, etiqueta?: string) =>
+      void ejecutar(accion, datos, etiqueta),
+    [ejecutar],
+  );
+
   // Cuenta atrás del reinicio: da 15 s a los jugadores tras el aviso y luego manda `stop` (acción
   // fija `reiniciar`). El servicio de systemd lo vuelve a levantar solo (`Restart=always`).
   useEffect(() => {
@@ -577,8 +611,8 @@ export function PanelMinecraftAdmin() {
     }
     const t = setTimeout(() => setCuentaReinicio((c) => (c ?? 1) - 1), 1000);
     return () => clearTimeout(t);
-    // `ejecutar` se redefine en cada render; la cuenta solo depende de sí misma.
-  }, [cuentaReinicio]);
+    // `ejecutar` es estable (`useCallback` sin dependencias): la cuenta solo depende de sí misma.
+  }, [cuentaReinicio, ejecutar]);
 
   // El enlace mágico llega en el fragmento (`#t=...`): no viaja al servidor, y aquí se canjea.
   useEffect(() => {
@@ -602,51 +636,27 @@ export function PanelMinecraftAdmin() {
     })();
   }, [cargar]);
 
-  /** Pide una acción al servidor y la anota en el registro con su respuesta (o su error). */
-  const ejecutar = async (
-    accion: string,
-    datos: Record<string, string> = {},
-    etiqueta: string = accion,
-  ) => {
-    setError(null);
-    setAviso(null);
-    setOcupado(true);
-    try {
-      const resultado = await pedirAccion(accion, datos);
-      if (resultado === "fuera") {
-        setSesion("fuera");
-        return;
-      }
-      const id = siguienteLinea.current++;
-      setConsola((c) => [...c, { id, comando: etiqueta, ...resultado }]);
-    } finally {
-      setOcupado(false);
-    }
-  };
-  const ejecutarSinEsperar = (
-    accion: string,
-    datos?: Record<string, string>,
-    etiqueta?: string,
-  ) => void ejecutar(accion, datos, etiqueta);
-
   /**
    * Las operaciones con formulario comparten la misma envoltura: limpian los mensajes, bloquean los
    * botones mientras dura y muestran el error de la API (o el de respaldo) si algo falla.
    */
-  const operar = async (tarea: () => Promise<void>, porDefecto: string) => {
-    setError(null);
-    setAviso(null);
-    setOcupado(true);
-    try {
-      await tarea();
-    } catch (e) {
-      setError(mensajeDe(e, porDefecto));
-    } finally {
-      setOcupado(false);
-    }
-  };
+  const operar = useCallback(
+    async (tarea: () => Promise<void>, porDefecto: string) => {
+      setError(null);
+      setAviso(null);
+      setOcupado(true);
+      try {
+        await tarea();
+      } catch (e) {
+        setError(mensajeDe(e, porDefecto));
+      } finally {
+        setOcupado(false);
+      }
+    },
+    [],
+  );
 
-  const iniciarReinicio = () => {
+  const iniciarReinicio = useCallback(() => {
     if (
       !window.confirm(
         "¿Reiniciar el servidor de Minecraft? Se avisa a los jugadores, el mundo se guarda y vuelve en ~1 minuto.",
@@ -660,77 +670,91 @@ export function PanelMinecraftAdmin() {
       "aviso de reinicio",
     );
     setCuentaReinicio(15);
-  };
-  const cancelarReinicio = () => setCuentaReinicio(null);
+  }, [ejecutar]);
+  const cancelarReinicio = useCallback(() => setCuentaReinicio(null), []);
 
-  const anunciar = (evento: React.SubmitEvent) => {
-    evento.preventDefault();
-    const limpio = anuncio.trim();
-    if (!limpio) {
-      return;
-    }
-    setAnuncio("");
-    void ejecutar("anunciar", { mensaje: limpio }, `anunciar: ${limpio}`);
-  };
+  const anunciar = useCallback(
+    (evento: React.SubmitEvent) => {
+      evento.preventDefault();
+      const limpio = anuncio.trim();
+      if (!limpio) {
+        return;
+      }
+      setAnuncio("");
+      void ejecutar("anunciar", { mensaje: limpio }, `anunciar: ${limpio}`);
+    },
+    [anuncio, ejecutar],
+  );
 
-  const sobreJugador = (accion: string, etiqueta: string) => {
-    const nombre = jugador.trim();
-    if (!/^[A-Za-z0-9_.]{1,20}$/.test(nombre)) {
-      setError("escribe el nombre exacto del jugador (letras, números, _ o .)");
-      return;
-    }
-    setError(null);
-    const razon = motivo.trim();
-    const conMotivo = razon ? ` (${razon})` : "";
-    void ejecutar(
-      accion,
-      { jugador: nombre, motivo: razon },
-      `${etiqueta} ${nombre}${conMotivo}`,
-    );
-  };
-
-  const pedirEnlace = (evento: React.SubmitEvent) => {
-    evento.preventDefault();
-    return operar(async () => {
-      await exigirOk(
-        await fetch("/api/minecraft-admin/enlace", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email }),
-        }),
-        "no se pudo enviar el enlace",
+  const sobreJugador = useCallback(
+    (accion: string, etiqueta: string) => {
+      const nombre = jugador.trim();
+      if (!/^[A-Za-z0-9_.]{1,20}$/.test(nombre)) {
+        setError(
+          "escribe el nombre exacto del jugador (letras, números, _ o .)",
+        );
+        return;
+      }
+      setError(null);
+      const razon = motivo.trim();
+      const conMotivo = razon ? ` (${razon})` : "";
+      void ejecutar(
+        accion,
+        { jugador: nombre, motivo: razon },
+        `${etiqueta} ${nombre}${conMotivo}`,
       );
-      setAviso(
-        "Si el correo puede administrar el servidor, el enlace va en camino.",
-      );
-    }, "no se pudo enviar el enlace");
-  };
+    },
+    [jugador, motivo, ejecutar],
+  );
 
-  const subir = (evento: React.SubmitEvent) => {
-    evento.preventDefault();
-    if (!archivo) {
-      setAviso(null);
-      setError("elige un archivo .jar");
-      return undefined;
-    }
-    return operar(async () => {
-      const nombre = encodeURIComponent(archivo.name);
-      const r = await exigirOk(
-        await fetch(`/api/minecraft-admin/plugins?nombre=${nombre}`, {
-          method: "POST",
-          headers: { "content-type": "application/java-archive" },
-          body: archivo,
-        }),
-        "no se pudo subir el plugin",
-      );
-      const meta = (await r.json()) as { plugin?: string };
-      setAviso(`Plugin guardado: ${meta.plugin ?? archivo.name}`);
-      setArchivo(null);
-      await cargar();
-    }, "no se pudo subir el plugin");
-  };
+  const pedirEnlace = useCallback(
+    (evento: React.SubmitEvent) => {
+      evento.preventDefault();
+      return operar(async () => {
+        await exigirOk(
+          await fetch("/api/minecraft-admin/enlace", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email }),
+          }),
+          "no se pudo enviar el enlace",
+        );
+        setAviso(
+          "Si el correo puede administrar el servidor, el enlace va en camino.",
+        );
+      }, "no se pudo enviar el enlace");
+    },
+    [email, operar],
+  );
 
-  const abrirConfiguracion = async () => {
+  const subir = useCallback(
+    (evento: React.SubmitEvent) => {
+      evento.preventDefault();
+      if (!archivo) {
+        setAviso(null);
+        setError("elige un archivo .jar");
+        return undefined;
+      }
+      return operar(async () => {
+        const nombre = encodeURIComponent(archivo.name);
+        const r = await exigirOk(
+          await fetch(`/api/minecraft-admin/plugins?nombre=${nombre}`, {
+            method: "POST",
+            headers: { "content-type": "application/java-archive" },
+            body: archivo,
+          }),
+          "no se pudo subir el plugin",
+        );
+        const meta = (await r.json()) as { plugin?: string };
+        setAviso(`Plugin guardado: ${meta.plugin ?? archivo.name}`);
+        setArchivo(null);
+        await cargar();
+      }, "no se pudo subir el plugin");
+    },
+    [archivo, operar, cargar],
+  );
+
+  const abrirConfiguracion = useCallback(async () => {
     setError(null);
     setAviso(null);
     const parametros = new URLSearchParams({ tipo: destino });
@@ -746,27 +770,82 @@ export function PanelMinecraftAdmin() {
     }
     const cuerpo = (await r.json()) as { contenido?: string };
     setTexto(cuerpo.contenido ?? "");
-  };
-  const abrirConfiguracionSinEsperar = () => void abrirConfiguracion();
+  }, [destino, nombreConfig]);
+  const abrirConfiguracionSinEsperar = useCallback(
+    () => void abrirConfiguracion(),
+    [abrirConfiguracion],
+  );
 
-  const guardarConfiguracion = (evento: React.SubmitEvent) => {
-    evento.preventDefault();
-    return operar(async () => {
-      await exigirOk(
-        await fetch("/api/minecraft-admin/configuracion", {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            tipo: destino,
-            archivo: destino === "plugin" ? nombreConfig : undefined,
-            contenido: texto,
+  const guardarConfiguracion = useCallback(
+    (evento: React.SubmitEvent) => {
+      evento.preventDefault();
+      return operar(async () => {
+        await exigirOk(
+          await fetch("/api/minecraft-admin/configuracion", {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              tipo: destino,
+              archivo: destino === "plugin" ? nombreConfig : undefined,
+              contenido: texto,
+            }),
           }),
-        }),
-        "no se pudo guardar la configuración",
-      );
-      setAviso("Configuración guardada.");
-      await cargar();
-    }, "no se pudo guardar la configuración");
+          "no se pudo guardar la configuración",
+        );
+        setAviso("Configuración guardada.");
+        await cargar();
+      }, "no se pudo guardar la configuración");
+    },
+    [destino, nombreConfig, texto, operar, cargar],
+  );
+
+  // Una vista por pestaña en una tabla (y no seis ternarios en el JSX): crear los elementos no
+  // monta nada, solo se pinta el de la pestaña elegida.
+  const vistas: Record<Pestana, React.ReactNode> = {
+    servidor: (
+      <PestanaServidor
+        panorama={panorama}
+        historial={historial}
+        hace={hace}
+        ocupado={ocupado}
+        esAdmin={esAdmin}
+        jugador={jugador}
+        motivo={motivo}
+        anuncio={anuncio}
+        consola={consola}
+        alCambiarJugador={setJugador}
+        alCambiarMotivo={setMotivo}
+        alCambiarAnuncio={setAnuncio}
+        alAnunciar={anunciar}
+        alModerar={sobreJugador}
+        ejecutar={ejecutarSinEsperar}
+      />
+    ),
+    plugins: (
+      <SeccionPlugins respaldo={estado.plugins ?? []}>
+        <SubirPlugin
+          ocupado={ocupado}
+          alElegirArchivo={setArchivo}
+          alSubir={subir}
+        />
+      </SeccionPlugins>
+    ),
+    archivos: <SeccionArchivos />,
+    consola: <SeccionConsola esAdmin={esAdmin} />,
+    experiencia: esAdmin ? <SeccionExperiencia /> : null,
+    configuracion: (
+      <PestanaConfiguracion
+        destino={destino}
+        nombreConfig={nombreConfig}
+        texto={texto}
+        ocupado={ocupado}
+        alCambiarDestino={setDestino}
+        alCambiarNombre={setNombreConfig}
+        alCambiarTexto={setTexto}
+        alAbrir={abrirConfiguracionSinEsperar}
+        alGuardar={guardarConfiguracion}
+      />
+    ),
   };
 
   if (sesion === "comprobando") {
@@ -813,55 +892,7 @@ export function PanelMinecraftAdmin() {
             <AvisoCarpeta directorio={estado.directorio} />
           ) : null}
 
-          {pestana === "servidor" ? (
-            <PestanaServidor
-              panorama={panorama}
-              historial={historial}
-              hace={hace}
-              ocupado={ocupado}
-              esAdmin={esAdmin}
-              jugador={jugador}
-              motivo={motivo}
-              anuncio={anuncio}
-              consola={consola}
-              alCambiarJugador={setJugador}
-              alCambiarMotivo={setMotivo}
-              alCambiarAnuncio={setAnuncio}
-              alAnunciar={anunciar}
-              alModerar={sobreJugador}
-              ejecutar={ejecutarSinEsperar}
-            />
-          ) : null}
-
-          {pestana === "plugins" ? (
-            <SeccionPlugins respaldo={estado.plugins ?? []}>
-              <SubirPlugin
-                ocupado={ocupado}
-                alElegirArchivo={setArchivo}
-                alSubir={subir}
-              />
-            </SeccionPlugins>
-          ) : null}
-
-          {pestana === "archivos" ? <SeccionArchivos /> : null}
-
-          {pestana === "consola" ? <SeccionConsola esAdmin={esAdmin} /> : null}
-
-          {pestana === "experiencia" && esAdmin ? <SeccionExperiencia /> : null}
-
-          {pestana === "configuracion" ? (
-            <PestanaConfiguracion
-              destino={destino}
-              nombreConfig={nombreConfig}
-              texto={texto}
-              ocupado={ocupado}
-              alCambiarDestino={setDestino}
-              alCambiarNombre={setNombreConfig}
-              alCambiarTexto={setTexto}
-              alAbrir={abrirConfiguracionSinEsperar}
-              alGuardar={guardarConfiguracion}
-            />
-          ) : null}
+          {vistas[pestana]}
 
           <Mensajes aviso={aviso} error={error} />
         </div>

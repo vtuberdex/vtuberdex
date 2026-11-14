@@ -20,7 +20,7 @@ import {
   useEffect,
   useMemo,
   useState,
-  type FormEvent,
+  type SubmitEvent,
 } from "react";
 
 import { api } from "@/lib/api";
@@ -458,7 +458,7 @@ export function CardWizard({
     );
   }
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (mode === "edit") {
       void persist();

@@ -31,7 +31,7 @@ export async function writeInside(base, target, data) {
   const raiz = path.resolve(base);
   const rel = path.relative(raiz, path.resolve(target));
   const tramos = rel.split(path.sep);
-  if (!rel || path.isAbsolute(rel) || tramos.some((tramo) => tramo === "..")) {
+  if (!rel || path.isAbsolute(rel) || tramos.includes("..")) {
     throw new Error(`ruta fuera de ${base}: ${target}`);
   }
   const destino = path.join(raiz, ...tramos.map(tramoValido));
