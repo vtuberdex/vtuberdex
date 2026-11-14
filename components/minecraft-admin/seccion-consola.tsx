@@ -10,16 +10,18 @@ import { useRef, useState } from "react";
 
 import { CLASE_BOTON, CLASE_CAMPO_MONO, FUENTE_MONO, Seccion } from "./ui";
 
-type Linea = { comando: string; salida: string; ok: boolean };
+/** `id` es la clave de React: el mismo comando se repite y el índice cambia al recortar a 200 líneas. */
+type Linea = { id: number; comando: string; salida: string; ok: boolean };
 
-export function SeccionConsola({ esAdmin }: { esAdmin: boolean }) {
+export function SeccionConsola({ esAdmin }: Readonly<{ esAdmin: boolean }>) {
   const [comando, setComando] = useState("");
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [ocupado, setOcupado] = useState(false);
   const historial = useRef<string[]>([]);
   const posicion = useRef(-1);
+  const siguienteLinea = useRef(0);
 
-  const enviar = async (evento: React.FormEvent) => {
+  const enviar = async (evento: React.SubmitEvent) => {
     evento.preventDefault();
     const texto = comando.trim();
     if (!texto || ocupado) {
@@ -42,9 +44,10 @@ export function SeccionConsola({ esAdmin }: { esAdmin: boolean }) {
         : [c?.error ?? `error ${r.status}`, c?.detail]
             .filter(Boolean)
             .join(": ");
+      const id = siguienteLinea.current++;
       setLineas((l) => [
         ...l.slice(-199),
-        { comando: texto, salida, ok: r.ok },
+        { id, comando: texto, salida, ok: r.ok },
       ]);
       historial.current = [texto, ...historial.current.slice(0, 49)];
       posicion.current = -1;
@@ -82,8 +85,8 @@ export function SeccionConsola({ esAdmin }: { esAdmin: boolean }) {
       >
         {lineas.length === 0
           ? "Escribe un comando (sin barra). ↑/↓ recorre el historial."
-          : lineas.map((l, n) => (
-              <span key={n} className={l.ok ? "" : "text-red-400"}>
+          : lineas.map((l) => (
+              <span key={l.id} className={l.ok ? "" : "text-red-400"}>
                 {`> ${l.comando}\n${l.salida}\n`}
               </span>
             ))}

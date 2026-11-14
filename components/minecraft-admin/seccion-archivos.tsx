@@ -57,6 +57,144 @@ const tamano = (bytes: number) =>
 
 const MONO = "font-[ui-monospace,SFMono-Regular,Menlo,Consolas,monospace]";
 
+/** Un enlace de las migas o una carpeta: navegar a `ruta`. */
+function BotonDeMiga({
+  ruta,
+  nombre,
+  alNavegar,
+}: Readonly<{ ruta: string; nombre: string; alNavegar: (ruta: string) => void }>) {
+  const navegar = () => alNavegar(ruta);
+  return (
+    <button
+      type="button"
+      onClick={navegar}
+      className="rounded px-1.5 py-0.5 text-dex-accent hover:bg-dex-panel-soft"
+    >
+      {nombre}
+    </button>
+  );
+}
+
+function FilaDeCarpeta({
+  carpeta,
+  alNavegar,
+}: Readonly<{ carpeta: Carpeta; alNavegar: (ruta: string) => void }>) {
+  const navegar = () => alNavegar(carpeta.ruta);
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={navegar}
+        className={`flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left ${MONO} text-dex-ink hover:bg-dex-panel-soft`}
+        title={carpeta.ruta}
+      >
+        <span aria-hidden>📁</span>
+        <span className="truncate">{carpeta.nombre}</span>
+        <span className="ml-auto text-dex-muted">›</span>
+      </button>
+    </li>
+  );
+}
+
+function FilaDeArchivo({
+  archivo,
+  abierto,
+  alAbrir,
+}: Readonly<{
+  archivo: Archivo;
+  abierto: boolean;
+  alAbrir: (ruta: string) => void;
+}>) {
+  const abrir = () => alAbrir(archivo.ruta);
+  const tono = abierto ? "bg-dex-panel-soft text-dex-accent" : "text-dex-ink";
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={abrir}
+        className={`flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left ${MONO} hover:bg-dex-panel-soft ${tono}`}
+        title={archivo.ruta}
+      >
+        <span className="truncate">{archivo.nombre}</span>
+        {archivo.escribible === false ? (
+          <span className="ml-auto shrink-0 text-[10px] uppercase text-amber-400">
+            solo lectura
+          </span>
+        ) : null}
+      </button>
+    </li>
+  );
+}
+
+/** Columna izquierda: migas, filtro y el contenido (ya filtrado) de la carpeta. */
+function Explorador({
+  migas,
+  carpetas,
+  archivos,
+  ruta,
+  filtro,
+  alFiltrar,
+  alNavegar,
+  alAbrir,
+}: Readonly<{
+  migas: Migaja[];
+  carpetas: Carpeta[];
+  archivos: Archivo[];
+  ruta: string | null;
+  filtro: string;
+  alFiltrar: (filtro: string) => void;
+  alNavegar: (ruta: string) => void;
+  alAbrir: (ruta: string) => void;
+}>) {
+  const filtrar = (e: React.ChangeEvent<HTMLInputElement>) =>
+    alFiltrar(e.target.value);
+  return (
+    <div className="space-y-2">
+      <nav
+        aria-label="Carpeta actual"
+        className={`flex flex-wrap items-center gap-1 text-xs ${MONO}`}
+      >
+        <BotonDeMiga ruta="" nombre="servidor" alNavegar={alNavegar} />
+        {migas.map((m) => (
+          <span key={m.ruta} className="flex items-center gap-1">
+            <span className="text-dex-muted">/</span>
+            <BotonDeMiga ruta={m.ruta} nombre={m.nombre} alNavegar={alNavegar} />
+          </span>
+        ))}
+      </nav>
+
+      <input
+        type="search"
+        value={filtro}
+        onChange={filtrar}
+        placeholder="Filtrar en esta carpeta"
+        aria-label="Filtrar archivos"
+        className={CLASE_CAMPO}
+      />
+
+      <ul
+        aria-label="Contenido de la carpeta"
+        className="max-h-[32rem] overflow-auto rounded-xl border border-dex-line bg-dex-void/60 p-1 text-xs"
+      >
+        {carpetas.length === 0 && archivos.length === 0 ? (
+          <li className="p-2 text-dex-muted">Carpeta vacía.</li>
+        ) : null}
+        {carpetas.map((c) => (
+          <FilaDeCarpeta key={c.ruta} carpeta={c} alNavegar={alNavegar} />
+        ))}
+        {archivos.map((a) => (
+          <FilaDeArchivo
+            key={a.ruta}
+            archivo={a}
+            abierto={a.ruta === ruta}
+            alAbrir={alAbrir}
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function SeccionArchivos() {
   const [datos, setDatos] = useState<Contenido | null>(null);
   const [filtro, setFiltro] = useState("");
@@ -120,7 +258,7 @@ export function SeccionArchivos() {
     setOriginal(c.contenido);
   };
 
-  const guardar = async (evento: React.FormEvent) => {
+  const guardar = async (evento: React.SubmitEvent) => {
     evento.preventDefault();
     if (!ruta) {
       return;
@@ -148,6 +286,11 @@ export function SeccionArchivos() {
       setOcupado(false);
     }
   };
+
+  const navegarSinEsperar = (destino: string) => void navegar(destino);
+  const abrirSinEsperar = (destino: string) => void abrir(destino);
+  const cambiarTexto = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
+    setTexto(e.target.value);
 
   const f = filtro.trim().toLowerCase();
   const carpetas = useMemo(
@@ -183,85 +326,16 @@ export function SeccionArchivos() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
-        <div className="space-y-2">
-          <nav
-            aria-label="Carpeta actual"
-            className={`flex flex-wrap items-center gap-1 text-xs ${MONO}`}
-          >
-            <button
-              type="button"
-              onClick={() => void navegar("")}
-              className="rounded px-1.5 py-0.5 text-dex-accent hover:bg-dex-panel-soft"
-            >
-              servidor
-            </button>
-            {(datos?.migas ?? []).map((m) => (
-              <span key={m.ruta} className="flex items-center gap-1">
-                <span className="text-dex-muted">/</span>
-                <button
-                  type="button"
-                  onClick={() => void navegar(m.ruta)}
-                  className="rounded px-1.5 py-0.5 text-dex-accent hover:bg-dex-panel-soft"
-                >
-                  {m.nombre}
-                </button>
-              </span>
-            ))}
-          </nav>
-
-          <input
-            type="search"
-            value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
-            placeholder="Filtrar en esta carpeta"
-            aria-label="Filtrar archivos"
-            className={CLASE_CAMPO}
-          />
-
-          <ul
-            aria-label="Contenido de la carpeta"
-            className="max-h-[32rem] overflow-auto rounded-xl border border-dex-line bg-dex-void/60 p-1 text-xs"
-          >
-            {carpetas.length === 0 && archivos.length === 0 ? (
-              <li className="p-2 text-dex-muted">Carpeta vacía.</li>
-            ) : null}
-            {carpetas.map((c) => (
-              <li key={c.ruta}>
-                <button
-                  type="button"
-                  onClick={() => void navegar(c.ruta)}
-                  className={`flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left ${MONO} text-dex-ink hover:bg-dex-panel-soft`}
-                  title={c.ruta}
-                >
-                  <span aria-hidden>📁</span>
-                  <span className="truncate">{c.nombre}</span>
-                  <span className="ml-auto text-dex-muted">›</span>
-                </button>
-              </li>
-            ))}
-            {archivos.map((a) => (
-              <li key={a.ruta}>
-                <button
-                  type="button"
-                  onClick={() => void abrir(a.ruta)}
-                  className={`flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left ${MONO} hover:bg-dex-panel-soft ${
-                    a.ruta === ruta
-                      ? "bg-dex-panel-soft text-dex-accent"
-                      : "text-dex-ink"
-                  }`}
-                  title={a.ruta}
-                >
-                  <span className="truncate">{a.nombre}</span>
-                  {a.escribible === false ? (
-                    <span className="ml-auto shrink-0 text-[10px] uppercase text-amber-400">
-                      solo lectura
-                    </span>
-                  ) : null}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <Explorador
+          migas={datos?.migas ?? []}
+          carpetas={carpetas}
+          archivos={archivos}
+          ruta={ruta}
+          filtro={filtro}
+          alFiltrar={setFiltro}
+          alNavegar={navegarSinEsperar}
+          alAbrir={abrirSinEsperar}
+        />
 
         <form onSubmit={guardar} className="space-y-3">
           {soloLectura ? (
@@ -289,7 +363,7 @@ export function SeccionArchivos() {
           ) : null}
           <textarea
             value={texto}
-            onChange={(e) => setTexto(e.target.value)}
+            onChange={cambiarTexto}
             rows={22}
             disabled={!ruta}
             spellCheck={false}
