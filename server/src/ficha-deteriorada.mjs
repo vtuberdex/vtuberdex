@@ -20,7 +20,7 @@
 import { GRADO_DE_BAJA } from "./premium.mjs";
 
 /** Símbolos con los que se sustituyen las letras: ASCII, para que cualquier fuente los tenga. */
-const SIMBOLOS = "#%&@*?/\\~=+<>";
+const SIMBOLOS = String.raw`#%&@*?/\~=+<>`;
 
 /** ¿Es una ficha en el grado de las bajas? Sirve para una tarjeta ya mapeada o para un grado suelto. */
 export function esFichaDeteriorada(cartaOGrado) {

@@ -220,7 +220,8 @@ export function refreshSearchIndex(db, vtuberId) {
  * Cae a `<prefijo>-<puntos de código en hex>`: determinista, así que el mismo texto da el mismo slug.
  */
 export function slugOCodigo(valor, prefijo) {
-  const slug = slugify(valor).slice(0, 80).replace(/-+$/, "");
+  // `slugify` nunca deja dos guiones seguidos: al cortar a 80 sobra como mucho UNO al final.
+  const slug = slugify(valor).slice(0, 80).replace(/-$/, "");
   if (slug) {
     return slug;
   }
@@ -316,7 +317,7 @@ export function replaceRelations(db, vtuberId, patch) {
     );
   }
   if (patch.factions) {
-    // Se resuelve TODO antes de tocar nada: un valor desconocido no puede dejar a la carta sin facciones.
+    // Se resuelven TODAS antes de tocar nada: un valor desconocido no puede dejar a la carta sin facciones.
     const resueltas = [];
     for (const valor of patch.factions) {
       const faccion = buscarFaccion(db, valor);
@@ -484,7 +485,8 @@ export function resolverDex(db, pedido, { excluirId = null } = {}) {
  * posible duplicado y el mantenedor lo decide.
  */
 function slugDesdeNombre(nombre, dex) {
-  return slugify(nombre).slice(0, 80).replace(/-+$/, "") || `vtuber-${dex}`;
+  // `slugify` nunca deja dos guiones seguidos: al cortar a 80 sobra como mucho UNO al final.
+  return slugify(nombre).slice(0, 80).replace(/-$/, "") || `vtuber-${dex}`;
 }
 
 /** Valida y normaliza un slug explícito. */
@@ -547,7 +549,7 @@ function cambiarSlug(db, id, actual, nuevo) {
  * fecha de alta cada vez que se sube de grado, porque esta función no ve la base.
  */
 export function sellarPremium(patch, ahora = hoy()) {
-  if (!patch || !patch.premium) {
+  if (!patch?.premium) {
     return patch;
   }
   return {
@@ -593,22 +595,25 @@ function aplicarPremium(db, vtuberId, premium) {
     ).run(vtuberId, premium.grade, alta, premium.gradedAt ?? alta);
     return;
   }
+  const { since, gradedAt } = fechasAlCambiar(actual, premium, ahora);
+  db.prepare(
+    "UPDATE premium SET grade = ?, since = ?, graded_at = ? WHERE vtuber_id = ?",
+  ).run(premium.grade, since, gradedAt, vtuberId);
+}
+
+/** `since` y `graded_at` de una fila premium que ya existe, según las reglas de `aplicarPremium`. */
+function fechasAlCambiar(actual, premium, ahora) {
   const cambioGrado = actual.grade !== premium.grade;
+  const ascenso = premium.gradedAt ?? ahora;
   const rachaRota =
     cambioGrado &&
     esGradoPremium(actual.grade) &&
     esGradoPremium(premium.grade) &&
-    mesesCalendario(actual.gradedAt, premium.gradedAt ?? ahora) > 1;
-  db.prepare(
-    "UPDATE premium SET grade = ?, since = ?, graded_at = ? WHERE vtuber_id = ?",
-  ).run(
-    premium.grade,
-    premium.since ?? (rachaRota ? (premium.gradedAt ?? ahora) : actual.since),
-    cambioGrado
-      ? (premium.gradedAt ?? ahora)
-      : (premium.gradedAt ?? actual.gradedAt),
-    vtuberId,
-  );
+    mesesCalendario(actual.gradedAt, ascenso) > 1;
+  return {
+    since: premium.since ?? (rachaRota ? ascenso : actual.since),
+    gradedAt: cambioGrado ? ascenso : (premium.gradedAt ?? actual.gradedAt),
+  };
 }
 
 const COLUMNAS = {
@@ -733,7 +738,11 @@ export function crearFicha(db, datos, { id = null } = {}) {
     .get(slug).id;
 
   // El resto de campos entra por el mismo camino que una edición.
-  const { name: _nombre, slug: _slug, dexNumber: _dex, ...resto } = datos;
+  // Nombre, slug y número ya se escribieron arriba: no pasan otra vez por el parche.
+  const resto = { ...datos };
+  delete resto.name;
+  delete resto.slug;
+  delete resto.dexNumber;
   aplicarParche(db, nuevoId, resto);
   return { id: nuevoId, slug };
 }

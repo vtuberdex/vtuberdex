@@ -169,11 +169,25 @@ const correo = z
   .trim()
   .toLowerCase()
   .max(200)
-  .refine(
-    (valor) =>
-      valor.length <= 200 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(valor),
-    "correo no válido",
-  );
+  .refine((valor) => valor.length <= 200 && esCorreoValido(valor), "correo no válido");
+
+/**
+ * Lo mismo que `/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/`, sin regex: el punto también cabe en `[^\s@]+`, así
+ * que la regex probaba cada punto del dominio y era polinómica. Sin blancos, UNA arroba con algo a
+ * cada lado, y en el dominio un punto que no sea el primer carácter con al menos dos detrás.
+ */
+function esCorreoValido(valor) {
+  if (/\s/.test(valor)) {
+    return false;
+  }
+  const arroba = valor.indexOf("@");
+  if (arroba < 1 || valor.indexOf("@", arroba + 1) >= 0) {
+    return false;
+  }
+  const dominio = valor.slice(arroba + 1);
+  const punto = dominio.indexOf(".", 1);
+  return punto >= 1 && punto <= dominio.length - 3;
+}
 
 /**
  * El «he leído y acepto». `z.literal(true)` y no `z.boolean()`: un `false` o un campo ausente
@@ -344,9 +358,9 @@ const ESQUEMAS = {
 /* ------------------------------------------------------------------ operaciones */
 
 const aJson = (valor) => JSON.stringify(valor);
-const deJson = (texto) => {
+const deJson = (json) => {
   try {
-    return texto ? JSON.parse(texto) : null;
+    return json ? JSON.parse(json) : null;
   } catch {
     return null;
   }
@@ -383,29 +397,118 @@ export async function crearSolicitud(
   if (!TIPOS.includes(tipo)) {
     throw new SolicitudError(400, "tipo_invalido", tipo);
   }
-  const esquema = ESQUEMAS[tipo];
-  // Con `permiso` el correo YA está verificado (lo canjeó por un código): sale del permiso, no de lo que
-  // diga el cuerpo, y la solicitud nace `pendiente` sin segundo correo. Se mira sin gastarlo: un error de
-  // validación de abajo no debe quemar el permiso, que cuesta rellenar un formulario largo.
-  let correoVerificado = null;
-  if (permiso !== null) {
-    correoVerificado = await correoDelToken(
-      ejecutor,
-      permiso,
-      propositoPermiso,
-      ahora.getTime(),
+  const correoVerificado = await correoDelPermiso(ejecutor, {
+    permiso,
+    propositoPermiso,
+    ahora,
+  });
+  const validados = datosValidados(ESQUEMAS[tipo], entrada, correoVerificado);
+  const { terminosVersion, website, email } = validados;
+  // Un bot rellena el campo oculto. Se responde como si todo fuera bien (sin pista de qué lo delató)
+  // pero no se guarda nada.
+  if (website) {
+    return { id: null, descartada: true };
+  }
+  if (terminosVersion !== TERMINOS_VERSION) {
+    throw new SolicitudError(
+      409,
+      "terminos_desactualizados",
+      "los términos cambiaron: recarga la página y vuelve a aceptarlos",
     );
-    if (!correoVerificado) {
+  }
+  const datos = { ...validados };
+  // Términos, versión, trampa y correo no son DATOS de la solicitud: van en sus columnas o se descartan.
+  delete datos.aceptaTerminos;
+  delete datos.terminosVersion;
+  delete datos.website;
+  delete datos.email;
+
+  const e = await conTablas(ejecutor);
+  const red = hashearRed(ip);
+  await comprobarCupos(e, { red, ahora, tipo, email });
+
+  // Las imágenes subidas tienen que ser de ESTE correo, del tipo que tocan y no estar en otra solicitud. Se
+  // mira antes de gastar el permiso, como el resto de la validación.
+  const imagenesIds =
+    tipo === "inscripcion" || tipo === "modificacion"
+      ? await validarImagenesDeFormulario(e, {
+          correo: email,
+          imageId: datos.imageId,
+          logoId: datos.logoId,
+          obligatorias: tipo === "inscripcion",
+        })
+      : [];
+
+  const fila = {
+    tipo,
+    datos,
+    contacto: { email },
+    red,
+    terminosVersion,
+    fecha: ahora.toISOString(),
+  };
+  if (correoVerificado) {
+    // Se gasta AHORA, con todo lo demás ya validado, y de forma atómica: dos envíos a la vez con el mismo
+    // permiso no crean dos solicitudes (el segundo ve 0 filas cambiadas).
+    if (!(await consumirToken(e, permiso, propositoPermiso, ahora.getTime()))) {
       throw new SolicitudError(
         410,
         "permiso_invalido",
         "La verificación de tu correo caducó o ya se usó. Vuelve al paso 1 y pide un código nuevo.",
       );
     }
+    const idDirecta = await insertarSolicitud(e, fila, "pendiente");
+    await adjuntarImagenes(e, idDirecta, imagenesIds);
+    return {
+      id: idDirecta,
+      descartada: false,
+      email,
+      tipo,
+      verificada: true,
+    };
   }
+  await reemplazarSinConfirmar(e, { tipo, email, ahora });
+  const idNueva = await insertarSolicitud(e, fila, "sin_verificar");
+  await adjuntarImagenes(e, idNueva, imagenesIds);
+  return {
+    id: idNueva,
+    descartada: false,
+    email,
+    tipo,
+  };
+}
+
+/**
+ * Con `permiso` el correo YA está verificado (lo canjeó por un código): sale del permiso, no de lo que
+ * diga el cuerpo, y la solicitud nace `pendiente` sin segundo correo. Se mira sin gastarlo: un error de
+ * validación de abajo no debe quemar el permiso, que cuesta rellenar un formulario largo.
+ * @returns {Promise<{ email: string } | null>} `null` si no vino permiso.
+ */
+async function correoDelPermiso(ejecutor, { permiso, propositoPermiso, ahora }) {
+  if (permiso === null) {
+    return null;
+  }
+  const correoVerificado = await correoDelToken(
+    ejecutor,
+    permiso,
+    propositoPermiso,
+    ahora.getTime(),
+  );
+  if (!correoVerificado) {
+    throw new SolicitudError(
+      410,
+      "permiso_invalido",
+      "La verificación de tu correo caducó o ya se usó. Vuelve al paso 1 y pide un código nuevo.",
+    );
+  }
+  return correoVerificado;
+}
+
+/** El cuerpo pasado por el esquema de su tipo (con el correo del permiso, si lo hay). Lanza un 400. */
+function datosValidados(esquema, entrada, correoVerificado) {
   const parsed = esquema.safeParse(
     correoVerificado
-      ? { ...(entrada ?? {}), email: correoVerificado.email }
+      ? { ...entrada, email: correoVerificado.email }
       : (entrada ?? {}),
   );
   if (!parsed.success) {
@@ -422,28 +525,11 @@ export async function crearSolicitud(
       { issues },
     );
   }
-  const {
-    aceptaTerminos: _acepta,
-    terminosVersion,
-    website,
-    email,
-    ...datos
-  } = parsed.data;
-  // Un bot rellena el campo oculto. Se responde como si todo fuera bien (sin pista de qué lo delató)
-  // pero no se guarda nada.
-  if (website) {
-    return { id: null, descartada: true };
-  }
-  if (terminosVersion !== TERMINOS_VERSION) {
-    throw new SolicitudError(
-      409,
-      "terminos_desactualizados",
-      "los términos cambiaron: recarga la página y vuelve a aceptarlos",
-    );
-  }
+  return parsed.data;
+}
 
-  const e = await conTablas(ejecutor);
-  const red = hashearRed(ip);
+/** Tope de envíos por red y día, y un solo pendiente por correo y tipo. Lanza 429/409. */
+async function comprobarCupos(e, { red, ahora, tipo, email }) {
   const desde = new Date(ahora.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const { rows } = await e.execute(
     "SELECT COUNT(*) AS n FROM solicitud WHERE red = ? AND creado >= ?",
@@ -469,54 +555,28 @@ export async function crearSolicitud(
       "ya hay una solicitud tuya en espera de revisión",
     );
   }
+}
 
-  // Las imágenes subidas tienen que ser de ESTE correo, del tipo que tocan y no estar en otra solicitud. Se
-  // mira antes de gastar el permiso, como el resto de la validación.
-  const imagenesIds =
-    tipo === "inscripcion" || tipo === "modificacion"
-      ? await validarImagenesDeFormulario(e, {
-          correo: email,
-          imageId: datos.imageId,
-          logoId: datos.logoId,
-          obligatorias: tipo === "inscripcion",
-        })
-      : [];
+/** Inserta la solicitud en `estado` y devuelve su id. */
+async function insertarSolicitud(e, { tipo, datos, contacto, red, terminosVersion, fecha }, estado) {
+  const insertada = await e.execute(
+    `INSERT INTO solicitud (tipo, estado, datos, contacto, red, terminos_version, terminos_aceptados_en, creado)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [tipo, estado, aJson(datos), aJson(contacto), red, terminosVersion, fecha, fecha],
+  );
+  const { rows: ultima } = await e.execute(
+    "SELECT MAX(id) AS id FROM solicitud WHERE red = ?",
+    [red],
+  );
+  return Number(insertada.lastInsertRowid ?? ultima[0]?.id ?? 0) || null;
+}
 
-  const contacto = { email };
-  const fecha = ahora.toISOString();
-  if (correoVerificado) {
-    // Se gasta AHORA, con todo lo demás ya validado, y de forma atómica: dos envíos a la vez con el mismo
-    // permiso no crean dos solicitudes (el segundo ve 0 filas cambiadas).
-    if (!(await consumirToken(e, permiso, propositoPermiso, ahora.getTime()))) {
-      throw new SolicitudError(
-        410,
-        "permiso_invalido",
-        "La verificación de tu correo caducó o ya se usó. Vuelve al paso 1 y pide un código nuevo.",
-      );
-    }
-    const directa = await e.execute(
-      `INSERT INTO solicitud (tipo, estado, datos, contacto, red, terminos_version, terminos_aceptados_en, creado)
-       VALUES (?, 'pendiente', ?, ?, ?, ?, ?, ?)`,
-      [tipo, aJson(datos), aJson(contacto), red, terminosVersion, fecha, fecha],
-    );
-    const { rows: ultima } = await e.execute(
-      "SELECT MAX(id) AS id FROM solicitud WHERE red = ?",
-      [red],
-    );
-    const idDirecta =
-      Number(directa.lastInsertRowid ?? ultima[0]?.id ?? 0) || null;
-    await adjuntarImagenes(e, idDirecta, imagenesIds);
-    return {
-      id: idDirecta,
-      descartada: false,
-      email,
-      tipo,
-      verificada: true,
-    };
-  }
-  // Una solicitud sin confirmar del mismo correo y tipo se REEMPLAZA (la persona volvió a enviar porque
-  // el correo no le llegó): no se acumulan. Y las que nadie confirmó en días se borran aquí mismo, sin
-  // un trabajo aparte.
+/**
+ * Una solicitud sin confirmar del mismo correo y tipo se REEMPLAZA (la persona volvió a enviar porque
+ * el correo no le llegó): no se acumulan. Y las que nadie confirmó en días se borran aquí mismo, sin
+ * un trabajo aparte.
+ */
+async function reemplazarSinConfirmar(e, { tipo, email, ahora }) {
   const sinConfirmar = await e.execute(
     "SELECT id, contacto, creado FROM solicitud WHERE tipo = ? AND estado = 'sin_verificar'",
     [tipo],
@@ -535,24 +595,6 @@ export async function crearSolicitud(
       );
     }
   }
-  const insertada = await e.execute(
-    `INSERT INTO solicitud (tipo, estado, datos, contacto, red, terminos_version, terminos_aceptados_en, creado)
-     VALUES (?, 'sin_verificar', ?, ?, ?, ?, ?, ?)`,
-    [tipo, aJson(datos), aJson(contacto), red, terminosVersion, fecha, fecha],
-  );
-  const { rows: ultimo } = await e.execute(
-    "SELECT MAX(id) AS id FROM solicitud WHERE red = ?",
-    [red],
-  );
-  const idNueva =
-    Number(insertada.lastInsertRowid ?? ultimo[0]?.id ?? 0) || null;
-  await adjuntarImagenes(e, idNueva, imagenesIds);
-  return {
-    id: idNueva,
-    descartada: false,
-    email,
-    tipo,
-  };
 }
 
 /**

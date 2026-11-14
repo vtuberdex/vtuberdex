@@ -238,6 +238,128 @@ function normalizeCountryFilters(values) {
     .map((value) => value.toLowerCase());
 }
 
+/** Una lista de filtro (`a,b` o varias) limpia y, si se pide, en minúsculas. */
+function listaDeFiltro(values, { minusculas = false } = {}) {
+  return values
+    .flatMap((value) => String(value).split(","))
+    .map((v) => (minusculas ? v.trim().toLowerCase() : v.trim()))
+    .filter(Boolean);
+}
+
+function filtroDeEstado(f, includeHidden, status) {
+  if (!includeHidden) {
+    f.where.push(`v.status = 'published'`);
+  } else if (status) {
+    f.where.push("v.status = ?");
+    f.args.push(status);
+  } else {
+    // El mantenedor sin estado concreto: todas (publicadas, borradores y ocultas).
+  }
+}
+
+function filtroPremium(db, f, premium) {
+  if (!premium) {
+    return;
+  }
+  // Sin la tabla no hay ninguna premium: el filtro devuelve vacío en vez de fallar.
+  if (!tienePremium(db)) {
+    f.where.push("0");
+  } else if (premium === "todas") {
+    f.where.push("EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id)");
+  } else {
+    f.where.push(
+      `EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id AND p.grade IN (${GRADOS.map(() => "?").join(",")}))`,
+    );
+    f.args.push(...GRADOS);
+  }
+}
+
+function filtroDeTexto(db, f, q, includeHidden) {
+  const term = String(q).trim();
+  if (!term) {
+    return;
+  }
+  const ftsQuery = buildFtsQuery(term);
+  const like = `%${normalizeText(term)}%`;
+  if (ftsQuery) {
+    f.where.push(`(
+        v.id IN (SELECT rowid FROM vtuber_fts WHERE vtuber_fts MATCH ?)
+        OR v.search_name LIKE ?
+        OR v.card_text LIKE ?
+        OR v.dex_number = ?
+      )`);
+    f.args.push(ftsQuery, like, like, Number(term) || -1);
+  } else {
+    f.where.push(
+      "(v.search_name LIKE ? OR v.card_text LIKE ? OR v.dex_number = ?)",
+    );
+    f.args.push(like, like, Number(term) || -1);
+  }
+  // Buscar por texto no puede revelar a quien se dio de baja: una ficha deteriorada no sale por su nombre.
+  if (!includeHidden && tienePremium(db)) {
+    f.where.push(
+      "NOT EXISTS (SELECT 1 FROM premium pb WHERE pb.vtuber_id = v.id AND pb.grade = ?)",
+    );
+    f.args.push(GRADO_DE_BAJA);
+  }
+}
+
+function filtroDePaises(f, countries) {
+  const countryList = normalizeCountryFilters(countries);
+  if (countryList.length === 0) {
+    return;
+  }
+  f.where.push(`EXISTS (
+      SELECT 1 FROM vtuber_country vc JOIN country c ON c.id = vc.country_id
+      WHERE vc.vtuber_id = v.id AND (c.slug IN (${countryList.map(() => "?").join(",")})
+        OR lower(c.name) IN (${countryList.map(() => "?").join(",")}))
+    )`);
+  f.args.push(...countryList, ...countryList);
+}
+
+function filtroDeIdiomas(f, languages) {
+  if (languages.length === 0) {
+    return;
+  }
+  const langList = listaDeFiltro(languages);
+  if (langList.length === 0) {
+    return;
+  }
+  f.where.push(`EXISTS (
+        SELECT 1 FROM vtuber_language vl
+        WHERE vl.vtuber_id = v.id AND vl.code IN (${langList.map(() => "?").join(",")})
+      )`);
+  f.args.push(...langList);
+}
+
+function filtroDeEtiquetas(f, kind, values) {
+  const list = listaDeFiltro(values, { minusculas: true });
+  if (list.length === 0) {
+    return;
+  }
+  f.where.push(`EXISTS (
+      SELECT 1 FROM vtuber_tag vt JOIN tag t ON t.id = vt.tag_id
+      WHERE vt.vtuber_id = v.id AND t.kind = ?
+        AND (t.slug IN (${list.map(() => "?").join(",")}) OR lower(t.label) IN (${list.map(() => "?").join(",")}))
+    )`);
+  f.args.push(kind, ...list, ...list);
+}
+
+function filtroDeFacciones(f, factions) {
+  if (factions.length === 0) {
+    return;
+  }
+  const list = listaDeFiltro(factions, { minusculas: true });
+  if (list.length === 0) {
+    return;
+  }
+  f.where.push(`EXISTS (
+        SELECT 1 FROM vtuber_faction vf JOIN faction f ON f.id = vf.faction_id
+        WHERE vf.vtuber_id = v.id AND (f.slug IN (${list.map(() => "?").join(",")}) OR lower(f.label) IN (${list.map(() => "?").join(",")}))
+      )`);
+  f.args.push(...list, ...list);
+}
+
 /**
  * Busca cartas con filtros facetados.
  * @param {import('node:sqlite').DatabaseSync} db
@@ -266,119 +388,25 @@ export function searchVtubers(db, params = {}) {
     premium = false,
   } = params;
 
-  const where = [];
-  const args = [];
-
-  if (!includeHidden) {
-    where.push(`v.status = 'published'`);
-  } else if (status) {
-    where.push("v.status = ?");
-    args.push(status);
-  }
-  if (premium) {
-    // Sin la tabla no hay ninguna premium: el filtro devuelve vacío en vez de fallar.
-    if (!tienePremium(db)) {
-      where.push("0");
-    } else if (premium === "todas") {
-      where.push("EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id)");
-    } else {
-      where.push(
-        `EXISTS (SELECT 1 FROM premium p WHERE p.vtuber_id = v.id AND p.grade IN (${GRADOS.map(() => "?").join(",")}))`,
-      );
-      args.push(...GRADOS);
-    }
-  }
+  // Cada filtro añade su condición y sus `?` en ESTE orden: el de `args` tiene que seguir al de `where`.
+  const f = { where: [], args: [] };
+  filtroDeEstado(f, includeHidden, status);
+  filtroPremium(db, f, premium);
   if (theme) {
-    where.push("v.theme_color = ?");
-    args.push(theme);
+    f.where.push("v.theme_color = ?");
+    f.args.push(theme);
   }
   if (minPower !== null) {
-    where.push("v.power_score >= ?");
-    args.push(minPower);
+    f.where.push("v.power_score >= ?");
+    f.args.push(minPower);
   }
-
-  const term = String(q).trim();
-  if (term) {
-    const ftsQuery = buildFtsQuery(term);
-    const like = `%${normalizeText(term)}%`;
-    if (ftsQuery) {
-      where.push(`(
-        v.id IN (SELECT rowid FROM vtuber_fts WHERE vtuber_fts MATCH ?)
-        OR v.search_name LIKE ?
-        OR v.card_text LIKE ?
-        OR v.dex_number = ?
-      )`);
-      args.push(ftsQuery, like, like, Number(term) || -1);
-    } else {
-      where.push(
-        "(v.search_name LIKE ? OR v.card_text LIKE ? OR v.dex_number = ?)",
-      );
-      args.push(like, like, Number(term) || -1);
-    }
-    // Buscar por texto no puede revelar a quien se dio de baja: una ficha deteriorada no sale por su nombre.
-    if (!includeHidden && tienePremium(db)) {
-      where.push(
-        "NOT EXISTS (SELECT 1 FROM premium pb WHERE pb.vtuber_id = v.id AND pb.grade = ?)",
-      );
-      args.push(GRADO_DE_BAJA);
-    }
-  }
-
-  const countryList = normalizeCountryFilters(countries);
-  if (countryList.length > 0) {
-    where.push(`EXISTS (
-      SELECT 1 FROM vtuber_country vc JOIN country c ON c.id = vc.country_id
-      WHERE vc.vtuber_id = v.id AND (c.slug IN (${countryList.map(() => "?").join(",")})
-        OR lower(c.name) IN (${countryList.map(() => "?").join(",")}))
-    )`);
-    args.push(...countryList, ...countryList);
-  }
-
-  if (languages.length > 0) {
-    const langList = languages
-      .flatMap((value) => String(value).split(","))
-      .map((v) => v.trim())
-      .filter(Boolean);
-    if (langList.length > 0) {
-      where.push(`EXISTS (
-        SELECT 1 FROM vtuber_language vl
-        WHERE vl.vtuber_id = v.id AND vl.code IN (${langList.map(() => "?").join(",")})
-      )`);
-      args.push(...langList);
-    }
-  }
-
-  const tagFilter = (kind, values) => {
-    const list = values
-      .flatMap((value) => String(value).split(","))
-      .map((v) => v.trim().toLowerCase())
-      .filter(Boolean);
-    if (list.length === 0) {
-      return;
-    }
-    where.push(`EXISTS (
-      SELECT 1 FROM vtuber_tag vt JOIN tag t ON t.id = vt.tag_id
-      WHERE vt.vtuber_id = v.id AND t.kind = ?
-        AND (t.slug IN (${list.map(() => "?").join(",")}) OR lower(t.label) IN (${list.map(() => "?").join(",")}))
-    )`);
-    args.push(kind, ...list, ...list);
-  };
-  tagFilter("group", groups);
-  tagFilter("artist", artists);
-
-  if (factions.length > 0) {
-    const list = factions
-      .flatMap((value) => String(value).split(","))
-      .map((v) => v.trim().toLowerCase())
-      .filter(Boolean);
-    if (list.length > 0) {
-      where.push(`EXISTS (
-        SELECT 1 FROM vtuber_faction vf JOIN faction f ON f.id = vf.faction_id
-        WHERE vf.vtuber_id = v.id AND (f.slug IN (${list.map(() => "?").join(",")}) OR lower(f.label) IN (${list.map(() => "?").join(",")}))
-      )`);
-      args.push(...list, ...list);
-    }
-  }
+  filtroDeTexto(db, f, q, includeHidden);
+  filtroDePaises(f, countries);
+  filtroDeIdiomas(f, languages);
+  filtroDeEtiquetas(f, "group", groups);
+  filtroDeEtiquetas(f, "artist", artists);
+  filtroDeFacciones(f, factions);
+  const { where, args } = f;
 
   const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
   const orderSql = SORT_SQL[sort] ?? SORT_SQL.dex;
