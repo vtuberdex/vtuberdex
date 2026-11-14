@@ -354,15 +354,8 @@ function cabenEn(slug, base, puntos) {
   return Math.max(0, Math.floor((tope - base) / paso) - puntos);
 }
 
-/**
- * Los stats de la ficha tal como los ve «Mi ficha»: base, puntos puestos, valor resultante y si aún admiten más.
- * @param {{ vtuberId: number, stats: Array<{slug: string, label: string, value: number|null}>, nivelesGanados: number }} entrada
- */
-export async function estadoDeStats(
-  ejecutor,
-  { vtuberId, stats, nivelesGanados },
-) {
-  const puestos = await leerPuntosDeStats(ejecutor, vtuberId);
+/** Los stats que se suben con puntos, con lo ya repartido en cada uno. */
+function statsMejorables(stats, puestos) {
   const lista = [];
   for (const stat of stats ?? []) {
     const regla = STATS_MEJORABLES[stat.slug];
@@ -381,6 +374,11 @@ export async function estadoDeStats(
       puedeSubir: cabenEn(stat.slug, stat.value, puntos) > 0,
     });
   }
+  return lista;
+}
+
+/** Los stats que suben solos con el nivel (sin puntos). */
+function statsAutomaticos(stats, nivelesGanados) {
   const automaticos = [];
   for (const stat of stats ?? []) {
     if (!STATS_AUTOMATICOS[stat.slug] || typeof stat.value !== "number") {
@@ -399,6 +397,20 @@ export async function estadoDeStats(
       tope: regla.tope ?? null,
     });
   }
+  return automaticos;
+}
+
+/**
+ * Los stats de la ficha tal como los ve «Mi ficha»: base, puntos puestos, valor resultante y si aún admiten más.
+ * @param {{ vtuberId: number, stats: Array<{slug: string, label: string, value: number|null}>, nivelesGanados: number }} entrada
+ */
+export async function estadoDeStats(
+  ejecutor,
+  { vtuberId, stats, nivelesGanados },
+) {
+  const puestos = await leerPuntosDeStats(ejecutor, vtuberId);
+  const lista = statsMejorables(stats, puestos);
+  const automaticos = statsAutomaticos(stats, nivelesGanados);
   const repartidos = lista.reduce((suma, s) => suma + s.puntos, 0);
   const ganados =
     Math.max(0, Math.trunc(Number(nivelesGanados) || 0)) *
@@ -512,6 +524,11 @@ export function aplicarPuntosAStats(stats, puestos, nivelesGanados = 0) {
   });
 }
 
+/** `nivel > nivelBase`, y `false` si alguno no es un número comparable (`undefined`, `NaN`). */
+function subioDeNivel(nivel, nivelBase) {
+  return nivel > nivelBase;
+}
+
 /**
  * ¿Le toca a esta llamada avisar de que la ficha subió a `nivel`? Solo si ganó niveles con likes
  * (`nivel > nivelBase`) y nadie avisó ya de ese nivel o uno mayor.
@@ -520,7 +537,7 @@ export async function reclamarAvisoDeNivel(
   ejecutor,
   { vtuberId, nivel, nivelBase, ahora = new Date() },
 ) {
-  if (!(nivel > nivelBase)) {
+  if (!subioDeNivel(nivel, nivelBase)) {
     return false;
   }
   const e = await conTablas(ejecutor);

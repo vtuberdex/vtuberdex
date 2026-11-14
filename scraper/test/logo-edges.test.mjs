@@ -94,10 +94,8 @@ test("encuentra la masa con estructura y descarta el fondo plano", () => {
     r.box.top + r.box.height <= 215,
     `la caja (${r.box.height}) no debe invadir el panel`,
   );
-  assert.ok(
-    r.box.left >= 300 && r.box.left <= 340,
-    `left ${r.box.left} dentro de la masa`,
-  );
+  assert.ok(r.box.left >= 300, `left ${r.box.left} dentro de la masa`);
+  assert.ok(r.box.left <= 340, `left ${r.box.left} dentro de la masa`);
 });
 
 test("prefiere la masa mayor y no el texto suelto", () => {

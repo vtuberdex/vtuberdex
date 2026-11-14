@@ -60,7 +60,7 @@ export const TODOS_LOS_GRADOS = Object.freeze([
 export const GRADO_INICIAL = GRADOS[0];
 
 /** Grado máximo: la Black Label. Por encima de él no hay nada. */
-export const GRADO_MAXIMO = GRADOS[GRADOS.length - 1];
+export const GRADO_MAXIMO = GRADOS.at(-1);
 
 /**
  * Nombre de cada grado, como el de las etiquetas de CGC. El `10` es «Gem Mint» y la `BL` es la

@@ -15,8 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { openDatabase } from "./db/index.mjs";
-import { setMeta } from "./db/index.mjs";
+import { openDatabase, setMeta } from "./db/index.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");

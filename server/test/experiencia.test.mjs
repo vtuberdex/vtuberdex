@@ -66,10 +66,9 @@ test("entradas absurdas no cuelgan ni dan NaN", () => {
     { level: 1, current: 0, max: 1 },
   ]) {
     const r = experienciaConLikes(base, 1e9);
-    assert.ok(
-      Number.isFinite(r.level) && Number.isFinite(r.current) && r.max > 0,
-      JSON.stringify(base),
-    );
+    assert.ok(Number.isFinite(r.level), JSON.stringify(base));
+    assert.ok(Number.isFinite(r.current), JSON.stringify(base));
+    assert.ok(r.max > 0, JSON.stringify(base));
   }
   assert.equal(experienciaConLikes({}, -3).likes, 0);
   assert.equal(experienciaConLikes({}, "abc").likes, 0);

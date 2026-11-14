@@ -32,18 +32,13 @@ import { normalizeText, slugify } from "./text.mjs";
  */
 export function fichaDeLaSolicitud(db, referencia) {
   const texto = String(referencia ?? "").trim();
-  const delEnlace = texto.match(/\/v\/([^/?#\s]+)/i)?.[1];
-  const marcaDex = /(?:^|\s)#\s*(\d{1,4})(?=\s|$|[.,;:\-–—)])/;
-  const dex = delEnlace ? null : texto.match(marcaDex)?.[1];
-  const sinDex = delEnlace
-    ? texto
-    : texto.replace(marcaDex, " ").replace(/\s+/g, " ").trim();
-
+  const { delEnlace, dex, sinDex } = leerReferencia(texto);
   const nombre = normalizeText(sinDex);
+  const hayDex = dex !== null && dex !== undefined;
 
   // Nombre Y número a la vez: la ficha que cumple las dos cosas gana a cualquier otra con el mismo
   // slug o nombre (con dos fichas llamadas igual, «#77 GKuro» no puede caer en la primera por slug).
-  if (dex !== null && dex !== undefined && nombre) {
+  if (hayDex && nombre) {
     const exactas = db
       .prepare(
         "SELECT slug FROM vtuber WHERE dex_number = ? AND search_name = ?",
@@ -54,21 +49,13 @@ export function fichaDeLaSolicitud(db, referencia) {
     }
   }
 
-  const candidatos = [delEnlace, slugify(sinDex), slugify(texto)].filter(
-    Boolean,
-  );
-  for (const slug of new Set(candidatos)) {
-    let ficha = null;
-    try {
-      ficha = getVtuberBySlug(db, decodeURIComponent(slug), {
-        includeHidden: true,
-      });
-    } catch {
-      /* un %xx mal formado en el enlace no debe tumbar la resolución */
-    }
-    if (ficha) {
-      return ficha;
-    }
+  const porSlug = fichaPorSlugs(db, [
+    delEnlace,
+    slugify(sinDex),
+    slugify(texto),
+  ]);
+  if (porSlug) {
+    return porSlug;
   }
 
   const porNombre = nombre
@@ -78,17 +65,11 @@ export function fichaDeLaSolicitud(db, referencia) {
     return getVtuberBySlug(db, porNombre[0].slug, { includeHidden: true });
   }
 
-  if (dex !== null && dex !== undefined) {
+  if (hayDex) {
     const porDex = db
       .prepare("SELECT slug FROM vtuber WHERE dex_number = ?")
       .all(Number(dex));
-    // Varias con el mismo nombre: el número decide cuál. Sin nombre escrito: el número es todo lo que hay.
-    const pool =
-      porNombre.length > 1
-        ? porNombre.filter((n) => porDex.some((d) => d.slug === n.slug))
-        : nombre
-          ? []
-          : porDex;
+    const pool = candidatasPorDex(porNombre, porDex, nombre);
     if (pool.length === 1) {
       return getVtuberBySlug(db, pool[0].slug, { includeHidden: true });
     }
@@ -101,8 +82,116 @@ export function fichaDeLaSolicitud(db, referencia) {
   throw new SolicitudError(404, "ficha_no_encontrada", detalle);
 }
 
+/**
+ * Lo escrito en el campo «ficha», por partes: el slug de un enlace `/v/<slug>`, o si no lo hay, el
+ * `#486` del catálogo y el texto sin él.
+ */
+function leerReferencia(texto) {
+  const delEnlace = /\/v\/([^/?#\s]+)/i.exec(texto)?.[1];
+  if (delEnlace) {
+    return { delEnlace, dex: null, sinDex: texto };
+  }
+  const marcaDex = /(?:^|\s)#\s*(\d{1,4})(?=\s|$|[.,;:\-–—)])/;
+  return {
+    delEnlace,
+    dex: marcaDex.exec(texto)?.[1],
+    sinDex: texto.replace(marcaDex, " ").replace(/\s+/g, " ").trim(),
+  };
+}
+
+/** La primera ficha (también oculta o en borrador) que resuelve alguno de los slugs candidatos. */
+function fichaPorSlugs(db, candidatos) {
+  for (const slug of new Set(candidatos.filter(Boolean))) {
+    let ficha = null;
+    try {
+      ficha = getVtuberBySlug(db, decodeURIComponent(slug), {
+        includeHidden: true,
+      });
+    } catch {
+      /* un %xx mal formado en el enlace no debe tumbar la resolución */
+    }
+    if (ficha) {
+      return ficha;
+    }
+  }
+  return null;
+}
+
+/**
+ * Varias con el mismo nombre: el número decide cuál. Sin nombre escrito: el número es todo lo que
+ * hay. Con un nombre que no es de nadie, el número solo no basta.
+ */
+function candidatasPorDex(porNombre, porDex, nombre) {
+  if (porNombre.length > 1) {
+    return porNombre.filter((n) => porDex.some((d) => d.slug === n.slug));
+  }
+  return nombre ? [] : porDex;
+}
+
 const igual = (a, b) =>
   normalizeText(String(a ?? "")) === normalizeText(String(b ?? ""));
+
+/** El modelador pasa al frente de `artists` sin quitar a nadie; `null` si no hay nada que cambiar. */
+function artistasConModelador(artistas, modeler) {
+  if (!modeler || artistas.some((nombre) => igual(nombre, modeler))) {
+    return null;
+  }
+  return [modeler, ...artistas];
+}
+
+/** Ids de las imágenes ya subidas; se copian a la ficha al aprobar (`imagenes-solicitud.mjs`). */
+function imagenesDe(d) {
+  const imagenes = {};
+  if (d.imageId) {
+    imagenes.imageId = d.imageId;
+  }
+  if (d.logoId) {
+    imagenes.logoId = d.logoId;
+  }
+  return imagenes;
+}
+
+/** Los gustos actualizan su fila de `profile` (o se añaden) sin tocar las demás. */
+function perfilConCambios(perfilActual, perfil) {
+  const filas = (perfilActual ?? []).map(({ label, value }) => ({
+    label,
+    value,
+  }));
+  for (const nueva of perfil) {
+    const indice = filas.findIndex((fila) => igual(fila.label, nueva.label));
+    if (indice >= 0) {
+      filas[indice] = nueva;
+    } else {
+      filas.push(nueva);
+    }
+  }
+  return filas;
+}
+
+/**
+ * Las redes se SUMAN o actualizan por plataforma. Se conservan label e icon de la red existente; las
+ * nulas se descartan para pasar el esquema.
+ */
+function redesConCambios(redesActuales, nuevas) {
+  const redes = (redesActuales ?? []).map((red) =>
+    Object.fromEntries(
+      Object.entries(red).filter(
+        ([, valor]) => valor !== null && valor !== undefined,
+      ),
+    ),
+  );
+  for (const nueva of nuevas) {
+    const indice = redes.findIndex((red) =>
+      igual(red.platform, nueva.platform),
+    );
+    if (indice >= 0) {
+      redes[indice] = { ...redes[indice], url: nueva.url };
+    } else {
+      redes.push({ platform: nueva.platform, url: nueva.url });
+    }
+  }
+  return redes;
+}
 
 /**
  * @param {import('node:sqlite').DatabaseSync} db
@@ -124,58 +213,17 @@ export function prepararModificacion(db, solicitud, { ficha = null } = {}) {
     patch.languages = d.languages;
   }
 
-  if (
-    modeler &&
-    !(actual.artists ?? []).some((nombre) => igual(nombre, modeler))
-  ) {
-    patch.artists = [modeler, ...(actual.artists ?? [])];
+  const artistas = artistasConModelador(actual.artists ?? [], modeler);
+  if (artistas) {
+    patch.artists = artistas;
   }
 
   if (perfil.length) {
-    const filas = (actual.profile ?? []).map(({ label, value }) => ({
-      label,
-      value,
-    }));
-    for (const nueva of perfil) {
-      const indice = filas.findIndex((fila) => igual(fila.label, nueva.label));
-      if (indice >= 0) {
-        filas[indice] = nueva;
-      } else {
-        filas.push(nueva);
-      }
-    }
-    patch.profile = filas;
+    patch.profile = perfilConCambios(actual.profile, perfil);
   }
-
   if (d.socials?.length) {
-    // Se conservan label e icon de la red existente; las nulas se descartan para pasar el esquema.
-    const redes = (actual.socials ?? []).map((red) =>
-      Object.fromEntries(
-        Object.entries(red).filter(
-          ([, valor]) => valor !== null && valor !== undefined,
-        ),
-      ),
-    );
-    for (const nueva of d.socials) {
-      const indice = redes.findIndex((red) =>
-        igual(red.platform, nueva.platform),
-      );
-      if (indice >= 0) {
-        redes[indice] = { ...redes[indice], url: nueva.url };
-      } else {
-        redes.push({ platform: nueva.platform, url: nueva.url });
-      }
-    }
-    patch.socials = redes;
+    patch.socials = redesConCambios(actual.socials, d.socials);
   }
 
-  const imagenes = {};
-  // Ids de las imágenes ya subidas; se copian a la ficha al aprobar (`imagenes-solicitud.mjs`).
-  if (d.imageId) {
-    imagenes.imageId = d.imageId;
-  }
-  if (d.logoId) {
-    imagenes.logoId = d.logoId;
-  }
-  return { id: actual.id, slug: actual.slug, patch, imagenes };
+  return { id: actual.id, slug: actual.slug, patch, imagenes: imagenesDe(d) };
 }

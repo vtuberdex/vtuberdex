@@ -82,7 +82,7 @@ const LARGO_CODIGO = 8;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 // Nombre de Java (3-16, letras, números y _) o de Bedrock vía Floodgate: el mismo con un «.» delante (los espacios del
 // gamertag Floodgate los cambia por _). Solo se guarda para mostrarlo en «Mi ficha»; si no cuadra, el vínculo vale igual.
-const JUGADOR = /^\.?[A-Za-z0-9_]{1,16}$/;
+const JUGADOR = /^\.?\w{1,16}$/;
 
 const DDL = `
   CREATE TABLE IF NOT EXISTS vinculo_minecraft (
@@ -260,13 +260,11 @@ export async function crearCodigoDeVinculo(
 }
 
 /**
- * Canjea un código y ata el UUID de Minecraft a su ficha. Una ficha tiene UNA cuenta y una cuenta UNA ficha:
- * vincular de nuevo reemplaza a la anterior (por los dos lados).
+ * Comprueba UUID, código y red ANTES de tocar la base y devuelve el código normalizado. Sin red no
+ * se le podría abrir la sesión: quedaría vinculada pero sin poder jugar. Mejor decirlo antes de
+ * gastar el código.
  */
-export async function vincular(
-  ejecutor,
-  { codigo, uuid, jugador = null, red = null, ahora = Date.now() },
-) {
+function codigoParaVincular(codigo, uuid, red) {
   if (!uuidValido(uuid)) {
     throw new MinecraftError(
       400,
@@ -282,7 +280,6 @@ export async function vincular(
       "El código tiene 8 caracteres.",
     );
   }
-  // Sin red no se le podría abrir la sesión: quedaría vinculada pero sin poder jugar. Mejor decirlo antes de gastar el código.
   if (requiereSesion(uuid) && !redValida(red)) {
     throw new MinecraftError(
       400,
@@ -290,6 +287,23 @@ export async function vincular(
       "No se pudo identificar tu conexión. Vuelve a entrar.",
     );
   }
+  return limpio;
+}
+
+/** El nombre de jugador tal cual si tiene la forma de uno de Minecraft; si no, `null`. */
+function jugadorValido(jugador) {
+  return typeof jugador === "string" && JUGADOR.test(jugador) ? jugador : null;
+}
+
+/**
+ * Canjea un código y ata el UUID de Minecraft a su ficha. Una ficha tiene UNA cuenta y una cuenta UNA ficha:
+ * vincular de nuevo reemplaza a la anterior (por los dos lados).
+ */
+export async function vincular(
+  ejecutor,
+  { codigo, uuid, jugador = null, red = null, ahora = Date.now() },
+) {
+  const limpio = codigoParaVincular(codigo, uuid, red);
   const e = await conTablas(ejecutor);
   const h = hash(limpio);
   const { rows } = await e.execute(
@@ -327,12 +341,7 @@ export async function vincular(
   );
   await e.execute(
     "INSERT INTO vinculo_minecraft (uuid, vtuber_id, jugador, creado) VALUES (?, ?, ?, ?)",
-    [
-      id,
-      vtuberId,
-      typeof jugador === "string" && JUGADOR.test(jugador) ? jugador : null,
-      new Date(ahora).toISOString(),
-    ],
+    [id, vtuberId, jugadorValido(jugador), new Date(ahora).toISOString()],
   );
   if (requiereSesion(id)) {
     await abrirSesion(e, { uuid: id, red, ahora });
@@ -465,6 +474,24 @@ export async function envioDeCodigoPermitido(
 
 /* ------------------------------------------------------------------------- XP */
 
+/** Un motivo conocido con una XP entera de 0 o más; lanza si no. */
+function validarMotivoDeXp(motivo, valor) {
+  if (!MOTIVOS_XP.includes(motivo)) {
+    throw new MinecraftError(
+      400,
+      "motivo_invalido",
+      `Motivo de XP desconocido: ${motivo}.`,
+    );
+  }
+  if (!Number.isInteger(valor) || valor < 0) {
+    throw new MinecraftError(
+      400,
+      "payload_invalido",
+      "La XP es un entero positivo.",
+    );
+  }
+}
+
 /** `{ mob: 12, tiempo: 5 }` validado: solo motivos conocidos, enteros positivos. Lanza si no cuadra. */
 function desgloseValido(detalle) {
   if (!detalle || typeof detalle !== "object" || Array.isArray(detalle)) {
@@ -477,20 +504,7 @@ function desgloseValido(detalle) {
   const limpio = {};
   let total = 0;
   for (const [motivo, valor] of Object.entries(detalle)) {
-    if (!MOTIVOS_XP.includes(motivo)) {
-      throw new MinecraftError(
-        400,
-        "motivo_invalido",
-        `Motivo de XP desconocido: ${motivo}.`,
-      );
-    }
-    if (!Number.isInteger(valor) || valor < 0) {
-      throw new MinecraftError(
-        400,
-        "payload_invalido",
-        "La XP es un entero positivo.",
-      );
-    }
+    validarMotivoDeXp(motivo, valor);
     if (valor > 0) {
       limpio[motivo] = valor;
     }
@@ -657,6 +671,29 @@ export async function xpDeJuego(ejecutor, vtuberId) {
 /** Tope de un ajuste manual (en positivo o negativo): lo suficiente para premiar un evento, no para fabricar niveles de un golpe. */
 export const XP_MANUAL_MAX = 10000;
 
+/** El cuerpo del 400 si la XP manual no cuadra; `null` si está bien. */
+function errorDeXpManual(id, n, razon, quien) {
+  if (!Number.isInteger(id) || id <= 0) {
+    return { error: "ficha_invalida" };
+  }
+  if (!Number.isInteger(n) || n === 0 || Math.abs(n) > XP_MANUAL_MAX) {
+    return {
+      error: "cantidad_invalida",
+      detail: `un entero distinto de 0, de hasta ${XP_MANUAL_MAX} en positivo o negativo`,
+    };
+  }
+  if (razon.length < 3 || razon.length > 200 || /\p{Cc}/u.test(razon)) {
+    return {
+      error: "motivo_invalido",
+      detail: "entre 3 y 200 caracteres, en una línea",
+    };
+  }
+  if (!quien) {
+    return { error: "actor_invalido" };
+  }
+  return null;
+}
+
 /**
  * XP dada A MANO por un administrador (o quitada, con una cantidad negativa para corregir un error).
  * Va en su propia tabla, con quién la dio y por qué: no gasta ningún tope diario y no se mezcla con la
@@ -671,31 +708,9 @@ export async function darXpManual(
   const n = Number(cantidad);
   const razon = String(motivo ?? "").trim();
   const quien = String(actor ?? "").trim();
-  if (!Number.isInteger(id) || id <= 0) {
-    return { ok: false, status: 400, cuerpo: { error: "ficha_invalida" } };
-  }
-  if (!Number.isInteger(n) || n === 0 || Math.abs(n) > XP_MANUAL_MAX) {
-    return {
-      ok: false,
-      status: 400,
-      cuerpo: {
-        error: "cantidad_invalida",
-        detail: `un entero distinto de 0, de hasta ${XP_MANUAL_MAX} en positivo o negativo`,
-      },
-    };
-  }
-  if (razon.length < 3 || razon.length > 200 || /\p{Cc}/u.test(razon)) {
-    return {
-      ok: false,
-      status: 400,
-      cuerpo: {
-        error: "motivo_invalido",
-        detail: "entre 3 y 200 caracteres, en una línea",
-      },
-    };
-  }
-  if (!quien) {
-    return { ok: false, status: 400, cuerpo: { error: "actor_invalido" } };
+  const cuerpo = errorDeXpManual(id, n, razon, quien);
+  if (cuerpo) {
+    return { ok: false, status: 400, cuerpo };
   }
   const e = await conTablas(ejecutor);
   await e.execute(

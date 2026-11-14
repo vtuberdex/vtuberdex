@@ -113,16 +113,28 @@ export const SLUGS_DE_ATRIBUTO = Object.freeze(ATRIBUTOS.map((a) => a.slug));
 
 /** Nombre canónico de una facción: sin acentos, en minúsculas y con guiones. */
 export function canonico(valor) {
-  return String(valor ?? "")
+  // Tras colapsar a guiones no puede haber dos seguidos: basta con quitar UNO por
+  // extremo, y las cifras finales se quitan con un bucle (`/\d+$/` sin ancla de
+  // inicio reintenta desde cada cifra y es cuadrática).
+  const conGuiones = String(valor ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/['\u2019\u00b4`]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/\d+$/, "")
-    .replace(/-+$/, "")
+    .replace(/^-|-$/g, "");
+  return sinCifrasFinales(conGuiones)
+    .replace(/-$/, "")
     .replace("lecagy", "legacy");
+}
+
+/** Quita las cifras del final (`Netherbane2` → `netherbane`). */
+function sinCifrasFinales(texto) {
+  let fin = texto.length;
+  while (fin > 0 && texto[fin - 1] >= "0" && texto[fin - 1] <= "9") {
+    fin -= 1;
+  }
+  return texto.slice(0, fin);
 }
 
 /** Bono total de las facciones de la ficha, atributo por atributo (0 donde no dé ninguna). */
@@ -246,8 +258,48 @@ export async function estadoDeAtributos(
     tieneStatsDeOrigen: conOrigen,
     puedeEditar,
     /** `vacio` (nada repartido), `repartido` (ya tiene build) u `origen` (trae stats del scrape). */
-    estado: repartidos > 0 ? "repartido" : conOrigen ? "origen" : "vacio",
+    estado: estadoDelReparto(repartidos, conOrigen),
   };
+}
+
+function estadoDelReparto(repartidos, conOrigen) {
+  if (repartidos > 0) {
+    return "repartido";
+  }
+  return conOrigen ? "origen" : "vacio";
+}
+
+/** Valida los puntos de UN atributo y los devuelve como entero. */
+function validarPuntosDeAtributo(slug, valor, bonos) {
+  if (!SLUGS_DE_ATRIBUTO.includes(slug)) {
+    throw new AtributoError(
+      400,
+      "atributo_desconocido",
+      "Ese atributo no existe.",
+    );
+  }
+  const n = Number(valor);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new AtributoError(
+      400,
+      "atributo_invalido",
+      "Los puntos de cada atributo tienen que ser un número entero de 0 o más.",
+    );
+  }
+  // La base y el bono de facción ya gastan parte del tope: a cada atributo solo le caben los
+  // puntos que faltan hasta 100 (60 sin bono, 40 con un bono de +20).
+  const bono = Math.max(0, Math.trunc(Number(bonos[slug]) || 0));
+  const tope = Math.max(0, ATRIBUTO_MAXIMO - ATRIBUTO_BASE - bono);
+  if (n > tope) {
+    throw new AtributoError(
+      400,
+      "atributo_invalido",
+      tope === 0
+        ? `Con la base de ${ATRIBUTO_BASE} y el bono de ${bono}, ${slug} ya llega a ${ATRIBUTO_MAXIMO}.`
+        : `A ${slug} solo le caben ${tope} puntos más (base ${ATRIBUTO_BASE} y bono ${bono} incluidos).`,
+    );
+  }
+  return n;
 }
 
 /** Valida una distribución completa y la devuelve como mapa de enteros (con el tope de cada uno). */
@@ -262,34 +314,7 @@ export function validarDistribucion(puntos, bonos = {}) {
   const limpio = {};
   let suma = 0;
   for (const [slug, valor] of Object.entries(puntos)) {
-    if (!SLUGS_DE_ATRIBUTO.includes(slug)) {
-      throw new AtributoError(
-        400,
-        "atributo_desconocido",
-        "Ese atributo no existe.",
-      );
-    }
-    const n = Number(valor);
-    if (!Number.isInteger(n) || n < 0) {
-      throw new AtributoError(
-        400,
-        "atributo_invalido",
-        "Los puntos de cada atributo tienen que ser un número entero de 0 o más.",
-      );
-    }
-    // La base y el bono de facción ya gastan parte del tope: a cada atributo solo le caben los
-    // puntos que faltan hasta 100 (60 sin bono, 40 con un bono de +20).
-    const bono = Math.max(0, Math.trunc(Number(bonos[slug]) || 0));
-    const tope = Math.max(0, ATRIBUTO_MAXIMO - ATRIBUTO_BASE - bono);
-    if (n > tope) {
-      throw new AtributoError(
-        400,
-        "atributo_invalido",
-        tope === 0
-          ? `Con la base de ${ATRIBUTO_BASE} y el bono de ${bono}, ${slug} ya llega a ${ATRIBUTO_MAXIMO}.`
-          : `A ${slug} solo le caben ${tope} puntos más (base ${ATRIBUTO_BASE} y bono ${bono} incluidos).`,
-      );
-    }
+    const n = validarPuntosDeAtributo(slug, valor, bonos);
     limpio[slug] = n;
     suma += n;
   }

@@ -34,10 +34,12 @@ test('el catálogo es coherente: ids únicos, metas positivas, contadores conoci
   for (const m of MISIONES) {
     assert.ok(Object.keys(m.requisitos).length > 0, m.id);
     for (const meta of Object.values(m.requisitos)) {
-      assert.ok(Number.isInteger(meta) && meta > 0, m.id);
+      assert.ok(Number.isInteger(meta), m.id);
+      assert.ok(meta > 0, m.id);
     }
     if (m.tipo === 'grado') {
-      assert.ok(GRADOS.indexOf(m.grado) >= 0 && GRADOS.indexOf(m.grado) <= tope, m.id);
+      assert.ok(GRADOS.indexOf(m.grado) >= 0, m.id);
+      assert.ok(GRADOS.indexOf(m.grado) <= tope, m.id);
       assert.equal(m.xp, 0, 'las de grado no pagan XP: el premio es el grado');
     }
   }

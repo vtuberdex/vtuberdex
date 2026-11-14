@@ -15,8 +15,7 @@
  *     refleje lo que hay en disco.
  */
 
-import fs from "node:fs";
-import { promises as fsP } from "node:fs";
+import fs, { promises as fsP } from "node:fs";
 import path from "node:path";
 
 /**
@@ -24,7 +23,7 @@ import path from "node:path";
  * como arreglo u objeto) y un nombre simple, sin separadores ni `..`.
  */
 export function assertSlug(slug) {
-  if (typeof slug !== 'string' || !/^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(slug) || slug.includes('..')) {
+  if (typeof slug !== 'string' || !/^\w[\w.-]*$/.test(slug) || slug.includes('..')) {
     throw new Error('slug_invalido');
   }
   return slug;
@@ -113,18 +112,10 @@ export function alphaBounds(data, width, height, channels) {
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       if (data[(y * width + x) * channels + 3] > 8) {
-        if (x < minX) {
-          minX = x;
-        }
-        if (x > maxX) {
-          maxX = x;
-        }
-        if (y < minY) {
-          minY = y;
-        }
-        if (y > maxY) {
-          maxY = y;
-        }
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
       }
     }
   }
@@ -149,6 +140,75 @@ export function alphaBounds(data, width, height, channels) {
  * @param {object} args.sharp    instancia de sharp
  * @returns {Promise<{path:string,width:number,height:number,bytes:number}>}
  */
+/** Validación por CONTENIDO: si sharp no lo decodifica, no es una imagen. */
+async function metadatosValidados(sharp, buffer) {
+  let meta;
+  try {
+    meta = await sharp(buffer).metadata();
+  } catch {
+    throw new Error("no_es_imagen");
+  }
+  if (!meta.format || !ACCEPTED_FORMATS.includes(meta.format)) {
+    throw new Error(`formato_no_soportado:${meta.format ?? "desconocido"}`);
+  }
+  if (!meta.width || !meta.height) {
+    throw new Error("imagen_sin_dimensiones");
+  }
+  return meta;
+}
+
+/**
+ * Los logos traen padding transparente baked; se recorta el alfa real para que
+ * no queden diminutos ni con márgenes enormes (mismo criterio que el scraper).
+ */
+async function pipelineRecortado(sharp, buffer) {
+  const raw = await sharp(buffer, { animated: false })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const bounds = alphaBounds(
+    raw.data,
+    raw.info.width,
+    raw.info.height,
+    raw.info.channels,
+  );
+  if (
+    bounds &&
+    (bounds.width < raw.info.width || bounds.height < raw.info.height)
+  ) {
+    return sharp(buffer, { animated: false }).extract(bounds);
+  }
+  return sharp(buffer, { animated: false });
+}
+
+/**
+ * El PERSONAJE y la CARTA se normalizan a la proporción EXACTA de la carta
+ * (1.4) al subirlos, con `cover`: escalan hasta llenar el lienzo y se recorta
+ * el exceso. Con `inside` se conservaba la proporción del archivo original, así
+ * que un personaje más ancho que una carta se guardaba más ancho y luego la
+ * carta 3D lo dejaba con franjas o lo deformaba: la imagen dejaba de ser
+ * proporcional al marco. Recortar es la única forma de garantizar que la
+ * proporción no dependa de lo que suba el usuario.
+ *
+ * Ojo: `resize` de sharp reconfigura el MISMO pipeline y lo devuelve; llamarlo
+ * dos veces (el reintento de abajo) deja la segunda configuración, igual que antes.
+ */
+function redimensionar(pipeline, spec) {
+  if (spec.ratio !== undefined) {
+    return pipeline.resize({
+      width: spec.width,
+      height: Math.round(spec.width * spec.ratio),
+      fit: "cover",
+      position: "top",
+    });
+  }
+  return pipeline.resize({
+    width: spec.width,
+    withoutEnlargement: true,
+    fit: "inside",
+  });
+}
+
 /**
  * Valida que lo recibido sea un Buffer no vacío y de tamaño permitido, y devuelve su longitud.
  * Las comprobaciones de tamaño usan este número, no `buffer.length` repetido en cada sitio.
@@ -181,45 +241,15 @@ export async function saveUploadedImage({
   assertSlug(slug);
   const tamanoOriginal = tamanoDeSubida(buffer);
 
-  // Validación por CONTENIDO: si sharp no lo decodifica, no es una imagen.
-  let meta;
-  try {
-    meta = await sharp(buffer).metadata();
-  } catch {
-    throw new Error("no_es_imagen");
-  }
-  if (!meta.format || !ACCEPTED_FORMATS.includes(meta.format)) {
-    throw new Error(`formato_no_soportado:${meta.format ?? "desconocido"}`);
-  }
-  if (!meta.width || !meta.height) {
-    throw new Error("imagen_sin_dimensiones");
-  }
+  const meta = await metadatosValidados(sharp, buffer);
 
   const dir = path.join(imageRoot, spec.folder);
   await fsP.mkdir(dir, { recursive: true });
   const file = path.join(dir, `${slug}.webp`);
 
-  let pipeline = sharp(buffer, { animated: false });
-  // Los logos traen padding transparente baked; se recorta el alfa real para que
-  // no queden diminutos ni con márgenes enormes (mismo criterio que el scraper).
-  if (spec.trim) {
-    const raw = await sharp(buffer, { animated: false })
-      .ensureAlpha()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    const bounds = alphaBounds(
-      raw.data,
-      raw.info.width,
-      raw.info.height,
-      raw.info.channels,
-    );
-    if (
-      bounds &&
-      (bounds.width < raw.info.width || bounds.height < raw.info.height)
-    ) {
-      pipeline = sharp(buffer, { animated: false }).extract(bounds);
-    }
-  }
+  const pipeline = spec.trim
+    ? await pipelineRecortado(sharp, buffer)
+    : sharp(buffer, { animated: false });
 
   // --- Conversión a WebP optimizado -------------------------------------------
   // Todo lo que se sube sale como WebP, sea cual sea el formato de entrada.
@@ -231,28 +261,7 @@ export async function saveUploadedImage({
   // `effort: 6` (el máximo) comprime mejor a costa de algo más de CPU: aquí no
   // importa porque se procesa una imagen por petición, no en lote.
   const hasAlpha = Boolean(meta.hasAlpha) || spec.keepAlpha;
-  /**
-   * El PERSONAJE y la CARTA se normalizan a la proporción EXACTA de la carta
-   * (1.4) al subirlos, con `cover`: escalan hasta llenar el lienzo y se recorta
-   * el exceso. Con `inside` se conservaba la proporción del archivo original, así
-   * que un personaje más ancho que una carta se guardaba más ancho y luego la
-   * carta 3D lo dejaba con franjas o lo deformaba: la imagen dejaba de ser
-   * proporcional al marco. Recortar es la única forma de garantizar que la
-   * proporción no dependa de lo que suba el usuario.
-   */
-  const fitsCard = spec.ratio !== undefined;
-  const resized = fitsCard
-    ? pipeline.resize({
-        width: spec.width,
-        height: Math.round(spec.width * spec.ratio),
-        fit: "cover",
-        position: "top",
-      })
-    : pipeline.resize({
-        width: spec.width,
-        withoutEnlargement: true,
-        fit: "inside",
-      });
+  const resized = redimensionar(pipeline, spec);
 
   let converted = await (
     hasAlpha
@@ -270,20 +279,7 @@ export async function saveUploadedImage({
   // agresiva. Sin esto, un original ya optimizado (un JPEG pequeño) salía más
   // grande que antes de subirlo, que es justo lo contrario de "optimizar".
   if (converted.length > tamanoOriginal) {
-    const alt = await (
-      fitsCard
-        ? pipeline.resize({
-            width: spec.width,
-            height: Math.round(spec.width * spec.ratio),
-            fit: "cover",
-            position: "top",
-          })
-        : pipeline.resize({
-            width: spec.width,
-            withoutEnlargement: true,
-            fit: "inside",
-          })
-    )
+    const alt = await redimensionar(pipeline, spec)
       .webp({ quality: hasAlpha ? 92 : 86, alphaQuality: 100, effort: 6 })
       .toBuffer();
     if (alt.length < converted.length) {
@@ -305,11 +301,16 @@ export async function saveUploadedImage({
      * Aviso para la UI: JPEG nunca tiene alfa, así que si el original era JPEG el
      * usuario no perdió nada; si era PNG/WebP con alfa y no se conservó, sí.
      */
-    alphaLost:
-      FORMATS_WITH_ALPHA.includes(meta.format) &&
-      Boolean(meta.hasAlpha) &&
-      !out.hasAlpha,
+    alphaLost: alfaPerdida(meta, out),
   };
+}
+
+function alfaPerdida(meta, out) {
+  return (
+    FORMATS_WITH_ALPHA.includes(meta.format) &&
+    Boolean(meta.hasAlpha) &&
+    !out.hasAlpha
+  );
 }
 
 /** Borra la imagen de un asset (deja el VTuber sin esa imagen). */
