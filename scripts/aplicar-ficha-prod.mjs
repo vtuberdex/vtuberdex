@@ -83,7 +83,8 @@ const estaVacio = (valor) =>
   valor === null ||
   valor === undefined ||
   (Array.isArray(valor) && valor.length === 0);
-const resumir = (valor) => (estaVacio(valor) ? "(vacío)" : JSON.stringify(valor));
+const resumir = (valor) =>
+  estaVacio(valor) ? "(vacío)" : JSON.stringify(valor);
 const proyeccion = {
   phrase: hoy.phrase,
   birthday: hoy.birthday,

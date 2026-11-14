@@ -6,6 +6,7 @@
 import { createClient } from "@libsql/client/node";
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { texto } from "./lib/filas.mjs";
 
 const i = process.argv.indexOf("--salida");
 const salida = resolve(i > 0 ? process.argv[i + 1] : "data/turso-local.db");
@@ -40,14 +41,6 @@ const { rows: objetos } = await origen.execute(
   "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'libsql_%' ORDER BY CASE type WHEN 'table' THEN 0 ELSE 1 END, name",
 );
 const tablas = objetos.filter((o) => o.type === "table");
-
-/** Las columnas de `sqlite_master` son TEXTO; cualquier otra cosa es una base que no se entiende. */
-function texto(valor) {
-  if (typeof valor !== "string") {
-    throw new TypeError(`se esperaba texto en sqlite_master, llegó ${typeof valor}`);
-  }
-  return valor;
-}
 for (const t of tablas) {
   await destino.execute(texto(t.sql));
 }

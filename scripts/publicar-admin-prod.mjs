@@ -185,7 +185,9 @@ function explicarHash(hash) {
     console.log(
       "  El hash está bien formado, así que el despliegue que sirve todavía no",
     );
-    console.log("  tiene el valor nuevo. Vuelve a correr sin `--sin-redeploy`.");
+    console.log(
+      "  tiene el valor nuevo. Vuelve a correr sin `--sin-redeploy`.",
+    );
     return;
   }
   for (const p of hash?.problemas ?? []) {
