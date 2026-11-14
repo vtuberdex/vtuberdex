@@ -17,11 +17,11 @@ export function FactionPicker({
   factions,
   value,
   onChange,
-}: {
+}: Readonly<{
   factions: FactionRow[];
   value: string[];
   onChange: (next: string[]) => void;
-}) {
+}>) {
   const full = value.length >= MAX_FACTIONS;
   // Facciones de la ficha que ya no existen en el catálogo (se limpiaron): se muestran para poder quitarlas.
   const orphans = value.filter(
@@ -31,7 +31,10 @@ export function FactionPicker({
   const toggle = (slug: string) => {
     if (value.includes(slug)) {
       onChange(value.filter((current) => current !== slug));
-    } else if (!full) {
+      return;
+    }
+    // Con el cupo lleno no se añade: hay que quitar una antes (el contador lo dice).
+    if (!full) {
       onChange([...value, slug]);
     }
   };

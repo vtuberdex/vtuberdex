@@ -17,10 +17,10 @@ export const ONBOARDING_KEY = "vtuberdex.admin.onboarding.dismissed";
 export function GettingStarted({
   onGoFactions,
   onNewCard,
-}: {
+}: Readonly<{
   onGoFactions: () => void;
   onNewCard: () => void;
-}) {
+}>) {
   const [dismissed, setDismissed] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -68,15 +68,13 @@ export function GettingStarted({
           Crea o revisa las{" "}
           <button type="button" className="underline" onClick={onGoFactions}>
             facciones y sus emblemas
-          </button>
-          .
+          </button>.
         </li>
         <li>
           Crea una ficha con{" "}
           <button type="button" className="underline" onClick={onNewCard}>
             «Nueva carta»
-          </button>
-          .
+          </button>.
         </li>
         <li>Súbele las imágenes (personaje, logo y fondo).</li>
         <li>Publícala en el último paso del asistente.</li>

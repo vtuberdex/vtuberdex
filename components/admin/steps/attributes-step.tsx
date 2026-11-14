@@ -15,7 +15,7 @@ import { ghostButton, inputClass } from "@/components/admin/ui";
 
 const celda = `${inputClass} !mt-0 !px-2 !py-1.5`;
 
-function Barra({ stat }: { stat: StatForm }) {
+function Barra({ stat }: Readonly<{ stat: StatForm }>) {
   const valor = Number(stat.value);
   const max = Number(stat.max) || 100;
   const pct =
@@ -35,7 +35,7 @@ function Barra({ stat }: { stat: StatForm }) {
   );
 }
 
-export function AttributesStep({ form, set }: StepProps) {
+export function AttributesStep({ form, set }: Readonly<StepProps>) {
   const [conTexto, setConTexto] = useState<number | null>(null);
   const stats = form.stats;
   const have = new Set(stats.map((stat) => stat.label.trim().toLowerCase()));
@@ -185,7 +185,7 @@ export function AttributesStep({ form, set }: StepProps) {
                 </div>
                 {conTexto === i && (
                   <label className="mt-2 flex items-center gap-2 text-xs text-dex-muted">
-                    Texto en vez del número (opcional)
+                    Texto en vez del número (opcional){" "}
                     <input
                       value={stat.valueText}
                       onChange={(e) =>

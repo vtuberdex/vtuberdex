@@ -15,13 +15,13 @@ export function EmblemDropzone({
   label = "Arrastra aquí tu emblema",
   buttonLabel = "Elegir archivo",
   inputLabel = "Archivo del emblema",
-}: {
+}: Readonly<{
   onFile: (file: File) => void;
   busy?: boolean;
   label?: string;
   buttonLabel?: string;
   inputLabel?: string;
-}) {
+}>) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
 

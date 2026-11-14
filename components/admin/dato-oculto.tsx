@@ -21,9 +21,22 @@ const MASCARA_TEXTO = "••••••••";
 const botonChico =
   "ml-1.5 rounded border border-dex-line px-1.5 py-0 text-[10px] uppercase tracking-[0.08em] text-dex-muted hover:text-dex-ink";
 
-/** ¿Parece un correo? Lo que no lo parece (un usuario «admin») se muestra tal cual. */
-export const pareceCorreo = (texto: string | null | undefined) =>
-  /\S+@\S+/.test(texto ?? "");
+const esEspacio = (c: string | undefined) => c === undefined || /\s/.test(c);
+
+/**
+ * ¿Parece un correo? Lo que no lo parece (un usuario «admin») se muestra tal cual. Es lo mismo que
+ * `/\S+@\S+/` (una «@» con algo que no es espacio justo antes y justo después), pero mirando solo los
+ * vecinos de cada «@»: la regex sin anclar reintentaba desde cada carácter (coste cuadrático).
+ */
+export const pareceCorreo = (texto: string | null | undefined): boolean => {
+  const t = texto ?? "";
+  for (let at = t.indexOf("@"); at !== -1; at = t.indexOf("@", at + 1)) {
+    if (!esEspacio(t[at - 1]) && !esEspacio(t[at + 1])) {
+      return true;
+    }
+  }
+  return false;
+};
 
 /**
  * Un dato que se ve como máscara hasta pulsar «Mostrar». `children` permite revelar algo con formato
@@ -33,11 +46,11 @@ export function DatoOculto({
   valor,
   etiqueta = "correo",
   children,
-}: {
+}: Readonly<{
   valor: string;
   etiqueta?: string;
   children?: ReactNode;
-}) {
+}>) {
   const [visible, setVisible] = useState(false);
   return (
     <span className="inline-flex items-baseline" data-testid="dato-oculto">
@@ -63,7 +76,7 @@ export function DatoOculto({
 }
 
 /** Texto que PUEDE ser un correo (el actor de un cambio, quien resolvió una solicitud): solo se oculta si lo es. */
-export function QuizasCorreo({ texto }: { texto: string }) {
+export function QuizasCorreo({ texto }: Readonly<{ texto: string }>) {
   return pareceCorreo(texto) ? <DatoOculto valor={texto} /> : <>{texto}</>;
 }
 
@@ -76,12 +89,12 @@ export function CampoCorreoOculto({
   onChange,
   etiqueta,
   placeholder,
-}: {
+}: Readonly<{
   valor: string;
   onChange: (valor: string) => void;
   etiqueta: string;
   placeholder?: string;
-}) {
+}>) {
   // Se oculta lo que YA venía guardado al abrir; si nació vacío, lo que se escribe se queda a la vista
   // (con `valor && !visible` el campo se escondía al teclear la primera letra).
   const [visible, setVisible] = useState(() => !valor);
