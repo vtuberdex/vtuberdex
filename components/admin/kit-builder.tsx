@@ -10,7 +10,14 @@
  * lo escribe `kit-habilidades.ts`. «Usar este kit» solo REEMPLAZA las habilidades en el formulario:
  * se publica con el «Guardar» de siempre, así que un kit a medias nunca llega a la base.
  */
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useMemo,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 
 import type { SkillForm } from "@/components/admin/form-model";
 import {
@@ -67,9 +74,10 @@ export function ListaDeProblemas({
           Falta: {f}
         </li>
       ))}
-      {problemas.map((p, i) => (
+      {/* `validarKit` anota cada (código, pieza, detalle) una sola vez: esa terna es la identidad. */}
+      {problemas.map((p) => (
         <li
-          key={`${p.codigo}-${i}`}
+          key={`${p.codigo}|${p.pieza}|${p.detalle}`}
           className={p.gravedad === "error" ? "text-red-300" : "text-amber-200"}
         >
           <span className="font-semibold">
@@ -201,6 +209,10 @@ function EditorDeActiva({
 }>) {
   const set = (parche: Partial<ActivaForm>) =>
     onChange({ ...valor, ...parche });
+  const cambiarEstado = useCallback(
+    (estado: EstadoElegido) => onChange({ ...valor, estado }),
+    [valor, onChange],
+  );
   return (
     <Pieza titulo={`Activa ${indice + 1}`} mp={MP_ACTIVA[indice]}>
       <div className="grid gap-2 sm:grid-cols-2">
@@ -265,7 +277,7 @@ function EditorDeActiva({
         etiqueta="Estado (máximo uno)"
         opcional
         valor={valor.estado}
-        onChange={(estado) => set({ estado })}
+        onChange={cambiarEstado}
         facciones={facciones}
         subfacciones={subfacciones}
       />
@@ -301,11 +313,22 @@ function EditorDeUltimate({
     onChange({ ...valor, ...parche });
   const setUnica = (parche: Partial<UltimateForm["unica"]>) =>
     set({ unica: { ...valor.unica, ...parche } });
-  const setEstado = (i: 0 | 1, estado: EstadoElegido) => {
-    const estados: UltimateForm["estados"] = [...valor.estados];
-    estados[i] = estado;
-    set({ estados });
-  };
+  const setEstado = useCallback(
+    (i: 0 | 1, estado: EstadoElegido) => {
+      const estados: UltimateForm["estados"] = [...valor.estados];
+      estados[i] = estado;
+      onChange({ ...valor, estados });
+    },
+    [valor, onChange],
+  );
+  const cambiarEstado1 = useCallback(
+    (e: EstadoElegido) => setEstado(0, e),
+    [setEstado],
+  );
+  const cambiarEstado2 = useCallback(
+    (e: EstadoElegido) => setEstado(1, e),
+    [setEstado],
+  );
   return (
     <Pieza titulo="Ultimate" mp={MP_ULTIMATE}>
       <div className="grid gap-2 sm:grid-cols-2">
@@ -414,7 +437,7 @@ function EditorDeUltimate({
         etiqueta="Estado 1"
         ultimate
         valor={valor.estados[0]}
-        onChange={(e) => setEstado(0, e)}
+        onChange={cambiarEstado1}
         facciones={facciones}
         subfacciones={subfacciones}
       />
@@ -422,7 +445,7 @@ function EditorDeUltimate({
         etiqueta="Estado 2"
         ultimate
         valor={valor.estados[1]}
-        onChange={(e) => setEstado(1, e)}
+        onChange={cambiarEstado2}
         facciones={facciones}
         subfacciones={subfacciones}
       />
@@ -441,8 +464,8 @@ function EditorDeUltimate({
           type="checkbox"
           checked={valor.unica.activa}
           onChange={(e) => setUnica({ activa: e.target.checked })}
-        />
-        {" "}Activa una Habilidad Única
+        />{" "}
+        Activa una Habilidad Única
       </label>
       {valor.unica.activa && (
         <div className="grid gap-2 rounded-lg border border-dex-line/70 p-2 sm:grid-cols-4">
@@ -499,12 +522,26 @@ function EditorDeUltimate({
   );
 }
 
+/**
+ * El kit es posicional (Activa 1, Activa 2, Pasiva 1…): la identidad de cada habilidad es su categoría y
+ * su orden dentro de ella, no el nombre (puede estar vacío o repetido mientras se escribe).
+ */
+function conClaveDePieza(
+  habilidades: SkillForm[],
+): Array<{ h: SkillForm; clave: string }> {
+  const vistas: Record<string, number> = {};
+  return habilidades.map((h) => {
+    vistas[h.category] = (vistas[h.category] ?? 0) + 1;
+    return { h, clave: `${h.category}-${vistas[h.category]}` };
+  });
+}
+
 function VistaPrevia({ habilidades }: Readonly<{ habilidades: SkillForm[] }>) {
   return (
     <ul className="space-y-2" data-testid="kit-vista-previa">
-      {habilidades.map((h, i) => (
+      {conClaveDePieza(habilidades).map(({ h, clave }) => (
         <li
-          key={i}
+          key={clave}
           className="rounded-xl border border-dex-line/80 bg-black/25 px-3 py-2 text-sm"
         >
           <p className="font-bold text-dex-ink">
@@ -573,6 +610,250 @@ function EditorDePasiva({
   );
 }
 
+type Revision = ReturnType<typeof revisarKit>;
+
+/** Lo que toca a cada pieza: sus faltantes y los problemas que la nombran. */
+function dePieza(revision: Revision, pieza: string) {
+  return {
+    faltan: revision.faltan.filter((f) => piezaDeFaltante(f) === pieza),
+    problemas: revision.problemas.filter((p) =>
+      p.pieza.split(", ").includes(pieza),
+    ),
+  };
+}
+
+/** Una pieza está bien si no le falta nada ni tiene errores (los avisos no cuentan). */
+function piezaBien(estado: ReturnType<typeof dePieza>): boolean {
+  return (
+    !estado.faltan.length &&
+    !estado.problemas.some((p) => p.gravedad === "error")
+  );
+}
+
+function NavDePiezas({
+  revision,
+  paso,
+  onPaso,
+}: Readonly<{
+  revision: Revision;
+  paso: number;
+  onPaso: (i: number) => void;
+}>) {
+  return (
+    <nav aria-label="Piezas del kit">
+      <ol className="flex flex-wrap gap-1.5">
+        {[...PIEZAS, "Revisar"].map((nombre, i) => {
+          const estado = i === REVISAR ? null : dePieza(revision, nombre);
+          const bien = estado && piezaBien(estado);
+          return (
+            <li key={nombre}>
+              <button
+                type="button"
+                aria-current={paso === i ? "step" : undefined}
+                onClick={() => onPaso(i)}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
+                  paso === i
+                    ? "border-dex-accent bg-dex-accent/15 text-dex-ink"
+                    : "border-dex-line text-dex-muted hover:text-dex-ink"
+                }`}
+              >
+                {estado && (
+                  <span
+                    aria-hidden
+                    className={bien ? "text-emerald-300" : "text-amber-300"}
+                  >
+                    {bien ? "✓" : "•"}
+                  </span>
+                )}
+                {nombre}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+/**
+ * El editor de la pieza en curso (0-1 activas, 2-3 pasivas, 4 Ultimate). Los cambios usan la forma
+ * funcional de `setKit`: así cada manejador solo depende del paso, no del kit entero.
+ */
+function EditorDePieza({
+  paso,
+  kit,
+  setKit,
+  facciones,
+  subfacciones,
+}: Readonly<{
+  paso: number;
+  kit: KitForm;
+  setKit: Dispatch<SetStateAction<KitForm>>;
+  facciones: string[];
+  subfacciones: Record<string, string>;
+}>) {
+  const cambiarActiva = useCallback(
+    (v: ActivaForm) =>
+      setKit((actual) => {
+        const activas: KitForm["activas"] = [...actual.activas];
+        activas[paso] = v;
+        return { ...actual, activas };
+      }),
+    [paso, setKit],
+  );
+  const cambiarPasiva = useCallback(
+    (v: PasivaForm) =>
+      setKit((actual) => {
+        const pasivas: KitForm["pasivas"] = [...actual.pasivas];
+        pasivas[paso - 2] = v;
+        return { ...actual, pasivas };
+      }),
+    [paso, setKit],
+  );
+  const cambiarUltimate = useCallback(
+    (ultimate: UltimateForm) => setKit((actual) => ({ ...actual, ultimate })),
+    [setKit],
+  );
+  if (paso < 2) {
+    return (
+      <EditorDeActiva
+        indice={paso}
+        valor={kit.activas[paso]}
+        facciones={facciones}
+        subfacciones={subfacciones}
+        onChange={cambiarActiva}
+      />
+    );
+  }
+  if (paso < 4) {
+    return (
+      <EditorDePasiva
+        indice={paso - 2}
+        valor={kit.pasivas[paso - 2]}
+        onChange={cambiarPasiva}
+      />
+    );
+  }
+  return (
+    <EditorDeUltimate
+      valor={kit.ultimate}
+      onChange={cambiarUltimate}
+      facciones={facciones}
+      subfacciones={subfacciones}
+    />
+  );
+}
+
+/**
+ * Lo que la ficha dice HOY en una pieza. Activas y Ultimate no se pueden leer de vuelta como menús, así
+ * que al rehacerlas se escriben desde cero: tener el texto anterior al lado evita trabajar de memoria.
+ */
+function TextoAnterior({ anterior }: Readonly<{ anterior?: SkillForm }>) {
+  if (!anterior || !(anterior.effectHtml || anterior.effect)) {
+    return null;
+  }
+  return (
+    <details
+      className="rounded-xl border border-dex-line/70 p-2"
+      data-testid="kit-anterior"
+    >
+      <summary className="cursor-pointer text-xs text-dex-muted">
+        Lo que dice ahora la ficha
+      </summary>
+      <p className="mt-2 text-sm font-semibold text-dex-ink">{anterior.name}</p>
+      {/* HTML ya guardado en la ficha: el servidor solo acepta su lista blanca. */}
+      <div
+        className="mt-1 text-sm leading-relaxed text-dex-ink/75"
+        dangerouslySetInnerHTML={{
+          __html: htmlDeEfecto(anterior),
+        }}
+      />
+    </details>
+  );
+}
+
+function ConfirmarReemplazo({
+  cuantas,
+  onReemplazar,
+  onVolver,
+}: Readonly<{
+  cuantas: number;
+  onReemplazar: () => void;
+  onVolver: () => void;
+}>) {
+  return (
+    <div
+      role="alertdialog"
+      aria-label="Confirmar reemplazo del kit"
+      className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100"
+    >
+      <p>
+        Se reemplazan las {cuantas} habilidades actuales. Los puntos de
+        habilidad repartidos en «Mi ficha» van por NOMBRE: si cambias un nombre,
+        esos puntos dejan de contar.
+      </p>
+      <div className="flex gap-2">
+        <button type="button" className={primaryButton} onClick={onReemplazar}>
+          Reemplazar
+        </button>
+        <button type="button" className={ghostButton} onClick={onVolver}>
+          Volver
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PieDelKit({
+  paso,
+  listo,
+  onAnterior,
+  onSiguiente,
+  onUsar,
+}: Readonly<{
+  paso: number;
+  listo: boolean;
+  onAnterior: () => void;
+  onSiguiente: () => void;
+  onUsar: () => void;
+}>) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-dex-line pt-3">
+      <button
+        type="button"
+        className={ghostButton}
+        disabled={paso === 0}
+        onClick={onAnterior}
+      >
+        ← Anterior
+      </button>
+      {paso < REVISAR ? (
+        <button type="button" className={primaryButton} onClick={onSiguiente}>
+          {paso === REVISAR - 1
+            ? "Revisar el kit →"
+            : `Siguiente: ${PIEZAS[paso + 1]} →`}
+        </button>
+      ) : (
+        <span className="flex flex-wrap items-center gap-2">
+          {!listo && (
+            <span className="text-[11px] text-dex-muted">
+              Corrige lo marcado para poder usarlo.
+            </span>
+          )}
+          <button
+            type="button"
+            className={primaryButton}
+            disabled={!listo}
+            onClick={onUsar}
+          >
+            Usar este kit
+          </button>
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function KitBuilder({
   skills,
   facciones,
@@ -596,10 +877,6 @@ export function KitBuilder({
     () => revisarKit(kit, facciones, subfacciones),
     [kit, facciones, subfacciones],
   );
-  /**
-   * Lo que la ficha dice HOY en cada pieza. Activas y Ultimate no se pueden leer de vuelta como menús, así
-   * que al rehacerlas se escriben desde cero: tener el texto anterior al lado evita trabajar de memoria.
-   */
   const anteriores = [
     ...[0, 1].map((i) => skills.filter((s) => s.category === "active")[i]),
     ...[0, 1].map((i) => skills.filter((s) => s.category === "passive")[i]),
@@ -610,28 +887,20 @@ export function KitBuilder({
   ).length;
   const listo = revision.faltan.length === 0 && errores === 0;
 
-  /** Lo que toca a cada pieza: sus faltantes y los problemas que la nombran. */
-  const dePieza = (pieza: string) => ({
-    faltan: revision.faltan.filter((f) => piezaDeFaltante(f) === pieza),
-    problemas: revision.problemas.filter((p) =>
-      p.pieza.split(", ").includes(pieza),
-    ),
-  });
-
-  const aplicar = () => {
+  const aplicar = useCallback(() => {
     onApply(reemplazarKit(skills, revision.habilidades));
-  };
-
-  const setActiva = (i: number, v: ActivaForm) => {
-    const activas: KitForm["activas"] = [...kit.activas];
-    activas[i] = v;
-    setKit({ ...kit, activas });
-  };
-  const setPasiva = (i: number, v: PasivaForm) => {
-    const pasivas: KitForm["pasivas"] = [...kit.pasivas];
-    pasivas[i] = v;
-    setKit({ ...kit, pasivas });
-  };
+  }, [onApply, skills, revision.habilidades]);
+  const anterior = useCallback(() => setPaso((p) => p - 1), []);
+  const siguiente = useCallback(() => setPaso((p) => p + 1), []);
+  const volver = useCallback(() => setConfirmando(false), []);
+  // Sin habilidades que perder no hace falta confirmar.
+  const usar = useCallback(() => {
+    if (kitActual.length) {
+      setConfirmando(true);
+    } else {
+      aplicar();
+    }
+  }, [kitActual.length, aplicar]);
 
   return (
     <section
@@ -651,69 +920,18 @@ export function KitBuilder({
         </button>
       </div>
 
-      <nav aria-label="Piezas del kit">
-        <ol className="flex flex-wrap gap-1.5">
-          {[...PIEZAS, "Revisar"].map((nombre, i) => {
-            const estado = i === REVISAR ? null : dePieza(nombre);
-            const bien =
-              estado &&
-              !estado.faltan.length &&
-              !estado.problemas.some((p) => p.gravedad === "error");
-            return (
-              <li key={nombre}>
-                <button
-                  type="button"
-                  aria-current={paso === i ? "step" : undefined}
-                  onClick={() => setPaso(i)}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
-                    paso === i
-                      ? "border-dex-accent bg-dex-accent/15 text-dex-ink"
-                      : "border-dex-line text-dex-muted hover:text-dex-ink"
-                  }`}
-                >
-                  {estado && (
-                    <span
-                      aria-hidden
-                      className={bien ? "text-emerald-300" : "text-amber-300"}
-                    >
-                      {bien ? "✓" : "•"}
-                    </span>
-                  )}
-                  {nombre}
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
+      <NavDePiezas revision={revision} paso={paso} onPaso={setPaso} />
 
       {paso < REVISAR ? (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <div>
-            {paso < 2 && (
-              <EditorDeActiva
-                indice={paso}
-                valor={kit.activas[paso]}
-                facciones={facciones}
-                subfacciones={subfacciones}
-                onChange={(v) => setActiva(paso, v)}
-              />
-            )}
-            {paso >= 2 && paso < 4 && (
-              <EditorDePasiva
-                indice={paso - 2}
-                valor={kit.pasivas[paso - 2]}
-                onChange={(v) => setPasiva(paso - 2, v)}
-              />
-            )}
-            {paso === 4 && (
-              <EditorDeUltimate
-                valor={kit.ultimate}
-                onChange={(ultimate) => setKit({ ...kit, ultimate })}
-                facciones={facciones}
-                subfacciones={subfacciones}
-              />
-            )}
+            <EditorDePieza
+              paso={paso}
+              kit={kit}
+              setKit={setKit}
+              facciones={facciones}
+              subfacciones={subfacciones}
+            />
           </div>
           <aside className="space-y-3">
             <div className="space-y-1">
@@ -722,28 +940,8 @@ export function KitBuilder({
               </h5>
               <VistaPrevia habilidades={[revision.habilidades[paso]]} />
             </div>
-            <ListaDeProblemas {...dePieza(PIEZAS[paso])} />
-            {anteriores[paso] &&
-              (anteriores[paso]?.effectHtml || anteriores[paso]?.effect) && (
-                <details
-                  className="rounded-xl border border-dex-line/70 p-2"
-                  data-testid="kit-anterior"
-                >
-                  <summary className="cursor-pointer text-xs text-dex-muted">
-                    Lo que dice ahora la ficha
-                  </summary>
-                  <p className="mt-2 text-sm font-semibold text-dex-ink">
-                    {anteriores[paso]?.name}
-                  </p>
-                  {/* HTML ya guardado en la ficha: el servidor solo acepta su lista blanca. */}
-                  <div
-                    className="mt-1 text-sm leading-relaxed text-dex-ink/75"
-                    dangerouslySetInnerHTML={{
-                      __html: htmlDeEfecto(anteriores[paso]),
-                    }}
-                  />
-                </details>
-              )}
+            <ListaDeProblemas {...dePieza(revision, PIEZAS[paso])} />
+            <TextoAnterior anterior={anteriores[paso]} />
           </aside>
         </div>
       ) : (
@@ -754,77 +952,23 @@ export function KitBuilder({
           />
           <VistaPrevia habilidades={revision.habilidades} />
           {confirmando && (
-            <div
-              role="alertdialog"
-              aria-label="Confirmar reemplazo del kit"
-              className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100"
-            >
-              <p>
-                Se reemplazan las {kitActual.length} habilidades actuales. Los
-                puntos de habilidad repartidos en «Mi ficha» van por NOMBRE: si
-                cambias un nombre, esos puntos dejan de contar.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className={primaryButton}
-                  onClick={aplicar}
-                >
-                  Reemplazar
-                </button>
-                <button
-                  type="button"
-                  className={ghostButton}
-                  onClick={() => setConfirmando(false)}
-                >
-                  Volver
-                </button>
-              </div>
-            </div>
+            <ConfirmarReemplazo
+              cuantas={kitActual.length}
+              onReemplazar={aplicar}
+              onVolver={volver}
+            />
           )}
         </div>
       )}
 
       {!confirmando && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-dex-line pt-3">
-          <button
-            type="button"
-            className={ghostButton}
-            disabled={paso === 0}
-            onClick={() => setPaso(paso - 1)}
-          >
-            ← Anterior
-          </button>
-          {paso < REVISAR ? (
-            <button
-              type="button"
-              className={primaryButton}
-              onClick={() => setPaso(paso + 1)}
-            >
-              {paso === REVISAR - 1
-                ? "Revisar el kit →"
-                : `Siguiente: ${PIEZAS[paso + 1]} →`}
-            </button>
-          ) : (
-            <span className="flex flex-wrap items-center gap-2">
-              {!listo && (
-                <span className="text-[11px] text-dex-muted">
-                  Corrige lo marcado para poder usarlo.
-                </span>
-              )}
-              <button
-                type="button"
-                className={primaryButton}
-                disabled={!listo}
-                onClick={() =>
-                  kitActual.length ? setConfirmando(true) : aplicar()
-                }
-              >
-                Usar este kit
-              </button>
-            </span>
-          )}
-        </div>
+        <PieDelKit
+          paso={paso}
+          listo={listo}
+          onAnterior={anterior}
+          onSiguiente={siguiente}
+          onUsar={usar}
+        />
       )}
     </section>
   );
