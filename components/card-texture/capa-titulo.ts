@@ -17,6 +17,19 @@ import {
   drawEngrave,
 } from "./pintura";
 
+/** El país de la cabecera: solo la bandera si hay emblemas que ocupan el sitio, bandera y nombre si no. */
+function etiquetaDePais(
+  primary: VtuberCard["countries"][number] | undefined,
+  emblemas: number,
+): string {
+  if (!primary) {
+    return "";
+  }
+  return emblemas > 0
+    ? (primary.flag ?? "").trim()
+    : `${primary.flag ?? ""} ${primary.name}`.trim();
+}
+
 /** Capa 3: título — cabecera, número de dex, nombre y país. TEXTO PLANO. */
 export function drawTitleLayer({
   card,
@@ -44,13 +57,8 @@ export function drawTitleLayer({
   const { accent } = cardPalette(card.themeColor, card.secondaryColor);
   ctx.fillStyle = metalFill(
     ctx,
-    pad,
-    headerTop,
-    headerW,
-    headerH,
-    TEXT_FINISH.metalStops,
-    accent,
-    TEXT_FINISH.brandTint,
+    { x: pad, y: headerTop, w: headerW, h: headerH },
+    { stops: TEXT_FINISH.metalStops, brand: accent, brandTint: TEXT_FINISH.brandTint },
   );
   roundRect(ctx, pad, headerTop, headerW, headerH, headerRadius);
   ctx.fill();
@@ -67,13 +75,8 @@ export function drawTitleLayer({
   const badgeRadius = 16;
   ctx.fillStyle = metalFill(
     ctx,
-    badgeX,
-    badgeY,
-    badgeW,
-    badgeH,
-    TEXT_FINISH.badgeStops,
-    accent,
-    TEXT_FINISH.brandTint,
+    { x: badgeX, y: badgeY, w: badgeW, h: badgeH },
+    { stops: TEXT_FINISH.badgeStops, brand: accent, brandTint: TEXT_FINISH.brandTint },
   );
   roundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeRadius);
   ctx.fill();
@@ -126,13 +129,12 @@ export function drawTitleLayer({
       (emblemas - 1 - i) * (FACTION_SOCKET.size + FACTION_SOCKET.gap);
     ctx.fillStyle = metalFill(
       ctx,
-      socketX,
-      socketY,
-      FACTION_SOCKET.size,
-      FACTION_SOCKET.size,
-      TEXT_FINISH.emblemSocketStops,
-      accent,
-      TEXT_FINISH.brandTint * 0.4,
+      { x: socketX, y: socketY, w: FACTION_SOCKET.size, h: FACTION_SOCKET.size },
+      {
+        stops: TEXT_FINISH.emblemSocketStops,
+        brand: accent,
+        brandTint: TEXT_FINISH.brandTint * 0.4,
+      },
     );
     roundRect(
       ctx,
@@ -167,11 +169,7 @@ export function drawTitleLayer({
    * carta (`capa-textos.ts`), y en la cabecera el sitio lo necesitan los emblemas. Con el nombre
    * completo, el del VTuber se encogía hasta la mitad de su tamaño. Sin facciones no cambia nada.
    */
-  const countryLabel = primary
-    ? emblemas > 0
-      ? (primary.flag ?? "").trim()
-      : `${primary.flag ?? ""} ${primary.name}`.trim()
-    : "";
+  const countryLabel = etiquetaDePais(primary, emblemas);
   ctx.font = `600 34px ${FONT}`;
   const countryWidth = countryLabel
     ? ctx.measureText(countryLabel).width + 28

@@ -8,6 +8,7 @@ import {
   kitVacio,
   reemplazarKit,
   revisarKit,
+  sinPuntuacionFinal,
   type KitForm,
 } from "@/components/admin/kit-habilidades";
 import { emptySkill } from "@/components/admin/form-model";
@@ -237,5 +238,22 @@ describe("kit de habilidades: desde lo que ya existe", () => {
     });
     const nuevas = habilidadesDelKit(kitCompleto());
     expect(reemplazarKit(actuales, nuevas)).toEqual([...nuevas, otra]);
+  });
+});
+
+describe("sinPuntuacionFinal", () => {
+  it("quita solo los puntos y comas del final", () => {
+    expect(sinPuntuacionFinal("Si el enemigo cae.,.")).toBe(
+      "Si el enemigo cae",
+    );
+    expect(sinPuntuacionFinal("a, b. c")).toBe("a, b. c");
+    expect(sinPuntuacionFinal("...")).toBe("");
+    expect(sinPuntuacionFinal("")).toBe("");
+    expect(sinPuntuacionFinal("sin signos")).toBe("sin signos");
+  });
+
+  it("es lineal con mucha puntuación seguida de texto", () => {
+    const largo = `${".".repeat(100_000)}x`;
+    expect(sinPuntuacionFinal(largo)).toBe(largo);
   });
 });

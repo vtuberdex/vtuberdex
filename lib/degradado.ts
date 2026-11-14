@@ -28,7 +28,7 @@ export function crearAzar(semilla: number): () => number {
 export function semillaDeCarta(id: number, grado: string): number {
   let h = 2166136261 ^ id;
   for (const c of grado) {
-    h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+    h = Math.imul(h ^ (c.codePointAt(0) ?? 0), 16777619);
   }
   return h >>> 0;
 }
@@ -167,6 +167,50 @@ function rayonAleatorio(
   };
 }
 
+/** Los mordiscos del borde: las primeras cuatro en las esquinas (si ya está bastante rota), el resto en un lado al azar. */
+function mordidasDeDeterioro(
+  s: number,
+  azar: () => number,
+  W: number,
+  H: number,
+): Mordida[] {
+  const { chips } = DETERIORO;
+  const mordidas: Mordida[] = [];
+  if (s < chips.minSeverity) {
+    return mordidas;
+  }
+  const cuantas = Math.round(interpolar(chips.count, s));
+  const lados: Lado[] = ["arriba", "abajo", "izquierda", "derecha"];
+  for (let i = 0; i < cuantas; i += 1) {
+    const profundidad = W * chips.depth * s * (0.25 + 0.75 * azar());
+    if (i < 4 && s > 0.3) {
+      mordidas.push(mordidaEnEsquina(i, profundidad * 1.4, azar, W, H));
+    } else {
+      const lado = lados[Math.floor(azar() * lados.length)];
+      const ancho =
+        (lado === "arriba" || lado === "abajo" ? W : H) *
+        (0.05 + 0.18 * azar() * (0.4 + s));
+      mordidas.push(
+        mordidaEnLado(lado, azar(), ancho, profundidad, azar, W, H),
+      );
+    }
+  }
+  return mordidas;
+}
+
+/** Tamaño del bloque de pixelado: 1 (nítido) bajo el umbral y crece con curva hasta `maxBlock`. */
+function bloqueDeDesenfoque(s: number): number {
+  const { blur } = DETERIORO;
+  if (s < blur.minSeverity) {
+    return 1;
+  }
+  return Math.round(
+    1 +
+      (blur.maxBlock - 1) *
+        ((s - blur.minSeverity) / (1 - blur.minSeverity)) ** 1.6,
+  );
+}
+
 /** Todo lo que se le hace a la carta con este grado. Severidad 0 (grado premium) = sin daño. */
 export function planDeDeterioro(
   grado: string | null | undefined,
@@ -193,49 +237,22 @@ export function planDeDeterioro(
 
   const semilla = semillaDeCarta(cartaId, grado);
   const azar = crearAzar(semilla);
-  const { chips, scratches, blur, noise, fade, whitening } = DETERIORO;
+  const { scratches, blur, noise, fade, whitening } = DETERIORO;
 
-  const mordidas: Mordida[] = [];
-  if (s >= chips.minSeverity) {
-    const cuantas = Math.round(interpolar(chips.count, s));
-    const lados: Lado[] = ["arriba", "abajo", "izquierda", "derecha"];
-    for (let i = 0; i < cuantas; i += 1) {
-      const profundidad = W * chips.depth * s * (0.25 + 0.75 * azar());
-      if (i < 4 && s > 0.3) {
-        mordidas.push(mordidaEnEsquina(i, profundidad * 1.4, azar, W, H));
-      } else {
-        const lado = lados[Math.floor(azar() * lados.length)];
-        const ancho =
-          (lado === "arriba" || lado === "abajo" ? W : H) *
-          (0.05 + 0.18 * azar() * (0.4 + s));
-        mordidas.push(
-          mordidaEnLado(lado, azar(), ancho, profundidad, azar, W, H),
-        );
-      }
-    }
-  }
-
+  // El ORDEN de las llamadas a `azar` es parte del resultado: primero las mordidas, luego los rayones.
+  const mordidas = mordidasDeDeterioro(s, azar, W, H);
   const rayones: Rayon[] = [];
   const cuantosRayones = Math.round(interpolar(scratches.count, s));
   for (let i = 0; i < cuantosRayones; i += 1) {
     rayones.push(rayonAleatorio(s, azar, W, H));
   }
 
-  const bloque =
-    s < blur.minSeverity
-      ? 1
-      : Math.round(
-          1 +
-            (blur.maxBlock - 1) *
-              ((s - blur.minSeverity) / (1 - blur.minSeverity)) ** 1.6,
-        );
-
   return {
     severidad: s,
     semilla,
     mordidas,
     rayones,
-    bloque,
+    bloque: bloqueDeDesenfoque(s),
     pixelar: s >= blur.pixelFrom,
     ruido: noise.alpha * s ** 1.3,
     gris: fade.gray * s,

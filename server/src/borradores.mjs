@@ -90,7 +90,7 @@ export function sanearBorrador(entrada) {
           url: comoTexto(r.url, 500),
         }))
     : [];
-  limpio.paso = datos.paso === 5 ? 5 : datos.paso === 4 ? 4 : 3;
+  limpio.paso = [4, 5].includes(datos.paso) ? datos.paso : 3;
   return limpio;
 }
 

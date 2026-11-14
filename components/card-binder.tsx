@@ -56,7 +56,7 @@ import {
   type RootState,
   type ThreeEvent,
 } from "@react-three/fiber";
-import * as THREE from "three";
+import { Group, Matrix4 } from "three";
 
 import type { VtuberCard } from "@/lib/types";
 import * as CFG from "@/components/card3d-config";
@@ -135,7 +135,7 @@ interface BinderFrame {
   token: number;
   ready: boolean;
   done: boolean;
-  sheet: THREE.Matrix4;
+  sheet: Matrix4;
   book: { x: number; y: number };
   pointer: { x: number; y: number };
   advance: (state: RootState, delta: number) => void;
@@ -164,11 +164,11 @@ function BinderCard({
   frame,
   textureWidth,
   onOpen,
-}: BinderCardProps) {
-  const group = useRef<THREE.Group>(null);
+}: Readonly<BinderCardProps>) {
+  const group = useRef<Group>(null);
   const hovered = useRef(false);
   const lift = useRef(0);
-  const local = useMemo(() => new THREE.Matrix4(), []);
+  const local = useMemo(() => new Matrix4(), []);
   const position = useMemo(
     () => slotPosition(placement.slot),
     [placement.slot],
@@ -292,10 +292,10 @@ function BinderScene({
   textureWidth,
   onFlipEnd,
   onOpen,
-}: BinderSceneProps) {
+}: Readonly<BinderSceneProps>) {
   const env = useSharedCardEnv();
 
-  const book = useRef<THREE.Group>(null);
+  const book = useRef<Group>(null);
   const pointer = usePointerTilt(book, {
     tiltY: BINDER.tiltY,
     tiltX: BINDER.tiltX,
@@ -325,7 +325,7 @@ function BinderScene({
 
   const frame = useRef<BinderFrame | null>(null);
   if (!frame.current) {
-    const f: BinderFrame = {
+    const nuevo: BinderFrame = {
       stamp: -1,
       time: 0,
       progress: 0,
@@ -334,28 +334,28 @@ function BinderScene({
       token: -1,
       ready: true,
       done: true,
-      sheet: new THREE.Matrix4(),
+      sheet: new Matrix4(),
       book: { x: 0, y: 0 },
       pointer: { x: 0, y: 0 },
       advance: (state, delta) => {
         const t = state.clock.elapsedTime;
-        if (f.stamp === t) {
+        if (nuevo.stamp === t) {
           return;
         }
-        f.stamp = t;
-        f.time = t;
-        f.pointer = pointer.current;
-        if (f.token >= 0 && !f.done) {
-          f.progress = advanceFlip(f.progress, delta, f.ready);
+        nuevo.stamp = t;
+        nuevo.time = t;
+        nuevo.pointer = pointer.current;
+        if (nuevo.token >= 0 && !nuevo.done) {
+          nuevo.progress = advanceFlip(nuevo.progress, delta, nuevo.ready);
         }
-        f.theta = f.token >= 0 ? sheetAngle(f.dir, f.progress) : 0;
-        sheetMatrix(f.theta, f.sheet);
+        nuevo.theta = nuevo.token >= 0 ? sheetAngle(nuevo.dir, nuevo.progress) : 0;
+        sheetMatrix(nuevo.theta, nuevo.sheet);
         const b = book.current;
-        f.book.x = b?.rotation.x ?? 0;
-        f.book.y = b?.rotation.y ?? 0;
+        nuevo.book.x = b?.rotation.x ?? 0;
+        nuevo.book.y = b?.rotation.y ?? 0;
       },
     };
-    frame.current = f;
+    frame.current = nuevo;
   }
   const f = frame.current;
   f.ready = ready;
@@ -453,6 +453,21 @@ const BINDER_CHROME = "var(--binder-chrome)";
 /** Ancho mínimo del libro cuando el viewport es muy bajo. */
 const BINDER_MIN_WIDTH = "var(--binder-min-width)";
 
+/**
+ * ¿Ya se puede mostrar la página entrante? Sin giro, siempre; durante uno, solo cuando llegó
+ * OTRO array de `items` (el de la página nueva) y no queda una carga en vuelo.
+ */
+function paginaEntranteLista(
+  flip: Flip | null,
+  items: VtuberCard[],
+  loading: boolean,
+): boolean {
+  if (!flip) {
+    return true;
+  }
+  return items !== flip.pending && !loading;
+}
+
 export function CardBinder({
   items,
   page,
@@ -460,7 +475,7 @@ export function CardBinder({
   loading,
   onPage,
   single = false,
-}: CardBinderProps) {
+}: Readonly<CardBinderProps>) {
   const { t } = useI18n();
   const router = useRouter();
   /**
@@ -516,7 +531,7 @@ export function CardBinder({
   }, [threeD, flip]);
 
   const onFlipEnd = useCallback((token: number) => {
-    setFlip((current) => (current && current.token === token ? null : current));
+    setFlip((current) => (current?.token === token ? null : current));
   }, []);
 
   /** ¿Se puede avanzar/retroceder? (botones y teclas lo comparten). */
@@ -552,9 +567,11 @@ export function CardBinder({
       if (isTypingTarget(event.target)) {
         return;
       }
-      if (event.key === "ArrowRight" && go(1)) {
-        event.preventDefault();
-      } else if (event.key === "ArrowLeft" && go(-1)) {
+      // `go` solo se llama con la flecha que toca: el cortocircuito evita girar en el otro sentido.
+      const avanzo =
+        (event.key === "ArrowRight" && go(1)) ||
+        (event.key === "ArrowLeft" && go(-1));
+      if (avanzo) {
         event.preventDefault();
       }
     };
@@ -576,7 +593,7 @@ export function CardBinder({
   const onPointerUp = (event: React.PointerEvent) => {
     const start = gesture.current;
     gesture.current = null;
-    if (!start || start.id !== event.pointerId) {
+    if (start?.id !== event.pointerId) {
       return;
     }
     const dx = event.clientX - start.x;
@@ -607,10 +624,15 @@ export function CardBinder({
   // Durante un giro, la página entrante no se muestra hasta que sus datos llegan (otro
   // array de `items` y sin carga en vuelo); sin giro (cambio de filtros) se mantiene lo
   // visible, atenuado, para no parpadear.
-  const arrived = !flip || (items !== flip.pending && !loading);
+  const arrived = paginaEntranteLista(flip, items, loading);
   const placements = useMemo(
     () => planPlacements(arrived ? items : [], flip, { singleSheet: single }),
     [arrived, items, flip, single],
+  );
+  const { attach } = recovery;
+  const onCanvasCreated = useCallback(
+    ({ gl }: { gl: { domElement: HTMLCanvasElement } }) => attach(gl.domElement),
+    [attach],
   );
   const { spreadW, pageW, pageH } = bookDimensions();
   const frameW = focus ? pageW : spreadW;
@@ -622,8 +644,8 @@ export function CardBinder({
     <section
       aria-label={t("libro.etiqueta", { page, total: pageCount })}
       data-testid="card-binder"
-      data-flipping={flip ? "true" : "false"}
-      data-single={single ? "true" : "false"}
+      data-flipping={String(flip !== null)}
+      data-single={String(single)}
     >
       <div
         className="relative mx-auto select-none"
@@ -662,7 +684,7 @@ export function CardBinder({
                     fov: CFG.GEOMETRY.cameraFov,
                     position: [0, 0, fitCameraZ(frameW / pageH)],
                   }}
-                  onCreated={({ gl }) => recovery.attach(gl.domElement)}
+                  onCreated={onCanvasCreated}
                 >
                   <BinderScene
                     placements={placements}

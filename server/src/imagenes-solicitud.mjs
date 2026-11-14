@@ -21,7 +21,7 @@
  *   · Dimensiones exactas para el personaje (720x1008, el lienzo de la carta) y topadas para el logo.
  *   · Peso máximo 900 KB: nginx corta en 1 MB, y una imagen de ese lienzo no necesita más.
  *   · Una imagen por tipo y por correo VERIFICADO (subir otra reemplaza la anterior), tope de subidas por
- *     correo y por red y día, y TODO caduca si no se aprueba (ver `LIMITES`: 24 h sin enviar, 30 días en una
+ *     correo y por red y día, y toda imagen caduca si no se aprueba (ver `LIMITES`: 24 h sin enviar, 30 días en una
  *     solicitud pendiente, 7 días en una resuelta).
  *
  * Nada de lo subido es público: se sirve solo a quien lo subió (para su vista previa) y al mantenedor. Al
@@ -149,6 +149,25 @@ function medidasDe(buf, primero) {
  */
 export function validarWebp(bytes) {
   const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes ?? []);
+  validarContenedorRiff(buf);
+  const { primero, imagenes } = recorrerTrozos(buf);
+  if (imagenes !== 1) {
+    rechazo("imagen_invalida", "El archivo no contiene una sola imagen.");
+  }
+  const medidas = medidasDe(buf, primero);
+  if (!medidas || !esPositiva(medidas.ancho) || !esPositiva(medidas.alto)) {
+    rechazo("imagen_invalida", "No se pudieron leer las medidas de la imagen.");
+  }
+  return medidas;
+}
+
+/** `true` solo con un número mayor que 0 (un `undefined` o `NaN` no lo es). */
+function esPositiva(n) {
+  return n > 0;
+}
+
+/** Tamaño, firma `RIFF…WEBP` y que el tamaño declarado sea el real. Lanza `SolicitudError`. */
+function validarContenedorRiff(buf) {
   if (buf.length < 30) {
     rechazo("imagen_invalida", "El archivo está vacío o no es una imagen.");
   }
@@ -171,7 +190,13 @@ export function validarWebp(bytes) {
   if (buf.readUInt32LE(4) + 8 !== buf.length) {
     rechazo("imagen_invalida", "El archivo está dañado o trae datos añadidos.");
   }
+}
 
+/**
+ * Recorre los trozos del contenedor: solo los permitidos, sin pasarse del final y sin animación ni
+ * metadatos en el `VP8X`. Devuelve el tipo del primero y cuántos son de imagen.
+ */
+function recorrerTrozos(buf) {
   let desplazamiento = 12;
   let primero = null;
   let imagenes = 0;
@@ -191,31 +216,20 @@ export function validarWebp(bytes) {
     if (siguiente > buf.length) {
       rechazo("imagen_invalida", "El archivo está dañado.");
     }
-    if (primero === null) {
-      primero = tipo;
-    }
+    primero ??= tipo;
     if (TROZOS_DE_IMAGEN.has(tipo)) {
       imagenes += 1;
     }
-    if (tipo === "VP8X") {
-      // Bit 1 (0x02) = animación; 0x08 = EXIF; 0x04 = XMP.
-      if (buf[20] & (0x02 | 0x08 | 0x04)) {
-        rechazo(
-          "imagen_invalida",
-          "La imagen trae metadatos o animación que no se aceptan.",
-        );
-      }
+    // Bit 1 (0x02) = animación; 0x08 = EXIF; 0x04 = XMP.
+    if (tipo === "VP8X" && buf[20] & (0x02 | 0x08 | 0x04)) {
+      rechazo(
+        "imagen_invalida",
+        "La imagen trae metadatos o animación que no se aceptan.",
+      );
     }
     desplazamiento = siguiente;
   }
-  if (imagenes !== 1) {
-    rechazo("imagen_invalida", "El archivo no contiene una sola imagen.");
-  }
-  const medidas = medidasDe(buf, primero);
-  if (!medidas || !(medidas.ancho > 0) || !(medidas.alto > 0)) {
-    rechazo("imagen_invalida", "No se pudieron leer las medidas de la imagen.");
-  }
-  return medidas;
+  return { primero, imagenes };
 }
 
 /** Que las medidas sean las que pide el tipo. Lanza `SolicitudError`. */
@@ -393,7 +407,7 @@ export async function validarImagenesDeFormulario(
       [String(id).toLowerCase()],
     );
     const f = rows[0];
-    if (!f || f.huella !== huella || f.tipo !== tipo || f.solicitud_id != null) {
+    if (f?.huella !== huella || f.tipo !== tipo || f.solicitud_id != null) {
       throw Object.assign(
         new SolicitudError(
           400,

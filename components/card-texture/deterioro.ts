@@ -283,6 +283,51 @@ export function deteriorarCabecera(
   });
 }
 
+type LadoDelCanto = "arriba" | "abajo" | "izquierda" | "derecha";
+type Punto = [number, number];
+
+/**
+ * Geometría de cada franja del canto: cuánto mide el lado, dónde cae el punto `a` del recorrido a
+ * profundidad `d` del borde, y los dos vértices de la orilla que cierran el polígono por fuera.
+ */
+const FRANJAS: Record<
+  LadoDelCanto,
+  { largo: number; punto: (a: number, d: number) => Punto; orilla: Punto[] }
+> = {
+  arriba: {
+    largo: CARD_TEXTURE_WIDTH,
+    punto: (a, d) => [a, d],
+    orilla: [
+      [CARD_TEXTURE_WIDTH, 0],
+      [0, 0],
+    ],
+  },
+  abajo: {
+    largo: CARD_TEXTURE_WIDTH,
+    punto: (a, d) => [a, CARD_TEXTURE_HEIGHT - d],
+    orilla: [
+      [CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT],
+      [0, CARD_TEXTURE_HEIGHT],
+    ],
+  },
+  izquierda: {
+    largo: CARD_TEXTURE_HEIGHT,
+    punto: (a, d) => [d, a],
+    orilla: [
+      [0, CARD_TEXTURE_HEIGHT],
+      [0, 0],
+    ],
+  },
+  derecha: {
+    largo: CARD_TEXTURE_HEIGHT,
+    punto: (a, d) => [CARD_TEXTURE_WIDTH - d, a],
+    orilla: [
+      [CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT],
+      [CARD_TEXTURE_WIDTH, 0],
+    ],
+  },
+};
+
 /** Capa 6 (la de arriba): canto blanqueado, trozos que faltan y rayones. */
 export function deteriorarCanto(
   canvas: HTMLCanvasElement,
@@ -290,50 +335,19 @@ export function deteriorarCanto(
 ): void {
   const { whitening, window: ventana } = DETERIORO;
   conLienzo(canvas, (ctx) => {
-    const W = CARD_TEXTURE_WIDTH;
-    const H = CARD_TEXTURE_HEIGHT;
-
     // Canto blanqueado: cuatro franjas con el borde interior quebrado, más anchas cuanto peor el grado.
     const azar = crearAzar(plan.semilla ^ 0x51ed270b);
     ctx.fillStyle = whitening.color;
     ctx.globalAlpha = whitening.alpha * Math.min(1, 0.35 + plan.severidad);
-    const franja = (lado: "arriba" | "abajo" | "izquierda" | "derecha") => {
-      const largo = lado === "arriba" || lado === "abajo" ? W : H;
+    const franja = (lado: LadoDelCanto) => {
+      const { largo, punto, orilla } = FRANJAS[lado];
       const pasos = Math.round(largo / 24);
       const puntos: Array<[number, number]> = [];
       for (let i = 0; i <= pasos; i += 1) {
         const a = (largo * i) / pasos;
         const d = plan.canto * (0.35 + 0.65 * azar());
-        puntos.push(
-          lado === "arriba"
-            ? [a, d]
-            : lado === "abajo"
-              ? [a, H - d]
-              : lado === "izquierda"
-                ? [d, a]
-                : [W - d, a],
-        );
+        puntos.push(punto(a, d));
       }
-      const orilla: Array<[number, number]> =
-        lado === "arriba"
-          ? [
-              [W, 0],
-              [0, 0],
-            ]
-          : lado === "abajo"
-            ? [
-                [W, H],
-                [0, H],
-              ]
-            : lado === "izquierda"
-              ? [
-                  [0, H],
-                  [0, 0],
-                ]
-              : [
-                  [W, H],
-                  [W, 0],
-                ];
       trazarPoligono(ctx, [...puntos, ...orilla]);
       ctx.fill();
     };

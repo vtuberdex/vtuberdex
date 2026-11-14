@@ -132,7 +132,22 @@ export function lunesDe(dia) {
 }
 
 /** Las diarias cuentan por día, las semanales por semana y las únicas, siempre en el mismo periodo. */
-const periodoDe = (mision, dia) => (mision.repetible === 'diaria' ? dia : mision.repetible === 'semanal' ? `semana:${lunesDe(dia)}` : 'unica');
+function periodoDe(mision, dia) {
+  if (mision.repetible === 'diaria') {
+    return dia;
+  }
+  return mision.repetible === 'semanal' ? `semana:${lunesDe(dia)}` : 'unica';
+}
+
+/** Un contador conocido y una cantidad entera 0…`AVANCE_POR_LOTE_MAX`; lanza si no. */
+function validarAvance(contador, cantidad) {
+  if (!(contador in CONTADORES)) {
+    throw new MisionError(400, 'contador_invalido', `Contador desconocido: ${contador}.`);
+  }
+  if (!Number.isInteger(cantidad) || cantidad < 0 || cantidad > AVANCE_POR_LOTE_MAX) {
+    throw new MisionError(400, 'payload_invalido', `Un avance es un entero entre 0 y ${AVANCE_POR_LOTE_MAX}.`);
+  }
+}
 
 /** Avances válidos: solo contadores conocidos, enteros 1…`AVANCE_POR_LOTE_MAX`. Lanza si no cuadra. */
 function avancesValidos(avances) {
@@ -141,12 +156,7 @@ function avancesValidos(avances) {
   }
   const limpio = {};
   for (const [contador, cantidad] of Object.entries(avances)) {
-    if (!(contador in CONTADORES)) {
-      throw new MisionError(400, 'contador_invalido', `Contador desconocido: ${contador}.`);
-    }
-    if (!Number.isInteger(cantidad) || cantidad < 0 || cantidad > AVANCE_POR_LOTE_MAX) {
-      throw new MisionError(400, 'payload_invalido', `Un avance es un entero entre 0 y ${AVANCE_POR_LOTE_MAX}.`);
-    }
+    validarAvance(contador, cantidad);
     if (cantidad > 0) {
       limpio[contador] = cantidad;
     }
@@ -155,6 +165,53 @@ function avancesValidos(avances) {
     throw new MisionError(400, 'payload_invalido', 'El lote no trae avances.');
   }
   return limpio;
+}
+
+/**
+ * Suma los contadores `tocados` a UNA misión de la ficha y la cierra si llegó a la meta.
+ * @returns {Promise<boolean>} `true` solo si ESTE lote la completó (y pagó su XP).
+ */
+async function avanzarMision(e, { id, mision, tocados, limpio, dia, ahora }) {
+  const periodo = periodoDe(mision, dia);
+  const hecha = await e.execute(
+    'SELECT 1 FROM mision_estado WHERE vtuber_id = ? AND mision_id = ? AND periodo = ?',
+    [id, mision.id, periodo],
+  );
+  if (hecha.rows.length) {
+    return false;
+  }
+  for (const contador of tocados) {
+    // MIN en la misma sentencia: el progreso nunca pasa de la meta, aunque lleguen dos lotes a la vez.
+    const meta = mision.requisitos[contador];
+    await e.execute(
+      `INSERT INTO mision_progreso (vtuber_id, mision_id, periodo, contador, progreso) VALUES (?, ?, ?, ?, MIN(?, ?))
+         ON CONFLICT (vtuber_id, mision_id, periodo, contador) DO UPDATE SET progreso = MIN(?, progreso + ?)`,
+      [id, mision.id, periodo, contador, limpio[contador], meta, meta, limpio[contador]],
+    );
+  }
+  const { rows } = await e.execute(
+    'SELECT contador, progreso FROM mision_progreso WHERE vtuber_id = ? AND mision_id = ? AND periodo = ?',
+    [id, mision.id, periodo],
+  );
+  const actual = new Map(rows.map((r) => [r.contador, Number(r.progreso)]));
+  const cumple = Object.entries(mision.requisitos).every(([c, meta]) => (actual.get(c) ?? 0) >= meta);
+  if (!cumple) {
+    return false;
+  }
+  const gano = await e.execute(
+    'INSERT INTO mision_estado (vtuber_id, mision_id, periodo, completada) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
+    [id, mision.id, periodo, new Date(ahora).toISOString()],
+  );
+  if (!Number(gano.rowsAffected ?? 0)) {
+    return false;
+  }
+  if (mision.xp > 0) {
+    await e.execute(
+      'INSERT INTO xp_mision (id_mision, vtuber_id, cantidad, dia, creado) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
+      [`${id}:${mision.id}:${periodo}`, id, mision.xp, dia, new Date(ahora).toISOString()],
+    );
+  }
+  return true;
 }
 
 /**
@@ -186,49 +243,9 @@ export async function registrarAvances(ejecutor, { vtuberId, idLote, avances, di
   const completadas = [];
   for (const mision of MISIONES) {
     const tocados = Object.keys(mision.requisitos).filter((c) => c in limpio);
-    if (!tocados.length) {
-      continue;
+    if (tocados.length && (await avanzarMision(e, { id, mision, tocados, limpio, dia, ahora }))) {
+      completadas.push({ id: mision.id, nombre: mision.nombre, tipo: mision.tipo, xp: mision.xp, ...(mision.grado ? { grado: mision.grado } : {}) });
     }
-    const periodo = periodoDe(mision, dia);
-    const hecha = await e.execute(
-      'SELECT 1 FROM mision_estado WHERE vtuber_id = ? AND mision_id = ? AND periodo = ?',
-      [id, mision.id, periodo],
-    );
-    if (hecha.rows.length) {
-      continue;
-    }
-    for (const contador of tocados) {
-      // MIN en la misma sentencia: el progreso nunca pasa de la meta, aunque lleguen dos lotes a la vez.
-      const meta = mision.requisitos[contador];
-      await e.execute(
-        `INSERT INTO mision_progreso (vtuber_id, mision_id, periodo, contador, progreso) VALUES (?, ?, ?, ?, MIN(?, ?))
-         ON CONFLICT (vtuber_id, mision_id, periodo, contador) DO UPDATE SET progreso = MIN(?, progreso + ?)`,
-        [id, mision.id, periodo, contador, limpio[contador], meta, meta, limpio[contador]],
-      );
-    }
-    const { rows } = await e.execute(
-      'SELECT contador, progreso FROM mision_progreso WHERE vtuber_id = ? AND mision_id = ? AND periodo = ?',
-      [id, mision.id, periodo],
-    );
-    const actual = new Map(rows.map((r) => [r.contador, Number(r.progreso)]));
-    const cumple = Object.entries(mision.requisitos).every(([c, meta]) => (actual.get(c) ?? 0) >= meta);
-    if (!cumple) {
-      continue;
-    }
-    const gano = await e.execute(
-      'INSERT INTO mision_estado (vtuber_id, mision_id, periodo, completada) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING',
-      [id, mision.id, periodo, new Date(ahora).toISOString()],
-    );
-    if (!Number(gano.rowsAffected ?? 0)) {
-      continue;
-    }
-    if (mision.xp > 0) {
-      await e.execute(
-        'INSERT INTO xp_mision (id_mision, vtuber_id, cantidad, dia, creado) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING',
-        [`${id}:${mision.id}:${periodo}`, id, mision.xp, dia, new Date(ahora).toISOString()],
-      );
-    }
-    completadas.push({ id: mision.id, nombre: mision.nombre, tipo: mision.tipo, xp: mision.xp, ...(mision.grado ? { grado: mision.grado } : {}) });
   }
   return { duplicado: false, completadas };
 }
@@ -312,7 +329,7 @@ export async function misionesDeFicha(ejecutor, { vtuberId, dia, gradoActual = n
  */
 export async function reclamarGrado(ejecutor, { vtuberId, misionId, gradoActual = null, ahora = Date.now() }) {
   const mision = misionPorId(misionId);
-  if (!mision || mision.tipo !== 'grado') {
+  if (mision?.tipo !== 'grado') {
     throw new MisionError(404, 'mision_no_encontrada', 'Esa misión no existe o no da un grado.');
   }
   const elegible = elegibilidadDeGrado(gradoActual, mision.grado);

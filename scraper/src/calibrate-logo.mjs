@@ -40,67 +40,68 @@ function toGray(data, width, height, channels) {
 }
 
 /**
- * Busca el logo dentro de la carta por SAD sobre los píxeles opacos del logo.
- * @returns {{x:number,y:number,scale:number,score:number}|null}
+ * Diferencia media del logo colocado en (x, y) de la carta, solo sobre los
+ * píxeles sólidos del logo y muestreando cada 2 px para que sea rápido.
+ * @returns {{sum:number,count:number}}
  */
-export function locateLogo(
-  cardGray,
-  cardW,
-  cardH,
-  logoGray,
-  logoW,
-  logoH,
-  logoAlpha,
-  scales,
-  searchTop = 0.62,
-  step = 2,
-) {
-  let best = null;
-  const yLimit = Math.floor(cardH * searchTop);
-
-  for (const scale of scales) {
-    const sw = Math.round(logoW * scale);
-    const sh = Math.round(logoH * scale);
-    if (sw < 24 || sh < 24 || sw > cardW || sh > yLimit) {
-      continue;
-    }
-
-    for (let y = 0; y + sh <= yLimit; y += step) {
-      for (let x = 0; x + sw <= cardW; x += step) {
-        let sum = 0;
-        let count = 0;
-        // Muestreo del logo (cada 2 px) para que sea rápido.
-        for (let ly = 0; ly < sh; ly += 2) {
-          const sy = Math.min(logoH - 1, Math.floor(ly / scale));
-          for (let lx = 0; lx < sw; lx += 2) {
-            const sx = Math.min(logoW - 1, Math.floor(lx / scale));
-            const a = logoAlpha[sy * logoW + sx];
-            if (a < 160) {
-              continue; // solo píxeles sólidos del logo
-            }
-            const cardPixel = cardGray[(y + ly) * cardW + (x + lx)];
-            const logoPixel = logoGray[sy * logoW + sx];
-            sum += Math.abs(cardPixel - logoPixel);
-            count += 1;
-          }
-        }
-        if (count < 40) {
-          continue;
-        }
-        const score = sum / count;
-        if (!best || score < best.score) {
-          best = {
-            x,
-            y,
-            width: sw,
-            height: sh,
-            scale,
-            score: Number(score.toFixed(2)),
-            samples: count,
-          };
-        }
+function sadAt(card, logo, x, y, sw, sh, scale) {
+  let sum = 0;
+  let count = 0;
+  for (let ly = 0; ly < sh; ly += 2) {
+    const sy = Math.min(logo.height - 1, Math.floor(ly / scale));
+    for (let lx = 0; lx < sw; lx += 2) {
+      const sx = Math.min(logo.width - 1, Math.floor(lx / scale));
+      const logoIndex = sy * logo.width + sx;
+      if (logo.alpha[logoIndex] >= 160) {
+        // solo píxeles sólidos del logo
+        const cardPixel = card.gray[(y + ly) * card.width + (x + lx)];
+        sum += Math.abs(cardPixel - logo.gray[logoIndex]);
+        count += 1;
       }
     }
+  }
+  return { sum, count };
+}
+
+/** Mejor posición para UNA escala, o `best` si ninguna lo mejora. */
+function bestAtScale(card, logo, scale, yLimit, step, best) {
+  const sw = Math.round(logo.width * scale);
+  const sh = Math.round(logo.height * scale);
+  if (sw < 24 || sh < 24 || sw > card.width || sh > yLimit) {
+    return best;
+  }
+  for (let y = 0; y + sh <= yLimit; y += step) {
+    for (let x = 0; x + sw <= card.width; x += step) {
+      const { sum, count } = sadAt(card, logo, x, y, sw, sh, scale);
+      const score = sum / count;
+      if (count >= 40 && (!best || score < best.score)) {
+        best = {
+          x,
+          y,
+          width: sw,
+          height: sh,
+          scale,
+          score: Number(score.toFixed(2)),
+          samples: count,
+        };
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Busca el logo dentro de la carta por SAD sobre los píxeles opacos del logo.
+ * @param {{gray:Float32Array,width:number,height:number}} card
+ * @param {{gray:Float32Array,width:number,height:number,alpha:Uint8Array}} logo
+ * @param {{scales:number[],searchTop?:number,step?:number}} options
+ * @returns {{x:number,y:number,scale:number,score:number}|null}
+ */
+export function locateLogo(card, logo, { scales, searchTop = 0.62, step = 2 }) {
+  let best = null;
+  const yLimit = Math.floor(card.height * searchTop);
+  for (const scale of scales) {
+    best = bestAtScale(card, logo, scale, yLimit, step, best);
   }
   return best;
 }
@@ -152,16 +153,22 @@ async function main() {
 
       // Escalas: el logo del sitio se guardó a 900px de ancho como máximo, pero la
       // carta es 720: hay que probar desde bastante reducido hasta casi completo.
-      const scales = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2];
+      const candidateScales = [
+        0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2,
+      ];
       const found = locateLogo(
-        cardGray,
-        cardRaw.info.width,
-        cardRaw.info.height,
-        logoGray,
-        logoRaw.info.width,
-        logoRaw.info.height,
-        alpha,
-        scales,
+        {
+          gray: cardGray,
+          width: cardRaw.info.width,
+          height: cardRaw.info.height,
+        },
+        {
+          gray: logoGray,
+          width: logoRaw.info.width,
+          height: logoRaw.info.height,
+          alpha,
+        },
+        { scales: candidateScales },
       );
       results.push({
         slug: card.slug,
@@ -195,7 +202,7 @@ async function main() {
     scoreMediana: scores.length ? scores[Math.floor(scores.length / 2)] : null,
     escalaMediana: scales.length ? scales[Math.floor(scales.length / 2)] : null,
     escalaMin: scales[0] ?? null,
-    escalaMax: scales[scales.length - 1] ?? null,
+    escalaMax: scales.at(-1) ?? null,
   };
   fs.writeFileSync(
     REPORT,
@@ -210,8 +217,10 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error("[calib] ERROR", error);
     process.exit(1);
-  });
+  }
 }

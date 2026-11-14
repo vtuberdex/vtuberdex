@@ -10,9 +10,7 @@
  * Es un modelo estándar redactado para el proyecto; antes de depender de él ante una disputa real
  * conviene que lo revise una persona abogada de tu jurisdicción.
  */
-import { TERMINOS_VERSION } from "@/server/src/terminos-version.mjs";
-
-export { TERMINOS_VERSION };
+export { TERMINOS_VERSION } from "@/server/src/terminos-version.mjs";
 
 export interface Clausula {
   /** Ancla (`/terminos#salida`): los formularios enlazan a las cláusulas que importan. */

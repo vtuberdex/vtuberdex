@@ -10,7 +10,7 @@ export interface SocialLinksProps {
   palette: { accent: string; secondary: string };
 }
 
-export function SocialLinks({ socials, palette }: SocialLinksProps) {
+export function SocialLinks({ socials, palette }: Readonly<SocialLinksProps>) {
   const { t } = useI18n();
   return (
     <section

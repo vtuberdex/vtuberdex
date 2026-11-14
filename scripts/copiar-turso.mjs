@@ -6,6 +6,7 @@
 import { createClient } from "@libsql/client/node";
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { texto } from "./lib/filas.mjs";
 
 const i = process.argv.indexOf("--salida");
 const salida = resolve(i > 0 ? process.argv[i + 1] : "data/turso-local.db");
@@ -41,12 +42,12 @@ const { rows: objetos } = await origen.execute(
 );
 const tablas = objetos.filter((o) => o.type === "table");
 for (const t of tablas) {
-  await destino.execute(String(t.sql));
+  await destino.execute(texto(t.sql));
 }
 
 for (const t of tablas) {
-  const nombre = String(t.name);
-  const q = `"${nombre.replace(/"/g, '""')}"`;
+  const nombre = texto(t.name);
+  const q = `"${nombre.replaceAll('"', '""')}"`;
   let n = 0;
   const lote = nombre === "asset_remoto" ? 5 : 200; // cada fila de asset lleva una imagen entera
   for (let off = 0; ; off += lote) {
@@ -58,7 +59,9 @@ for (const t of tablas) {
     if (!rows.length) {
       break;
     }
-    const sql = `INSERT INTO ${q} (${columns.map((c) => `"${c}"`).join(",")}) VALUES (${columns.map(() => "?").join(",")})`;
+    const nombres = columns.map((c) => `"${c}"`).join(",");
+    const huecos = columns.map(() => "?").join(",");
+    const sql = `INSERT INTO ${q} (${nombres}) VALUES (${huecos})`;
     await destino.batch(
       rows.map((r) => ({ sql, args: columns.map((c) => r[c]) })),
       "write",
@@ -67,11 +70,11 @@ for (const t of tablas) {
   }
   console.log(`${nombre}: ${n} filas`);
 }
-for (const o of objetos.filter((o) => o.type !== "table")) {
+for (const o of objetos.filter((obj) => obj.type !== "table")) {
   try {
-    await destino.execute(String(o.sql));
+    await destino.execute(texto(o.sql));
   } catch (e) {
-    console.warn(`aviso ${o.name}: ${e.message}`);
+    console.warn(`aviso ${texto(o.name)}: ${e.message}`);
   }
 }
 console.log(`✓ copia en ${salida}`);

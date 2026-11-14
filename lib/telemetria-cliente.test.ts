@@ -44,7 +44,7 @@ describe("fichaDeRuta", () => {
   });
   it("decodifica, acota el largo y no se rompe con un % mal formado", () => {
     expect(fichaDeRuta("/v/ni%C3%B1a")).toBe("niña");
-    expect(fichaDeRuta("/v/" + "a".repeat(500))!.length).toBe(120);
+    expect(fichaDeRuta("/v/" + "a".repeat(500))).toHaveLength(120);
     expect(fichaDeRuta("/v/%E0%A4%A")).toBeNull();
   });
 });

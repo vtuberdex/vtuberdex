@@ -11,6 +11,7 @@
  * tiene que ser lo mismo que allá, o el paso pasaría y el envío final rebotaría.
  */
 import { CAMPOS_PERFIL, type ClavePerfil } from '@/components/solicitudes/campos-ficha';
+import { esCorreoBienFormado } from '@/lib/correo-formato.mjs';
 
 export interface Falta {
   /** Valor de `data-campo` del control (o del grupo) donde está el problema. */
@@ -35,7 +36,13 @@ export interface EstadoInscripcion {
   acepta: boolean;
 }
 
-const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/**
+ * Lo mismo que pedía la expresión `^[^\s@]+@[^\s@]+\.[^\s@]+$` (dominio con un punto que no sea ni el
+ * primer ni el último carácter): es la variante `tldMinimo: 1` de la regla común, escrita sin regex en
+ * `lib/correo-formato.mjs` porque la expresión retrocedía en tiempo cuadrático (Sonar S8786).
+ */
+const pareceCorreo = (valor: string): boolean => esCorreoBienFormado(valor, { tldMinimo: 1 });
+
 export const esEnlaceHttp = (valor: string): boolean => {
   try {
     const url = new URL(valor.trim());
@@ -55,52 +62,72 @@ const faltasDePerfil = (paso: 2 | 3, perfil: Record<ClavePerfil, string>): Falta
     motivo: 'vacio' as const,
   }));
 
-export function faltasDelPaso(paso: 1 | 2 | 3 | 4 | 5, e: EstadoInscripcion): Falta[] {
-  const faltas: Falta[] = [];
+export type PasoInscripcion = 1 | 2 | 3 | 4 | 5;
 
-  if (paso === 1) {
-    if (!lleno(e.name)) {
-      faltas.push({ campo: 'name', etiqueta: 'ins.nombreArtistico', motivo: 'vacio' });
-    }
-    if (!lleno(e.email)) {
-      faltas.push({ campo: 'email', etiqueta: 'ficha.correo', motivo: 'vacio' });
-    } else if (!CORREO.test(e.email.trim())) {
-      faltas.push({ campo: 'email', etiqueta: 'ficha.correo', motivo: 'invalido' });
-    }
+type Motivo = Falta['motivo'];
+
+/** Vacío, mal escrito o bien (`null`). */
+const motivoDelCorreo = (email: string): Motivo | null => {
+  if (!lleno(email)) {
+    return 'vacio';
   }
-  if (paso === 2 && e.codigo.trim().length < 20) {
-    faltas.push({ campo: 'codigo', etiqueta: 'ficha.codigoEtiqueta', motivo: lleno(e.codigo) ? 'invalido' : 'vacio' });
+  return pareceCorreo(email.trim()) ? null : 'invalido';
+};
+
+/** El código del correo tiene al menos 20 caracteres: uno más corto está vacío o mal copiado. */
+const motivoDelCodigo = (codigo: string): Motivo | null => {
+  if (codigo.trim().length >= 20) {
+    return null;
   }
-  if (paso === 3) {
-    if (e.languages.length === 0) {
-      faltas.push({ campo: 'languages', etiqueta: 'ficha.leyendaIdiomas', motivo: 'vacio' });
-    }
-    // Hace falta al menos UNA red completa; una fila a medias (plataforma sin enlace o al revés) también molesta.
-    const escritas = e.socials.filter((r) => lleno(r.platform) || lleno(r.url));
-    const completas = escritas.filter((r) => lleno(r.platform) && esEnlaceHttp(r.url));
-    if (completas.length === 0) {
-      faltas.push({ campo: 'socials', etiqueta: 'ins.redes', motivo: escritas.length ? 'invalido' : 'vacio' });
-    } else if (completas.length < escritas.length) {
-      faltas.push({ campo: 'socials', etiqueta: 'ins.redes', motivo: 'invalido' });
-    }
+  return lleno(codigo) ? 'invalido' : 'vacio';
+};
+
+/**
+ * Hace falta al menos UNA red completa; una fila a medias (plataforma sin enlace o al revés) también molesta.
+ * Sin nada escrito es «vacío»; con algo escrito pero sin todas completas, «inválido».
+ */
+const motivoDeLasRedes = (socials: EstadoInscripcion['socials']): Motivo | null => {
+  const escritas = socials.filter((r) => lleno(r.platform) || lleno(r.url));
+  const completas = escritas.filter((r) => lleno(r.platform) && esEnlaceHttp(r.url));
+  if (completas.length > 0 && completas.length === escritas.length) {
+    return null;
   }
-  if (paso === 4) {
-    if (!lleno(e.imageId)) {
-      faltas.push({ campo: 'imageId', etiqueta: 'ficha.avatar', motivo: 'vacio' });
-    }
-    if (!lleno(e.logoId)) {
-      faltas.push({ campo: 'logoId', etiqueta: 'ficha.logo', motivo: 'vacio' });
-    }
-    faltas.push(...faltasDePerfil(2, e.perfil));
-    if (!lleno(e.cardText)) {
-      faltas.push({ campo: 'cardText', etiqueta: 'ficha.lore', motivo: 'vacio' });
-    }
-  }
-  if (paso === 5) {
-    faltas.push(...faltasDePerfil(3, e.perfil));
-    if (!e.acepta) {
-      faltas.push({ campo: 'acepta', etiqueta: 'ins.falta.terminos', motivo: 'vacio' });
-    }
-  }
-  return faltas;
+  return escritas.length ? 'invalido' : 'vacio';
+};
+
+/** Una falta «vacío» si el texto no tiene nada. */
+const siVacio = (valor: string, campo: string, etiqueta: string): Falta[] =>
+  lleno(valor) ? [] : [{ campo, etiqueta, motivo: 'vacio' }];
+
+/** Una falta con su motivo, o ninguna si el motivo es `null`. */
+const siMotivo = (motivo: Motivo | null, campo: string, etiqueta: string): Falta[] =>
+  motivo ? [{ campo, etiqueta, motivo }] : [];
+
+/** Qué mira cada paso, en el orden en que aparecen los campos. */
+const FALTAS_POR_PASO: Record<PasoInscripcion, (e: EstadoInscripcion) => Falta[]> = {
+  1: (e) => [
+    ...siVacio(e.name, 'name', 'ins.nombreArtistico'),
+    ...siMotivo(motivoDelCorreo(e.email), 'email', 'ficha.correo'),
+  ],
+  2: (e) => siMotivo(motivoDelCodigo(e.codigo), 'codigo', 'ficha.codigoEtiqueta'),
+  3: (e) => [
+    ...(e.languages.length === 0
+      ? [{ campo: 'languages', etiqueta: 'ficha.leyendaIdiomas', motivo: 'vacio' as const }]
+      : []),
+    ...siMotivo(motivoDeLasRedes(e.socials), 'socials', 'ins.redes'),
+  ],
+  4: (e) => [
+    ...siVacio(e.imageId, 'imageId', 'ficha.avatar'),
+    ...siVacio(e.logoId, 'logoId', 'ficha.logo'),
+    ...faltasDePerfil(2, e.perfil),
+    ...siVacio(e.cardText, 'cardText', 'ficha.lore'),
+  ],
+  5: (e) => [
+    ...faltasDePerfil(3, e.perfil),
+    ...(e.acepta ? [] : [{ campo: 'acepta', etiqueta: 'ins.falta.terminos', motivo: 'vacio' as const }]),
+  ],
+};
+
+export function faltasDelPaso(paso: PasoInscripcion, e: EstadoInscripcion): Falta[] {
+  return FALTAS_POR_PASO[paso](e);
 }

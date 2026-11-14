@@ -60,48 +60,42 @@ import { ipDelCliente, origenPermitido } from "../../../../lib/likes.mjs";
 import {
   adminListQuerySchema,
   bulkStatusSchema,
-  factionCreateSchema,
-  factionUpdateSchema,
   formatIssues,
   fichaCorreoSchema,
   vtuberCreateSchema,
   vtuberUpdateSchema,
 } from "../../../../server/src/validation.mjs";
-import {
-  MutationError,
-  listarFacciones,
-  ultimoDex,
-} from "../../../../server/src/mutations.mjs";
-import {
-  MisionError,
-  listarReclamos,
-  misionPorId,
-  revocarReclamo,
-} from "../../../../server/src/misiones.mjs";
-import { resumenDeRechazos } from "../../../../server/src/rechazos.mjs";
+import { ultimoDex } from "../../../../server/src/mutations.mjs";
 import { ejecutorDeSolicitudes } from "../../../../lib/solicitudes.mjs";
 import { correoDeBienvenida, enviarCorreo } from "../../../../lib/correo.mjs";
 import {
   SolicitudError,
-  fichaDesdeInscripcion,
   correosDeFichas,
   fijarCorreoDeFicha,
-  leerSolicitud,
-  listarSolicitudes,
-  resolverSolicitud,
 } from "../../../../server/src/solicitudes.mjs";
-import {
-  aplicarImagenesDeSolicitud,
-  imagenesDeSolicitud,
-  imagenesParaAplicar,
-  purgarCaducadas,
-} from "../../../../server/src/imagenes-solicitud.mjs";
 import { listarConCorreo } from "../../../../server/src/correo-fichas.mjs";
 import { estadisticasDelMantenedor } from "../../../../server/src/estadisticas-admin.mjs";
-import { prepararModificacion } from "../../../../server/src/modificacion.mjs";
-import { vistaPrevia } from "../../../../server/src/solicitud-vista.mjs";
 import { getVtuberBySlug } from "../../../../server/src/search.mjs";
 import { readWebpSize } from "../../../../server/src/seed.mjs";
+
+import { MIME_WEBP, OP_EDITAR, responderError } from "./respuestas.js";
+import {
+  imagenDeSolicitudRuta,
+  imagenesDeSolicitudRuta,
+  listarSolicitudesRuta,
+  rechazosRuta,
+  reclamosDeMisionesRuta,
+  resolverSolicitudRuta,
+  revocarReclamoRuta,
+  vistaPreviaRuta,
+} from "./solicitudes-rutas.js";
+import {
+  crearFaccionRuta,
+  editarFaccionRuta,
+  eliminarFaccionRuta,
+  listaDeFacciones,
+  subirEmblema,
+} from "./facciones-rutas.js";
 
 export const dynamic = "force-dynamic";
 
@@ -129,24 +123,6 @@ async function exigirSesion(request) {
     return [null, noAutenticado()];
   }
   return [user, null];
-}
-
-/**
- * Respuesta de error de una mutación: el estado y el código que decidieron las reglas
- * compartidas (`server/src/mutations.mjs`), idénticos a los del Express local.
- */
-function responderError(error) {
-  if (error instanceof MutationError) {
-    return NextResponse.json(
-      { error: error.code, detail: error.detail },
-      { status: error.status },
-    );
-  }
-  console.error("[admin] error al guardar", error);
-  return NextResponse.json(
-    { error: "error_al_guardar", detail: error.message },
-    { status: 500 },
-  );
 }
 
 /**
@@ -294,11 +270,10 @@ async function enlaceDeAcceso(request, accion) {
   }
   const cuerpo = await request.json().catch(() => null);
   try {
+    const token = typeof cuerpo?.token === "string" ? cuerpo.token : "";
     const { status, cuerpo: respuesta } =
       accion === "entrar"
-        ? await entrarConEnlace(
-            typeof cuerpo?.token === "string" ? cuerpo.token : "",
-          )
+        ? await entrarConEnlace(token)
         : await pedirEnlaceDeAcceso({
             email: cuerpo?.email,
             ip: ipDelCliente(request.headers),
@@ -420,7 +395,7 @@ async function editarVtuber(request, id, usuario) {
       return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
     }
     const { db: dbNueva, resultado } = await aplicarYAnotar(
-      { tipo: "vtuber.editar", id: actual.id, patch: parsed.data },
+      { tipo: OP_EDITAR, id: actual.id, patch: parsed.data },
       usuario.username,
     );
     // Los reemplazos de imagen del mantenedor se guardan por slug: al cambiar la URL se mudan
@@ -594,142 +569,6 @@ async function siguienteDex() {
   return NextResponse.json({ next: ultimoDex(db) + 1 });
 }
 
-// ------------------------------------------------------------- facciones
-
-/** `GET /api/admin/factions` — las facciones con su conteo real. */
-async function listaDeFacciones() {
-  return NextResponse.json({ items: listarFacciones(await dbConDiario()) });
-}
-
-/** Aplica una operación de facción y devuelve la lista nueva (la UI repinta desde ella). */
-async function mutarFaccion(operacion, usuario, status = 200) {
-  try {
-    const { db, resultado } = await aplicarYAnotar(operacion, usuario.username);
-    return NextResponse.json(
-      { faction: resultado, items: listarFacciones(db) },
-      { status },
-    );
-  } catch (error) {
-    return responderError(error);
-  }
-}
-
-async function crearFaccionRuta(request, usuario) {
-  const parsed = factionCreateSchema.safeParse(
-    await request.json().catch(() => null),
-  );
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "payload_invalido", issues: formatIssues(parsed.error) },
-      { status: 400 },
-    );
-  }
-  return mutarFaccion(
-    { tipo: "faccion.crear", datos: parsed.data },
-    usuario,
-    201,
-  );
-}
-
-async function editarFaccionRuta(request, id, usuario) {
-  const parsed = factionUpdateSchema.safeParse(
-    await request.json().catch(() => null),
-  );
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "payload_invalido", issues: formatIssues(parsed.error) },
-      { status: 400 },
-    );
-  }
-  return mutarFaccion(
-    { tipo: "faccion.editar", id: Number(id), patch: parsed.data },
-    usuario,
-  );
-}
-
-/**
- * Medidas de un PNG leídas de su cabecera (IHDR), o `null` si los bytes no son un PNG.
- * JS puro: aquí no hay `sharp` (binario nativo que no viaja a la función).
- */
-function leerMedidasPng(bytes) {
-  const firma = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-  if (bytes.length < 24 || firma.some((valor, i) => bytes[i] !== valor)) {
-    return null;
-  }
-  return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
-}
-
-/**
- * `POST /api/admin/factions/:id/image` — sube el emblema de una facción (PNG).
- *
- * El cliente lo normaliza a PNG de hasta 512 px antes de enviarlo (en producción no hay `sharp`),
- * y aquí se valida la FIRMA, no la extensión. Se guarda como asset del mantenedor (`kind =
- * 'faction'`, por slug de la facción) y la facción pasa a apuntar a él con `?v=<ms>`: la ruta es
- * canónica y sin versión el navegador seguiría mostrando el emblema anterior.
- */
-async function subirEmblema(request, id, usuario) {
-  try {
-    const db = await dbConDiario();
-    const faccion = db
-      .prepare("SELECT id, slug FROM faction WHERE id = ?")
-      .get(Number(id));
-    if (!faccion) {
-      return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
-    }
-    const bytes = Buffer.from(await request.arrayBuffer());
-    if (bytes.length > 2 * 1024 * 1024) {
-      return NextResponse.json(
-        {
-          error: "archivo_demasiado_grande",
-          detail: "el emblema admite hasta 2 MB",
-        },
-        { status: 400 },
-      );
-    }
-    const medidas = leerMedidasPng(bytes);
-    if (!medidas) {
-      return NextResponse.json(
-        { error: "formato_invalido", detail: "se esperaba un PNG" },
-        { status: 400 },
-      );
-    }
-    await guardarAssetDelMantenedor(
-      faccion.slug,
-      "faction",
-      bytes,
-      "image/png",
-      medidas,
-    );
-    const ruta = `images/faction/${faccion.slug}.png?v=${Date.now()}`;
-    const { db: dbNueva, resultado } = await aplicarYAnotar(
-      { tipo: "faccion.editar", id: faccion.id, patch: { icon: ruta } },
-      usuario.username,
-    );
-    return NextResponse.json({
-      faction: resultado,
-      items: listarFacciones(dbNueva),
-      asset: { path: ruta, ...medidas, bytes: bytes.length },
-    });
-  } catch (error) {
-    return responderError(error);
-  }
-}
-
-async function eliminarFaccionRuta(request, id, usuario) {
-  const bruto = new URL(request.url).searchParams.get("mergeInto");
-  const destino = bruto === null ? null : Number(bruto);
-  if (destino !== null && !Number.isInteger(destino)) {
-    return NextResponse.json(
-      { error: "fusion_invalida", detail: "mergeInto debe ser un id" },
-      { status: 400 },
-    );
-  }
-  return mutarFaccion(
-    { tipo: "faccion.eliminar", id: Number(id), fusionarEn: destino },
-    usuario,
-  );
-}
-
 /**
  * `POST /api/admin/vtubers/:id/image/:kind` — guarda los bytes de una imagen en Turso.
  *
@@ -790,7 +629,7 @@ async function subirImagen(request, id, kind) {
     actual.slug,
     kind,
     bytes,
-    "image/webp",
+    MIME_WEBP,
     medidas,
   );
 
@@ -882,339 +721,74 @@ async function estadoMasivo(request, usuario) {
   }
 }
 
+
 /** Respuesta común cuando no hay ningún backend de escritura. */
-/**
- * `GET /api/admin/solicitudes?estado=&tipo=` — la cola de inscripciones y bajas que llegaron
- * por los formularios públicos. Trae el contacto confidencial: solo se sirve con sesión.
- */
-async function listarSolicitudesRuta(request) {
-  const consulta = new URL(request.url).searchParams;
-  const estado = consulta.get("estado") ?? "pendiente";
-  const tipo = consulta.get("tipo");
-  if (
-    !["pendiente", "aprobada", "rechazada", "procesada", "todas"].includes(
-      estado,
-    ) ||
-    (tipo && !["inscripcion", "baja", "modificacion"].includes(tipo))
-  ) {
-    return NextResponse.json({ error: "query_invalida" }, { status: 400 });
-  }
-  try {
-    const ejecutor = await ejecutorDeSolicitudes();
-    // Aprovecha la visita para limpiar las imágenes caducadas (no hay un trabajo programado).
-    await purgarCaducadas(ejecutor).catch(() => {});
-    return NextResponse.json(
-      await listarSolicitudes(ejecutor, { estado, tipo }),
-    );
-  } catch (error) {
-    console.error("[admin] no se pudo leer la cola de solicitudes", error);
-    return NextResponse.json(
-      { error: "solicitudes_no_disponibles", detail: error.message },
-      { status: 503 },
-    );
-  }
-}
-
-/**
- * `GET /api/admin/solicitudes/rechazos?dias=7` — qué formulario rechazó qué y por qué campo en los últimos
- * días (sin correos ni contenido): para saber dónde se atasca la gente.
- */
-async function rechazosRuta(request) {
-  const dias = Math.min(
-    30,
-    Math.max(1, Number(new URL(request.url).searchParams.get("dias")) || 7),
-  );
-  try {
-    return NextResponse.json(
-      await resumenDeRechazos(await ejecutorDeSolicitudes(), { dias }),
-    );
-  } catch (error) {
-    console.error("[admin] no se pudo leer el resumen de rechazos", error);
-    return NextResponse.json(
-      { error: "solicitudes_no_disponibles", detail: error.message },
-      { status: 503 },
-    );
-  }
-}
-
-/**
- * `GET /api/admin/misiones/reclamos` — los grados que la gente reclamó con misiones de Minecraft: quién, cuál, el grado
- * que tenía antes y el que lleva hoy (por si una donación lo subió después). Es lo que permite revisar abusos.
- */
-async function reclamosDeMisionesRuta() {
-  try {
-    const db = await dbConDiario();
-    const filas = await listarReclamos(await ejecutorDeSolicitudes());
-    const items = filas.map((f) => {
-      const ficha = db.prepare("SELECT slug, name FROM vtuber WHERE id = ?").get(f.vtuberId);
-      let actual = null;
-      try {
-        actual = db.prepare("SELECT grade FROM premium WHERE vtuber_id = ?").get(f.vtuberId)?.grade ?? null;
-      } catch {
-        /* una base anterior al premium no tiene la tabla */
-      }
-      return { ...f, mision: misionPorId(f.misionId)?.nombre ?? f.misionId, slug: ficha?.slug ?? null, name: ficha?.name ?? `#${f.vtuberId}`, gradoActual: actual };
-    });
-    return NextResponse.json({ items }, { headers: { "cache-control": "no-store" } });
-  } catch (error) {
-    console.error("[admin] no se pudieron leer los reclamos de misiones", error);
-    return NextResponse.json({ error: "misiones_no_disponibles", detail: error.message }, { status: 503 });
-  }
-}
-
-/**
- * `POST /api/admin/misiones/reclamos/:vtuberId/:mision/revocar` — quita un grado reclamado con misiones y devuelve la carta
- * al grado que tenía antes (o a carta normal). Si la carta ya no lleva ese grado (una donación la subió) NO se toca: solo
- * queda revocado el reclamo. La misión sigue reclamada, así que no se puede volver a reclamar.
- */
-async function revocarReclamoRuta(vtuberId, misionId, usuario) {
-  const id = Number(vtuberId);
-  if (!Number.isInteger(id) || !misionPorId(misionId)) {
-    return NextResponse.json({ error: "query_invalida" }, { status: 400 });
-  }
-  try {
-    const { grado, gradoPrevio } = await revocarReclamo(await ejecutorDeSolicitudes(), { vtuberId: id, misionId });
-    let actual = null;
-    try {
-      actual = (await dbConDiario()).prepare("SELECT grade FROM premium WHERE vtuber_id = ?").get(id)?.grade ?? null;
-    } catch {
-      /* sin tabla premium */
-    }
-    const quitada = actual === grado;
-    if (quitada) {
-      await aplicarYAnotar(
-        { tipo: "vtuber.editar", id, patch: { premium: gradoPrevio === null ? null : { grade: gradoPrevio } } },
-        usuario,
-      );
-    }
-    return NextResponse.json({ ok: true, grado, gradoPrevio, cartaModificada: quitada });
-  } catch (error) {
-    if (error instanceof MisionError) {
-      return NextResponse.json({ error: error.code, detail: error.detail }, { status: error.status });
-    }
-    return responderError(error);
-  }
-}
-
-/** Lo que el mantenedor puede escribir como dirección de una ficha: letras, números y guiones. */
-const SLUG_DE_FICHA = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-
-/**
- * `GET /api/admin/solicitudes/:id/vista-previa?ficha=<slug>` — qué pasaría al aprobar, SIN escribir nada: si se
- * puede, qué cambia (antes → después), a qué ficha afecta y, si la ficha no se encontró, candidatas para elegir.
- * `ficha` elige a mano la ficha de una modificación (la misma que luego se manda al aprobar).
- */
-async function vistaPreviaRuta(request, id) {
-  const fichaSlug = new URL(request.url).searchParams.get("ficha");
-  if (fichaSlug !== null && !SLUG_DE_FICHA.test(fichaSlug)) {
-    return NextResponse.json({ error: "query_invalida" }, { status: 400 });
-  }
-  try {
-    const solicitud = await leerSolicitud(await ejecutorDeSolicitudes(), id);
-    if (!solicitud) {
-      return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
-    }
-    return NextResponse.json(
-      vistaPrevia(await dbConDiario(), solicitud, { fichaSlug }),
-      { headers: { "cache-control": "no-store" } },
-    );
-  } catch (error) {
-    return responderError(error);
-  }
-}
-
-/**
- * `GET /api/admin/solicitudes/:id/imagenes` — qué imágenes subió la persona con el formulario (sin bytes).
- * `GET /api/admin/solicitudes/:id/imagen/:tipo` — los bytes de una, para verla antes de aprobar.
- * Solo el mantenedor: no son públicas.
- */
-async function imagenesDeSolicitudRuta(id) {
-  try {
-    return NextResponse.json({
-      imagenes: await imagenesDeSolicitud(await ejecutorDeSolicitudes(), id),
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: "solicitudes_no_disponibles", detail: error.message },
-      { status: 503 },
-    );
-  }
-}
-
-async function imagenDeSolicitudRuta(id, tipo) {
-  try {
-    const imagen = (
-      await imagenesParaAplicar(await ejecutorDeSolicitudes(), id)
-    ).find((i) => i.tipo === tipo);
-    if (!imagen) {
-      return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
-    }
-    return new NextResponse(imagen.bytes, {
-      headers: {
-        "content-type": "image/webp",
-        "cache-control": "private, no-store",
-        "x-content-type-options": "nosniff",
-      },
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { error: "solicitudes_no_disponibles", detail: error.message },
-      { status: 503 },
-    );
-  }
-}
-
-/**
- * `POST /api/admin/solicitudes/:id/resolver` con `{ accion, nota?, fichaSlug? }` (`fichaSlug`: la ficha elegida a mano en una modificación).
- *
- *   · `aprobar`  (inscripción): crea la ficha en BORRADOR por el mismo camino que «Nueva carta»
- *     (`vtuber.crear` del diario) y cierra la solicitud. Si la ficha no se puede crear (URL
- *     repetida, país desconocido…) la solicitud sigue pendiente y el error llega tal cual.
- *   · `aprobar`  (modificación): aplica los cambios a la ficha existente (`vtuber.editar`); el avatar y
- *     el logo, que llegan como enlace, los sube el mantenedor por el gestor de imágenes.
- *   · `rechazar` (todas) y `procesar` (baja): cierran la solicitud. La baja NO borra nada: qué
- *     se hace con la ficha lo decide el mantenedor aparte, según la cláusula de salida.
- */
-async function resolverSolicitudRuta(request, id, usuario) {
-  const cuerpo = await request.json().catch(() => null);
-  const accion = cuerpo?.accion;
-  if (!["aprobar", "rechazar", "procesar"].includes(accion)) {
-    return NextResponse.json(
-      {
-        error: "payload_invalido",
-        detail: "accion: aprobar | rechazar | procesar",
-      },
-      { status: 400 },
-    );
-  }
-  const nota = typeof cuerpo?.nota === "string" ? cuerpo.nota : "";
-  try {
-    const ejecutor = await ejecutorDeSolicitudes();
-    const solicitud = await leerSolicitud(ejecutor, id);
-    if (!solicitud) {
-      return NextResponse.json({ error: "no_encontrado" }, { status: 404 });
-    }
-    if (solicitud.estado !== "pendiente") {
-      return NextResponse.json(
-        { error: "ya_resuelta", detail: "esta solicitud ya fue resuelta" },
-        { status: 409 },
-      );
-    }
-    let vtuberSlug = null;
-    if (accion === "aprobar" && solicitud.tipo === "modificacion") {
-      // Se aplica el parche a la ficha EXISTENTE (`vtuber.editar` del diario); avatar y logo (enlaces)
-      // los sube el mantenedor aparte. La ficha se lee del diario ya reproducido, no de la base empaquetada.
-      const db = await dbConDiario();
-      // El mantenedor puede haber ELEGIDO la ficha cuando lo escrito en el formulario no se resolvía solo.
-      let elegida = null;
-      if (typeof cuerpo?.fichaSlug === "string" && cuerpo.fichaSlug) {
-        elegida = SLUG_DE_FICHA.test(cuerpo.fichaSlug)
-          ? getVtuberBySlug(db, cuerpo.fichaSlug, { includeHidden: true })
-          : null;
-        if (!elegida) {
-          return NextResponse.json(
-            {
-              error: "ficha_no_encontrada",
-              detail: "la ficha elegida no existe",
-            },
-            { status: 404 },
-          );
-        }
-      }
-      const {
-        id: fichaId,
-        slug,
-        patch,
-      } = prepararModificacion(db, solicitud, { ficha: elegida });
-      const datos = vtuberUpdateSchema.safeParse(patch);
-      if (!datos.success) {
-        return NextResponse.json(
-          { error: "payload_invalido", issues: formatIssues(datos.error) },
-          { status: 400 },
-        );
-      }
-      vtuberSlug = slug;
-      if (Object.keys(datos.data).length) {
-        const { resultado } = await aplicarYAnotar(
-          { tipo: "vtuber.editar", id: fichaId, patch: datos.data },
-          usuario.username,
-        );
-        vtuberSlug = resultado.slug;
-      }
-    } else if (accion === "aprobar") {
-      if (solicitud.tipo !== "inscripcion") {
-        return NextResponse.json(
-          {
-            error: "estado_invalido",
-            detail: "solo se aprueban inscripciones y modificaciones",
-          },
-          { status: 400 },
-        );
-      }
-      const datos = vtuberCreateSchema.safeParse(
-        fichaDesdeInscripcion(solicitud),
-      );
-      if (!datos.success) {
-        return NextResponse.json(
-          { error: "payload_invalido", issues: formatIssues(datos.error) },
-          { status: 400 },
-        );
-      }
-      const { resultado } = await aplicarYAnotar(
-        { tipo: "vtuber.crear", datos: datos.data },
-        usuario.username,
-      );
-      vtuberSlug = resultado.slug;
-    }
-    const estado =
-      accion === "aprobar"
-        ? "aprobada"
-        : accion === "procesar"
-          ? "procesada"
-          : "rechazada";
-    const resuelta = await resolverSolicitud(ejecutor, id, {
-      estado,
-      actor: usuario.username,
-      nota,
-      vtuberSlug,
-    });
-    // Aprobada: las imágenes subidas pasan a ser las de la ficha (fila de Turso con origen `mantenedor`, como
-    // las que sube el mantenedor a mano). Si alguna falla la aprobación sigue en pie y se informa cuál.
-    let imagenes = { aplicadas: [], fallidas: [] };
-    if (estado === "aprobada" && vtuberSlug) {
-      imagenes = await aplicarImagenesDeSolicitud(
-        ejecutor,
-        id,
-        async ({ tipo, bytes, ancho, alto }) => {
-          const guardada = await guardarAssetDelMantenedor(
-            vtuberSlug,
-            tipo,
-            bytes,
-            "image/webp",
-            { width: ancho, height: alto },
-          );
-          if (!guardada) {
-            throw new Error("el almacén de imágenes no está disponible");
-          }
-        },
-      );
-    }
-    return NextResponse.json({ solicitud: resuelta, imagenes });
-  } catch (error) {
-    if (error instanceof SolicitudError) {
-      return NextResponse.json(
-        { error: error.code, detail: error.detail },
-        { status: error.status },
-      );
-    }
-    return responderError(error);
-  }
-}
-
 function sinBackend() {
   return noDisponible(
     "el mantenedor solo existe en local: hace falta VTUBERDEX_DB_URL (la base del mantenedor)",
   );
+}
+
+/**
+ * ¿`partes` sigue el `patron`? Cada elemento es un literal exacto o `"*"` (segmento no vacío).
+ * Con `exacto` (por defecto) el largo también tiene que coincidir; sin él, sobran segmentos al final.
+ */
+function coincide(partes, patron, { exacto = true } = {}) {
+  const largoOk = exacto
+    ? partes.length === patron.length
+    : partes.length >= patron.length;
+  return (
+    largoOk &&
+    patron.every((segmento, i) =>
+      segmento === "*" ? Boolean(partes[i]) : partes[i] === segmento,
+    )
+  );
+}
+
+/** Segmentos de la ruta pedida (`[...path]`), siempre como lista. */
+async function partesDe(context) {
+  const { path } = await context.params;
+  return Array.isArray(path) ? path : [path];
+}
+
+const noSoportada = (partes) =>
+  noDisponible(
+    `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
+  );
+
+/**
+ * Rutas GET de sufijo FIJO (con sesión). Un `Map` y no un objeto literal: un sufijo como
+ * `constructor` no puede caer en el prototipo.
+ */
+const GET_FIJAS = new Map([
+  ["stats", () => estadisticas()],
+  // `audit` va vacío a propósito: el registro vive en `audit_log`, que la base que se
+  // despliega sanea (contiene el hash de la contraseña). Se devuelve `{items: []}` para que
+  // la UI muestre "sin registros" en vez de un error que parecería una avería.
+  ["audit", () => NextResponse.json({ items: [] })],
+  ["vtubers", (request) => listarVtubers(request)],
+  ["dex/next", () => siguienteDex()],
+  ["factions", () => listaDeFacciones()],
+  ["solicitudes", (request) => listarSolicitudesRuta(request)],
+  ["solicitudes/rechazos", (request) => rechazosRuta(request)],
+  ["misiones/reclamos", () => reclamosDeMisionesRuta()],
+]);
+
+/** Rutas GET con parámetros, después de las fijas. */
+function getConParametros(request, partes) {
+  if (coincide(partes, ["vtubers", "*"])) {
+    return detalleVtuber(partes[1]);
+  }
+  if (coincide(partes, ["solicitudes", "*", "vista-previa"])) {
+    return vistaPreviaRuta(request, partes[1]);
+  }
+  if (coincide(partes, ["solicitudes", "*", "imagenes"])) {
+    return imagenesDeSolicitudRuta(partes[1]);
+  }
+  if (coincide(partes, ["solicitudes", "*", "imagen", "*"])) {
+    return imagenDeSolicitudRuta(partes[1], partes[3]);
+  }
+  return noSoportada(partes);
 }
 
 export async function GET(request, context) {
@@ -1224,8 +798,7 @@ export async function GET(request, context) {
   if (!tursoConfigurado()) {
     return sinBackend();
   }
-  const { path } = await context.params;
-  const partes = Array.isArray(path) ? path : [path];
+  const partes = await partesDe(context);
   const sufijo = partes.join("/");
   if (sufijo === "session") {
     return sesionTurso(request);
@@ -1234,64 +807,11 @@ export async function GET(request, context) {
   if (negado) {
     return negado;
   }
-  if (sufijo === "stats") {
-    return estadisticas();
+  const fija = GET_FIJAS.get(sufijo);
+  if (fija) {
+    return fija(request);
   }
-  // `audit` va vacío a propósito: el registro vive en `audit_log`, que la base que se
-  // despliega sanea (contiene el hash de la contraseña). Se devuelve `{items: []}` para que
-  // la UI muestre "sin registros" en vez de un error que parecería una avería.
-  if (sufijo === "audit") {
-    return NextResponse.json({ items: [] });
-  }
-  if (sufijo === "vtubers") {
-    return listarVtubers(request);
-  }
-  if (partes[0] === "vtubers" && partes[1] && partes.length === 2) {
-    return detalleVtuber(partes[1]);
-  }
-  if (sufijo === "dex/next") {
-    return siguienteDex();
-  }
-  if (sufijo === "factions") {
-    return listaDeFacciones();
-  }
-  if (sufijo === "solicitudes") {
-    return listarSolicitudesRuta(request);
-  }
-  if (sufijo === "solicitudes/rechazos") {
-    return rechazosRuta(request);
-  }
-  if (sufijo === "misiones/reclamos") {
-    return reclamosDeMisionesRuta();
-  }
-  if (
-    partes[0] === "solicitudes" &&
-    partes[1] &&
-    partes[2] === "vista-previa" &&
-    partes.length === 3
-  ) {
-    return vistaPreviaRuta(request, partes[1]);
-  }
-  if (
-    partes[0] === "solicitudes" &&
-    partes[1] &&
-    partes[2] === "imagenes" &&
-    partes.length === 3
-  ) {
-    return imagenesDeSolicitudRuta(partes[1]);
-  }
-  if (
-    partes[0] === "solicitudes" &&
-    partes[1] &&
-    partes[2] === "imagen" &&
-    partes[3] &&
-    partes.length === 4
-  ) {
-    return imagenDeSolicitudRuta(partes[1], partes[3]);
-  }
-  return noDisponible(
-    `ruta del mantenedor no soportada en producción: ${sufijo}`,
-  );
+  return getConParametros(request, partes);
 }
 
 export async function PATCH(request, context) {
@@ -1305,17 +825,14 @@ export async function PATCH(request, context) {
   if (negado) {
     return negado;
   }
-  const { path } = await context.params;
-  const partes = Array.isArray(path) ? path : [path];
-  if (partes[0] === "vtubers" && partes[1]) {
+  const partes = await partesDe(context);
+  if (coincide(partes, ["vtubers", "*"], { exacto: false })) {
     return editarVtuber(request, partes[1], usuario);
   }
-  if (partes[0] === "factions" && partes[1]) {
+  if (coincide(partes, ["factions", "*"], { exacto: false })) {
     return editarFaccionRuta(request, partes[1], usuario);
   }
-  return noDisponible(
-    `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
-  );
+  return noSoportada(partes);
 }
 
 export async function PUT(request, context) {
@@ -1329,31 +846,16 @@ export async function PUT(request, context) {
   if (negado) {
     return negado;
   }
-  const { path } = await context.params;
-  const partes = Array.isArray(path) ? path : [path];
-  if (
-    partes[0] === "vtubers" &&
-    partes[1] &&
-    partes[2] === "correo" &&
-    partes.length === 3
-  ) {
+  const partes = await partesDe(context);
+  if (coincide(partes, ["vtubers", "*", "correo"])) {
     return fijarCorreo(request, partes[1]);
   }
-  return noDisponible(
-    `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
-  );
+  return noSoportada(partes);
 }
 
-export async function POST(request, context) {
-  if (ADMIN_UPSTREAM) {
-    return reenviar(request, context, "POST");
-  }
-  if (!tursoConfigurado()) {
-    return sinBackend();
-  }
-  const { path } = await context.params;
-  const partes = Array.isArray(path) ? path : [path];
-  // El login es la ÚNICA ruta sin sesión: es la que la crea.
+/** Rutas POST que crean la sesión o la cierran: no la exigen. `null` si no es ninguna. */
+function postSinSesion(request, partes) {
+  // El login es la ÚNICA ruta sin sesión que entra con contraseña: es la que la crea.
   if (partes[0] === "login") {
     return login(request);
   }
@@ -1363,46 +865,52 @@ export async function POST(request, context) {
   if (partes[0] === "logout") {
     return logout(request);
   }
+  return null;
+}
+
+/** Rutas POST con sesión ya comprobada. */
+function postConSesion(request, partes, usuario) {
+  if (coincide(partes, ["vtubers"])) {
+    return crearVtuber(request, usuario);
+  }
+  if (coincide(partes, ["vtubers", "bulk-status"], { exacto: false })) {
+    return estadoMasivo(request, usuario);
+  }
+  if (coincide(partes, ["vtubers", "*", "image", "*"], { exacto: false })) {
+    return subirImagen(request, partes[1], partes[3]);
+  }
+  if (coincide(partes, ["solicitudes", "*", "resolver"], { exacto: false })) {
+    return resolverSolicitudRuta(request, partes[1], usuario);
+  }
+  if (coincide(partes, ["misiones", "reclamos", "*", "*", "revocar"])) {
+    return revocarReclamoRuta(partes[2], partes[3], usuario);
+  }
+  if (coincide(partes, ["factions"])) {
+    return crearFaccionRuta(request, usuario);
+  }
+  if (coincide(partes, ["factions", "*", "image"], { exacto: false })) {
+    return subirEmblema(request, partes[1], usuario);
+  }
+  return noSoportada(partes);
+}
+
+export async function POST(request, context) {
+  if (ADMIN_UPSTREAM) {
+    return reenviar(request, context, "POST");
+  }
+  if (!tursoConfigurado()) {
+    return sinBackend();
+  }
+  const partes = await partesDe(context);
+  const sinSesion = postSinSesion(request, partes);
+  if (sinSesion) {
+    return sinSesion;
+  }
   const [usuario, negado] = await exigirSesion(request);
   if (negado) {
     return negado;
   }
-  if (partes[0] === "vtubers" && partes.length === 1) {
-    return crearVtuber(request, usuario);
-  }
-  if (partes[0] === "vtubers" && partes[1] === "bulk-status") {
-    return estadoMasivo(request, usuario);
-  }
-  if (
-    partes[0] === "vtubers" &&
-    partes[1] &&
-    partes[2] === "image" &&
-    partes[3]
-  ) {
-    return subirImagen(request, partes[1], partes[3]);
-  }
-  if (partes[0] === "solicitudes" && partes[1] && partes[2] === "resolver") {
-    return resolverSolicitudRuta(request, partes[1], usuario);
-  }
-  if (
-    partes[0] === "misiones" &&
-    partes[1] === "reclamos" &&
-    partes[2] &&
-    partes[3] &&
-    partes[4] === "revocar" &&
-    partes.length === 5
-  ) {
-    return revocarReclamoRuta(partes[2], partes[3], usuario);
-  }
-  if (partes[0] === "factions" && partes.length === 1) {
-    return crearFaccionRuta(request, usuario);
-  }
-  if (partes[0] === "factions" && partes[1] && partes[2] === "image") {
-    return subirEmblema(request, partes[1], usuario);
-  }
-  return noDisponible(
-    `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
-  );
+  return postConSesion(request, partes, usuario);
 }
 
 export async function DELETE(request, context) {
@@ -1416,20 +924,12 @@ export async function DELETE(request, context) {
   if (negado) {
     return negado;
   }
-  const { path } = await context.params;
-  const partes = Array.isArray(path) ? path : [path];
-  if (
-    partes[0] === "vtubers" &&
-    partes[1] &&
-    partes[2] === "image" &&
-    partes[3]
-  ) {
+  const partes = await partesDe(context);
+  if (coincide(partes, ["vtubers", "*", "image", "*"], { exacto: false })) {
     return borrarImagen(partes[1], partes[3]);
   }
-  if (partes[0] === "factions" && partes[1]) {
+  if (coincide(partes, ["factions", "*"], { exacto: false })) {
     return eliminarFaccionRuta(request, partes[1], usuario);
   }
-  return noDisponible(
-    `ruta del mantenedor no soportada en producción: ${partes.join("/")}`,
-  );
+  return noSoportada(partes);
 }

@@ -27,9 +27,7 @@ export function AbriendoDetalle() {
           aria-hidden
           className="h-5 w-5 animate-spin rounded-full border-2 border-dex-accent/30 border-t-dex-accent"
         />
-        <p role="status" className="text-sm">
-          {t("abriendo.detalle")}
-        </p>
+        <output className="block text-sm">{t("abriendo.detalle")}</output>
       </div>
     </div>
   );

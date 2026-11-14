@@ -14,7 +14,7 @@ import {
   getVtuberBySlug,
   searchVtubers,
 } from "./search.mjs";
-import { hashPassword, verifyPassword } from "./auth.mjs";
+import { verifyPassword } from "./auth.mjs";
 import {
   adminListQuerySchema,
   fichaCorreoSchema,
@@ -96,6 +96,8 @@ function registrarAsset(db, vtuberId, kind, saved) {
   return Boolean(existing);
 }
 
+const SQL_FICHA_POR_ID = "SELECT id, slug FROM vtuber WHERE id = ?";
+
 const splitCsv = (value) =>
   String(value ?? "")
     .split(",")
@@ -137,22 +139,85 @@ function enTransaccion(db, fn) {
   }
 }
 
-/**
- * Construye el router de la API.
- * @param {{db: import('node:sqlite').DatabaseSync, sessions: object, imageRoot: string}} deps
- */
-export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
-  const router = express.Router();
-  // Freno a la fuerza bruta del login: de sobra para una persona, corto para un diccionario.
-  const limiteLogin = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 30,
-    standardHeaders: "draft-8",
-    legacyHeaders: false,
-  });
+/** Estado en que queda una solicitud según la acción del mantenedor (ya validada). */
+const ESTADO_TRAS_RESOLVER = {
+  aprobar: "aprobada",
+  procesar: "procesada",
+  rechazar: "rechazada",
+};
 
+/**
+ * Aprueba una solicitud pendiente: una MODIFICACIÓN aplica el parche a la ficha existente (avatar y logo
+ * se copian de lo subido tras resolver) y una INSCRIPCIÓN crea la ficha en borrador. Devuelve la ficha
+ * tocada, o `rechazo` con el cuerpo del 400 si los datos no pasan o el tipo no se aprueba.
+ */
+function aprobarSolicitud(db, solicitud, actor) {
+  if (solicitud.tipo === "modificacion") {
+    const { id, slug, patch } = prepararModificacion(db, solicitud);
+    const datos = vtuberUpdateSchema.safeParse(patch);
+    if (!datos.success) {
+      return {
+        rechazo: { error: "payload_invalido", issues: formatIssues(datos.error) },
+      };
+    }
+    let vtuberSlug = slug;
+    if (Object.keys(datos.data).length) {
+      vtuberSlug = enTransaccion(db, () => {
+        const resultado = aplicarParche(db, id, datos.data);
+        audit(db, actor, "vtuber", id, "update", datos.data);
+        return resultado;
+      });
+    }
+    return { vtuberSlug, fichaId: id };
+  }
+  if (solicitud.tipo !== "inscripcion") {
+    return {
+      rechazo: {
+        error: "estado_invalido",
+        detail: "solo se aprueban inscripciones y modificaciones",
+      },
+    };
+  }
+  const datos = vtuberCreateSchema.safeParse(fichaDesdeInscripcion(solicitud));
+  if (!datos.success) {
+    return {
+      rechazo: { error: "payload_invalido", issues: formatIssues(datos.error) },
+    };
+  }
+  const creada = enTransaccion(db, () => {
+    const resultado = crearFicha(db, datos.data);
+    audit(db, actor, "vtuber", resultado.id, "create", datos.data);
+    return resultado;
+  });
+  return { vtuberSlug: creada.slug, fichaId: creada.id };
+}
+
+/** Copia a la ficha aprobada las imágenes que se subieron con el formulario. */
+async function copiarImagenesAprobadas(
+  { db, solicitudes, imageRoot },
+  { id, fichaId, vtuberSlug, actor },
+) {
+  const sharp = await import("sharp").then((m) => m.default);
+  return aplicarImagenesDeSolicitud(solicitudes, id, async ({ tipo, bytes }) => {
+    const saved = await saveUploadedImage({
+      buffer: bytes,
+      kind: tipo,
+      slug: vtuberSlug,
+      imageRoot,
+      sharp,
+    });
+    registrarAsset(db, fichaId, tipo, saved);
+    audit(db, actor, "vtuber", fichaId, `upload-${tipo}`, {
+      path: saved.path,
+      desde: `solicitud ${id}`,
+    });
+  });
+}
+
+/** Catálogo público y facetas. */
+function rutasPublicas({ router, db, sessions }) {
   // ---------------------------------------------------------------- catálogo
-  router.get("/health", (req, res) => {
+  router.get("/health", (_req, res) => {
     const counts = db
       .prepare(
         `SELECT COUNT(*) AS vtubers,
@@ -223,6 +288,17 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
           .get()?.value ?? null,
     });
   });
+}
+
+/** Login, sesión y el guardia `requireAdmin` (lo devuelve para el resto de rutas). */
+function rutasDeSesion({ router, db, sessions }) {
+  // Freno a la fuerza bruta del login: de sobra para una persona, corto para un diccionario.
+  const limiteLogin = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 30,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+  });
 
   // ------------------------------------------------------------ mantenedor
   router.post("/admin/login", limiteLogin, (req, res) => {
@@ -280,7 +356,11 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
     req.user = user;
     next();
   };
+  return requireAdmin;
+}
 
+/** Lectura de fichas en el mantenedor: listado con borradores, detalle, correo y siguiente dex. */
+function rutasDeFichasAdmin({ router, db, solicitudes, requireAdmin }) {
   /**
    * Listado del MANTENEDOR: incluye borradores y ocultos. La ruta pública solo devuelve lo
    * publicado, así que una ficha en borrador (o una carta recién creada) no podía abrirse para
@@ -318,7 +398,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
   /** Detalle por id, sin filtrar por estado: es lo que el editor abre. */
   router.get("/admin/vtubers/:id", requireAdmin, async (req, res) => {
     const row = db
-      .prepare("SELECT id, slug FROM vtuber WHERE id = ?")
+      .prepare(SQL_FICHA_POR_ID)
       .get(Number(req.params.id));
     const detail = row
       ? getVtuberBySlug(db, row.slug, { includeHidden: true })
@@ -378,10 +458,13 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
   });
 
   /** El siguiente número libre al final de la dex, para el botón "al final". */
-  router.get("/admin/dex/next", requireAdmin, (req, res) => {
+  router.get("/admin/dex/next", requireAdmin, (_req, res) => {
     res.json({ next: ultimoDex(db) + 1 });
   });
+}
 
+/** Cola de solicitudes de los formularios públicos. */
+function rutasDeSolicitudes({ router, db, imageRoot, solicitudes, requireAdmin }) {
   // ------------------------------------------------- solicitudes (formularios públicos)
   // La cola vive en `solicitudes` (un ejecutor SQLite); los formularios públicos escriben en el
   // mismo archivo desde Next. Las reglas son las de `solicitudes.mjs`, iguales a las de producción.
@@ -496,71 +579,15 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
         }
         let vtuberSlug = null;
         let fichaId = null;
-        if (accion === "aprobar" && solicitud.tipo === "modificacion") {
-          // Se aplica el parche a la ficha EXISTENTE; avatar y logo se copian de lo subido tras resolver.
-          const { id, slug, patch } = prepararModificacion(db, solicitud);
-          fichaId = id;
-          const datos = vtuberUpdateSchema.safeParse(patch);
-          if (!datos.success) {
-            res
-              .status(400)
-              .json({
-                error: "payload_invalido",
-                issues: formatIssues(datos.error),
-              });
+        if (accion === "aprobar") {
+          const aprobada = aprobarSolicitud(db, solicitud, req.user.username);
+          if (aprobada.rechazo) {
+            res.status(400).json(aprobada.rechazo);
             return;
           }
-          vtuberSlug = slug;
-          if (Object.keys(datos.data).length) {
-            vtuberSlug = enTransaccion(db, () => {
-              const resultado = aplicarParche(db, id, datos.data);
-              audit(db, req.user.username, "vtuber", id, "update", datos.data);
-              return resultado;
-            });
-          }
-        } else if (accion === "aprobar") {
-          if (solicitud.tipo !== "inscripcion") {
-            res
-              .status(400)
-              .json({
-                error: "estado_invalido",
-                detail: "solo se aprueban inscripciones y modificaciones",
-              });
-            return;
-          }
-          const datos = vtuberCreateSchema.safeParse(
-            fichaDesdeInscripcion(solicitud),
-          );
-          if (!datos.success) {
-            res
-              .status(400)
-              .json({
-                error: "payload_invalido",
-                issues: formatIssues(datos.error),
-              });
-            return;
-          }
-          const creada = enTransaccion(db, () => {
-            const resultado = crearFicha(db, datos.data);
-            audit(
-              db,
-              req.user.username,
-              "vtuber",
-              resultado.id,
-              "create",
-              datos.data,
-            );
-            return resultado;
-          });
-          vtuberSlug = creada.slug;
-          fichaId = creada.id;
+          ({ vtuberSlug, fichaId } = aprobada);
         }
-        const estado =
-          accion === "aprobar"
-            ? "aprobada"
-            : accion === "procesar"
-              ? "procesada"
-              : "rechazada";
+        const estado = ESTADO_TRAS_RESOLVER[accion];
         const resuelta = await resolverSolicitud(solicitudes, req.params.id, {
           estado,
           actor: req.user.username,
@@ -569,32 +596,13 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
         });
         // Aprobada: las imágenes subidas pasan a ser las de la ficha (con `sharp`, como la subida del
         // mantenedor). Si alguna falla la aprobación sigue en pie y se informa cuál.
-        let imagenes = { aplicadas: [], fallidas: [] };
-        if (estado === "aprobada" && fichaId) {
-          const sharp = await import("sharp").then((m) => m.default);
-          imagenes = await aplicarImagenesDeSolicitud(
-            solicitudes,
-            req.params.id,
-            async ({ tipo, bytes }) => {
-              const saved = await saveUploadedImage({
-                buffer: bytes,
-                kind: tipo,
-                slug: vtuberSlug,
-                imageRoot,
-                sharp,
-              });
-              registrarAsset(db, fichaId, tipo, saved);
-              audit(
-                db,
-                req.user.username,
-                "vtuber",
-                fichaId,
-                `upload-${tipo}`,
-                { path: saved.path, desde: `solicitud ${req.params.id}` },
-              );
-            },
-          );
-        }
+        const imagenes =
+          estado === "aprobada" && fichaId
+            ? await copiarImagenesAprobadas(
+                { db, solicitudes, imageRoot },
+                { id: req.params.id, fichaId, vtuberSlug, actor: req.user.username },
+              )
+            : { aplicadas: [], fallidas: [] };
         res.json({ solicitud: resuelta, imagenes });
       } catch (error) {
         if (error instanceof SolicitudError) {
@@ -607,7 +615,10 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
       }
     },
   );
+}
 
+/** Alta y edición de fichas. */
+function rutasDeEdicion({ router, db, requireAdmin }) {
   router.post("/admin/vtubers", requireAdmin, (req, res) => {
     const parsed = vtuberCreateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -668,9 +679,12 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
       responderError(res, error);
     }
   });
+}
 
+/** Catálogo de facciones. */
+function rutasDeFacciones({ router, db, requireAdmin }) {
   // ------------------------------------------------------------- facciones
-  router.get("/admin/factions", requireAdmin, (req, res) => {
+  router.get("/admin/factions", requireAdmin, (_req, res) => {
     res.json({ items: listarFacciones(db) });
   });
 
@@ -759,7 +773,10 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
       responderError(res, error);
     }
   });
+}
 
+/** Subida y borrado de imágenes (fichas y emblemas). */
+function rutasDeImagenes({ router, db, imageRoot, requireAdmin }) {
   // ------------------------------------------------- subida de imágenes (admin)
   // El cuerpo llega como binario crudo (`express.raw`), así que hay que subir el
   // límite SOLO en estas rutas: el JSON global está en 1 MB y una imagen lo
@@ -831,7 +848,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
       const id = Number(req.params.id);
       const kind = req.params.kind;
       const row = db
-        .prepare("SELECT id, slug FROM vtuber WHERE id = ?")
+        .prepare(SQL_FICHA_POR_ID)
         .get(id);
       if (!row) {
         res.status(404).json({ error: "no_encontrado" });
@@ -885,7 +902,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
       const id = Number(req.params.id);
       const kind = req.params.kind;
       const row = db
-        .prepare("SELECT id, slug FROM vtuber WHERE id = ?")
+        .prepare(SQL_FICHA_POR_ID)
         .get(id);
       if (!row) {
         res.status(404).json({ error: "no_encontrado" });
@@ -914,7 +931,10 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
       res.json({ ok: true, kind, vtuber: updated });
     },
   );
+}
 
+/** Estado en lote, auditoría y estadísticas. */
+function rutasDeAuditoria({ router, db, solicitudes, requireAdmin }) {
   router.post("/admin/vtubers/bulk-status", requireAdmin, (req, res) => {
     const parsed = bulkStatusSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -949,7 +969,7 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
     res.json({ updated: ids.length, status });
   });
 
-  router.get("/admin/audit", requireAdmin, (req, res) => {
+  router.get("/admin/audit", requireAdmin, (_req, res) => {
     const rows = db
       .prepare(
         "SELECT id, actor, entity, entity_id AS entityId, action, payload, created_at AS createdAt FROM audit_log ORDER BY id DESC LIMIT 100",
@@ -958,16 +978,32 @@ export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
     res.json({ items: rows });
   });
 
-  router.get("/admin/stats", requireAdmin, async (req, res, next) => {
+  router.get("/admin/stats", requireAdmin, async (_req, res, next) => {
     try {
       res.json(await estadisticasDelMantenedor(db, solicitudes));
     } catch (error) {
       next(error);
     }
   });
+}
 
-  void imageRoot;
+/**
+ * Construye el router de la API. Las rutas se registran por bloques y en el MISMO orden de siempre:
+ * en Express el orden decide qué ruta atiende primero.
+ * @param {{db: import('node:sqlite').DatabaseSync, sessions: object, imageRoot: string}} deps
+ */
+export function createApiRouter({ db, sessions, imageRoot, solicitudes }) {
+  const router = express.Router();
+  const ctx = { router, db, sessions, imageRoot, solicitudes };
+  rutasPublicas(ctx);
+  ctx.requireAdmin = rutasDeSesion(ctx);
+  rutasDeFichasAdmin(ctx);
+  rutasDeSolicitudes(ctx);
+  rutasDeEdicion(ctx);
+  rutasDeFacciones(ctx);
+  rutasDeImagenes(ctx);
+  rutasDeAuditoria(ctx);
   return router;
 }
 
-export { hashPassword };
+export { hashPassword } from "./auth.mjs";

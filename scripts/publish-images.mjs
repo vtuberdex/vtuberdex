@@ -47,6 +47,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createClient } from "@libsql/client/node";
 
 import { CARPETAS_PUBLICADAS } from "../lib/carpetas.mjs";
+import { claveDeAsset } from "./lib/filas.mjs";
 import { leerOpciones } from "./lib/terminal.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -130,15 +131,14 @@ export async function reemplazosEnElArbolDelCatalogo(db, todos) {
   const { rows } = await db.execute(
     "SELECT slug, kind, size FROM asset_remoto WHERE origen = 'mantenedor'",
   );
-  const porClave = new Map(
-    rows.map((r) => [`${r.kind}/${r.slug}`, Number(r.size)]),
-  );
+  const porClave = new Map(rows.map((r) => [claveDeAsset(r), Number(r.size)]));
   return todos
     .filter((a) => porClave.get(`${a.kind}/${a.slug}`) === a.bytes)
     .map((a) => a.rel);
 }
 
-async function main() {
+/** Lee el manifiesto y su lista de imágenes publicables; sale con código 1 si falta algo. */
+function leerPendientes() {
   if (!fs.existsSync(MANIFEST)) {
     console.error(
       `✖ falta el manifiesto: ${MANIFEST} (corre antes: node scripts/build-db.mjs)`,
@@ -151,16 +151,11 @@ async function main() {
     console.error("✖ el manifiesto no tiene imágenes publicables");
     process.exit(1);
   }
-  console.log(
-    `[publish] ${todos.length} imágenes (${(todos.reduce((s, a) => s + a.bytes, 0) / 1024 / 1024).toFixed(1)} MB)${FORCE ? " — FORZANDO resubida" : ""}`,
-  );
+  return { manifest, todos };
+}
 
-  if (DRY_RUN) {
-    console.log("[publish] dry-run: no se sube nada");
-    console.log(`[publish] carpetas: ${JSON.stringify(manifest.folders)}`);
-    return;
-  }
-
+/** Cliente de Turso con el esquema de `lib/ediciones.mjs` ya aplicado. */
+async function conectar() {
   if (!URL_TURSO) {
     console.error("✖ falta TURSO_DATABASE_URL (o --turso-url).");
     console.error(
@@ -181,124 +176,117 @@ async function main() {
   }
   const { asegurarTablas } = await import("../lib/ediciones.mjs");
   await asegurarTablas();
+  return db;
+}
 
-  /**
-   * El publicador mira SOLO las filas de origen `catalogo`.
-   *
-   * Las del mantenedor son de otra persona y no se comparan ni se podan: si el publicador
-   * las viera, las consideraría residuos (no están en el manifiesto) y borraría los
-   * reemplazos hechos a mano, y peor, el conteo de "ya publicado" taparía una imagen del
-   * catálogo que sí falta subir.
-   */
-  const { rows } = await db.execute(
-    "SELECT slug, kind, size FROM asset_remoto WHERE origen = 'catalogo'",
-  );
-  const yaEstan = new Map(
-    rows.map((r) => [`${r.kind}/${r.slug}`, Number(r.size)]),
-  );
-  console.log(`[publish] ya en Turso: ${yaEstan.size}`);
-
-  /**
-   * El punto de no retorno: se comprueba ANTES de escribir nada. Si el árbol del catálogo tiene
-   * los bytes de un reemplazo del mantenedor, subirlos los guardaría con `origen = 'catalogo'` y
-   * la imagen pública original se perdería (clave `(slug, kind, origen)`, sin copia de debajo).
-   */
+/**
+ * El punto de no retorno: se comprueba ANTES de escribir nada. Si el árbol del catálogo tiene
+ * los bytes de un reemplazo del mantenedor, subirlos los guardaría con `origen = 'catalogo'` y
+ * la imagen pública original se perdería (clave `(slug, kind, origen)`, sin copia de debajo).
+ */
+async function abortarSiContaminado(db, todos) {
   const contaminados = await reemplazosEnElArbolDelCatalogo(db, todos);
-  if (contaminados.length > 0) {
-    console.error(
-      `✖ ${contaminados.length} archivo(s) de data/images/ coinciden con un REEMPLAZO del mantenedor.`,
-    );
-    console.error(
-      "  Subirlos los guardaría como origen=catalogo y perdería la imagen pública original.",
-    );
-    console.error(
-      "  Causa habitual: los reemplazos se bajaron a data/images/ en vez de a data/mantenedor/.",
-    );
-    console.error(
-      `  Arréglalo con: rm -rf data/images && npm run download:images, y regenera con npm run build:data`,
-    );
-    for (const rel of contaminados.slice(0, 10)) {
-      console.error(`   · ${rel}`);
-    }
-    await db.close();
-    process.exit(1);
-  }
-
-  // Se compara TAMAÑO además de presencia: si el scraper regeneró una imagen, el nombre
-  // canónico es el mismo pero el contenido cambió, y sin esta comprobación la versión
-  // vieja se quedaría publicada para siempre.
-  const cola = FORCE
-    ? todos
-    : todos.filter((a) => yaEstan.get(`${a.kind}/${a.slug}`) !== a.bytes);
-
-  /**
-   * PODA: lo que está en Turso y ya no está en el manifiesto es un residuo (p. ej. los
-   * emblemas de una campaña retirada). El publicador es la fuente de la verdad de qué
-   * debe existir, así que también limpia lo que sobra.
-   */
-  const esperados = new Set(todos.map((a) => `${a.kind}/${a.slug}`));
-  const residuos = [...yaEstan.keys()].filter((clave) => !esperados.has(clave));
-  if (residuos.length > 0) {
-    console.log(`[publish] residuos por borrar: ${residuos.length}`);
-    if (!FORCE) {
-      for (let i = 0; i < residuos.length; i += 100) {
-        const lote = residuos.slice(i, i + 100);
-        await db.batch(
-          lote.map((clave) => {
-            const [kind, ...resto] = clave.split("/");
-            return {
-              sql: "DELETE FROM asset_remoto WHERE slug = ? AND kind = ? AND origen = 'catalogo'",
-              args: [resto.join("/"), kind],
-            };
-          }),
-          "write",
-        );
-      }
-      console.log("[publish] residuos borrados");
-    }
-  }
-
-  if (cola.length === 0) {
-    console.log("[publish] todo estaba ya publicado; nada que subir");
-    await db.close();
+  if (contaminados.length === 0) {
     return;
   }
-  console.log(`[publish] por subir: ${cola.length}`);
+  console.error(
+    `✖ ${contaminados.length} archivo(s) de data/images/ coinciden con un REEMPLAZO del mantenedor.`,
+  );
+  console.error(
+    "  Subirlos los guardaría como origen=catalogo y perdería la imagen pública original.",
+  );
+  console.error(
+    "  Causa habitual: los reemplazos se bajaron a data/images/ en vez de a data/mantenedor/.",
+  );
+  console.error(
+    `  Arréglalo con: rm -rf data/images && npm run download:images, y regenera con npm run build:data`,
+  );
+  for (const rel of contaminados.slice(0, 10)) {
+    console.error(`   · ${rel}`);
+  }
+  // `close()` del cliente de libsql es síncrono: no hay promesa que esperar.
+  db.close();
+  process.exit(1);
+}
 
-  // Lotes de 25 dentro de un `batch` (una transacción): si algo falla a mitad, lo ya
-  // subido queda y volver a correr reintenta exactamente lo que falta.
+/**
+ * PODA: lo que está en Turso y ya no está en el manifiesto es un residuo (p. ej. los
+ * emblemas de una campaña retirada). El publicador es la fuente de la verdad de qué
+ * debe existir, así que también limpia lo que sobra.
+ */
+async function podarResiduos(db, yaEstan, todos) {
+  const esperados = new Set(todos.map((a) => `${a.kind}/${a.slug}`));
+  const residuos = [...yaEstan.keys()].filter((clave) => !esperados.has(clave));
+  if (residuos.length === 0) {
+    return;
+  }
+  console.log(`[publish] residuos por borrar: ${residuos.length}`);
+  if (FORCE) {
+    return;
+  }
+  for (let i = 0; i < residuos.length; i += 100) {
+    const lote = residuos.slice(i, i + 100);
+    await db.batch(
+      lote.map((clave) => {
+        const [kind, ...resto] = clave.split("/");
+        return {
+          sql: "DELETE FROM asset_remoto WHERE slug = ? AND kind = ? AND origen = 'catalogo'",
+          args: [resto.join("/"), kind],
+        };
+      }),
+      "write",
+    );
+  }
+  console.log("[publish] residuos borrados");
+}
+
+/** Sentencia de subida de un archivo del manifiesto (lee sus bytes del disco). */
+function sentenciaDeSubida(a) {
+  const bytes = fs.readFileSync(a.abs);
+  return {
+    sql: `INSERT INTO asset_remoto (slug, kind, origen, mime, bytes, size, actualizado)
+          VALUES (?, ?, 'catalogo', ?, ?, ?, datetime('now'))
+          ON CONFLICT (slug, kind, origen) DO UPDATE
+            SET bytes = excluded.bytes, mime = excluded.mime,
+                size = excluded.size, actualizado = excluded.actualizado`,
+    args: [a.slug, a.kind, a.mime, bytes, bytes.length],
+  };
+}
+
+/** Sube un lote en un `batch` (una transacción); devuelve cuántas subió y anota los fallos. */
+async function subirLote(db, lote, fallos) {
+  const sentencias = [];
+  for (const a of lote) {
+    try {
+      sentencias.push(sentenciaDeSubida(a));
+    } catch (error) {
+      fallos.push({ rel: a.rel, error: error.message });
+    }
+  }
+  if (sentencias.length === 0) {
+    return 0;
+  }
+  try {
+    await db.batch(sentencias, "write");
+    return sentencias.length;
+  } catch (error) {
+    for (const a of lote) {
+      fallos.push({ rel: a.rel, error: error.message });
+    }
+    return 0;
+  }
+}
+
+/**
+ * Lotes de 25 dentro de un `batch` (una transacción): si algo falla a mitad, lo ya
+ * subido queda y volver a correr reintenta exactamente lo que falta.
+ */
+async function subirCola(db, cola) {
   const LOTE = 25;
   let subidas = 0;
   const fallos = [];
-
   for (let i = 0; i < cola.length; i += LOTE) {
-    const lote = cola.slice(i, i + LOTE);
-    const sentencias = [];
-    for (const a of lote) {
-      try {
-        const bytes = fs.readFileSync(a.abs);
-        sentencias.push({
-          sql: `INSERT INTO asset_remoto (slug, kind, origen, mime, bytes, size, actualizado)
-                VALUES (?, ?, 'catalogo', ?, ?, ?, datetime('now'))
-                ON CONFLICT (slug, kind, origen) DO UPDATE
-                  SET bytes = excluded.bytes, mime = excluded.mime,
-                      size = excluded.size, actualizado = excluded.actualizado`,
-          args: [a.slug, a.kind, a.mime, bytes, bytes.length],
-        });
-      } catch (error) {
-        fallos.push({ rel: a.rel, error: error.message });
-      }
-    }
-    if (sentencias.length > 0) {
-      try {
-        await db.batch(sentencias, "write");
-        subidas += sentencias.length;
-      } catch (error) {
-        for (const a of lote) {
-          fallos.push({ rel: a.rel, error: error.message });
-        }
-      }
-    }
+    subidas += await subirLote(db, cola.slice(i, i + LOTE), fallos);
     const hechos = Math.min(i + LOTE, cola.length);
     if (hechos % 250 < LOTE || hechos === cola.length) {
       console.log(
@@ -306,15 +294,19 @@ async function main() {
       );
     }
   }
+  return { subidas, fallos };
+}
 
+/** Lo que quedó en Turso tras la corrida, comparado con lo que declara el manifiesto. */
+async function informarFinal(db, todos, { subidas, fallos }) {
   const { rows: finales } = await db.execute(
     "SELECT COUNT(*) AS n, SUM(size) AS bytes FROM asset_remoto WHERE origen = 'catalogo'",
   );
   const n = Number(finales[0].n);
-  const bytes = Number(finales[0].bytes ?? 0);
+  const bytesTotales = Number(finales[0].bytes ?? 0);
   console.log(`\n[publish] subidas: ${subidas} | fallos: ${fallos.length}`);
   console.log(
-    `[publish] catálogo en Turso ahora: ${n} objetos, ${(bytes / 1024 / 1024).toFixed(1)} MB`,
+    `[publish] catálogo en Turso ahora: ${n} objetos, ${(bytesTotales / 1024 / 1024).toFixed(1)} MB`,
   );
   // Los reemplazos del mantenedor se informan aparte: cuentan como "no es lo que publicó
   // el manifiesto", pero no deben alterar la comprobación de integridad del catálogo.
@@ -341,7 +333,61 @@ async function main() {
     );
     process.exitCode = 1;
   }
-  await db.close();
+}
+
+async function main() {
+  const { manifest, todos } = leerPendientes();
+  const totalMB = (
+    todos.reduce((s, a) => s + a.bytes, 0) /
+    1024 /
+    1024
+  ).toFixed(1);
+  const forzando = FORCE ? " — FORZANDO resubida" : "";
+  console.log(`[publish] ${todos.length} imágenes (${totalMB} MB)${forzando}`);
+
+  if (DRY_RUN) {
+    console.log("[publish] dry-run: no se sube nada");
+    console.log(`[publish] carpetas: ${JSON.stringify(manifest.folders)}`);
+    return;
+  }
+
+  const db = await conectar();
+
+  /**
+   * El publicador mira SOLO las filas de origen `catalogo`.
+   *
+   * Las del mantenedor son de otra persona y no se comparan ni se podan: si el publicador
+   * las viera, las consideraría residuos (no están en el manifiesto) y borraría los
+   * reemplazos hechos a mano, y peor, el conteo de "ya publicado" taparía una imagen del
+   * catálogo que sí falta subir.
+   */
+  const { rows } = await db.execute(
+    "SELECT slug, kind, size FROM asset_remoto WHERE origen = 'catalogo'",
+  );
+  const yaEstan = new Map(rows.map((r) => [claveDeAsset(r), Number(r.size)]));
+  console.log(`[publish] ya en Turso: ${yaEstan.size}`);
+
+  await abortarSiContaminado(db, todos);
+
+  // Se compara TAMAÑO además de presencia: si el scraper regeneró una imagen, el nombre
+  // canónico es el mismo pero el contenido cambió, y sin esta comprobación la versión
+  // vieja se quedaría publicada para siempre.
+  const cola = FORCE
+    ? todos
+    : todos.filter((a) => yaEstan.get(`${a.kind}/${a.slug}`) !== a.bytes);
+
+  await podarResiduos(db, yaEstan, todos);
+
+  if (cola.length === 0) {
+    console.log("[publish] todo estaba ya publicado; nada que subir");
+    db.close();
+    return;
+  }
+  console.log(`[publish] por subir: ${cola.length}`);
+
+  const resultado = await subirCola(db, cola);
+  await informarFinal(db, todos, resultado);
+  db.close();
 }
 
 /**
@@ -352,8 +398,10 @@ async function main() {
  * dispararía el script entero —y con él una escritura real— durante la suite.
  */
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error("[publish] ERROR", error.message);
     process.exit(1);
-  });
+  }
 }

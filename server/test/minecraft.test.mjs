@@ -522,7 +522,8 @@ test("premiar un directo: una vez por tramo, sin tope y sumado a la XP de la fic
   for (let i = 2; i < 40; i += 1) {
     const pago = await pagar(t0 + tramo * i);
     assert.equal(pago, xpDirectoDelTramo(i));
-    assert.ok(pago >= XP_DIRECTO_MINIMO && pago <= anterior);
+    assert.ok(pago >= XP_DIRECTO_MINIMO, `el tramo ${i} paga menos del mínimo`);
+    assert.ok(pago <= anterior, `el tramo ${i} paga más que el anterior`);
     anterior = pago;
     total += pago;
   }

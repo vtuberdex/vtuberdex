@@ -20,7 +20,7 @@ export function useSingleSheet(): boolean {
   const [single, setSingle] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) {
-      return;
+      return undefined;
     }
     const query = window.matchMedia(
       `(max-width: ${BINDER.singleMaxWidth - 1}px)`,

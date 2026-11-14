@@ -39,7 +39,7 @@ export function ListEditor<T>({
   addLabel,
   emptyText,
   max,
-}: ListEditorProps<T>) {
+}: Readonly<ListEditorProps<T>>) {
   const move = (from: number, to: number) => {
     if (to < 0 || to >= items.length) {
       return;

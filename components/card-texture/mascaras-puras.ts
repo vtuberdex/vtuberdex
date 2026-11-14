@@ -29,12 +29,14 @@ export function mascaraTintaYPiel(
 
     const maxCh = Math.max(r, g, b);
     const minCh = Math.min(r, g, b);
-    const ink = maxCh < 92 ? 1 - maxCh / 92 : 0;
+    // Tinta: 1 en el negro, bajando hasta 0 en un canal máximo de 92 (más claro ya no es lineart).
+    const ink = Math.max(0, 1 - maxCh / 92);
 
     const esCalido = r > g && g >= b && r - b > 12 && r - b < 120;
     const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     const sat = maxCh === 0 ? 0 : (maxCh - minCh) / maxCh;
-    const piel = esCalido && lum > 70 && lum < 250 && sat < 0.62 ? 1 : 0;
+    const luzDePiel = lum > 70 && lum < 250 && sat < 0.62;
+    const piel = esCalido && luzDePiel ? 1 : 0;
     const skinWeight = 0.55;
 
     const intensidad = Math.max(ink, piel * skinWeight);

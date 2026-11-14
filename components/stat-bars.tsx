@@ -22,8 +22,12 @@ export interface StatBarsProps {
 /** Máximos de referencia para escalar las barras (los datos del origen son 0-400). */
 const REFERENCE_MAX = 400;
 
-export function StatBars({ stats, palette, level, experience }: StatBarsProps) {
-  const rango = level !== null ? rangoDelNivel(level) : null;
+export function StatBars({
+  stats,
+  palette,
+  level,
+  experience,
+}: Readonly<StatBarsProps>) {
   const { t, locale } = useI18n();
   const numeric = stats.filter((stat) => typeof stat.value === "number");
 
@@ -38,12 +42,7 @@ export function StatBars({ stats, palette, level, experience }: StatBarsProps) {
     ? numeric.filter((stat) => !slugsDelRadar.has(stat.slug))
     : numeric;
 
-  const expPercent =
-    experience?.current !== null &&
-    experience?.current !== undefined &&
-    experience?.max
-      ? Math.min(100, Math.round((experience.current / experience.max) * 100))
-      : null;
+  const expPercent = porcentajeDeExperiencia(experience);
 
   return (
     <section
@@ -54,62 +53,15 @@ export function StatBars({ stats, palette, level, experience }: StatBarsProps) {
         <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">
           {t("atributos.titulo")}
         </h2>
-        {level !== null && (
-          <span className="flex items-center gap-2">
-            <span
-              className="rounded-lg border border-dex-accent/50 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.1em] text-dex-accent"
-              data-testid="rango"
-              title={
-                rango?.siguiente
-                  ? t("rango.sig", {
-                      rango: t(`rango.${rango.siguiente.id}`),
-                      n: rango.siguiente.desde,
-                    })
-                  : t("rango.max")
-              }
-            >
-              {rango ? t(`rango.${rango.id}`) : ""}
-            </span>
-            <span className="rounded-lg border border-dex-line px-2 py-0.5 font-mono text-xs text-dex-ink">
-              {t("atributos.nivel", { n: level })}
-            </span>
-          </span>
-        )}
+        {level !== null && <InsigniaDeNivel level={level} />}
       </div>
 
       {experience && expPercent !== null && (
-        <div className="mt-4">
-          <div className="flex justify-between text-[11px] uppercase tracking-[0.12em] text-dex-muted">
-            <span>{t("atributos.experiencia")}</span>
-            <span className="font-mono">
-              {experience.current} / {experience.max}
-            </span>
-          </div>
-          <div
-            className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10"
-            role="progressbar"
-            aria-label={t("atributos.experiencia")}
-            aria-valuemin={0}
-            aria-valuemax={experience.max ?? 0}
-            aria-valuenow={experience.current ?? 0}
-          >
-            <div
-              className="h-full rounded-full transition-[width] duration-500"
-              style={{ width: `${expPercent}%`, background: palette.accent }}
-            />
-          </div>
-          {typeof experience.total === "number" && (
-            <p
-              className="mt-1.5 flex justify-between text-[11px] uppercase tracking-[0.12em] text-dex-muted"
-              data-testid="exp-total"
-            >
-              <span>{t("atributos.expTotal")}</span>
-              <span className="font-mono">
-                {experience.total.toLocaleString(locale)}
-              </span>
-            </p>
-          )}
-        </div>
+        <BarraDeExperiencia
+          experience={experience}
+          percent={expPercent}
+          accent={palette.accent}
+        />
       )}
 
       {/*
@@ -156,6 +108,88 @@ export function StatBars({ stats, palette, level, experience }: StatBarsProps) {
         })}
       </ul>
     </section>
+  );
+}
+
+type Experiencia = NonNullable<StatBarsProps["experience"]>;
+
+/** Llenado de la barra de EXP (0-100), o `null` si falta el valor o el tope del nivel. */
+function porcentajeDeExperiencia(
+  experience: StatBarsProps["experience"],
+): number | null {
+  const current = experience?.current;
+  const max = experience?.max;
+  if (current === null || current === undefined || !max) {
+    return null;
+  }
+  return Math.min(100, Math.round((current / max) * 100));
+}
+
+/** Rango (con el siguiente en el `title`) y nivel, a la derecha del título. */
+function InsigniaDeNivel({ level }: Readonly<{ level: number }>) {
+  const { t } = useI18n();
+  const rango = rangoDelNivel(level);
+  const titulo = rango?.siguiente
+    ? t("rango.sig", {
+        rango: t(`rango.${rango.siguiente.id}`),
+        n: rango.siguiente.desde,
+      })
+    : t("rango.max");
+  return (
+    <span className="flex items-center gap-2">
+      <span
+        className="rounded-lg border border-dex-accent/50 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.1em] text-dex-accent"
+        data-testid="rango"
+        title={titulo}
+      >
+        {rango ? t(`rango.${rango.id}`) : ""}
+      </span>
+      <span className="rounded-lg border border-dex-line px-2 py-0.5 font-mono text-xs text-dex-ink">
+        {t("atributos.nivel", { n: level })}
+      </span>
+    </span>
+  );
+}
+
+function BarraDeExperiencia({
+  experience,
+  percent,
+  accent,
+}: Readonly<{ experience: Experiencia; percent: number; accent: string }>) {
+  const { t, locale } = useI18n();
+  return (
+    <div className="mt-4">
+      <div className="flex justify-between text-[11px] uppercase tracking-[0.12em] text-dex-muted">
+        <span>{t("atributos.experiencia")}</span>
+        <span className="font-mono">
+          {experience.current} / {experience.max}
+        </span>
+      </div>
+      <div
+        className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white/10"
+        role="progressbar"
+        aria-label={t("atributos.experiencia")}
+        aria-valuemin={0}
+        aria-valuemax={experience.max ?? 0}
+        aria-valuenow={experience.current ?? 0}
+      >
+        <div
+          className="h-full rounded-full transition-[width] duration-500"
+          style={{ width: `${percent}%`, background: accent }}
+        />
+      </div>
+      {typeof experience.total === "number" && (
+        <p
+          className="mt-1.5 flex justify-between text-[11px] uppercase tracking-[0.12em] text-dex-muted"
+          data-testid="exp-total"
+        >
+          <span>{t("atributos.expTotal")}</span>
+          <span className="font-mono">
+            {experience.total.toLocaleString(locale)}
+          </span>
+        </p>
+      )}
+    </div>
   );
 }
 

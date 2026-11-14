@@ -12,8 +12,7 @@
  * con transparencia para que no aparezca en la carta ni en el listado.
  */
 
-import { promises as fsP } from "node:fs";
-import fs from "node:fs";
+import fs, { promises as fsP } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
@@ -296,8 +295,10 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error("[character] ERROR", error);
     process.exit(1);
-  });
+  }
 }

@@ -196,7 +196,7 @@ function conVersion(path: string, version: number | undefined): string {
   return `${base}?${parametros.toString()}`;
 }
 
-export function ImageManager({ token, detail, onUpdated }: Props) {
+export function ImageManager({ token, detail, onUpdated }: Readonly<Props>) {
   const [busy, setBusy] = useState<ManagedKind | null>(null);
   const [dragging, setDragging] = useState<ManagedKind | null>(null);
   /** Marca de tiempo por tipo para forzar la recarga de la vista previa. */
@@ -433,7 +433,7 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
                   onClick={() => inputs.current[kind]?.click()}
                   className="rounded-lg bg-teal-500/20 px-3 py-1.5 text-xs font-semibold text-teal-100 transition hover:bg-teal-500/30 disabled:opacity-50"
                 >
-                  {working ? "Subiendo…" : info.path ? "Reemplazar" : "Subir"}
+                  {textoDeSubida(working, Boolean(info.path))}
                 </button>
                 {info.path && (
                   <button
@@ -452,4 +452,12 @@ export function ImageManager({ token, detail, onUpdated }: Props) {
       </ul>
     </section>
   );
+}
+
+/** Rótulo del botón de subida: mientras sube, «Subiendo…»; si ya hay imagen, se reemplaza. */
+function textoDeSubida(subiendo: boolean, hayImagen: boolean): string {
+  if (subiendo) {
+    return "Subiendo…";
+  }
+  return hayImagen ? "Reemplazar" : "Subir";
 }

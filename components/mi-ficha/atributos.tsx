@@ -28,11 +28,11 @@ export function AtributosPanel({
   estado,
   ocupada,
   alGuardar,
-}: {
+}: Readonly<{
   estado: EstadoDeAtributos;
   ocupada: string | null;
   alGuardar: (puntos: Record<string, number>) => void;
-}) {
+}>) {
   const { t } = useI18n();
   const [puntos, setPuntos] = useState<Record<string, number>>(estado.puntos);
 

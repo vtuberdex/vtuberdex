@@ -171,6 +171,95 @@ function serveLocal(key, etagPedido, raiz = LOCAL_IMAGE_ROOT) {
   });
 }
 
+/** 404 explícito: la imagen no está publicada (o su carpeta se retiró). */
+function noPublicada(key) {
+  return Response.json(
+    { error: "imagen_no_publicada", path: key },
+    { status: 404 },
+  );
+}
+
+/** Sirve una fila de `asset_remoto` (Turso), con 304 si el navegador ya tiene esa versión. */
+function servirRemoto(request, remoto, etagPedido) {
+  /**
+   * El `ETag` sale de la marca de la fila (`actualizado`), que es la MISMA que versiona
+   * la URL del catálogo: si el navegador manda `If-None-Match` con la versión que ya
+   * tiene, la respuesta correcta es un 304 sin cuerpo — ni la imagen viaja, ni el CDN
+   * se llena de copias nuevas solo porque cambió el query.
+   */
+  const marca = remoto.actualizado
+    ? String(remoto.actualizado).replace(/\D/g, "")
+    : "";
+  const etag = remoto.actualizado ? `"${marca}"` : null;
+  if (etag && etagPedido === etag) {
+    return new Response(null, { status: 304, headers: { etag } });
+  }
+  /**
+   * Si la URL trae la versión (`?v=`) Y coincide con la marca de la fila, el contenido de ESA
+   * URL ya no puede cambiar: reemplazar o restaurar la imagen produce otra versión y, con
+   * ella, otra URL. Se puede cachear un año como `immutable`, sin revalidar ni en el borde
+   * ni en el navegador. Sin versión, o con una versión que ya no es la vigente, se queda la
+   * caché corta de abajo (la copia vieja no puede vivir mucho).
+   */
+  const versionPedida = new URL(request.url).searchParams.get("v");
+  const versionVigente = Boolean(versionPedida) && versionPedida === marca;
+  return new Response(remoto.bytes, {
+    status: 200,
+    headers: {
+      "content-type": remoto.mime,
+      ...(etag
+        ? { etag, "last-modified": fechaDeMarca(remoto.actualizado) }
+        : {}),
+      /**
+       * Caché CORTA a propósito. El mantenedor puede reemplazar esta imagen y, al
+       * restaurarla, la copia antigua sigue viva en el CDN de Vercel: con
+       * `s-maxage=3600` el usuario veía la imagen reemplazada hasta una HORA después
+       * de haberla restaurado. Comprobado en producción (con `?bust=` salía la del
+       * catálogo y sin él la vieja). Cinco minutos de CDN y uno de navegador son
+       * suficiente protección de cuota y no dejan una imagen obsoleta a la vista.
+       */
+      "cache-control": versionVigente
+        ? "public, max-age=31536000, s-maxage=31536000, immutable"
+        : "public, max-age=60, s-maxage=300",
+      "content-length": String(remoto.bytes.byteLength),
+    },
+  });
+}
+
+/** Rama de disco (sin Turso ni Blob): reemplazos del mantenedor y luego el catálogo. */
+function servirDeDisco(key, etagPedido) {
+  /**
+   * MODO LOCAL: primero el REEMPLAZO del mantenedor, después el catálogo de `data/images/`.
+   *
+   * PRECEDENCIA: es la misma que sirve la API cuando hay Turso (`leerAssetRemoto` ordena
+   * `origen = 'mantenedor'` primero), así que la vista local y la de producción muestran la
+   * MISMA imagen. Si esta rama fuera al revés, bajar los reemplazos no serviría de nada: se
+   * seguiría viendo el catálogo.
+   *
+   * POR QUÉ LOS REEMPLAZOS NO ESTÁN EN `data/images/`
+   * ------------------------------------------------
+   * Porque ese árbol es la fuente del MANIFIESTO (`scripts/build-db.mjs` lo arma desde las filas
+   * `asset` de la base local) y el manifiesto es la lista de lo que publica
+   * `publish-images.mjs`. Tener ahí los bytes del mantenedor hacía que el publicador pudiera
+   * subirlos **como `origen = 'catalogo'`**, destruyendo la imagen original del catálogo en
+   * Turso. Aparte quedan dos cosas separadas y la contaminación es imposible, no improbable.
+   *
+   * Ninguna de las dos ramas exige estar en el manifiesto: en LOCAL el disco es la fuente de
+   * verdad —lo que hay es lo que se acaba de subir— y `isInsideRoot` sigue impidiendo salir de
+   * su carpeta. En PRODUCCIÓN el manifiesto sigue mandando y la carpeta retirada sigue dando
+   * 404: de eso se encargan las ramas de arriba, que se evalúan antes.
+   */
+  const reemplazo = serveLocal(key, etagPedido, REEMPLAZOS_IMAGE_ROOT);
+  if (reemplazo) {
+    return reemplazo;
+  }
+  const local = serveLocal(key, etagPedido);
+  if (local) {
+    return local;
+  }
+  return noPublicada(key);
+}
+
 export async function GET(request, { params }) {
   const { path: segments } = await params;
   const key = `images/${Array.isArray(segments) ? segments.join("/") : segments}`;
@@ -200,10 +289,7 @@ export async function GET(request, { params }) {
    */
   const carpeta = key.split("/")[1];
   if (!CARPETAS_PUBLICADAS.includes(carpeta)) {
-    return Response.json(
-      { error: "imagen_no_publicada", path: key },
-      { status: 404 },
-    );
+    return noPublicada(key);
   }
   const published = Boolean(resolveImageUrl(key));
 
@@ -223,51 +309,7 @@ export async function GET(request, { params }) {
   if (tursoConfigurado()) {
     const remoto = await leerAssetRemoto(key);
     if (remoto) {
-      /**
-       * El `ETag` sale de la marca de la fila (`actualizado`), que es la MISMA que versiona
-       * la URL del catálogo: si el navegador manda `If-None-Match` con la versión que ya
-       * tiene, la respuesta correcta es un 304 sin cuerpo — ni la imagen viaja, ni el CDN
-       * se llena de copias nuevas solo porque cambió el query.
-       */
-      const etag = remoto.actualizado
-        ? `"${String(remoto.actualizado).replace(/[^0-9]/g, "")}"`
-        : null;
-      if (etag && etagPedido === etag) {
-        return new Response(null, { status: 304, headers: { etag } });
-      }
-      /**
-       * Si la URL trae la versión (`?v=`) Y coincide con la marca de la fila, el contenido de ESA
-       * URL ya no puede cambiar: reemplazar o restaurar la imagen produce otra versión y, con
-       * ella, otra URL. Se puede cachear un año como `immutable`, sin revalidar ni en el borde
-       * ni en el navegador. Sin versión, o con una versión que ya no es la vigente, se queda la
-       * caché corta de abajo (la copia vieja no puede vivir mucho).
-       */
-      const versionPedida = new URL(request.url).searchParams.get("v");
-      const marca = remoto.actualizado
-        ? String(remoto.actualizado).replace(/\D/g, "")
-        : "";
-      const versionVigente = Boolean(versionPedida) && versionPedida === marca;
-      return new Response(remoto.bytes, {
-        status: 200,
-        headers: {
-          "content-type": remoto.mime,
-          ...(etag
-            ? { etag, "last-modified": fechaDeMarca(remoto.actualizado) }
-            : {}),
-          /**
-           * Caché CORTA a propósito. El mantenedor puede reemplazar esta imagen y, al
-           * restaurarla, la copia antigua sigue viva en el CDN de Vercel: con
-           * `s-maxage=3600` el usuario veía la imagen reemplazada hasta una HORA después
-           * de haberla restaurado. Comprobado en producción (con `?bust=` salía la del
-           * catálogo y sin él la vieja). Cinco minutos de CDN y uno de navegador son
-           * suficiente protección de cuota y no dejan una imagen obsoleta a la vista.
-           */
-          "cache-control": versionVigente
-            ? "public, max-age=31536000, s-maxage=31536000, immutable"
-            : "public, max-age=60, s-maxage=300",
-          "content-length": String(remoto.bytes.byteLength),
-        },
-      });
+      return servirRemoto(request, remoto, etagPedido);
     }
     /**
      * Con Turso configurado, lo que no está en la base NO se busca en otro sitio: se
@@ -275,53 +317,15 @@ export async function GET(request, { params }) {
      * quedó **bloqueada** (`403 Your store is blocked`), ese rodeo convertía una imagen
      * que falta en un error ajeno y confuso en vez de decir que no está.
      */
-    return Response.json(
-      { error: "imagen_no_publicada", path: key },
-      { status: 404 },
-    );
+    return noPublicada(key);
   }
 
   if (usesLocalImages()) {
-    /**
-     * MODO LOCAL: primero el REEMPLAZO del mantenedor, después el catálogo de `data/images/`.
-     *
-     * PRECEDENCIA: es la misma que sirve la API cuando hay Turso (`leerAssetRemoto` ordena
-     * `origen = 'mantenedor'` primero), así que la vista local y la de producción muestran la
-     * MISMA imagen. Si esta rama fuera al revés, bajar los reemplazos no serviría de nada: se
-     * seguiría viendo el catálogo.
-     *
-     * POR QUÉ LOS REEMPLAZOS NO ESTÁN EN `data/images/`
-     * ------------------------------------------------
-     * Porque ese árbol es la fuente del MANIFIESTO (`scripts/build-db.mjs` lo arma desde las filas
-     * `asset` de la base local) y el manifiesto es la lista de lo que publica
-     * `publish-images.mjs`. Tener ahí los bytes del mantenedor hacía que el publicador pudiera
-     * subirlos **como `origen = 'catalogo'`**, destruyendo la imagen original del catálogo en
-     * Turso. Aparte quedan dos cosas separadas y la contaminación es imposible, no improbable.
-     *
-     * Ninguna de las dos ramas exige estar en el manifiesto: en LOCAL el disco es la fuente de
-     * verdad —lo que hay es lo que se acaba de subir— y `isInsideRoot` sigue impidiendo salir de
-     * su carpeta. En PRODUCCIÓN el manifiesto sigue mandando y la carpeta retirada sigue dando
-     * 404: de eso se encargan las ramas de arriba, que se evalúan antes.
-     */
-    const reemplazo = serveLocal(key, etagPedido, REEMPLAZOS_IMAGE_ROOT);
-    if (reemplazo) {
-      return reemplazo;
-    }
-    const local = serveLocal(key, etagPedido);
-    if (local) {
-      return local;
-    }
-    return Response.json(
-      { error: "imagen_no_publicada", path: key },
-      { status: 404 },
-    );
+    return servirDeDisco(key, etagPedido);
   }
 
   if (!published) {
-    return Response.json(
-      { error: "imagen_no_publicada", path: key },
-      { status: 404 },
-    );
+    return noPublicada(key);
   }
 
   return new Response(null, {

@@ -1,11 +1,19 @@
 // Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 import sharp from "sharp";
 import fs from "node:fs";
+/** Orden por unidades de código (el de `<`): la muestra no depende del locale. */
+function compararNombres(a, b) {
+  if (a < b) {
+    return -1;
+  }
+  return a > b ? 1 : 0;
+}
+
 // Muestra aleatoria determinista amplia: 24 logos
 const all = fs
   .readdirSync("../data/images/logo")
   .filter((f) => f.endsWith(".webp"))
-  .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  .sort(compararNombres);
 const step = Math.floor(all.length / 24);
 const picks = all.filter((_, i) => i % step === 0).slice(0, 24);
 const COLS = 4,
@@ -16,8 +24,7 @@ const COLS = 4,
 // Salida dentro del repo (`scraper/out/`, ignorado): /tmp es escribible por cualquiera.
 fs.mkdirSync("out", { recursive: true });
 const comps = [];
-for (let i = 0; i < picks.length; i++) {
-  const f = picks[i];
+for (const [i, f] of picks.entries()) {
   const col = i % COLS,
     row = Math.floor(i / COLS);
   const x = col * (W + PAD) + PAD,
@@ -25,13 +32,17 @@ for (let i = 0; i < picks.length; i++) {
   const svg = Buffer.from(
     `<svg width="${W}" height="${LH}"><text x="2" y="13" font-size="12" fill="#8ef">${f.replace(".webp", "")}</text></svg>`,
   );
-  comps.push({ input: svg, top: y, left: x });
-  // fondo gris para ver transparencia
-  comps.push({
-    input: { create: { width: W, height: H, channels: 3, background: "#555" } },
-    top: y + LH,
-    left: x,
-  });
+  comps.push(
+    { input: svg, top: y, left: x },
+    // fondo gris para ver transparencia
+    {
+      input: {
+        create: { width: W, height: H, channels: 3, background: "#555" },
+      },
+      top: y + LH,
+      left: x,
+    },
+  );
   try {
     const buf = await sharp(`../data/images/logo/${f}`)
       .resize({ width: W, height: H, fit: "inside" })

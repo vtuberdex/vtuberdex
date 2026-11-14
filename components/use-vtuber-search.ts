@@ -15,7 +15,6 @@ import {
 import { guardarCatalogo } from "@/lib/volver-al-catalogo";
 import {
   DEFAULT_PER_PAGE,
-  DEFAULT_SEARCH,
   searchParamsFromUrl,
   searchParamsToUrl,
 } from "@/lib/query";
@@ -194,4 +193,4 @@ export function useVtuberSearch({
   return { params, data, loading, error, setParams, reset, goToPage };
 }
 
-export { DEFAULT_SEARCH };
+export { DEFAULT_SEARCH } from "@/lib/query";

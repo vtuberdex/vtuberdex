@@ -104,7 +104,7 @@ function resumenDeFicha(f) {
 /** Qué fichas se parecen a lo que escribió la persona, para elegir a mano cuando no se resuelve sola. */
 export function candidatasParaReferencia(db, referencia, limite = 6) {
   const texto = String(referencia ?? "").trim();
-  const dex = texto.match(/#\s*(\d{1,4})\b/)?.[1];
+  const dex = /#\s*(\d{1,4})\b/.exec(texto)?.[1];
   const sinDex = texto
     .replace(/#\s*\d{1,4}\b/, " ")
     .replace(/\s+/g, " ")
@@ -140,30 +140,38 @@ export function cambiosDeModificacion(actual, patch) {
     agregar(etiqueta, comoTexto(actual[clave]), comoTexto(patch[clave]));
   }
   if (patch.profile) {
-    const antes = new Map(
-      (actual.profile ?? []).map((f) => [normalizeText(f.label), f.value]),
-    );
-    for (const fila of patch.profile) {
-      agregar(
-        `Gusto · ${fila.label}`,
-        antes.get(normalizeText(fila.label)) ?? "",
-        fila.value,
-      );
-    }
+    cambiosDeGustos(actual.profile, patch.profile, agregar);
   }
   if (patch.socials) {
-    const antes = new Map(
-      (actual.socials ?? []).map((r) => [normalizeText(r.platform), r.url]),
-    );
-    for (const red of patch.socials) {
-      agregar(
-        `Red · ${red.label ?? red.platform}`,
-        antes.get(normalizeText(red.platform)) ?? "",
-        red.url,
-      );
-    }
+    cambiosDeRedes(actual.socials, patch.socials, agregar);
   }
   return cambios;
+}
+
+function cambiosDeGustos(perfilActual, perfilNuevo, agregar) {
+  const antes = new Map(
+    (perfilActual ?? []).map((f) => [normalizeText(f.label), f.value]),
+  );
+  for (const fila of perfilNuevo) {
+    agregar(
+      `Gusto · ${fila.label}`,
+      antes.get(normalizeText(fila.label)) ?? "",
+      fila.value,
+    );
+  }
+}
+
+function cambiosDeRedes(redesActuales, redesNuevas, agregar) {
+  const antes = new Map(
+    (redesActuales ?? []).map((r) => [normalizeText(r.platform), r.url]),
+  );
+  for (const red of redesNuevas) {
+    agregar(
+      `Red · ${red.label ?? red.platform}`,
+      antes.get(normalizeText(red.platform)) ?? "",
+      red.url,
+    );
+  }
 }
 
 function vistaInscripcion(db, solicitud, base) {
@@ -207,49 +215,26 @@ function vistaInscripcion(db, solicitud, base) {
   };
 }
 
-function vistaModificacion(db, solicitud, base, { fichaSlug }) {
-  let ficha = null;
-  try {
-    ficha = fichaSlug
-      ? getVtuberBySlug(db, fichaSlug, { includeHidden: true })
-      : fichaDeLaSolicitud(db, solicitud.datos.ficha);
-    if (!ficha) {
-      throw new SolicitudError(
-        404,
-        "ficha_no_encontrada",
-        "no se encontró esa ficha",
-      );
-    }
-  } catch (error) {
-    if (!(error instanceof SolicitudError)) {
-      throw error;
-    }
-    return {
-      ...base,
-      puedeAprobar: false,
-      problema: {
-        codigo: error.code,
-        mensaje: `No se encontró la ficha «${solicitud.datos.ficha}». ${error.detail === "no se encontró esa ficha" ? "Elige cuál es" : error.detail}.`,
-      },
-      candidatas: candidatasParaReferencia(db, solicitud.datos.ficha),
-    };
+/**
+ * La ficha que tocaría la modificación: la elegida a mano (`fichaSlug`) o la que escribió la persona.
+ * Lanza `SolicitudError` si no se resuelve.
+ */
+function fichaDeModificacion(db, solicitud, fichaSlug) {
+  const ficha = fichaSlug
+    ? getVtuberBySlug(db, fichaSlug, { includeHidden: true })
+    : fichaDeLaSolicitud(db, solicitud.datos.ficha);
+  if (!ficha) {
+    throw new SolicitudError(
+      404,
+      "ficha_no_encontrada",
+      "no se encontró esa ficha",
+    );
   }
+  return ficha;
+}
 
-  const { patch, imagenes } = prepararModificacion(db, solicitud, { ficha });
-  const parsed = vtuberUpdateSchema.safeParse(patch);
-  const salida = { ...base, ficha: resumenDeFicha(ficha), imagenes };
-  if (!parsed.success) {
-    return {
-      ...salida,
-      puedeAprobar: false,
-      problema: {
-        codigo: "payload_invalido",
-        mensaje: "Los cambios propuestos no cumplen el formato.",
-        detalles: formatIssues(parsed.error),
-      },
-    };
-  }
-  const cambios = cambiosDeModificacion(ficha, parsed.data);
+/** Lo que conviene mirar antes de aprobar una modificación (no impide aprobarla). */
+function avisosDeModificacion(cambios, imagenes, ficha) {
   const avisos = [];
   if (cambios.length === 0) {
     avisos.push(
@@ -270,6 +255,48 @@ function vistaModificacion(db, solicitud, base, { fichaSlug }) {
       "La ficha no está publicada: los cambios no se verán en el catálogo hasta que lo esté.",
     );
   }
+  return avisos;
+}
+
+function vistaModificacion(db, solicitud, base, { fichaSlug }) {
+  let ficha = null;
+  try {
+    ficha = fichaDeModificacion(db, solicitud, fichaSlug);
+  } catch (error) {
+    if (!(error instanceof SolicitudError)) {
+      throw error;
+    }
+    const pista =
+      error.detail === "no se encontró esa ficha"
+        ? "Elige cuál es"
+        : error.detail;
+    return {
+      ...base,
+      puedeAprobar: false,
+      problema: {
+        codigo: error.code,
+        mensaje: `No se encontró la ficha «${solicitud.datos.ficha}». ${pista}.`,
+      },
+      candidatas: candidatasParaReferencia(db, solicitud.datos.ficha),
+    };
+  }
+
+  const { patch, imagenes } = prepararModificacion(db, solicitud, { ficha });
+  const parsed = vtuberUpdateSchema.safeParse(patch);
+  const salida = { ...base, ficha: resumenDeFicha(ficha), imagenes };
+  if (!parsed.success) {
+    return {
+      ...salida,
+      puedeAprobar: false,
+      problema: {
+        codigo: "payload_invalido",
+        mensaje: "Los cambios propuestos no cumplen el formato.",
+        detalles: formatIssues(parsed.error),
+      },
+    };
+  }
+  const cambios = cambiosDeModificacion(ficha, parsed.data);
+  const avisos = avisosDeModificacion(cambios, imagenes, ficha);
 
   const corrida = simular(db, () => aplicarParche(db, ficha.id, parsed.data));
   if (!corrida.ok) {
@@ -307,6 +334,8 @@ function vistaBaja(db, solicitud, base) {
     avisos.unshift(
       `No se encontró la ficha «${escrita}»: ubícala a mano desde «Fichas».`,
     );
+  } else {
+    // Ficha escrita y encontrada: no hace falta avisar de nada más.
   }
   return { ...base, ficha: ficha ? resumenDeFicha(ficha) : null, avisos };
 }

@@ -7,10 +7,10 @@ const FALLBACK_FLAG = "🏳️";
 export function CountryBadge({
   country,
   showName = false,
-}: {
+}: Readonly<{
   country: CountryRef;
   showName?: boolean;
-}) {
+}>) {
   const flag = country.flag?.trim() || FALLBACK_FLAG;
   return (
     <span

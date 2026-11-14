@@ -60,6 +60,7 @@ export function SideMenu() {
   const panel = useRef<HTMLElement>(null);
 
   const cerrar = useCallback(() => setAbierto(false), []);
+  const titulo = t("menu.titulo");
 
   // Navegar cierra el menú (el enlace puede ser a la misma ruta con otro querystring).
   useEffect(() => {
@@ -68,7 +69,7 @@ export function SideMenu() {
 
   useEffect(() => {
     if (!abierto) {
-      return;
+      return undefined;
     }
     const boton_ = boton.current;
     const anterior = document.body.style.overflow;
@@ -91,13 +92,15 @@ export function SideMenu() {
         return;
       }
       const primero = items[0];
-      const ultimo = items[items.length - 1];
-      if (e.shiftKey && document.activeElement === primero) {
+      const ultimo = items.at(-1) ?? primero;
+      // Tab en el último vuelve al primero y Mayús+Tab en el primero salta al último; en
+      // cualquier otro elemento el navegador mueve el foco solo.
+      const desborda = e.shiftKey
+        ? document.activeElement === primero
+        : document.activeElement === ultimo;
+      if (desborda) {
         e.preventDefault();
-        ultimo.focus();
-      } else if (!e.shiftKey && document.activeElement === ultimo) {
-        e.preventDefault();
-        primero.focus();
+        (e.shiftKey ? ultimo : primero).focus();
       }
     };
     document.addEventListener("keydown", alTeclear);
@@ -153,12 +156,12 @@ export function SideMenu() {
               id={idPanel}
               role="dialog"
               aria-modal="true"
-              aria-label={t("menu.titulo")}
+              aria-label={titulo}
               className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-r border-dex-line/80 bg-dex-void shadow-2xl"
             >
               <div className="flex h-14 shrink-0 items-center justify-between border-b border-dex-line/80 px-4">
                 <span className="font-heading text-sm uppercase tracking-[0.2em] text-dex-ink">
-                  {t("menu.titulo")}
+                  {titulo}
                 </span>
                 <button
                   type="button"
@@ -181,7 +184,7 @@ export function SideMenu() {
                 </button>
               </div>
               <nav
-                aria-label={t("menu.titulo")}
+                aria-label={titulo}
                 className="flex-1 overflow-y-auto px-2 py-3"
               >
                 {GRUPOS.map((grupo, i) => (

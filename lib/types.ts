@@ -141,8 +141,11 @@ export interface StatRow {
   position: number;
 }
 
+/** Tipo de habilidad de la ficha (las `other` son las que no encajan en el kit). */
+export type SkillCategory = "active" | "passive" | "ultimate" | "other";
+
 export interface SkillRow {
-  category: "active" | "passive" | "ultimate" | "other";
+  category: SkillCategory;
   section: string | null;
   type: string | null;
   name: string | null;
@@ -162,7 +165,7 @@ export interface SocialRow {
 }
 
 export interface AssetRow {
-  kind: "character" | "card" | "thumb" | "logo" | "radar" | "background";
+  kind: UploadKind;
   path: string;
   sourceUrl: string | null;
   width: number | null;

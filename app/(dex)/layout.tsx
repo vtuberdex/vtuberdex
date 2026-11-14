@@ -12,9 +12,9 @@ import { AppHeader } from "@/components/app-header";
  */
 export default function CatalogLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="dex-grid relative min-h-screen">
       <div className="relative z-10">

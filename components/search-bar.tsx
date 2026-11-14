@@ -26,7 +26,7 @@ export function SearchBar({
   total,
   loading = false,
   placeholder,
-}: SearchBarProps) {
+}: Readonly<SearchBarProps>) {
   const { t } = useI18n();
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,7 +40,7 @@ export function SearchBar({
 
   useEffect(() => {
     if (draft === value) {
-      return;
+      return undefined;
     }
     const timer = window.setTimeout(
       () => onChangeRef.current(draft),

@@ -93,8 +93,8 @@ function textoAjustado(
   tamano: number,
   peso: string,
 ) {
-  const medir = (px: number) => {
-    ctx.font = `${peso} ${px}px ${FUENTE}`;
+  const medir = (tam: number) => {
+    ctx.font = `${peso} ${tam}px ${FUENTE}`;
     return ctx.measureText(texto).width;
   };
   const px = ajustarFuente(medir, ancho, tamano, Math.round(tamano * 0.55));
@@ -170,6 +170,33 @@ interface Coordenadas {
   aY: (y: number) => number;
 }
 
+/** Papel, tinta y filete: la Black Label tiene su juego propio; el resto, el papel claro. */
+function coloresDeEtiqueta(negra: boolean) {
+  const { label } = PREMIUM;
+  if (negra) {
+    return label.black;
+  }
+  return {
+    paper: label.paper,
+    ink: label.ink,
+    mutedInk: label.mutedInk,
+    line: null,
+  };
+}
+
+/** Rótulo de la banda: BLACK LABEL, DETERIORADA (grados 5…1) o PREMIUM. */
+function tipoDeEtiqueta(negra: boolean, degradada: boolean): string {
+  if (negra) {
+    return "BLACK LABEL";
+  }
+  return degradada ? "DETERIORADA" : "PREMIUM";
+}
+
+/** Con el deterioro avanzado la bandera del país deja de imprimirse (`DETERIORO.hideCountryFrom`). */
+function paisVisible<T>(pais: T, severidad: number): T | null {
+  return pais && severidad >= DETERIORO.hideCountryFrom ? null : pais;
+}
+
 function dibujarEtiqueta(
   ctx: CanvasRenderingContext2D,
   layout: SlabLayout,
@@ -179,14 +206,7 @@ function dibujarEtiqueta(
   const { label } = PREMIUM;
   const { grade, cert, since } = datos.premium;
   const negra = esBlackLabel(grade);
-  const colores = negra
-    ? label.black
-    : {
-        paper: label.paper,
-        ink: label.ink,
-        mutedInk: label.mutedInk,
-        line: null,
-      };
+  const colores = coloresDeEtiqueta(negra);
   const r = layout.label;
   const x = c.aX(r.x - r.w / 2);
   const y = c.aY(r.y + r.h / 2);
@@ -225,7 +245,7 @@ function dibujarEtiqueta(
   ctx.font = `700 ${Math.round(bandaH * 0.4)}px ${FUENTE}`;
   const degradada = esGradoDegradado(grade);
   ctx.fillText(
-    negra ? "BLACK LABEL" : degradada ? "DETERIORADA" : "PREMIUM",
+    tipoDeEtiqueta(negra, degradada),
     x + w - pad,
     y + bandaH / 2 + 1,
   );
@@ -262,10 +282,7 @@ function dibujarEtiqueta(
   const severidad = severidadDeGrado(grade);
   const semilla = semillaDeCarta(Number(cert.replace(/\D/g, "")) || 0, grade);
   const nombre = corromperTexto(datos.name.toUpperCase(), severidad, semilla);
-  const pais =
-    datos.country && severidad >= DETERIORO.hideCountryFrom
-      ? null
-      : datos.country;
+  const pais = paisVisible(datos.country, severidad);
   ctx.fillText(
     textoAjustado(ctx, nombre, anchoTexto, Math.round(resto * 0.26), "800"),
     x + pad,

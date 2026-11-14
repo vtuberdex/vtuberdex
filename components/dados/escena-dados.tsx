@@ -14,7 +14,7 @@
  * deshaciendo hasta la orientación final exacta (`orientacionFinal`), mientras rebota cada vez más
  * bajo. Al terminar, la cara de arriba es la del resultado sin aproximaciones.
  */
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree, type RootState } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import {
   CanvasTexture,
@@ -142,7 +142,7 @@ function sombraCompartida(): CanvasTexture {
   return texturaSombra;
 }
 
-function Dado({ dado, x, z }: { dado: DadoEnMesa; x: number; z: number }) {
+function Dado({ dado, x, z }: Readonly<{ dado: DadoEnMesa; x: number; z: number }>) {
   const grupo = useRef<Group>(null);
   const sombra = useRef<Mesh>(null);
   const humo = useRef<Mesh>(null);
@@ -210,9 +210,7 @@ function Dado({ dado, x, z }: { dado: DadoEnMesa; x: number; z: number }) {
       return;
     }
     const ahora = state.clock.elapsedTime;
-    if (inicio.current === null) {
-      inicio.current = ahora;
-    }
+    inicio.current ??= ahora;
     const t = dado.animar
       ? Math.min(1, (ahora - inicio.current) / plan.duracion)
       : 1;
@@ -239,10 +237,10 @@ function Dado({ dado, x, z }: { dado: DadoEnMesa; x: number; z: number }) {
         ESCENA.sombra.opacidad / (1 + altura * 0.9);
     }
 
-    const material = humo.current?.material as
+    const materialDelHumo = humo.current?.material as
       ReturnType<typeof crearMaterialDeHumo> | undefined;
-    if (material) {
-      material.uniforms.uTiempo.value = ahora;
+    if (materialDelHumo) {
+      materialDelHumo.uniforms.uTiempo.value = ahora;
     }
     if (luz.current) {
       luz.current.color.copy(colorDelHumo(dado.semilla, ahora, color));
@@ -345,7 +343,7 @@ export function distanciaDeCamara(n: number): number {
 }
 
 /** Acerca o aleja la cámara con suavidad cuando cambia la bandeja (sin saltos). */
-function CamaraAjustada({ n }: { n: number }) {
+function CamaraAjustada({ n }: Readonly<{ n: number }>) {
   const destino = useMemo(
     () =>
       new Vector3(...ESCENA.camara.posicion).multiplyScalar(
@@ -360,13 +358,16 @@ function CamaraAjustada({ n }: { n: number }) {
   return null;
 }
 
+/** Al crear el canvas la cámara ya mira al centro de la mesa (luego la sigue `CamaraAjustada`). */
+const mirarAlCentro = ({ camera }: RootState) => camera.lookAt(0, 0, 0.4);
+
 export function EscenaDados({
   dados,
   semillaMesa,
-}: {
+}: Readonly<{
   dados: DadoEnMesa[];
   semillaMesa: number;
-}) {
+}>) {
   const posiciones = posicionesEnMesa(dados.length, semillaMesa);
   return (
     <Canvas
@@ -377,7 +378,7 @@ export function EscenaDados({
           .toArray() as [number, number, number],
         fov: ESCENA.camara.fov,
       }}
-      onCreated={({ camera }) => camera.lookAt(0, 0, 0.4)}
+      onCreated={mirarAlCentro}
       gl={{ antialias: true }}
       style={{ background: "#07080d" }}
     >

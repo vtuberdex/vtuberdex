@@ -53,11 +53,11 @@ function leerGuardado(): string | null {
 export function I18nProvider({
   children,
   inicial,
-}: {
+}: Readonly<{
   children: ReactNode;
   inicial?: Locale;
-}) {
-  const [locale, setLocaleEstado] = useState<Locale>(
+}>) {
+  const [localeEstado, setLocaleEstado] = useState<Locale>(
     inicial ?? LOCALE_POR_DEFECTO,
   );
 
@@ -76,8 +76,8 @@ export function I18nProvider({
   }, [inicial]);
 
   useEffect(() => {
-    document.documentElement.lang = BCP47[locale];
-  }, [locale]);
+    document.documentElement.lang = BCP47[localeEstado];
+  }, [localeEstado]);
 
   const setLocale = useCallback((nuevo: Locale) => {
     if (!esLocale(nuevo)) {
@@ -93,11 +93,11 @@ export function I18nProvider({
 
   const valor = useMemo<ContextoI18n>(
     () => ({
-      locale,
+      locale: localeEstado,
       setLocale,
-      t: (clave, variables) => traducir(locale, clave, variables),
+      t: (clave, variables) => traducir(localeEstado, clave, variables),
     }),
-    [locale, setLocale],
+    [localeEstado, setLocale],
   );
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }

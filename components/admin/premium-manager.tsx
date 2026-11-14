@@ -28,23 +28,21 @@ import {
   GRADOS_DEGRADADOS,
   GRADO_DE_BAJA,
   GRADO_INICIAL,
-  esGradoDegradado,
-  gradoSiguiente,
-  leyendaDePremium,
-  mesesEntre,
-  mismoMes,
   nombreDeGrado,
-  textoDeRacha,
 } from "@/lib/premium";
 import type { PremiumGrade, VtuberCard } from "@/lib/types";
-import { PremiumBadge } from "@/components/premium-badge";
 import {
-  Reason,
   ghostButton,
   inputClass,
   labelClass,
   primaryButton,
 } from "@/components/admin/ui";
+import {
+  COLUMNAS,
+  dexTexto,
+  Fila,
+  type Guardar,
+} from "@/components/admin/premium-fila";
 import {
   FILTROS,
   ORDENES,
@@ -58,22 +56,10 @@ import {
 } from "@/components/admin/premium-lista";
 
 type Notify = (kind: "ok" | "error", text: string) => void;
-type Guardar = (
-  row: VtuberCard,
-  premium: { grade: PremiumGrade } | null,
-  okText: string,
-) => Promise<void>;
 
 /** Tamaño de página que se pide a la API; se pide página tras página hasta traerlas TODAS (antes se cortaba en 100). */
 const PEDIDO_POR_PAGINA = 100;
 const MAX_PAGINAS_PEDIDAS = 30;
-
-const dexTexto = (n: number) => `#${String(n).padStart(3, "0")}`;
-/**
- * Columnas de la lista en pantallas anchas. La última es de ANCHO FIJO (no `auto`): con `auto` el encabezado y las
- * filas calculaban anchos distintos y los títulos quedaban desalineados de sus datos.
- */
-const COLUMNAS = "md:grid-cols-[3.5rem_minmax(0,1fr)_5rem_9rem_15rem]";
 
 async function cargarTodas(
   token: string,
@@ -94,369 +80,351 @@ async function cargarTodas(
   return todas;
 }
 
-/** El aviso bajo la fecha del último cambio de grado; ninguno si la ficha está degradada. */
-function avisoDeGrado(
-  premium: NonNullable<VtuberCard["premium"]>,
-  siguiente: ReturnType<typeof gradoSiguiente>,
-): { texto: string; clase: string } | null {
-  if (esGradoDegradado(premium.grade)) {
-    return null;
+/** Color del filtro: el activo, «Por subir» con trabajo pendiente (resaltado) o uno cualquiera. */
+function claseDeFiltro(activo: boolean, importante: boolean): string {
+  if (activo) {
+    return "border-dex-accent bg-dex-accent/15 text-dex-ink";
   }
-  if (siguiente === null) {
-    return { texto: "grado máximo", clase: "text-dex-muted" };
-  }
-  if (mismoMes(premium.gradedAt)) {
-    return { texto: "✓ subió este mes", clase: "text-emerald-300" };
-  }
-  return { texto: "por revisar", clase: "text-amber-200" };
+  return importante
+    ? "border-amber-300/50 text-amber-200 hover:bg-amber-300/10"
+    : "border-dex-line text-dex-muted hover:text-dex-ink";
 }
 
-/** Cuándo se cambió el grado por última vez y si toca revisarla este mes. */
-function UltimoCambio({ row }: { row: VtuberCard }) {
-  const premium = row.premium;
-  if (!premium) {
-    return null;
-  }
-  const siguiente = gradoSiguiente(premium.grade);
-  const aviso = avisoDeGrado(premium, siguiente);
-  return (
-    <span className="flex flex-col leading-tight">
-      <span className="font-mono text-xs text-dex-ink">{premium.gradedAt}</span>
-      {aviso && (
-        <span className={`text-[11px] ${aviso.clase}`}>{aviso.texto}</span>
-      )}
-    </span>
-  );
-}
+type Conteo = ReturnType<typeof contarPorFiltro>;
 
-/** El panel «Más»: lo que no se usa cada mes. */
-function PanelMas({
-  row,
-  busy,
-  guardar,
-  confirmando,
-  setConfirmando,
-}: {
-  row: VtuberCard;
-  busy: boolean;
-  guardar: Guardar;
-  confirmando: boolean;
-  setConfirmando: (valor: boolean) => void;
-}) {
-  const premium = row.premium!;
-  const degradada = esGradoDegradado(premium.grade);
-  const siguiente = gradoSiguiente(premium.grade);
-  // Arranca en el deterioro MÁS LEVE: el grado 1 (la baja) deja la ficha sin página pública y con el nombre oculto,
-  // así que nunca debe ser el valor por defecto de un botón. Para el 1 se pide confirmación (ver abajo).
-  const [gradoDeterioro, setGradoDeterioro] = useState<PremiumGrade>(
-    GRADOS_DEGRADADOS[0],
-  );
-  const [confirmandoBaja, setConfirmandoBaja] = useState(false);
-  const esBaja = gradoDeterioro === GRADO_DE_BAJA;
-
+function CabeceraDePremium({
+  total,
+  porSubir,
+  altaVisible,
+  onAlternarAlta,
+}: Readonly<{
+  total: number;
+  /** `null` mientras no ha cargado. */
+  porSubir: number | null;
+  altaVisible: boolean;
+  onAlternarAlta: () => void;
+}>) {
   return (
-    <div
-      className="grid gap-4 border-t border-dex-line/70 px-3 py-3 text-xs md:grid-cols-3"
-      data-testid="premium-mas"
-    >
-      <div className="space-y-1 text-dex-muted">
-        <p className="font-bold uppercase tracking-[0.14em]">Detalles</p>
-        <p>
-          Certificado{" "}
-          <span className="font-mono text-dex-ink">{premium.cert}</span>
-        </p>
-        <p>
-          {degradada ? "Degradada" : "Premium"} desde {premium.since} (
-          {mesesEntre(premium.since)} meses)
-        </p>
-        <p>Último cambio de grado: {premium.gradedAt}</p>
-        {siguiente && mismoMes(premium.gradedAt) && !degradada && (
-          <div className="pt-1">
-            <Reason>
-              Ya cambió de grado este mes ({premium.gradedAt}): sube otra vez
-              solo si de verdad corresponde.
-            </Reason>
-          </div>
+    <header className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">
+          Cartas premium <span className="font-mono text-dex-ink">{total}</span>
+        </h2>
+        {porSubir !== null && porSubir > 0 && (
+          <p className="mt-0.5 text-xs text-amber-200">
+            {porSubir}{" "}
+            {porSubir === 1 ? "carta pendiente" : "cartas pendientes"} de
+            revisar este mes.
+          </p>
         )}
       </div>
+      <button
+        type="button"
+        className={altaVisible ? ghostButton : primaryButton}
+        aria-expanded={altaVisible}
+        onClick={onAlternarAlta}
+      >
+        {altaVisible && total > 0 ? "Cerrar" : "+ Nueva premium"}
+      </button>
+    </header>
+  );
+}
 
-      <div className="space-y-1">
+function AltaDePremium({
+  query,
+  onQuery,
+  grade,
+  onGrade,
+  gradeDeterioro,
+  onGradeDeterioro,
+  candidates,
+  busyId,
+  save,
+}: Readonly<{
+  query: string;
+  onQuery: (query: string) => void;
+  grade: PremiumGrade;
+  onGrade: (grade: PremiumGrade) => void;
+  gradeDeterioro: PremiumGrade;
+  onGradeDeterioro: (grade: PremiumGrade) => void;
+  candidates: VtuberCard[];
+  busyId: number | null;
+  save: Guardar;
+}>) {
+  return (
+    <section
+      className="space-y-3 rounded-2xl border border-dex-accent/40 bg-dex-panel/60 p-4"
+      data-testid="premium-alta"
+    >
+      <p className="text-xs text-dex-muted">
+        Escribe el nombre, el número o el código{" "}
+        <span className="font-mono">VTD-016</span> que el donante puso en la
+        nota de PayPal. Lo normal es entrar con el {GRADO_INICIAL}; sube medio
+        punto por mes.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-[1fr_12rem]">
         <label className={labelClass}>
-          Fijar grado
+          Buscar ficha{" "}
+          <input
+            value={query}
+            onChange={(event) => onQuery(event.target.value)}
+            className={inputClass}
+            placeholder="nombre, número o código VTD-…"
+            aria-label="Buscar ficha para hacerla premium"
+          />
+        </label>
+        <label className={labelClass}>
+          Grado inicial{" "}
           <select
-            aria-label={`Grado de ${row.name}`}
-            value={premium.grade}
-            disabled={busy}
-            onChange={(event) =>
-              guardar(
-                row,
-                { grade: event.target.value as PremiumGrade },
-                `${row.name}: grado ${event.target.value}.`,
-              )
-            }
-            className={`${inputClass} w-32`}
+            aria-label="Grado inicial"
+            value={grade}
+            onChange={(event) => onGrade(event.target.value as PremiumGrade)}
+            className={inputClass}
           >
-            <optgroup label="Deterioro">
-              {GRADOS_DEGRADADOS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Premium">
-              {GRADOS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </optgroup>
+            {GRADOS.map((item) => (
+              <option key={item} value={item}>
+                {item === "BL" ? "BL · Black Label" : item}
+              </option>
+            ))}
           </select>
         </label>
-        <p className="text-[11px] text-dex-muted">
-          Para corregir un error o registrar a quien ya donaba.
-        </p>
       </div>
-
-      <div className="space-y-2">
-        {degradada ? (
-          <button
-            type="button"
-            className={ghostButton}
-            disabled={busy || premium.grade === GRADO_DE_BAJA}
-            onClick={() =>
-              guardar(
-                row,
-                { grade: GRADO_DE_BAJA },
-                `${row.name} queda ilegible (grado ${GRADO_DE_BAJA}).`,
-              )
-            }
+      <ul
+        className="dex-scroll max-h-64 space-y-1 overflow-y-auto"
+        data-testid="premium-candidates"
+      >
+        {candidates.map((candidate) => (
+          <li
+            key={candidate.id}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-dex-muted hover:bg-white/5"
           >
-            {premium.grade === GRADO_DE_BAJA
-              ? "Ya está en el grado 1"
-              : "Llevar al grado 1 (baja)"}
-          </button>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              aria-label={`Grado de deterioro de ${row.name}`}
-              value={gradoDeterioro}
-              onChange={(event) => {
-                setGradoDeterioro(event.target.value as PremiumGrade);
-                setConfirmandoBaja(false);
-              }}
-              className={`${inputClass} !mt-0 w-auto`}
-            >
-              {GRADOS_DEGRADADOS.map((item) => (
-                <option key={item} value={item}>
-                  {item === GRADO_DE_BAJA
-                    ? "1 · ilegible (baja)"
-                    : `${item} · ${nombreDeGrado(item)}`}
-                </option>
-              ))}
-            </select>
+            <span className="font-mono text-[11px]">
+              {dexTexto(candidate.dexNumber)}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-dex-ink">
+              {candidate.name}
+            </span>
             <button
               type="button"
-              className={ghostButton}
-              disabled={busy}
+              className={primaryButton}
+              disabled={busyId === candidate.id}
               onClick={() =>
-                esBaja
-                  ? setConfirmandoBaja(true)
-                  : guardar(
-                      row,
-                      { grade: gradoDeterioro },
-                      `${row.name} queda degradada (${gradoDeterioro}).`,
-                    )
-              }
-            >
-              {esBaja ? "Dar de baja (grado 1)" : "Degradar"}
-            </button>
-          </div>
-        )}
-        {confirmandoBaja && !degradada && (
-          <span
-            className="flex flex-wrap items-center gap-2 text-amber-200"
-            data-testid="premium-confirmar-baja"
-          >
-            ¿Dar de baja a {row.name}? Su ficha dejará de tener página pública.
-            <button
-              type="button"
-              className={ghostButton}
-              disabled={busy}
-              onClick={() =>
-                guardar(
-                  row,
-                  { grade: GRADO_DE_BAJA },
-                  `${row.name} queda ilegible (grado ${GRADO_DE_BAJA}).`,
+                save(
+                  candidate,
+                  { grade },
+                  `${candidate.name} ya es premium (${grade}).`,
                 )
               }
             >
-              Sí, dar de baja
+              Hacer premium
             </button>
             <button
               type="button"
               className={ghostButton}
-              onClick={() => setConfirmandoBaja(false)}
-            >
-              No
-            </button>
-          </span>
-        )}
-        {confirmando ? (
-          <span className="flex flex-wrap items-center gap-2 text-dex-muted">
-            ¿Quitar el premium a {row.name}?
-            <button
-              type="button"
-              className={ghostButton}
-              disabled={busy}
+              disabled={busyId === candidate.id}
               onClick={() =>
-                guardar(row, null, `${row.name} vuelve a carta normal.`)
+                save(
+                  candidate,
+                  { grade: gradeDeterioro },
+                  `${candidate.name} queda degradada (${gradeDeterioro}).`,
+                )
               }
             >
-              Sí, quitar
+              Degradar
             </button>
-            <button
-              type="button"
-              className={ghostButton}
-              onClick={() => setConfirmando(false)}
-            >
-              No
-            </button>
-          </span>
-        ) : (
-          <button
-            type="button"
-            className={`${ghostButton} block`}
-            onClick={() => setConfirmando(true)}
-          >
-            Quitar premium
-          </button>
+          </li>
+        ))}
+        {query.trim().length >= 2 && candidates.length === 0 && (
+          <li className="px-2 py-2 text-xs text-dex-muted">
+            Ninguna ficha sin premium coincide.
+          </li>
         )}
-      </div>
-    </div>
+      </ul>
+      <details className="text-xs text-dex-muted">
+        <summary className="cursor-pointer select-none">
+          Opciones de deterioro (bajas)
+        </summary>
+        <label className={`${labelClass} mt-2 max-w-xs`}>
+          Grado de deterioro{" "}
+          <select
+            aria-label="Grado de deterioro"
+            value={gradeDeterioro}
+            onChange={(event) =>
+              onGradeDeterioro(event.target.value as PremiumGrade)
+            }
+            className={inputClass}
+          >
+            {GRADOS_DEGRADADOS.map((item) => (
+              <option key={item} value={item}>
+                {item === GRADO_DE_BAJA ? "1 · ilegible (baja)" : item} ·{" "}
+                {nombreDeGrado(item)}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-[11px] normal-case tracking-normal text-dex-muted">
+            «Degradar» deja la carta rota en una placa: el 7 apenas se nota, el
+            1 solo deja ver el número. Las bajas van al 1.
+          </span>
+        </label>
+      </details>
+    </section>
   );
 }
 
-function Fila({
-  row,
-  abierta,
-  alternar,
-  busy,
-  guardar,
-  confirmando,
-  setConfirmando,
-}: {
-  row: VtuberCard;
-  abierta: boolean;
-  alternar: () => void;
-  busy: boolean;
-  guardar: Guardar;
-  confirmando: boolean;
-  setConfirmando: (valor: boolean) => void;
-}) {
-  const premium = row.premium;
-  if (!premium) {
-    return null;
-  }
-  const degradada = esGradoDegradado(premium.grade);
-  const siguiente = gradoSiguiente(premium.grade);
-  const racha = textoDeRacha(premium);
-
-  // El botón relleno es para el TRABAJO PENDIENTE: solo lo lleva quien está por revisar este mes. Quien ya subió se ve
-  // en contorno, y el grado máximo en gris: si todos los botones son iguales de llamativos, ninguno destaca.
-  const yaSubio = siguiente !== null && mismoMes(premium.gradedAt);
-  const claseSubir = !siguiente
-    ? `${ghostButton} !px-3`
-    : yaSubio
-      ? "rounded-lg border border-dex-accent/40 px-3 py-1.5 text-xs font-semibold text-dex-accent hover:bg-dex-accent/10 disabled:opacity-50"
-      : `${primaryButton} !px-3 !py-1.5 !text-xs`;
-
+function FiltrosDePremium({
+  filtro,
+  conteo,
+  onFiltro,
+}: Readonly<{
+  filtro: FiltroPremium;
+  conteo: Conteo;
+  onFiltro: (filtro: FiltroPremium) => void;
+}>) {
   return (
-    <li
-      data-testid="premium-row"
-      className={`rounded-xl border bg-dex-panel/60 ${abierta ? "border-dex-accent/50" : "border-dex-line"}`}
-    >
-      {/*
-        Móvil: DOS líneas (nombre y grado / estado y acciones). Escritorio: una fila de rejilla. Los `md:contents`
-        hacen que los hijos de cada línea pasen a ser celdas de la rejilla grande.
-      */}
-      <div
-        className={`flex flex-col gap-1.5 px-3 py-2.5 md:grid md:items-center md:gap-x-3 ${COLUMNAS}`}
-      >
-        <div className="flex min-w-0 items-center gap-2 md:contents">
-          <span className="font-mono text-[11px] text-dex-muted">
-            {dexTexto(row.dexNumber)}
-          </span>
-          <span className="flex min-w-0 flex-1 flex-col md:flex-none">
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-sm font-bold text-dex-ink">
-                {row.name}
-              </span>
-              {row.status !== "published" && (
-                <span
-                  className="shrink-0 rounded bg-amber-500/20 px-1.5 text-[10px] text-amber-200"
-                  title="No se ve en el catálogo público"
-                >
-                  {row.status === "draft" ? "borrador" : "oculto"}
-                </span>
-              )}
+    <nav aria-label="Filtrar cartas premium" className="flex flex-wrap gap-2">
+      {FILTROS.map((f) => {
+        const activo = filtro === f.id;
+        const importante = f.id === "por-subir" && conteo[f.id] > 0;
+        return (
+          <button
+            key={f.id}
+            type="button"
+            aria-pressed={activo}
+            title={f.ayuda}
+            onClick={() => onFiltro(f.id)}
+            className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${claseDeFiltro(activo, importante)}`}
+          >
+            {f.etiqueta}{" "}
+            <span className="ml-1 font-mono text-[11px] opacity-80">
+              {conteo[f.id]}
             </span>
-            {racha && (
-              <span className="text-[11px] leading-tight text-dex-muted">
-                {racha}
-              </span>
-            )}
-          </span>
-          <span className="shrink-0">
-            <PremiumBadge premium={premium} compacto />
-          </span>
-        </div>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
 
-        <div className="flex items-center justify-between gap-2 md:contents">
-          <UltimoCambio row={row} />
-          <span className="flex items-center justify-end gap-2">
-            {degradada ? (
-              <span className="text-[11px] text-dex-muted">deteriorada</span>
-            ) : (
-              <button
-                type="button"
-                className={claseSubir}
-                disabled={busy || siguiente === null}
-                onClick={() =>
-                  siguiente &&
-                  guardar(
-                    row,
-                    { grade: siguiente },
-                    `${row.name} sube a ${leyendaDePremium({ grade: siguiente })}.`,
-                  )
-                }
-              >
-                {siguiente
-                  ? `Subir a ${siguiente === "BL" ? "Black Label" : siguiente}`
-                  : "Grado máximo"}
-              </button>
-            )}
+function Paginacion({
+  pag,
+  hayFiltros,
+  total,
+  onPagina,
+}: Readonly<{
+  pag: ReturnType<typeof paginar<VtuberCard>>;
+  hayFiltros: boolean;
+  total: number;
+  onPagina: (pagina: number) => void;
+}>) {
+  return (
+    <footer
+      className="flex flex-wrap items-center justify-between gap-3 text-xs text-dex-muted"
+      data-testid="premium-paginacion"
+    >
+      <span>
+        Mostrando {pag.desde}–{pag.hasta} de {pag.total}
+        {hayFiltros && ` (de ${total} en total)`}
+      </span>
+      {pag.paginas > 1 && (
+        <span className="flex items-center gap-2">
+          <button
+            type="button"
+            className={ghostButton}
+            disabled={pag.pagina <= 1}
+            onClick={() => onPagina(pag.pagina - 1)}
+          >
+            ‹ Anterior
+          </button>
+          <span className="font-mono text-dex-ink">
+            {pag.pagina} / {pag.paginas}
+          </span>
+          <button
+            type="button"
+            className={ghostButton}
+            disabled={pag.pagina >= pag.paginas}
+            onClick={() => onPagina(pag.pagina + 1)}
+          >
+            Siguiente ›
+          </button>
+        </span>
+      )}
+    </footer>
+  );
+}
+
+/** La lista filtrada (o por qué está vacía) y su paginación. */
+function ResultadosDePremium({
+  hay,
+  pag,
+  hayFiltros,
+  total,
+  onLimpiarFiltros,
+  onPagina,
+  abiertaId,
+  busyId,
+  confirmingId,
+  save,
+  onAlternar,
+  onConfirmar,
+}: Readonly<{
+  /** Algún resultado con los filtros actuales. */
+  hay: boolean;
+  pag: ReturnType<typeof paginar<VtuberCard>>;
+  hayFiltros: boolean;
+  total: number;
+  onLimpiarFiltros: () => void;
+  onPagina: (pagina: number) => void;
+  abiertaId: number | null;
+  busyId: number | null;
+  confirmingId: number | null;
+  save: Guardar;
+  onAlternar: (id: number) => void;
+  onConfirmar: (id: number, valor: boolean) => void;
+}>) {
+  return (
+    <>
+      {hay ? (
+        <ul className="space-y-2">
+          {pag.items.map((row) => (
+            <Fila
+              key={row.id}
+              row={row}
+              abierta={abiertaId === row.id}
+              onAlternar={onAlternar}
+              busy={busyId === row.id}
+              guardar={save}
+              confirmando={confirmingId === row.id}
+              onConfirmar={onConfirmar}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p
+          className="rounded-2xl border border-dashed border-dex-line px-6 py-8 text-center text-sm text-dex-muted"
+          data-testid="premium-sin-resultados"
+        >
+          Ninguna carta coincide con este filtro.{" "}
+          {hayFiltros && (
             <button
               type="button"
-              className={ghostButton}
-              aria-expanded={abierta}
-              aria-label={`Más opciones de ${row.name}`}
-              onClick={alternar}
+              className="text-dex-accent hover:underline"
+              onClick={onLimpiarFiltros}
             >
-              Más {abierta ? "▴" : "▾"}
+              Quitar filtros
             </button>
-          </span>
-        </div>
-      </div>
-      {abierta && (
-        <PanelMas
-          row={row}
-          busy={busy}
-          guardar={guardar}
-          confirmando={confirmando}
-          setConfirmando={setConfirmando}
+          )}
+        </p>
+      )}
+
+      {hay && (
+        <Paginacion
+          pag={pag}
+          hayFiltros={hayFiltros}
+          total={total}
+          onPagina={onPagina}
         />
       )}
-    </li>
+    </>
   );
 }
 
@@ -464,12 +432,12 @@ export function PremiumManager({
   token,
   notify,
   onChanged,
-}: {
+}: Readonly<{
   token: string;
   notify?: Notify;
   /** Cambiar el premium cambia lo que se ve de la ficha: el padre refresca lista y métricas. */
   onChanged?: () => void;
-}) {
+}>) {
   const [rows, setRows] = useState<VtuberCard[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [version, setVersion] = useState(0);
@@ -489,7 +457,6 @@ export function PremiumManager({
   /** Grado con el que se DEGRADA una ficha que no era premium (por defecto el de las bajas). */
   const [gradeDeterioro, setGradeDeterioro] =
     useState<PremiumGrade>(GRADO_DE_BAJA);
-  const say: Notify = (kind, text) => notify?.(kind, text);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -510,7 +477,7 @@ export function PremiumManager({
     const term = query.trim();
     if (!altaVisible || term.length < 2) {
       setCandidates([]);
-      return;
+      return undefined;
     }
     const controller = new AbortController();
     /**
@@ -550,11 +517,11 @@ export function PremiumManager({
       setBusyId(row.id);
       try {
         await api.updateVtuber(token, row.id, { premium });
-        say("ok", okText);
+        notify?.("ok", okText);
         setVersion((current) => current + 1);
         onChanged?.();
       } catch (cause) {
-        say(
+        notify?.(
           "error",
           cause instanceof Error
             ? cause.message
@@ -565,8 +532,6 @@ export function PremiumManager({
         setConfirmingId(null);
       }
     },
-    // `say` cierra sobre `notify`; basta con él.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [token, notify, onChanged],
   );
 
@@ -585,201 +550,60 @@ export function PremiumManager({
   const pag = paginar(visibles, pagina);
   const hayFiltros = filtro !== "todas" || texto.trim() !== "";
 
-  const elegirFiltro = (valor: FiltroPremium) => {
+  const elegirFiltro = useCallback((valor: FiltroPremium) => {
     setFiltro(valor);
     setPagina(1);
-  };
-  const limpiarFiltros = () => {
+  }, []);
+  const limpiarFiltros = useCallback(() => {
     setFiltro("todas");
     setTexto("");
     setPagina(1);
-  };
+  }, []);
+  const alternarAlta = useCallback(() => setAltaAbierta((v) => !v), []);
+  // Abrir otra fila cierra la confirmación de «Quitar» que hubiera en la anterior.
+  const alternarFila = useCallback((id: number) => {
+    setAbiertaId((actual) => (actual === id ? null : id));
+    setConfirmingId(null);
+  }, []);
+  const confirmarQuitar = useCallback(
+    (id: number, valor: boolean) => setConfirmingId(valor ? id : null),
+    [],
+  );
 
   return (
     <div className="space-y-4" data-testid="premium-manager">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">
-            Cartas premium{" "}
-            <span className="font-mono text-dex-ink">{rows.length}</span>
-          </h2>
-          {loaded && conteo["por-subir"] > 0 && (
-            <p className="mt-0.5 text-xs text-amber-200">
-              {conteo["por-subir"]}{" "}
-              {conteo["por-subir"] === 1
-                ? "carta pendiente"
-                : "cartas pendientes"}{" "}
-              de revisar este mes.
-            </p>
-          )}
-        </div>
-        <button
-          type="button"
-          className={altaVisible ? ghostButton : primaryButton}
-          aria-expanded={altaVisible}
-          onClick={() => setAltaAbierta((v) => !v)}
-        >
-          {altaVisible && rows.length > 0 ? "Cerrar" : "+ Nueva premium"}
-        </button>
-      </header>
+      <CabeceraDePremium
+        total={rows.length}
+        porSubir={loaded ? conteo["por-subir"] : null}
+        altaVisible={altaVisible}
+        onAlternarAlta={alternarAlta}
+      />
 
       {altaVisible && (
-        <section
-          className="space-y-3 rounded-2xl border border-dex-accent/40 bg-dex-panel/60 p-4"
-          data-testid="premium-alta"
-        >
-          <p className="text-xs text-dex-muted">
-            Escribe el nombre, el número o el código{" "}
-            <span className="font-mono">VTD-016</span> que el donante puso en la
-            nota de PayPal. Lo normal es entrar con el {GRADO_INICIAL}; sube
-            medio punto por mes.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-[1fr_12rem]">
-            <label className={labelClass}>
-              Buscar ficha
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className={inputClass}
-                placeholder="nombre, número o código VTD-…"
-                aria-label="Buscar ficha para hacerla premium"
-              />
-            </label>
-            <label className={labelClass}>
-              Grado inicial
-              <select
-                aria-label="Grado inicial"
-                value={grade}
-                onChange={(event) =>
-                  setGrade(event.target.value as PremiumGrade)
-                }
-                className={inputClass}
-              >
-                {GRADOS.map((item) => (
-                  <option key={item} value={item}>
-                    {item === "BL" ? "BL · Black Label" : item}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <ul
-            className="dex-scroll max-h-64 space-y-1 overflow-y-auto"
-            data-testid="premium-candidates"
-          >
-            {candidates.map((candidate) => (
-              <li
-                key={candidate.id}
-                className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-dex-muted hover:bg-white/5"
-              >
-                <span className="font-mono text-[11px]">
-                  {dexTexto(candidate.dexNumber)}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-dex-ink">
-                  {candidate.name}
-                </span>
-                <button
-                  type="button"
-                  className={primaryButton}
-                  disabled={busyId === candidate.id}
-                  onClick={() =>
-                    save(
-                      candidate,
-                      { grade },
-                      `${candidate.name} ya es premium (${grade}).`,
-                    )
-                  }
-                >
-                  Hacer premium
-                </button>
-                <button
-                  type="button"
-                  className={ghostButton}
-                  disabled={busyId === candidate.id}
-                  onClick={() =>
-                    save(
-                      candidate,
-                      { grade: gradeDeterioro },
-                      `${candidate.name} queda degradada (${gradeDeterioro}).`,
-                    )
-                  }
-                >
-                  Degradar
-                </button>
-              </li>
-            ))}
-            {query.trim().length >= 2 && candidates.length === 0 && (
-              <li className="px-2 py-2 text-xs text-dex-muted">
-                Ninguna ficha sin premium coincide.
-              </li>
-            )}
-          </ul>
-          <details className="text-xs text-dex-muted">
-            <summary className="cursor-pointer select-none">
-              Opciones de deterioro (bajas)
-            </summary>
-            <label className={`${labelClass} mt-2 max-w-xs`}>
-              Grado de deterioro
-              <select
-                aria-label="Grado de deterioro"
-                value={gradeDeterioro}
-                onChange={(event) =>
-                  setGradeDeterioro(event.target.value as PremiumGrade)
-                }
-                className={inputClass}
-              >
-                {GRADOS_DEGRADADOS.map((item) => (
-                  <option key={item} value={item}>
-                    {item === GRADO_DE_BAJA ? "1 · ilegible (baja)" : item} ·{" "}
-                    {nombreDeGrado(item)}
-                  </option>
-                ))}
-              </select>
-              <span className="mt-1 block text-[11px] normal-case tracking-normal text-dex-muted">
-                «Degradar» deja la carta rota en una placa: el 7 apenas se nota,
-                el 1 solo deja ver el número. Las bajas van al 1.
-              </span>
-            </label>
-          </details>
-        </section>
+        <AltaDePremium
+          query={query}
+          onQuery={setQuery}
+          grade={grade}
+          onGrade={setGrade}
+          gradeDeterioro={gradeDeterioro}
+          onGradeDeterioro={setGradeDeterioro}
+          candidates={candidates}
+          busyId={busyId}
+          save={save}
+        />
       )}
 
       {rows.length > 0 && (
         <>
-          <nav
-            aria-label="Filtrar cartas premium"
-            className="flex flex-wrap gap-2"
-          >
-            {FILTROS.map((f) => {
-              const activo = filtro === f.id;
-              const importante = f.id === "por-subir" && conteo[f.id] > 0;
-              return (
-                <button
-                  key={f.id}
-                  type="button"
-                  aria-pressed={activo}
-                  title={f.ayuda}
-                  onClick={() => elegirFiltro(f.id)}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                    activo
-                      ? "border-dex-accent bg-dex-accent/15 text-dex-ink"
-                      : importante
-                        ? "border-amber-300/50 text-amber-200 hover:bg-amber-300/10"
-                        : "border-dex-line text-dex-muted hover:text-dex-ink"
-                  }`}
-                >
-                  {f.etiqueta}{" "}
-                  <span className="ml-1 font-mono text-[11px] opacity-80">
-                    {conteo[f.id]}
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
+          <FiltrosDePremium
+            filtro={filtro}
+            conteo={conteo}
+            onFiltro={elegirFiltro}
+          />
 
           <div className="flex flex-wrap items-end gap-3">
             <label className={`${labelClass} min-w-[14rem] flex-1`}>
-              Buscar en la lista
+              Buscar en la lista{" "}
               <input
                 value={texto}
                 onChange={(event) => {
@@ -792,7 +616,7 @@ export function PremiumManager({
               />
             </label>
             <label className={labelClass}>
-              Ordenar por
+              Ordenar por{" "}
               <select
                 aria-label="Ordenar"
                 value={orden}
@@ -822,80 +646,20 @@ export function PremiumManager({
             <span className="text-right">Acciones</span>
           </div>
 
-          {visibles.length === 0 ? (
-            <p
-              className="rounded-2xl border border-dashed border-dex-line px-6 py-8 text-center text-sm text-dex-muted"
-              data-testid="premium-sin-resultados"
-            >
-              Ninguna carta coincide con este filtro.{" "}
-              {hayFiltros && (
-                <button
-                  type="button"
-                  className="text-dex-accent hover:underline"
-                  onClick={limpiarFiltros}
-                >
-                  Quitar filtros
-                </button>
-              )}
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {pag.items.map((row) => (
-                <Fila
-                  key={row.id}
-                  row={row}
-                  abierta={abiertaId === row.id}
-                  alternar={() => {
-                    setAbiertaId((actual) =>
-                      actual === row.id ? null : row.id,
-                    );
-                    setConfirmingId(null);
-                  }}
-                  busy={busyId === row.id}
-                  guardar={save}
-                  confirmando={confirmingId === row.id}
-                  setConfirmando={(valor) =>
-                    setConfirmingId(valor ? row.id : null)
-                  }
-                />
-              ))}
-            </ul>
-          )}
-
-          {visibles.length > 0 && (
-            <footer
-              className="flex flex-wrap items-center justify-between gap-3 text-xs text-dex-muted"
-              data-testid="premium-paginacion"
-            >
-              <span>
-                Mostrando {pag.desde}–{pag.hasta} de {pag.total}
-                {hayFiltros && ` (de ${rows.length} en total)`}
-              </span>
-              {pag.paginas > 1 && (
-                <span className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className={ghostButton}
-                    disabled={pag.pagina <= 1}
-                    onClick={() => setPagina(pag.pagina - 1)}
-                  >
-                    ‹ Anterior
-                  </button>
-                  <span className="font-mono text-dex-ink">
-                    {pag.pagina} / {pag.paginas}
-                  </span>
-                  <button
-                    type="button"
-                    className={ghostButton}
-                    disabled={pag.pagina >= pag.paginas}
-                    onClick={() => setPagina(pag.pagina + 1)}
-                  >
-                    Siguiente ›
-                  </button>
-                </span>
-              )}
-            </footer>
-          )}
+          <ResultadosDePremium
+            hay={visibles.length > 0}
+            pag={pag}
+            hayFiltros={hayFiltros}
+            total={rows.length}
+            onLimpiarFiltros={limpiarFiltros}
+            onPagina={setPagina}
+            abiertaId={abiertaId}
+            busyId={busyId}
+            confirmingId={confirmingId}
+            save={save}
+            onAlternar={alternarFila}
+            onConfirmar={confirmarQuitar}
+          />
         </>
       )}
 

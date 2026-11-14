@@ -28,7 +28,7 @@
  * para pegarlos a mano en `card3d-config.ts`. No escribe el archivo desde el navegador
  * a propósito: un panel de trabajo que edita el código fuente es una vía de sorpresas.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useReducer, useState } from "react";
 
 import {
   GRUPOS,
@@ -47,20 +47,21 @@ export function Card3dTuner() {
    * Contador que NO se lee: existe solo para forzar el repintado de los sliders
    * tras "reiniciar" y al mover una perilla. Los valores viven fuera de React
    * (`card3d-live`), así que sin un cambio de estado el panel mostraría números
-   * viejos. Se marca con `_` para que el linter no lo lea como descuido.
+   * viejos. Es un `useReducer` que solo suma (y no un `useState` con el valor sin usar):
+   * lo único que se necesita de él es el despacho que repinta.
    */
-  const [_version, setVersion] = useState(0);
+  const [, repintar] = useReducer((v: number) => v + 1, 0);
 
   const mover = useCallback((clave: keyof LiveKnobs, valor: number) => {
     setKnob(clave, valor);
     // Re-render solo del PANEL (para ver el número), no de la escena: la carta lee
     // `live` en su propio frame y no está suscrita a este estado.
-    setVersion((v) => v + 1);
+    repintar();
   }, []);
 
   const reiniciar = useCallback(() => {
     resetLive();
-    setVersion((v) => v + 1);
+    repintar();
   }, []);
 
   const movidos = cambios();
