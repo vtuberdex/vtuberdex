@@ -126,6 +126,21 @@ describe("explorador por carpetas", () => {
   });
 });
 
+describe("barras al principio y al final de la carpeta", () => {
+  it("se quitan sin tocar las del medio, también con muchas seguidas", () => {
+    expect(validarCarpetaRelativa("///plugins/Essentials//", "admin")).toEqual({
+      ok: true,
+      relativa: "plugins/Essentials",
+    });
+    expect(validarCarpetaRelativa("/".repeat(5000), "admin")).toEqual({
+      ok: true,
+      relativa: "",
+    });
+    // Una barra doble en medio deja un segmento vacío: sigue siendo inválida.
+    expect(validarCarpetaRelativa("plugins//x", "admin").ok).toBe(false);
+  });
+});
+
 describe("guardar sin permiso de escritura", () => {
   it("traduce el fallo del sistema a un aviso entendible", () => {
     expect(falloDeEscritura({ code: "EACCES" })).toMatchObject({
