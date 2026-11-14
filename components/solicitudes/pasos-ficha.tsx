@@ -93,9 +93,9 @@ export function useEnvio() {
     try {
       await accion();
       return true;
-    } catch (causa) {
-      alFallar?.(causa);
-      setError(causa instanceof ApiError ? causa.message : t(claveError));
+    } catch (error_) {
+      alFallar?.(error_);
+      setError(error_ instanceof ApiError ? error_.message : t(claveError));
       return false;
     } finally {
       setEnviando(false);
@@ -108,11 +108,11 @@ export function FichaRecibida({
   testId,
   titulo,
   texto,
-}: {
+}: Readonly<{
   testId: string;
   titulo: Clave;
   texto: Clave;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <div className="space-y-4" data-testid={testId}>
@@ -137,13 +137,13 @@ export function BarraDePasos({
   total,
   titulo,
   children,
-}: {
+}: Readonly<{
   testId: string;
   paso: number;
   total: number;
   titulo: string;
   children?: ReactNode;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <div>
@@ -178,7 +178,7 @@ export function PasoCorreo({
   setWebsite,
   marcado,
   children,
-}: {
+}: Readonly<{
   leyenda: string;
   ayuda: string;
   privacidad: string;
@@ -189,7 +189,7 @@ export function PasoCorreo({
   /** Marca (`aria-invalid`) el campo que falta; lo decide quien usa el paso. */
   marcado?: (campo: string) => true | undefined;
   children?: ReactNode;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <fieldset className={claseFieldset}>
@@ -237,13 +237,13 @@ export function PasoCodigo({
   codigo,
   setCodigo,
   marcado,
-}: {
+}: Readonly<{
   testId: string;
   email: string;
   codigo: string;
   setCodigo: (v: string) => void;
   marcado?: (campo: string) => true | undefined;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <fieldset className={claseFieldset} data-testid={testId}>
@@ -279,13 +279,13 @@ export function CamposDelPaso({
   setPerfil,
   obligatorio = false,
   marcado,
-}: {
+}: Readonly<{
   n: number;
   perfil: Perfil;
   setPerfil: Dispatch<SetStateAction<Perfil>>;
   obligatorio?: boolean;
   marcado?: (campo: string) => true | undefined;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <>
@@ -328,14 +328,14 @@ export function CamposPaisYSigno({
   zodiac,
   setZodiac,
   vacio,
-}: {
+}: Readonly<{
   paises: Opcion[];
   country: string;
   setCountry: (v: string) => void;
   zodiac: string;
   setZodiac: (v: string) => void;
   vacio: string;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <>
@@ -387,13 +387,13 @@ export function SelectorIdiomas({
   languages,
   setLanguages,
   marcado = false,
-}: {
+}: Readonly<{
   leyenda: ReactNode;
   idiomas: Opcion[];
   languages: string[];
   setLanguages: Dispatch<SetStateAction<string[]>>;
   marcado?: boolean;
-}) {
+}>) {
   const alternar = (codigo: string) =>
     setLanguages((actuales) =>
       actuales.includes(codigo)
@@ -436,13 +436,13 @@ export function EditorRedes({
   setSocials,
   marcado = false,
   children,
-}: {
+}: Readonly<{
   titulo: ReactNode;
   socials: Red[];
   setSocials: Dispatch<SetStateAction<Red[]>>;
   marcado?: boolean;
   children?: ReactNode;
-}) {
+}>) {
   const { t } = useI18n();
   const cambiarRed = (indice: number, cambio: Partial<Red>) =>
     setSocials((actuales) =>
@@ -513,6 +513,28 @@ export function EditorRedes({
   );
 }
 
+/** El texto del botón principal según el paso (y si ya se está enviando). */
+function textoDelBotonPrincipal(
+  t: ReturnType<typeof useI18n>["t"],
+  {
+    paso,
+    total,
+    enviando,
+    textoEnviar,
+  }: { paso: number; total: number; enviando: boolean; textoEnviar: string },
+): string {
+  if (paso === 1) {
+    return enviando ? t("ficha.enviando") : t("ficha.enviarCodigo");
+  }
+  if (paso === 2) {
+    return enviando ? t("ficha.confirmando") : t("ficha.confirmarCodigo");
+  }
+  if (paso < total) {
+    return t("ficha.siguiente");
+  }
+  return enviando ? t("ficha.enviando") : textoEnviar;
+}
+
 /**
  * El error del envío (si hay) y la botonera: «Volver» (si `conVolver`) y el botón principal, cuyo texto depende del paso (1: pedir código,
  * 2: confirmarlo, intermedios: siguiente, último: `textoEnviar`).
@@ -526,7 +548,7 @@ export function BotoneraPasos({
   conVolver,
   alVolver,
   textoEnviar,
-}: {
+}: Readonly<{
   paso: number;
   error: string | null;
   total: number;
@@ -536,18 +558,9 @@ export function BotoneraPasos({
   conVolver: boolean;
   alVolver: () => void;
   textoEnviar: string;
-}) {
+}>) {
   const { t } = useI18n();
-  let texto: string;
-  if (paso === 1) {
-    texto = enviando ? t("ficha.enviando") : t("ficha.enviarCodigo");
-  } else if (paso === 2) {
-    texto = enviando ? t("ficha.confirmando") : t("ficha.confirmarCodigo");
-  } else if (paso < total) {
-    texto = t("ficha.siguiente");
-  } else {
-    texto = enviando ? t("ficha.enviando") : textoEnviar;
-  }
+  const texto = textoDelBotonPrincipal(t, { paso, total, enviando, textoEnviar });
   return (
     <>
       {error && <Aviso tipo="error">{error}</Aviso>}

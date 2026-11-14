@@ -52,6 +52,85 @@ import {
 const TOTAL_PASOS = 4;
 type Paso = 1 | 2 | 3 | 4;
 
+/**
+ * Qué ficha se actualiza: con UNA ficha en el correo se nombra; con varias se elige; sin ninguna (las del
+ * scrape no tienen correo guardado) se escribe a mano.
+ */
+function ElegirFicha({
+  fichasDelCorreo,
+  ficha,
+  alCambiar,
+}: Readonly<{
+  fichasDelCorreo: Array<{ slug: string; name: string }>;
+  ficha: string;
+  alCambiar: (ficha: string) => void;
+}>) {
+  const { t } = useI18n();
+  const cambiar = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    alCambiar(e.target.value);
+  if (fichasDelCorreo.length === 1) {
+    return (
+      <p className="text-sm text-dex-ink">
+        {t("mod.vasActualizarA")}
+        <strong>{fichasDelCorreo[0].name}</strong>
+        {t("mod.vasActualizarB")}
+      </p>
+    );
+  }
+  if (fichasDelCorreo.length > 1) {
+    return (
+      <Campo etiqueta={t("mod.cualFicha")} obligatorio>
+        <select
+          className={claseInput}
+          required
+          value={ficha}
+          onChange={cambiar}
+        >
+          <option value="">{t("mod.eligeUna")}</option>
+          {fichasDelCorreo.map((f) => (
+            <option key={f.slug} value={f.slug}>
+              {f.name}
+            </option>
+          ))}
+        </select>
+      </Campo>
+    );
+  }
+  return (
+    <Campo
+      etiqueta={t("mod.fichaEtiqueta")}
+      obligatorio
+      ayuda={t("mod.fichaAyuda")}
+    >
+      <input
+        className={claseInput}
+        required
+        maxLength={300}
+        value={ficha}
+        onChange={cambiar}
+      />
+    </Campo>
+  );
+}
+
+/** Hay algo que cambiar: un texto escrito, el color marcado, algún idioma o alguna red. En blanco = no cambia. */
+function hayAlgunCambio({
+  textos,
+  cambiaColor,
+  languages,
+  redes,
+}: {
+  textos: string[];
+  cambiaColor: boolean;
+  languages: string[];
+  redes: unknown[];
+}): boolean {
+  if (textos.some((v) => v.trim())) {
+    return true;
+  }
+  return cambiaColor || languages.length > 0 || redes.length > 0;
+}
+
 export function ModificacionForm() {
   const { t } = useI18n();
   const { paises, idiomas } = useOpcionesFicha();
@@ -89,8 +168,8 @@ export function ModificacionForm() {
   });
 
   const redes = redesEscritas(socials);
-  const hayCambios =
-    [
+  const hayCambios = hayAlgunCambio({
+    textos: [
       phrase,
       cardText,
       country,
@@ -98,12 +177,13 @@ export function ModificacionForm() {
       imageId,
       logoId,
       ...Object.values(perfil),
-    ].some((v) => v.trim()) ||
-    cambiaColor ||
-    languages.length > 0 ||
-    redes.length > 0;
+    ],
+    cambiaColor,
+    languages,
+    redes,
+  });
 
-  const enviar = async (evento: React.FormEvent) => {
+  const enviar = async (evento: React.SubmitEvent) => {
     evento.preventDefault();
     setError(null);
     // La validación nativa (`required`) del paso corre antes de este `submit`.
@@ -175,6 +255,21 @@ export function ModificacionForm() {
     );
   };
 
+  const cambiarFrase = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setPhrase(e.target.value);
+  const cambiarLore = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
+    setCardText(e.target.value);
+  const marcarColor = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setCambiaColor(e.target.checked);
+  const cambiarColor = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setThemeColor(e.target.value);
+  const cambiarNota = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
+    setNota(e.target.value);
+  const volver = () => {
+    setError(null);
+    setPaso((paso - 1) as Paso);
+  };
+
   if (enviada) {
     return (
       <FichaRecibida
@@ -228,45 +323,11 @@ export function ModificacionForm() {
             <legend className="px-2 text-sm font-bold text-dex-ink">
               {t("mod.tuFicha")}
             </legend>
-            {fichasDelCorreo.length === 1 && (
-              <p className="text-sm text-dex-ink">
-                {t("mod.vasActualizarA")}
-                <strong>{fichasDelCorreo[0].name}</strong>
-                {t("mod.vasActualizarB")}
-              </p>
-            )}
-            {fichasDelCorreo.length > 1 && (
-              <Campo etiqueta={t("mod.cualFicha")} obligatorio>
-                <select
-                  className={claseInput}
-                  required
-                  value={ficha}
-                  onChange={(e) => setFicha(e.target.value)}
-                >
-                  <option value="">{t("mod.eligeUna")}</option>
-                  {fichasDelCorreo.map((f) => (
-                    <option key={f.slug} value={f.slug}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
-              </Campo>
-            )}
-            {fichasDelCorreo.length === 0 && (
-              <Campo
-                etiqueta={t("mod.fichaEtiqueta")}
-                obligatorio
-                ayuda={t("mod.fichaAyuda")}
-              >
-                <input
-                  className={claseInput}
-                  required
-                  maxLength={300}
-                  value={ficha}
-                  onChange={(e) => setFicha(e.target.value)}
-                />
-              </Campo>
-            )}
+            <ElegirFicha
+              fichasDelCorreo={fichasDelCorreo}
+              ficha={ficha}
+              alCambiar={setFicha}
+            />
           </fieldset>
           <fieldset className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-5">
             <legend className="px-2 text-sm font-bold text-dex-ink">
@@ -289,7 +350,7 @@ export function ModificacionForm() {
                 className={claseInput}
                 maxLength={600}
                 value={phrase}
-                onChange={(e) => setPhrase(e.target.value)}
+                onChange={cambiarFrase}
               />
             </Campo>
             <Campo etiqueta={t("ficha.lore")} ayuda={t("mod.loreAyuda")}>
@@ -297,7 +358,7 @@ export function ModificacionForm() {
                 className={`${claseInput} min-h-28`}
                 maxLength={4000}
                 value={cardText}
-                onChange={(e) => setCardText(e.target.value)}
+                onChange={cambiarLore}
               />
             </Campo>
             <SelectorIdiomas
@@ -311,9 +372,9 @@ export function ModificacionForm() {
                 <input
                   type="checkbox"
                   checked={cambiaColor}
-                  onChange={(e) => setCambiaColor(e.target.checked)}
+                  onChange={marcarColor}
                 />
-                {t("mod.cambiarColor")}
+                <span>{t("mod.cambiarColor")}</span>
               </label>
               {cambiaColor && (
                 <input
@@ -321,7 +382,7 @@ export function ModificacionForm() {
                   aria-label={t("ficha.colorMarca")}
                   className="mt-2 h-10 w-full cursor-pointer rounded-lg border border-dex-line bg-dex-void p-1 sm:w-48"
                   value={themeColor}
-                  onChange={(e) => setThemeColor(e.target.value)}
+                  onChange={cambiarColor}
                 />
               )}
             </div>
@@ -380,7 +441,7 @@ export function ModificacionForm() {
                 className={`${claseInput} min-h-20`}
                 maxLength={2000}
                 value={nota}
-                onChange={(e) => setNota(e.target.value)}
+                onChange={cambiarNota}
               />
             </Campo>
           </fieldset>
@@ -400,10 +461,7 @@ export function ModificacionForm() {
         enviando={enviando}
         acepta={acepta}
         conVolver={paso === 2 || paso === 4}
-        alVolver={() => {
-          setError(null);
-          setPaso((paso - 1) as Paso);
-        }}
+        alVolver={volver}
         textoEnviar={t("mod.enviar")}
       />
     </form>
