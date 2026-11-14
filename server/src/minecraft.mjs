@@ -341,12 +341,7 @@ export async function vincular(
   );
   await e.execute(
     "INSERT INTO vinculo_minecraft (uuid, vtuber_id, jugador, creado) VALUES (?, ?, ?, ?)",
-    [
-      id,
-      vtuberId,
-      jugadorValido(jugador),
-      new Date(ahora).toISOString(),
-    ],
+    [id, vtuberId, jugadorValido(jugador), new Date(ahora).toISOString()],
   );
   if (requiereSesion(id)) {
     await abrirSesion(e, { uuid: id, red, ahora });

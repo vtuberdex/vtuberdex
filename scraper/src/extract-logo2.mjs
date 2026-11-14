@@ -227,7 +227,11 @@ function denseRows(rowHits, cellY0, cellY1) {
   if (firstDense < 0) {
     return null;
   }
-  return { firstDense, lastDense: lastDenseRow(rowsBand, firstDense, peak), peak };
+  return {
+    firstDense,
+    lastDense: lastDenseRow(rowsBand, firstDense, peak),
+    peak,
+  };
 }
 
 /** Descarta cajas degeneradas (una línea, o que cubran toda la banda). */

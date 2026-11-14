@@ -49,7 +49,11 @@ export function fichaDeLaSolicitud(db, referencia) {
     }
   }
 
-  const porSlug = fichaPorSlugs(db, [delEnlace, slugify(sinDex), slugify(texto)]);
+  const porSlug = fichaPorSlugs(db, [
+    delEnlace,
+    slugify(sinDex),
+    slugify(texto),
+  ]);
   if (porSlug) {
     return porSlug;
   }

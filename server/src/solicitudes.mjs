@@ -169,7 +169,10 @@ const correo = z
   .trim()
   .toLowerCase()
   .max(200)
-  .refine((valor) => valor.length <= 200 && esCorreoValido(valor), "correo no válido");
+  .refine(
+    (valor) => valor.length <= 200 && esCorreoValido(valor),
+    "correo no válido",
+  );
 
 /**
  * Lo mismo que `/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/`, sin regex: el punto también cabe en `[^\s@]+`, así
@@ -484,7 +487,10 @@ export async function crearSolicitud(
  * validación de abajo no debe quemar el permiso, que cuesta rellenar un formulario largo.
  * @returns {Promise<{ email: string } | null>} `null` si no vino permiso.
  */
-async function correoDelPermiso(ejecutor, { permiso, propositoPermiso, ahora }) {
+async function correoDelPermiso(
+  ejecutor,
+  { permiso, propositoPermiso, ahora },
+) {
   if (permiso === null) {
     return null;
   }
@@ -558,11 +564,24 @@ async function comprobarCupos(e, { red, ahora, tipo, email }) {
 }
 
 /** Inserta la solicitud en `estado` y devuelve su id. */
-async function insertarSolicitud(e, { tipo, datos, contacto, red, terminosVersion, fecha }, estado) {
+async function insertarSolicitud(
+  e,
+  { tipo, datos, contacto, red, terminosVersion, fecha },
+  estado,
+) {
   const insertada = await e.execute(
     `INSERT INTO solicitud (tipo, estado, datos, contacto, red, terminos_version, terminos_aceptados_en, creado)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [tipo, estado, aJson(datos), aJson(contacto), red, terminosVersion, fecha, fecha],
+    [
+      tipo,
+      estado,
+      aJson(datos),
+      aJson(contacto),
+      red,
+      terminosVersion,
+      fecha,
+      fecha,
+    ],
   );
   const { rows: ultima } = await e.execute(
     "SELECT MAX(id) AS id FROM solicitud WHERE red = ?",

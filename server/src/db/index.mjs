@@ -160,7 +160,11 @@ const MIGRATIONS = [
           continue;
         }
         const madre = madreSembrada(hija, facciones, porEtiqueta);
-        if (!madre || madre.id === hija.id || formariaCiclo(madre, hija, facciones)) {
+        if (
+          !madre ||
+          madre.id === hija.id ||
+          formariaCiclo(madre, hija, facciones)
+        ) {
           continue;
         }
         enlazar.run(madre.id, hija.id);
