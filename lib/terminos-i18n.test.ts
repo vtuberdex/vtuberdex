@@ -12,7 +12,7 @@ describe("terminos traducidos", () => {
       expect(t.clausulas.map((c) => c.parrafos.length)).toEqual(
         CLAUSULAS.map((c) => c.parrafos.length),
       );
-      expect(t.preambulo.length).toBe(terminosDe("es").preambulo.length);
+      expect(t.preambulo).toHaveLength(terminosDe("es").preambulo.length);
       for (const c of t.clausulas) {
         expect(c.titulo.trim()).not.toBe("");
         for (const p of c.parrafos) {

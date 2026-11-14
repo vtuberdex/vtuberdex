@@ -22,14 +22,16 @@ import {
   esBlackLabel as esBlackLabelServidor,
   gradoSiguiente as gradoSiguienteServidor,
   hoy,
-  numeroDeCertificado,
-  rangoDeGrado,
 } from "@/server/src/premium.mjs";
 
 import { esFichaDeteriorada as esFichaDeterioradaServidor } from "@/server/src/ficha-deteriorada.mjs";
 import type { PremiumGrade, PremiumInfo } from "@/lib/types";
 
-export { hoy, numeroDeCertificado, rangoDeGrado };
+export { hoy };
+export {
+  numeroDeCertificado,
+  rangoDeGrado,
+} from "@/server/src/premium.mjs";
 
 /** La escala completa, de menor a mayor. */
 export const GRADOS = GRADOS_SERVIDOR as readonly PremiumGrade[];
@@ -105,10 +107,14 @@ export const mismoMes = (a: string, b: string = hoy()): boolean =>
   a.slice(0, 7) === b.slice(0, 7);
 
 /** ¿Es una ficha deteriorada (grado 1, la de las bajas)? El público no ve sus datos ni su logo. */
-export const esFichaDeteriorada = (
-  cartaOGrado:
-    { premium?: { grade: string } | null } | string | null | undefined,
-): boolean => esFichaDeterioradaServidor(cartaOGrado);
+/** Una carta (con su `premium`) o directamente su grado. */
+export type CartaOGrado =
+  | { premium?: { grade: string } | null }
+  | string
+  | null
+  | undefined;
+
+export const esFichaDeteriorada = (cartaOGrado: CartaOGrado): boolean => esFichaDeterioradaServidor(cartaOGrado);
 
 /**
  * Grado con que se pinta una ficha sin correo, SIN placa (no es una carta premium). Es el 6 y no el 4: el 4 rompía

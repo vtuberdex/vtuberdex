@@ -56,33 +56,40 @@ export function trocear(texto: string, max = 380): string[] {
       tramos.push("", "\n");
       continue;
     }
-    const frases = linea.match(/[^.!?。！？]+[.!?。！？]*\s*/g) ?? [linea];
-    let actual = "";
-    for (const frase of frases) {
-      if (actual && actual.length + frase.length > max) {
-        tramos.push(actual.trim());
-        actual = "";
-      }
-      // Una «frase» sin puntuación más larga que el máximo se corta en palabras.
-      if (frase.length > max) {
-        const palabras = frase.split(/(\s+)/);
-        for (const palabra of palabras) {
-          if (actual.length + palabra.length > max) {
-            tramos.push(actual.trim());
-            actual = "";
-          }
-          actual += palabra;
-        }
-      } else {
-        actual += frase;
-      }
-    }
-    if (actual.trim()) {
-      tramos.push(actual.trim());
-    }
-    tramos.push("\n");
+    tramos.push(...tramosDeLinea(linea, max), "\n");
   }
   tramos.pop();
+  return tramos;
+}
+
+/** Los tramos de UNA línea con texto: frases agrupadas hasta `max` y, si una sola no cabe, partida en palabras. */
+function tramosDeLinea(linea: string, max: number): string[] {
+  const tramos: string[] = [];
+  const frases = linea.match(/[^.!?。！？]+[.!?。！？]*\s*/g) ?? [linea];
+  let actual = "";
+  const cerrar = () => {
+    tramos.push(actual.trim());
+    actual = "";
+  };
+  for (const frase of frases) {
+    if (actual && actual.length + frase.length > max) {
+      cerrar();
+    }
+    if (frase.length <= max) {
+      actual += frase;
+      continue;
+    }
+    // Una «frase» sin puntuación más larga que el máximo se corta en palabras.
+    for (const palabra of frase.split(/(\s+)/)) {
+      if (actual.length + palabra.length > max) {
+        cerrar();
+      }
+      actual += palabra;
+    }
+  }
+  if (actual.trim()) {
+    tramos.push(actual.trim());
+  }
   return tramos;
 }
 

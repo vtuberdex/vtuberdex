@@ -103,10 +103,35 @@ export const IMAGEN_SOLICITUD = {
 } as const;
 
 /** Código del error: la interfaz lo traduce a un texto (`img.error.*`). */
+export type CodigoDeErrorDeImagen = "tipo" | "peso" | "chica" | "grande" | "navegador";
+
 export class ErrorDeImagen extends Error {
-  constructor(readonly codigo: "tipo" | "peso" | "chica" | "grande" | "navegador") {
+  constructor(readonly codigo: CodigoDeErrorDeImagen) {
     super(codigo);
     this.name = "ErrorDeImagen";
+  }
+}
+
+/** Dibuja el bitmap en el lienzo con el encuadre de su tipo (ver `normalizarImagenDeSolicitud`). */
+function encuadrar(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  bitmap: ImageBitmap,
+  tipo: TipoImagenSolicitud,
+): void {
+  if (tipo === "character") {
+    const { ancho, alto } = IMAGEN_SOLICITUD.character;
+    canvas.width = ancho;
+    canvas.height = alto;
+    const escala = Math.max(ancho / bitmap.width, alto / bitmap.height);
+    const dw = bitmap.width * escala;
+    const dh = bitmap.height * escala;
+    ctx.drawImage(bitmap, (ancho - dw) / 2, 0, dw, dh);
+  } else {
+    const escala = Math.min(1, IMAGEN_SOLICITUD.logo.maxLado / Math.max(bitmap.width, bitmap.height));
+    canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+    canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   }
 }
 
@@ -141,25 +166,12 @@ export async function normalizarImagenDeSolicitud(
     bitmap.close?.();
     throw new ErrorDeImagen("navegador");
   }
-  if (tipo === "character") {
-    const { ancho, alto } = IMAGEN_SOLICITUD.character;
-    canvas.width = ancho;
-    canvas.height = alto;
-    const escala = Math.max(ancho / bitmap.width, alto / bitmap.height);
-    const dw = bitmap.width * escala;
-    const dh = bitmap.height * escala;
-    ctx.drawImage(bitmap, (ancho - dw) / 2, 0, dw, dh);
-  } else {
-    const escala = Math.min(1, IMAGEN_SOLICITUD.logo.maxLado / Math.max(bitmap.width, bitmap.height));
-    canvas.width = Math.max(1, Math.round(bitmap.width * escala));
-    canvas.height = Math.max(1, Math.round(bitmap.height * escala));
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  }
+  encuadrar(canvas, ctx, bitmap, tipo);
   bitmap.close?.();
 
   for (const calidad of [0.92, 0.85, 0.75, 0.65, 0.5]) {
     const webp = await canvasABlob(canvas, "image/webp", calidad);
-    if (!webp || webp.type !== "image/webp") {
+    if (webp?.type !== "image/webp") {
       throw new ErrorDeImagen("navegador");
     }
     if (webp.size <= IMAGEN_SOLICITUD.salidaMaxBytes) {
