@@ -5,7 +5,7 @@
  * Cada grupo se pinta con su contador real y estado seleccionado, en un
  * acordeón que funciona igual en escritorio (columna) y móvil (hoja).
  */
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
 import { nombreDeIdioma, nombreDePais } from "@/lib/i18n/nombres";
@@ -14,11 +14,16 @@ import type { FacetBucket, Facets, SearchParams } from "@/lib/types";
 import { facetValue } from "@/lib/types";
 import { toggleValue } from "@/lib/query";
 
+/** Las facetas que el panel filtra: cada una es una lista de valores en `SearchParams`. */
+type FacetKey = "countries" | "languages" | "factions" | "groups" | "artists";
+
 interface FacetGroupProps {
   title: string;
+  /** Qué faceta pinta este grupo: viaja a `onToggle`, así un solo manejador sirve a todos. */
+  facet: FacetKey;
   buckets: FacetBucket[];
   selected: string[];
-  onToggle: (value: string) => void;
+  onToggle: (facet: FacetKey, value: string) => void;
   initialOpen?: boolean;
   showFlag?: boolean;
   max?: number;
@@ -28,6 +33,7 @@ interface FacetGroupProps {
 
 function FacetGroup({
   title,
+  facet,
   buckets,
   selected,
   onToggle,
@@ -35,7 +41,7 @@ function FacetGroup({
   showFlag = false,
   max = 14,
   nombre,
-}: FacetGroupProps) {
+}: Readonly<FacetGroupProps>) {
   const { t } = useI18n();
   const [open, setOpen] = useState(initialOpen);
   const [showAll, setShowAll] = useState(false);
@@ -94,7 +100,7 @@ function FacetGroup({
                   <input
                     type="checkbox"
                     checked={active}
-                    onChange={() => onToggle(value)}
+                    onChange={() => onToggle(facet, value)}
                     className="h-3.5 w-3.5 accent-dex-accent"
                   />
                   {showFlag && (
@@ -143,7 +149,7 @@ export function FilterPanel({
   onChange,
   onReset,
   loading = false,
-}: FilterPanelProps) {
+}: Readonly<FilterPanelProps>) {
   const { t, locale } = useI18n();
   const activeCount =
     params.countries.length +
@@ -151,6 +157,21 @@ export function FilterPanel({
     params.groups.length +
     params.artists.length +
     params.factions.length;
+
+  const alternar = useCallback(
+    (facet: FacetKey, value: string) =>
+      onChange({ [facet]: toggleValue(params[facet], value), page: 1 }),
+    [onChange, params],
+  );
+  const nombrePais = useCallback(
+    (bucket: FacetBucket) => nombreDePais(locale, bucket),
+    [locale],
+  );
+  const nombreIdioma = useCallback(
+    (bucket: FacetBucket) =>
+      nombreDeIdioma(locale, bucket.code ?? facetValue(bucket), bucket.name),
+    [locale],
+  );
 
   return (
     <div
@@ -181,48 +202,41 @@ export function FilterPanel({
 
       <FacetGroup
         title={t("filtros.pais")}
+        facet="countries"
         buckets={facets?.countries ?? []}
         selected={params.countries}
-        onToggle={(value) =>
-          onChange({ countries: toggleValue(params.countries, value), page: 1 })
-        }
+        onToggle={alternar}
         showFlag
-        nombre={(bucket) => nombreDePais(locale, bucket)}
+        nombre={nombrePais}
       />
       <FacetGroup
         title={t("filtros.idioma")}
+        facet="languages"
         buckets={facets?.languages ?? []}
         selected={params.languages}
-        onToggle={(value) =>
-          onChange({ languages: toggleValue(params.languages, value), page: 1 })
-        }
-        nombre={(bucket) =>
-          nombreDeIdioma(locale, bucket.code ?? facetValue(bucket), bucket.name)
-        }
+        onToggle={alternar}
+        nombre={nombreIdioma}
       />
       <FacetGroup
         title={t("filtros.faccion")}
+        facet="factions"
         buckets={facets?.factions ?? []}
         selected={params.factions}
-        onToggle={(value) =>
-          onChange({ factions: toggleValue(params.factions, value), page: 1 })
-        }
+        onToggle={alternar}
       />
       <FacetGroup
         title={t("filtros.grupo")}
+        facet="groups"
         buckets={facets?.groups ?? []}
         selected={params.groups}
-        onToggle={(value) =>
-          onChange({ groups: toggleValue(params.groups, value), page: 1 })
-        }
+        onToggle={alternar}
       />
       <FacetGroup
         title={t("filtros.artista")}
+        facet="artists"
         buckets={facets?.artists ?? []}
         selected={params.artists}
-        onToggle={(value) =>
-          onChange({ artists: toggleValue(params.artists, value), page: 1 })
-        }
+        onToggle={alternar}
       />
     </div>
   );

@@ -16,13 +16,13 @@ export function LikeButton({
   slug,
   likes,
   onChange,
-}: {
+}: Readonly<{
   slug: string;
   /** Total que trajo la ficha: se muestra de inmediato, antes de saber el estado del visitante. */
   likes: number;
   /** Tras cambiar (like dado o estado leído) el padre actualiza nivel y barra de experiencia. */
   onChange?: (resumen: LikeResumen) => void;
-}) {
+}>) {
   const { t } = useI18n();
   const [total, setTotal] = useState(likes);
   const [liked, setLiked] = useState<boolean | null>(null);
@@ -99,20 +99,29 @@ export function LikeButton({
           {total}
         </span>
       </button>
-      <p
-        role="status"
-        className="text-xs text-dex-muted"
+      <output
+        className="block text-xs text-dex-muted"
         data-testid="like-message"
       >
-        {mensaje ??
-          (liked === false
-            ? t("like.ayuda", { xp: xp ?? 10 })
-            : liked
-              ? t("like.manana")
-              : "")}
-      </p>
+        {mensaje ?? ayudaDelLike(liked, xp, t)}
+      </output>
     </div>
   );
+}
+
+/**
+ * Texto bajo el botón cuando no hay un mensaje del servidor: la ayuda antes del like, «vuelve
+ * mañana» después, y nada mientras aún no se sabe (`liked` nulo: no se adelanta ninguno).
+ */
+function ayudaDelLike(
+  liked: boolean | null,
+  xp: number | null | undefined,
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  if (liked === false) {
+    return t("like.ayuda", { xp: xp ?? 10 });
+  }
+  return liked ? t("like.manana") : "";
 }
 
 export default LikeButton;

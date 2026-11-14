@@ -8,7 +8,7 @@
  *
  * Los assets (logo y cruz de Teletón) son de VRTon (repo `VRTon/ASSETS2025`), cuya licencia
  * permite derivados no comerciales a condición de enlazar visiblemente a https://vrton.org/:
- * todo el pendón es ese enlace. Las imágenes viven en `components/vrton/` (recortadas y en WebP;
+ * el pendón entero es ese enlace. Las imágenes viven en `components/vrton/` (recortadas y en WebP;
  * `public/` está en .gitignore, así que no viajarían al deploy).
  */
 import { useI18n } from "@/lib/i18n";
@@ -86,7 +86,7 @@ function Estandarte() {
   );
 }
 
-function Pendon({ lado }: { lado: "izquierdo" | "derecho" }) {
+function Pendon({ lado }: Readonly<{ lado: "izquierdo" | "derecho" }>) {
   const { t } = useI18n();
   return (
     <aside
@@ -153,10 +153,10 @@ export const VRTON_VISIBLE = false;
 export function VrtonBanners({
   children,
   visible = VRTON_VISIBLE,
-}: {
+}: Readonly<{
   children: React.ReactNode;
   visible?: boolean;
-}) {
+}>) {
   // Mismo `grid gap-3` que con los pendones: los hijos conservan su separación vertical.
   if (!visible) {
     return <div className="grid gap-3">{children}</div>;

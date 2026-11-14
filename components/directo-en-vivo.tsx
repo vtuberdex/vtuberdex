@@ -20,10 +20,10 @@ const NOMBRES = { twitch: "Twitch", youtube: "YouTube", kick: "Kick" } as const;
 export function DirectoEnVivo({
   slug,
   palette,
-}: {
+}: Readonly<{
   slug: string;
   palette: { accent: string; secondary: string };
-}) {
+}>) {
   const { t, locale } = useI18n();
   const [canales, setCanales] = useState<CanalDirecto[]>([]);
 

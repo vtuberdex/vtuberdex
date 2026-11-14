@@ -29,7 +29,7 @@ export interface SkillListProps {
   palette: { accent: string; secondary: string };
 }
 
-export function SkillList({ skills, palette }: SkillListProps) {
+export function SkillList({ skills, palette }: Readonly<SkillListProps>) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState<string | null>(skills[0]?.name ?? null);
 

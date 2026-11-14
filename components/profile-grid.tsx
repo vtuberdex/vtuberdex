@@ -10,7 +10,7 @@ export interface ProfileGridProps {
   palette: { accent: string; secondary: string };
 }
 
-export function ProfileGrid({ profile, palette }: ProfileGridProps) {
+export function ProfileGrid({ profile, palette }: Readonly<ProfileGridProps>) {
   const { t, locale } = useI18n();
   if (profile.length === 0) {
     return (

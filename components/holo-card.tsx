@@ -12,16 +12,23 @@
  *   5 tags        · tags / facciones / barra de stats
  *   6 wordmark    · VTUBERDEX
  *
- * El usuario pidió empezar con TODO el texto PLANO (sin metal, sin sombras) y
+ * El usuario pidió empezar con el texto ENTERO PLANO (sin metal, sin sombras) y
  * luego añadir efectos capa por capa. Las 7 texturas y su sincronización con el
  * shader viven en `card-material.ts` (`useCardMaterials`), que comparte este archivo
  * con el libro del catálogo (`card-binder.tsx`); aquí queda la ESCENA de una carta
  * suelta: su cámara, su inclinación hacia el puntero y su flotación. Los efectos se
  * activan desde `card3d-config.ts` y `card-texture.ts` sin ensuciar el shader.
  */
-import { Component, useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  Component,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import * as THREE from "three";
+import type { Group } from "three";
 
 import type { VtuberCard } from "@/lib/types";
 import { cardPalette } from "@/lib/color";
@@ -84,7 +91,7 @@ const ZERO_TILT = { x: 0, y: 0 };
  * tanto como una carta suelta sin salirse del encuadre.
  */
 export function usePointerTilt(
-  ref: React.RefObject<THREE.Group | null>,
+  ref: React.RefObject<Group | null>,
   amounts: PointerTiltAmounts = CFG.MOTION,
 ) {
   const target = useRef({ x: 0, y: 0 });
@@ -141,10 +148,10 @@ export function usePointerTilt(
 export function CardMeshes({
   mats,
   card,
-}: {
+}: Readonly<{
   mats: CardMaterials;
   card?: VtuberCard;
-}) {
+}>) {
   const premium = card?.premium ?? null;
   const mallas = (
     <>
@@ -191,8 +198,8 @@ function CardMesh({
   holo = CFG.INTENSITY.holo.default,
   gloss = CFG.INTENSITY.gloss.default,
   textureWidth,
-}: HoloCardSceneProps) {
-  const group = useRef<THREE.Group>(null);
+}: Readonly<HoloCardSceneProps>) {
+  const group = useRef<Group>(null);
   const pointer = usePointerTilt(group);
   const { camera } = useThree();
   const mats = useCardMaterials(card, {
@@ -238,10 +245,10 @@ function CardMesh({
 export function Rig({
   accent,
   cameraZ = CARD_CAMERA_Z,
-}: {
+}: Readonly<{
   accent: string;
   cameraZ?: number;
-}) {
+}>) {
   const shift = cameraZ - CARD_CAMERA_Z;
   return (
     <>
@@ -306,7 +313,7 @@ export function HoloCard({
   gloss = CFG.INTENSITY.gloss.default,
   className,
   textureWidth,
-}: HoloCardProps) {
+}: Readonly<HoloCardProps>) {
   const recovery = useWebGLRecovery();
   const palette = useMemo(
     () => cardPalette(card.themeColor, card.secondaryColor),
@@ -318,6 +325,12 @@ export function HoloCard({
     dpr: [1, CFG.RENDER.dprMax] as [number, number],
     textureWidth: textureWidth ?? CARD_TEXTURE_FULL_WIDTH,
   };
+  const { attach } = recovery;
+  const onCanvasCreated = useCallback(
+    ({ gl }: { gl: { domElement: HTMLCanvasElement } }) =>
+      attach(gl.domElement),
+    [attach],
+  );
 
   /**
    * `relative` en la raíz y el canvas dentro de una caja POSICIONADA.
@@ -368,7 +381,7 @@ export function HoloCard({
                 fov: CFG.GEOMETRY.cameraFov,
                 position: [0, 0, cameraZFor(card)],
               }}
-              onCreated={({ gl }) => recovery.attach(gl.domElement)}
+              onCreated={onCanvasCreated}
             >
               <RenderGovernor wake={card} idleFps={CFG.RENDER.idleFpsDetail} />
               <Rig accent={palette.accent} cameraZ={cameraZFor(card)} />

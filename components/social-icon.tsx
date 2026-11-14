@@ -87,7 +87,7 @@ export function SocialIcon({
   url = "",
   className = "h-4 w-4",
   color,
-}: SocialIconProps) {
+}: Readonly<SocialIconProps>) {
   const red = redDe(platform, url);
   return (
     <svg

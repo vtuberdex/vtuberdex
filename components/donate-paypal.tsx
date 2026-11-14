@@ -24,7 +24,9 @@ import {
 import { DONACION_POR_GRADO } from "@/lib/premium";
 import type { PremiumInfo } from "@/lib/types";
 
-export function PayPalLogo({ className = "h-6 w-6" }: { className?: string }) {
+export function PayPalLogo({
+  className = "h-6 w-6",
+}: Readonly<{ className?: string }>) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -131,12 +133,12 @@ export function DonatePayPal({
   premium,
   card,
   merchantId = PAYPAL_MERCHANT_ID,
-}: {
+}: Readonly<{
   premium?: PremiumInfo | null;
   card?: { dexNumber: number; name: string };
   /** Solo para probar el formato con referencia; por defecto, el de `lib/donar.ts`. */
   merchantId?: string;
-}) {
+}>) {
   const { t } = useI18n();
   const [copiado, setCopiado] = useState<boolean | null>(null);
   // Una carta en Black Label ya está en lo más alto: no hay nada que subir con una donación.

@@ -294,12 +294,14 @@ export function planPlacements<T extends Identified>(
     ];
   }
   const incomingIds = new Set(incoming.map((card) => card.id));
-  const outgoing = flip.outgoing.filter((card) => !incomingIds.has(card.id));
+  const outgoing = new Set(
+    flip.outgoing.filter((card) => !incomingIds.has(card.id)),
+  );
   const outgoingLeft = splitLeft(flip.outgoing).filter((card) =>
-    outgoing.includes(card),
+    outgoing.has(card),
   );
   const outgoingRight = splitRight(flip.outgoing).filter((card) =>
-    outgoing.includes(card),
+    outgoing.has(card),
   );
 
   const place = <U>(

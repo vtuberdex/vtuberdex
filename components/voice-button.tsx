@@ -45,10 +45,10 @@ const ESTILO_FLOTANTE =
 export function VoiceButton({
   slug,
   flotante = false,
-}: {
+}: Readonly<{
   slug: string;
   flotante?: boolean;
-}) {
+}>) {
   const { t } = useI18n();
   const audio = useRef<HTMLAudioElement>(null);
   const [disponible, setDisponible] = useState(false);
@@ -79,7 +79,7 @@ export function VoiceButton({
   useEffect(() => {
     const el = audio.current;
     if (!disponible || !el) {
-      return;
+      return undefined;
     }
     if (!silenciada) {
       reproducir();
@@ -135,46 +135,62 @@ export function VoiceButton({
       >
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path d="M4 9v6h4l5 4V5L8 9H4Z" fill="currentColor" />
-          {silenciada || !sonando ? (
-            silenciada ? (
-              <path
-                d="m17 9 5 6m0-6-5 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            ) : (
-              <path
-                d="M16 9.5a4 4 0 0 1 0 5"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                opacity="0.5"
-              />
-            )
-          ) : (
-            <>
-              <path
-                d="M16 9a4.5 4.5 0 0 1 0 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-              <path
-                d="M18.5 6.5a8 8 0 0 1 0 11"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </>
-          )}
+          <OndasDelParlante silenciada={silenciada} sonando={sonando} />
         </svg>
-        {sonando
-          ? t("voz.silenciar")
-          : silenciada
-            ? t("voz.silenciada")
-            : t("voz.escuchar")}
+        {t(claveDelRotulo(sonando, silenciada))}
       </button>
+    </>
+  );
+}
+
+/** Sonando ofrece silenciar; si no, dice si está silenciada o invita a escuchar. */
+function claveDelRotulo(sonando: boolean, silenciada: boolean) {
+  if (sonando) {
+    return "voz.silenciar" as const;
+  }
+  return silenciada ? ("voz.silenciada" as const) : ("voz.escuchar" as const);
+}
+
+/** Lo que sale del parlante: una cruz si está silenciada, ondas si suena, una onda tenue en reposo. */
+function OndasDelParlante({
+  silenciada,
+  sonando,
+}: Readonly<{ silenciada: boolean; sonando: boolean }>) {
+  if (silenciada) {
+    return (
+      <path
+        d="m17 9 5 6m0-6-5 6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    );
+  }
+  if (!sonando) {
+    return (
+      <path
+        d="M16 9.5a4 4 0 0 1 0 5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        opacity="0.5"
+      />
+    );
+  }
+  return (
+    <>
+      <path
+        d="M16 9a4.5 4.5 0 0 1 0 6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M18.5 6.5a8 8 0 0 1 0 11"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </>
   );
 }

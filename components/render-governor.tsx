@@ -79,7 +79,8 @@ export function RenderGovernor({
     };
     const sincronizar = () => {
       if (pausado()) {
-        return parar();
+        parar();
+        return;
       }
       if (raf) {
         return;

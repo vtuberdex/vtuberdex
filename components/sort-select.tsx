@@ -15,10 +15,10 @@ const OPTIONS: Array<{ value: SortKey; label: Clave }> = [
 export function SortSelect({
   value,
   onChange,
-}: {
+}: Readonly<{
   value: SortKey;
   onChange: (value: SortKey) => void;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <label className="inline-flex items-center gap-2 text-xs text-dex-muted">

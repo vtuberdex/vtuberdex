@@ -34,7 +34,7 @@ import * as CFG from "@/components/card3d-config";
  * Ese fallo es INVISIBLE para todo el stack estático: `tsc` ve una cadena, los tests
  * pasan, `next build` pasa y `check-shaders.mjs` no mira valores. Solo se ve en el
  * navegador, como `THREE.WebGLProgram: Shader Error ... Fragment shader is not
- * compiled` y la carta negra. Por eso TODO número de la config pasa por aquí: no se
+ * compiled` y la carta negra. Por eso CADA número de la config pasa por aquí: no se
  * interpola un `CFG` a pelo en el GLSL.
  */
 const f = (n: number): string => (Number.isInteger(n) ? `${n}.0` : String(n));

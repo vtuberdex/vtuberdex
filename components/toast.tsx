@@ -26,7 +26,10 @@ const ICON = {
   error: "✕",
 };
 
-export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
+export function ToastContainer({
+  toasts,
+  onRemove,
+}: Readonly<ToastContainerProps>) {
   return (
     <div className="fixed right-4 top-4 z-50 flex flex-col gap-2">
       {toasts.map((toast) => (
@@ -39,10 +42,10 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
 function Toast({
   toast,
   onRemove,
-}: {
+}: Readonly<{
   toast: ToastItem;
   onRemove: (id: string) => void;
-}) {
+}>) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -64,8 +67,7 @@ function Toast({
       : "border-red-500/40 bg-red-500/15 text-red-100";
 
   return (
-    <div
-      role="status"
+    <output
       data-testid={`toast-${toast.kind}`}
       className={`flex max-w-xs items-start gap-2 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm transition-all duration-300 ${colors} ${
         visible ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
@@ -84,7 +86,7 @@ function Toast({
       >
         ×
       </button>
-    </div>
+    </output>
   );
 }
 
@@ -101,10 +103,16 @@ export function useToasts() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const add = useCallback((kind: ToastItem["kind"], text: string) => {
-    const id =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `${Date.now()}-${++secuenciaDeToasts}`;
+    let id: string;
+    if (
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
+    ) {
+      id = crypto.randomUUID();
+    } else {
+      secuenciaDeToasts += 1;
+      id = `${Date.now()}-${secuenciaDeToasts}`;
+    }
     setToasts((current) => [...current, { id, kind, text }]);
     return id;
   }, []);
