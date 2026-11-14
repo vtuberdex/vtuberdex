@@ -179,9 +179,24 @@ if (SIN_REDEPLOY) {
 }
 
 // --- 4. comprobar el resultado, no la intención ---------------------------
+/** Con el diagnóstico del 401: qué falló, el usuario, la contraseña o ambos. */
+function explicarLoginRechazado(d) {
+  if (!d.usuarioOk) {
+    console.log(
+      `  El USUARIO no es el esperado: el campo pide "${d.usuarioEsperado}".`,
+    );
+  }
+  if (!d.claveOk) {
+    console.log(
+      "  La CONTRASEÑA no corresponde al hash que quedó en producción.",
+    );
+    explicarHash(d.hash);
+  }
+}
+
 /** Con la contraseña rechazada: ¿falta redeployar o el hash guardado está mal formado? */
-function explicarHash(hash) {
-  if (hash?.valido) {
+function explicarHash(diagnostico) {
+  if (diagnostico?.valido) {
     console.log(
       "  El hash está bien formado, así que el despliegue que sirve todavía no",
     );
@@ -190,7 +205,7 @@ function explicarHash(hash) {
     );
     return;
   }
-  for (const p of hash?.problemas ?? []) {
+  for (const p of diagnostico?.problemas ?? []) {
     console.log(`    · ${p}`);
   }
 }
@@ -228,17 +243,7 @@ if (SIN_VERIFICAR) {
     console.log("");
     const d = login.cuerpo ?? {};
     if (typeof d.usuarioOk === "boolean") {
-      if (!d.usuarioOk) {
-        console.log(
-          `  El USUARIO no es el esperado: el campo pide "${d.usuarioEsperado}".`,
-        );
-      }
-      if (!d.claveOk) {
-        console.log(
-          "  La CONTRASEÑA no corresponde al hash que quedó en producción.",
-        );
-        explicarHash(d.hash);
-      }
+      explicarLoginRechazado(d);
     } else {
       console.log(
         "  El despliegue que sirve producción es anterior al diagnóstico: vuelve a",

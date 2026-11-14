@@ -133,4 +133,48 @@ describe("quitarPreambuloDeIA", () => {
       expect(quitarPreambuloDeIA(t)).toBe(t);
     }
   });
+
+  it("da lo mismo que el regex original (antes de recorrerlo a mano)", () => {
+    // El patrón de antes, tal cual: la referencia de la semántica.
+    const original =
+      /^(?:[¡!]?\s*(?:hola|claro|por supuesto|vale|listo)\b[^:.!?]{0,40}[!.,]?\s*)?(?:aqu[ií] (?:tienes|est[aá]|va)|te (?:dejo|paso|presento))\b[^:]{0,200}(?:versi[oó]n|texto|presentaci[oó]n|descripci[oó]n|historia|biograf[ií]a|lore)[^:]{0,200}:\s*/i;
+    const conOriginal = (t: string) => {
+      const m = original.exec(t);
+      return m ? t.slice(m[0].length) : t;
+    };
+    const piezas = [
+      "¡", "!", " ", "  ", "\n", "Hola", "hola", "CLARO", "Por supuesto", "vale", "listo",
+      "listos", ",", ".", "?", ":", " Paima", "aquí tienes", "Aquí está", "aqui va", "te dejo",
+      "te paso", "te presento", "tienes", "la versión", "tu texto", "LORE", "historia", "biografía",
+      "x".repeat(35), "y".repeat(190), "z".repeat(9), "ñ", "á",
+    ];
+    // Generador determinista (Park-Miller: el producto cabe exacto en un double), para que la prueba
+    // no cambie de una corrida a otra.
+    let semilla = 12345;
+    const azar = (n: number) => {
+      semilla = (semilla * 48271) % 2147483647;
+      return semilla % n;
+    };
+    let conPreambulo = 0;
+    for (let k = 0; k < 4000; k += 1) {
+      let t = "";
+      const n = 1 + azar(12);
+      for (let j = 0; j < n; j += 1) {
+        t += piezas[azar(piezas.length)];
+      }
+      if (azar(2)) {
+        t = `${["", "¡Hola, Paima! ", "Claro, ", "Por supuesto. "][azar(4)]}${["Aquí tienes", "te dejo", "aquí va"][azar(3)]}${t}`;
+      }
+      if (azar(2)) {
+        t += ["la historia", " texto", "lore"][azar(3)] + [": fin", ":  ¡Soy yo!", ""][azar(3)];
+      }
+      const esperado = conOriginal(t);
+      if (esperado !== t) {
+        conPreambulo += 1;
+      }
+      expect(quitarPreambuloDeIA(t), JSON.stringify(t)).toBe(esperado);
+    }
+    // Que la comparación ejercite los dos caminos, no solo «no toca nada».
+    expect(conPreambulo).toBeGreaterThan(100);
+  });
 });

@@ -38,15 +38,9 @@ export function fichaDeLaSolicitud(db, referencia) {
 
   // Nombre Y número a la vez: la ficha que cumple las dos cosas gana a cualquier otra con el mismo
   // slug o nombre (con dos fichas llamadas igual, «#77 GKuro» no puede caer en la primera por slug).
-  if (hayDex && nombre) {
-    const exactas = db
-      .prepare(
-        "SELECT slug FROM vtuber WHERE dex_number = ? AND search_name = ?",
-      )
-      .all(Number(dex), nombre);
-    if (exactas.length === 1) {
-      return getVtuberBySlug(db, exactas[0].slug, { includeHidden: true });
-    }
+  const exacta = hayDex && nombre ? fichaPorDexYNombre(db, dex, nombre) : null;
+  if (exacta) {
+    return exacta;
   }
 
   const porSlug = fichaPorSlugs(db, [
@@ -65,14 +59,11 @@ export function fichaDeLaSolicitud(db, referencia) {
     return getVtuberBySlug(db, porNombre[0].slug, { includeHidden: true });
   }
 
-  if (hayDex) {
-    const porDex = db
-      .prepare("SELECT slug FROM vtuber WHERE dex_number = ?")
-      .all(Number(dex));
-    const pool = candidatasPorDex(porNombre, porDex, nombre);
-    if (pool.length === 1) {
-      return getVtuberBySlug(db, pool[0].slug, { includeHidden: true });
-    }
+  const desempatada = hayDex
+    ? fichaPorDexDesempatada(db, dex, porNombre, nombre)
+    : null;
+  if (desempatada) {
+    return desempatada;
   }
 
   const detalle =
@@ -80,6 +71,30 @@ export function fichaDeLaSolicitud(db, referencia) {
       ? "hay varias fichas con ese nombre: pídele su dirección /v/…"
       : "no se encontró esa ficha";
   throw new SolicitudError(404, "ficha_no_encontrada", detalle);
+}
+
+/** La ficha con ese número de dex Y ese nombre, si hay exactamente una; si no, `null`. */
+function fichaPorDexYNombre(db, dex, nombre) {
+  const exactas = db
+    .prepare("SELECT slug FROM vtuber WHERE dex_number = ? AND search_name = ?")
+    .all(Number(dex), nombre);
+  return exactas.length === 1
+    ? getVtuberBySlug(db, exactas[0].slug, { includeHidden: true })
+    : null;
+}
+
+/**
+ * El número de dex como desempate (o como lo único escrito): la ficha si las candidatas se reducen a
+ * una; si no, `null`.
+ */
+function fichaPorDexDesempatada(db, dex, porNombre, nombre) {
+  const porDex = db
+    .prepare("SELECT slug FROM vtuber WHERE dex_number = ?")
+    .all(Number(dex));
+  const pool = candidatasPorDex(porNombre, porDex, nombre);
+  return pool.length === 1
+    ? getVtuberBySlug(db, pool[0].slug, { includeHidden: true })
+    : null;
 }
 
 /**

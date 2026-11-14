@@ -251,25 +251,37 @@ function credencialesDeTurso(envFile) {
   let token = value("turso-token", process.env.TURSO_AUTH_TOKEN ?? "");
   let deArchivo = null;
   if ((!url || !token) && fs.existsSync(envFile)) {
-    const env = leerEnvFile(envFile);
-    url = url || env.TURSO_DATABASE_URL || "";
-    token = token || env.TURSO_AUTH_TOKEN || "";
+    ({ url, token } = completarDesdeEnvFile(envFile, url, token));
     deArchivo = envFile;
   }
   if (!url) {
-    console.error("✖ falta la URL de Turso.");
-    console.error(
-      "  Pásala con --turso-url o TURSO_DATABASE_URL, o deja un .env-file legible.",
-    );
-    console.error(
-      "  Las de PRODUCCIÓN están marcadas *sensitive* en Vercel y no se pueden leer:",
-    );
-    console.error(
-      "  usa las de *development* (npx vercel env pull --environment=development).",
-    );
-    process.exit(1);
+    salirSinUrlDeTurso();
   }
   return { url, token, deArchivo };
+}
+
+/** Rellena lo que falte de URL y token con el `.env-file`; lo que ya venía de opciones o entorno manda. */
+function completarDesdeEnvFile(envFile, url, token) {
+  const env = leerEnvFile(envFile);
+  return {
+    url: url || env.TURSO_DATABASE_URL || "",
+    token: token || env.TURSO_AUTH_TOKEN || "",
+  };
+}
+
+/** Sin URL no hay nada que bajar: explica de dónde sacarla y sale con código 1. */
+function salirSinUrlDeTurso() {
+  console.error("✖ falta la URL de Turso.");
+  console.error(
+    "  Pásala con --turso-url o TURSO_DATABASE_URL, o deja un .env-file legible.",
+  );
+  console.error(
+    "  Las de PRODUCCIÓN están marcadas *sensitive* en Vercel y no se pueden leer:",
+  );
+  console.error(
+    "  usa las de *development* (npx vercel env pull --environment=development).",
+  );
+  process.exit(1);
 }
 
 /**

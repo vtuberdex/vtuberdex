@@ -184,7 +184,7 @@ function esCorreoValido(valor) {
     return false;
   }
   const arroba = valor.indexOf("@");
-  if (arroba < 1 || valor.indexOf("@", arroba + 1) >= 0) {
+  if (arroba < 1 || valor.includes("@", arroba + 1)) {
     return false;
   }
   const dominio = valor.slice(arroba + 1);

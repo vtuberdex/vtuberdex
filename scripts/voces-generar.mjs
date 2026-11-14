@@ -145,15 +145,15 @@ async function procesar(ficha) {
 }
 
 async function fichasPublicadas(db) {
-  const todas = [];
+  const fichas = [];
   for (let pagina = 1; ; pagina += 1) {
     const r = searchVtubers(db, { sort: "dex", page: pagina, perPage: 100 });
-    todas.push(...r.items);
+    fichas.push(...r.items);
     if (pagina >= r.pageCount) {
       break;
     }
   }
-  return todas;
+  return fichas;
 }
 
 const resumen = new Map();

@@ -756,7 +756,7 @@ export async function premiarDirecto(
   }
   const id = Number(vtuberId);
   if (!Number.isInteger(id)) {
-    throw new Error(`ficha inválida: ${vtuberId}`);
+    throw new TypeError(`ficha inválida: ${vtuberId}`);
   }
   const tramo = Math.floor(ahora / (DIRECTO_TRAMO_MIN * 60_000));
   const clave = `directo:${id}:${tramo}`;

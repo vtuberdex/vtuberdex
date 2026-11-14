@@ -215,7 +215,7 @@ function redimensionar(pipeline, spec) {
  */
 function tamanoDeSubida(buffer) {
   if (!Buffer.isBuffer(buffer)) {
-    throw new Error("archivo_vacio");
+    throw new TypeError("archivo_vacio");
   }
   const tamano = buffer.byteLength;
   if (tamano === 0) {
