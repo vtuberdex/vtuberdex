@@ -128,7 +128,7 @@ const QUALITY_CHECKS = [
 
 function detectQualityFlags(card, detail) {
   return QUALITY_CHECKS.filter(([, falta]) => falta(card, detail)).map(
-    ([flag]) => flag,
+    ([marca]) => marca,
   );
 }
 
@@ -443,7 +443,23 @@ const RESET_TABLES = [
   "vtuber_fts",
 ];
 
-/** Columnas de `vtuber` que salen del dataset (todas menos `dex_number`, que es la clave). */
+/** Los valores de `claves` en `obj`, con `null` donde falte (o falte el propio `obj`). */
+function camposONull(obj, claves) {
+  return claves.map((clave) => obj?.[clave] ?? null);
+}
+
+/** `hasDetail`, `indexImage` y `detailUrl` del origen del scrape, en ese orden. */
+function columnasDeOrigen(source) {
+  return [
+    source?.hasDetail ? 1 : 0,
+    ...camposONull(source, ["indexImage", "detailUrl"]),
+  ];
+}
+
+/**
+ * Columnas de `vtuber` que salen del dataset (todas menos `dex_number`, que es la clave). Los grupos de
+ * campos opcionales salen de `camposONull` para que esta lista se lea como el orden de las columnas.
+ */
 function vtuberColumns(payload, detail) {
   const rawStats = buildStats(payload);
   const hp = rawStats.find((stat) => stat.slug === "hp");
@@ -455,26 +471,20 @@ function vtuberColumns(payload, detail) {
     payload.name,
     normalizeText(payload.name),
     payload.alt ?? null,
-    detail.phrase ?? null,
-    detail.phraseHtml ?? null,
-    detail.theme ?? null,
-    detail.favoriteColor ?? null,
+    ...camposONull(detail, ["phrase", "phraseHtml", "theme", "favoriteColor"]),
     JSON.stringify(detail.palette ?? []),
-    detail.birthday ?? null,
-    detail.height ?? null,
-    detail.hashtag ?? null,
-    detail.favoriteColor ?? null,
-    detail.level ?? null,
-    detail.experience?.current ?? null,
-    detail.experience?.max ?? null,
-    hp?.value ?? null,
-    hp?.max ?? null,
-    mp?.value ?? null,
-    mp?.max ?? null,
+    ...camposONull(detail, [
+      "birthday",
+      "height",
+      "hashtag",
+      "favoriteColor",
+      "level",
+    ]),
+    ...camposONull(detail.experience, ["current", "max"]),
+    ...camposONull(hp, ["value", "max"]),
+    ...camposONull(mp, ["value", "max"]),
     powerScore(rawStats),
-    payload.source?.hasDetail ? 1 : 0,
-    payload.source?.indexImage ?? null,
-    payload.source?.detailUrl ?? null,
+    ...columnasDeOrigen(payload.source),
     JSON.stringify(quality),
   ];
 }

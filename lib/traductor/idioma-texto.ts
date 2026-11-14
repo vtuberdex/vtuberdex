@@ -25,7 +25,7 @@ const LETRA = /\p{L}/gu;
 
 /** Cuántas coincidencias de un regex global hay en el texto. */
 const cuantas = (texto: string, patron: RegExp) =>
-  texto.match(patron)?.length ?? 0;
+  Array.from(texto.matchAll(patron)).length;
 
 export function idiomaDelTexto(texto: string): Locale | null {
   const t = texto.trim();

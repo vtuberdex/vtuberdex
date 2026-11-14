@@ -33,12 +33,17 @@ function describirFallo(hallazgos) {
   return `ambiguo → ${lista.join(", ")}`;
 }
 
-let accion = "graduada";
-if (seco) {
-  accion = "se marcaría";
-} else if (quitar) {
-  accion = "desmarcada";
+/** Qué se le dice a cada nombre según el modo: `--seco` manda sobre `--quitar`. */
+function accionDelModo() {
+  if (seco) {
+    return "se marcaría";
+  }
+  if (quitar) {
+    return "desmarcada";
+  }
+  return "graduada";
 }
+const accion = accionDelModo();
 
 let problemas = 0;
 for (const nombre of nombres) {

@@ -30,7 +30,7 @@ export async function otorgarExp(ejecutor, { cambioId, tipo, actor, ahora = Date
   }
   const id = Number(cambioId);
   if (!Number.isInteger(id)) {
-    throw new Error(`cambio inválido: ${cambioId}`);
+    throw new TypeError(`cambio inválido: ${cambioId}`);
   }
   const e = await tabla(ejecutor);
   const r = await e.execute(
