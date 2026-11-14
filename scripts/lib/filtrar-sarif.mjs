@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Quita de un SARIF los hallazgos que `sonar-project.properties` ya declara revisados
  * (`sonar.issue.ignore.multicriteria.*`: regla + archivo).
