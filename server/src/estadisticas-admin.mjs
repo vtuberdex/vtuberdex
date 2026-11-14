@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Estadísticas del panel del mantenedor (`GET /api/admin/stats`). Una sola definición para el Express
  * local y la ruta de Next: antes cada uno tenía sus tres consultas copiadas y el panel solo podía pintar

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Países e idiomas que ofrecen los formularios públicos, sacados de las facetas del catálogo. Si la API

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * CAPA 0 — LA SUPERFICIE DE LA CARTA (no una capa sobre ella).
  *
@@ -49,7 +50,9 @@ export function drawSurfaceLayer({
   width: number;
 }): HTMLCanvasElement {
   const { canvas, ctx, W, H } = createLayer(width);
-  if (!ctx) return canvas;
+  if (!ctx) {
+    return canvas;
+  }
 
   const { accent, secondary } = cardPalette(
     card.themeColor,

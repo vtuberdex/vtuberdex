@@ -31,7 +31,9 @@ const tmpRoot = () => {
   return dir;
 };
 after(() => {
-  for (const dir of raices) fs.rmSync(dir, { recursive: true, force: true });
+  for (const dir of raices) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 /** PNG opaco de color plano. */
@@ -248,8 +250,11 @@ test("el logo con alfa usa near-lossless (mejor para trazos finos)", async () =>
   let opacos = 0;
   let claros = 0;
   for (let i = 3; i < data.length; i += info.channels) {
-    if (data[i] > 250) opacos += 1;
-    else if (data[i] === 0) claros += 1;
+    if (data[i] > 250) {
+      opacos += 1;
+    } else if (data[i] === 0) {
+      claros += 1;
+    }
   }
   assert.ok(opacos > 0, "quedan trazos opacos");
   assert.ok(claros > 0, "queda fondo transparente");

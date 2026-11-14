@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Textos de los formularios de inscripción y modificación (es / en / ja). Mismas claves en los tres;
  * se mezclan en es.ts / en.ts / ja.ts. Lo que viaja al servidor (signos, claves de campos) sigue en

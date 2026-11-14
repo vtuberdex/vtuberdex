@@ -16,8 +16,9 @@ describe("sesión de visitante en el cliente", () => {
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
         llamadas.push(`${init?.method ?? "GET"} ${url}`);
-        if (url === "/api/sesion" && !init?.method)
+        if (url === "/api/sesion" && !init?.method) {
           return json(200, { reto: "1.a.b", bits: 1 });
+        }
         if (url === "/api/sesion") {
           sesion = true;
           return new Response(null, { status: 204 });
@@ -46,9 +47,12 @@ describe("sesión de visitante en el cliente", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
-        if (url === "/api/sesion" && !init?.method)
+        if (url === "/api/sesion" && !init?.method) {
           return json(200, { reto: "1.a.b", bits: 1 });
-        if (url === "/api/sesion") return new Response(null, { status: 204 });
+        }
+        if (url === "/api/sesion") {
+          return new Response(null, { status: 204 });
+        }
         return json(401, { error: "sesion_requerida" });
       }),
     );

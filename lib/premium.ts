@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Premium en la interfaz: la escala (reexportada del servidor, que es su única definición) y lo
  * que la carta 3D, la etiqueta y el mantenedor necesitan para mostrarla.
@@ -21,14 +22,16 @@ import {
   esBlackLabel as esBlackLabelServidor,
   gradoSiguiente as gradoSiguienteServidor,
   hoy,
-  numeroDeCertificado,
-  rangoDeGrado,
 } from "@/server/src/premium.mjs";
 
 import { esFichaDeteriorada as esFichaDeterioradaServidor } from "@/server/src/ficha-deteriorada.mjs";
 import type { PremiumGrade, PremiumInfo } from "@/lib/types";
 
-export { hoy, numeroDeCertificado, rangoDeGrado };
+export { hoy };
+export {
+  numeroDeCertificado,
+  rangoDeGrado,
+} from "@/server/src/premium.mjs";
 
 /** La escala completa, de menor a mayor. */
 export const GRADOS = GRADOS_SERVIDOR as readonly PremiumGrade[];
@@ -77,8 +80,9 @@ export const notaVisible = (grado: PremiumGrade): string =>
 /** Leyenda corta para chips: `GEM MINT 10`, `NM/MT 8`, `PRISTINE 10 · BLACK LABEL`. */
 export function leyendaDePremium(premium: Pick<PremiumInfo, "grade">): string {
   const { grade } = premium;
-  if (esGradoDegradado(grade))
+  if (esGradoDegradado(grade)) {
     return `${nombreDeGrado(grade)} ${grade} · DETERIORADA`;
+  }
   return esBlackLabel(grade)
     ? "PRISTINE 10 · BLACK LABEL"
     : `${nombreDeGrado(grade)} ${grade}`;
@@ -91,7 +95,9 @@ export function leyendaDePremium(premium: Pick<PremiumInfo, "grade">): string {
 export function mesesEntre(desde: string, hasta: string = hoy()): number {
   const [ay, am, ad] = desde.split("-").map(Number);
   const [by, bm, bd] = hasta.split("-").map(Number);
-  if (![ay, am, ad, by, bm, bd].every(Number.isFinite)) return 0;
+  if (![ay, am, ad, by, bm, bd].every(Number.isFinite)) {
+    return 0;
+  }
   const meses = (by - ay) * 12 + (bm - am) - (bd < ad ? 1 : 0);
   return Math.max(0, meses);
 }
@@ -101,10 +107,14 @@ export const mismoMes = (a: string, b: string = hoy()): boolean =>
   a.slice(0, 7) === b.slice(0, 7);
 
 /** ¿Es una ficha deteriorada (grado 1, la de las bajas)? El público no ve sus datos ni su logo. */
-export const esFichaDeteriorada = (
-  cartaOGrado:
-    { premium?: { grade: string } | null } | string | null | undefined,
-): boolean => esFichaDeterioradaServidor(cartaOGrado);
+/** Una carta (con su `premium`) o directamente su grado. */
+export type CartaOGrado =
+  | { premium?: { grade: string } | null }
+  | string
+  | null
+  | undefined;
+
+export const esFichaDeteriorada = (cartaOGrado: CartaOGrado): boolean => esFichaDeterioradaServidor(cartaOGrado);
 
 /**
  * Grado con que se pinta una ficha sin correo, SIN placa (no es una carta premium). Es el 6 y no el 4: el 4 rompía

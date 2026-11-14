@@ -33,9 +33,13 @@ test('el catálogo es coherente: ids únicos, metas positivas, contadores conoci
   const tope = GRADOS.indexOf(GRADO_MAXIMO_POR_MISIONES);
   for (const m of MISIONES) {
     assert.ok(Object.keys(m.requisitos).length > 0, m.id);
-    for (const meta of Object.values(m.requisitos)) assert.ok(Number.isInteger(meta) && meta > 0, m.id);
+    for (const meta of Object.values(m.requisitos)) {
+      assert.ok(Number.isInteger(meta), m.id);
+      assert.ok(meta > 0, m.id);
+    }
     if (m.tipo === 'grado') {
-      assert.ok(GRADOS.indexOf(m.grado) >= 0 && GRADOS.indexOf(m.grado) <= tope, m.id);
+      assert.ok(GRADOS.indexOf(m.grado) >= 0, m.id);
+      assert.ok(GRADOS.indexOf(m.grado) <= tope, m.id);
       assert.equal(m.xp, 0, 'las de grado no pagan XP: el premio es el grado');
     }
   }
@@ -118,9 +122,11 @@ test('el grado se reclama una sola vez, solo si la misión está completa, y se 
   const e = nuevo();
   const g6 = MISIONES.find((m) => m.id === 'grado-6');
   assert.equal((await error(reclamarGrado(e, { vtuberId: 7, misionId: 'grado-6' }))).code, 'mision_incompleta');
-  for (const [contador, meta] of Object.entries(g6.requisitos))
-    for (let hecho = 0; hecho < meta; hecho += AVANCE_POR_LOTE_MAX)
+  for (const [contador, meta] of Object.entries(g6.requisitos)) {
+    for (let hecho = 0; hecho < meta; hecho += AVANCE_POR_LOTE_MAX) {
       await registrarAvances(e, lote({ [contador]: Math.min(AVANCE_POR_LOTE_MAX, meta - hecho) }));
+    }
+  }
   let vista = await misionesDeFicha(e, { vtuberId: 7, dia: DIA });
   assert.equal(vista.grado.find((m) => m.id === 'grado-6').reclamable, true);
 
@@ -147,9 +153,11 @@ test('una misión secundaria no se puede reclamar como grado', async () => {
 test('un reclamo deja rastro con el grado anterior, se puede revocar una vez y no se puede volver a reclamar', async () => {
   const e = nuevo();
   const g7 = MISIONES.find((m) => m.id === 'grado-7');
-  for (const [contador, meta] of Object.entries(g7.requisitos))
-    for (let hecho = 0; hecho < meta; hecho += AVANCE_POR_LOTE_MAX)
+  for (const [contador, meta] of Object.entries(g7.requisitos)) {
+    for (let hecho = 0; hecho < meta; hecho += AVANCE_POR_LOTE_MAX) {
       await registrarAvances(e, lote({ [contador]: Math.min(AVANCE_POR_LOTE_MAX, meta - hecho) }));
+    }
+  }
   await reclamarGrado(e, { vtuberId: 7, misionId: 'grado-7', gradoActual: '6' });
   const [reclamo] = await listarReclamos(e);
   assert.deepEqual({ ...reclamo, reclamado: undefined }, { vtuberId: 7, misionId: 'grado-7', grado: '7', gradoPrevio: '6', reclamado: undefined, revocado: null });
@@ -164,9 +172,11 @@ test('un reclamo deja rastro con el grado anterior, se puede revocar una vez y n
 test('una carta sin grado previo guarda null; soltar un reclamo que falló borra su rastro', async () => {
   const e = nuevo();
   const g6 = MISIONES.find((m) => m.id === 'grado-6');
-  for (const [contador, meta] of Object.entries(g6.requisitos))
-    for (let hecho = 0; hecho < meta; hecho += AVANCE_POR_LOTE_MAX)
+  for (const [contador, meta] of Object.entries(g6.requisitos)) {
+    for (let hecho = 0; hecho < meta; hecho += AVANCE_POR_LOTE_MAX) {
       await registrarAvances(e, lote({ [contador]: Math.min(AVANCE_POR_LOTE_MAX, meta - hecho) }));
+    }
+  }
   await reclamarGrado(e, { vtuberId: 7, misionId: 'grado-6' });
   assert.equal((await listarReclamos(e))[0].gradoPrevio, null);
   await soltarReclamo(e, { vtuberId: 7, misionId: 'grado-6' });
@@ -176,7 +186,9 @@ test('una carta sin grado previo guarda null; soltar un reclamo que falló borra
 test('el resumen cuenta quién completó cada misión y el avance de quienes van en camino', async () => {
   const e = nuevo();
   await registrarAvances(e, lote({ jefes: 1 })); // completa «primer-jefe» (ficha 7)
-  for (let i = 0; i < 5; i += 1) await registrarAvances(e, lote({ distancia: 1000 }, { vtuberId: 8 })); // «gran-explorador» al 50 %
+  for (let i = 0; i < 5; i += 1) {
+    await registrarAvances(e, lote({ distancia: 1000 }, { vtuberId: 8 })); // «gran-explorador» al 50 %
+  }
   await registrarAvances(e, lote({ distancia: 1000 }, { vtuberId: 9 })); // al 10 %
   const r = Object.fromEntries((await resumenDeMisiones(e)).map((m) => [m.id, m]));
   assert.equal(r['primer-jefe'].completaron, 1);
@@ -199,8 +211,9 @@ test('las semanales acumulan de lunes a domingo, pagan una vez por semana y se r
   const e = nuevo();
   // Lunes a viernes de la misma semana: 100 monstruos por día completan «cazador-semanal» (500).
   let completadas = [];
-  for (const dia of ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'])
+  for (const dia of ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23']) {
     completadas.push(...(await registrarAvances(e, lote({ mobs: 100 }, { dia }))).completadas);
+  }
   assert.equal(completadas.filter((m) => m.id === 'cazador-semanal').length, 1);
   // 5 días × 25 de «cazador del día» (100 monstruos > 50) + 80 de la semanal.
   assert.equal(await xpDeJuego(e, 7), 5 * 25 + 80);

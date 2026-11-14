@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Banner de «Primeros pasos», descartable.
@@ -16,10 +17,10 @@ export const ONBOARDING_KEY = "vtuberdex.admin.onboarding.dismissed";
 export function GettingStarted({
   onGoFactions,
   onNewCard,
-}: {
+}: Readonly<{
   onGoFactions: () => void;
   onNewCard: () => void;
-}) {
+}>) {
   const [dismissed, setDismissed] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -30,7 +31,9 @@ export function GettingStarted({
     }
   }, []);
 
-  if (dismissed !== false) return null;
+  if (dismissed !== false) {
+    return null;
+  }
 
   const dismiss = () => {
     setDismissed(true);
@@ -65,15 +68,13 @@ export function GettingStarted({
           Crea o revisa las{" "}
           <button type="button" className="underline" onClick={onGoFactions}>
             facciones y sus emblemas
-          </button>
-          .
+          </button>.
         </li>
         <li>
           Crea una ficha con{" "}
           <button type="button" className="underline" onClick={onNewCard}>
             «Nueva carta»
-          </button>
-          .
+          </button>.
         </li>
         <li>Súbele las imágenes (personaje, logo y fondo).</li>
         <li>Publícala en el último paso del asistente.</li>

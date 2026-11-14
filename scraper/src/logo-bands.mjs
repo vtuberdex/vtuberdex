@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Constantes de la banda donde vive el logo dentro de la carta.
  * Viven en su propio módulo para que `extract-logo2.mjs` y `logo-edges.mjs`

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * La FICHA DETERIORADA: lo que el público deja de ver de una carta en el grado 1 (la de las bajas).
  *
@@ -19,7 +20,7 @@
 import { GRADO_DE_BAJA } from "./premium.mjs";
 
 /** Símbolos con los que se sustituyen las letras: ASCII, para que cualquier fuente los tenga. */
-const SIMBOLOS = "#%&@*?/\\~=+<>";
+const SIMBOLOS = String.raw`#%&@*?/\~=+<>`;
 
 /** ¿Es una ficha en el grado de las bajas? Sirve para una tarjeta ya mapeada o para un grado suelto. */
 export function esFichaDeteriorada(cartaOGrado) {
@@ -35,7 +36,9 @@ export function esFichaDeteriorada(cartaOGrado) {
 export function nombreDeteriorado(nombre, id) {
   let estado = (Number(id) || 0) + 0x9e3779b9;
   return Array.from(String(nombre ?? ""), (c) => {
-    if (/[\s\d#]/.test(c)) return c;
+    if (/[\s\d#]/.test(c)) {
+      return c;
+    }
     estado = (Math.imul(estado, 1103515245) + 12345) >>> 0;
     return SIMBOLOS[estado % SIMBOLOS.length];
   }).join("");
@@ -47,7 +50,9 @@ export function nombreDeteriorado(nombre, id) {
  * el resto. No muta la entrada.
  */
 export function ocultarFichaDeteriorada(card) {
-  if (!esFichaDeteriorada(card)) return card;
+  if (!esFichaDeteriorada(card)) {
+    return card;
+  }
   const oculta = {
     ...card,
     name: nombreDeteriorado(card.name, card.id),

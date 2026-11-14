@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Gráfico de telaraña (radar) de los atributos: la matemática, sin React ni DOM.
  *
@@ -62,7 +63,9 @@ export function verticesDeRadar(stats: readonly StatRow[]): VerticeDeRadar[] {
   );
   return EJES_DE_RADAR.flatMap((eje) => {
     const stat = porSlug.get(eje.slug);
-    if (!stat || typeof stat.value !== "number") return [];
+    if (!stat || typeof stat.value !== "number") {
+      return [];
+    }
     const bruto = Math.max(0, stat.value) / eje.ref;
     return [
       {

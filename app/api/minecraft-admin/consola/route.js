@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/minecraft-admin/consola` — comando por RCON.
  *
@@ -35,7 +36,9 @@ export async function POST(request) {
       comando: cuerpo.comando,
       sesion: acceso.sesion,
     });
-    if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
     return respuestaJson({
       ok: true,
       comando: resultado.comando,

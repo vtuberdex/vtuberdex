@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * RANGOS por nivel: el título que lleva una ficha según el nivel al que llegó (likes, juego, entregas, directos…).
  * UNA sola tabla: la ficha pública, «Mi ficha» y el plugin de Minecraft (`GET /api/minecraft/reglas`) la leen de aquí.
@@ -27,7 +28,11 @@ export const RANGOS = Object.freeze([
 export function rangoDeNivel(nivel) {
   const n = Number.isFinite(Number(nivel)) ? Math.max(1, Math.trunc(Number(nivel))) : 1;
   let indice = 0;
-  for (let i = 0; i < RANGOS.length; i += 1) if (n >= RANGOS[i].desde) indice = i;
+  for (let i = 0; i < RANGOS.length; i += 1) {
+    if (n >= RANGOS[i].desde) {
+      indice = i;
+    }
+  }
   const siguiente = RANGOS[indice + 1] ?? null;
   return {
     id: RANGOS[indice].id,

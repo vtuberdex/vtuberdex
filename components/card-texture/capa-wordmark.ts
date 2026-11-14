@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * CAPA 6 — wordmark VTUBERDEX.
  */
@@ -22,16 +23,18 @@ export function drawWordmarkLayer({
   width: number;
 }): HTMLCanvasElement {
   const { canvas, ctx, H } = createLayer(width);
-  if (!ctx) return canvas;
-  const pad = 46;
-  const { accent } = cardPalette(card.themeColor, card.secondaryColor);
-  /**
-   * IZQUIERDA, no derecha (petición del usuario).
-   *
-   * Se dibujaba en `W - pad` con alineación derecha, es decir en el ángulo inferior
-   * DERECHO. Ese rincón lo ocupa ahora el LOGO, que el usuario ha movido allí y al doble
-   * de tamaño; si la palabra se quedara, los dos se solaparían.
-   */
-  drawMetalWordmark(ctx, "VTUBERDEX", pad, H - 86, `800 28px ${FONT}`, accent);
+  // Sin contexto 2D se devuelve el lienzo vacío (mismo contrato que el resto de capas).
+  if (ctx) {
+    const pad = 46;
+    const { accent } = cardPalette(card.themeColor, card.secondaryColor);
+    /**
+     * IZQUIERDA, no derecha (petición del usuario).
+     *
+     * Se dibujaba en `W - pad` con alineación derecha, es decir en el ángulo inferior
+     * DERECHO. Ese rincón lo ocupa ahora el LOGO, que el usuario ha movido allí y al doble
+     * de tamaño; si la palabra se quedara, los dos se solaparían.
+     */
+    drawMetalWordmark(ctx, "VTUBERDEX", pad, H - 86, `800 28px ${FONT}`, accent);
+  }
   return canvas;
 }

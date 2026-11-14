@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Texto libre de una ficha (frase, historia) con traducción al vuelo.
@@ -24,12 +25,12 @@ export function TextoTraducible({
   texto,
   className = "",
   acento,
-}: {
+}: Readonly<{
   texto: string;
   className?: string;
   acento?: string;
-}) {
-  const { locale, t } = useI18n();
+}>) {
+  const { locale } = useI18n();
   const [estado, setEstado] = useState<Estado>({ fase: "reposo" });
   const [verOriginal, setVerOriginal] = useState(false);
   // El motor nativo depende del navegador: se consulta tras hidratar para no discrepar con el servidor.
@@ -46,7 +47,9 @@ export function TextoTraducible({
   const traducido = estado.fase === "listo" && !verOriginal;
 
   const traducir = async () => {
-    if (!origen) return;
+    if (!origen) {
+      return;
+    }
     setEstado({ fase: "traduciendo", pct: null });
     try {
       const salida = await traducirTexto(texto, origen, locale, (pct) =>
@@ -59,6 +62,8 @@ export function TextoTraducible({
     }
   };
 
+  const alternarOriginal = () => setVerOriginal((v) => !v);
+
   return (
     <div data-testid="texto-traducible">
       <p
@@ -68,45 +73,91 @@ export function TextoTraducible({
         {estado.fase === "listo" && !verOriginal ? estado.texto : texto}
       </p>
       {origen && origen !== locale && (
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-dex-muted">
-          {estado.fase === "listo" ? (
-            <button
-              type="button"
-              onClick={() => setVerOriginal((v) => !v)}
-              className="underline hover:text-dex-ink"
-              style={{ color: acento }}
-            >
-              {verOriginal
-                ? t("traduccion.traducir", { idioma: NOMBRE_PROPIO[locale] })
-                : t("traduccion.original")}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={traducir}
-              disabled={estado.fase === "traduciendo"}
-              data-testid="boton-traducir"
-              className="underline hover:text-dex-ink disabled:cursor-wait disabled:no-underline disabled:opacity-70"
-              style={{ color: acento }}
-            >
-              {estado.fase === "traduciendo"
-                ? estado.pct === null
-                  ? t("traduccion.traduciendo")
-                  : t("traduccion.descargando", { pct: estado.pct })
-                : t("traduccion.traducir", { idioma: NOMBRE_PROPIO[locale] })}
-            </button>
-          )}
-          {estado.fase === "fallo" && (
-            <span role="alert" className="text-amber-200">
-              {t("traduccion.fallo")}
-            </span>
-          )}
-          {estado.fase === "reposo" && !nativo && (
-            <span>{t("traduccion.avisoDescarga")}</span>
-          )}
-          {traducido && <span>{t("traduccion.aviso")}</span>}
-        </div>
+        <ControlesDeTraduccion
+          estado={estado}
+          verOriginal={verOriginal}
+          onAlternar={alternarOriginal}
+          onTraducir={traducir}
+          nativo={nativo}
+          traducido={traducido}
+          acento={acento}
+        />
       )}
+    </div>
+  );
+}
+
+type Traductor = ReturnType<typeof useI18n>["t"];
+type Locale = ReturnType<typeof useI18n>["locale"];
+
+/** Rótulo del botón mientras no hay traducción: traduciendo, descargando el modelo (%) o la oferta. */
+function rotuloDeTraducir(
+  estado: Estado,
+  t: Traductor,
+  locale: Locale,
+): string {
+  if (estado.fase !== "traduciendo") {
+    return t("traduccion.traducir", { idioma: NOMBRE_PROPIO[locale] });
+  }
+  if (estado.pct === null) {
+    return t("traduccion.traduciendo");
+  }
+  return t("traduccion.descargando", { pct: estado.pct });
+}
+
+/** Botón de traducir / ver original y los avisos que lo acompañan. */
+function ControlesDeTraduccion({
+  estado,
+  verOriginal,
+  onAlternar,
+  onTraducir,
+  nativo,
+  traducido,
+  acento,
+}: Readonly<{
+  estado: Estado;
+  verOriginal: boolean;
+  onAlternar: () => void;
+  onTraducir: () => void;
+  nativo: boolean;
+  traducido: boolean;
+  acento?: string;
+}>) {
+  const { locale, t } = useI18n();
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-dex-muted">
+      {estado.fase === "listo" ? (
+        <button
+          type="button"
+          onClick={onAlternar}
+          className="underline hover:text-dex-ink"
+          style={{ color: acento }}
+        >
+          {verOriginal
+            ? t("traduccion.traducir", { idioma: NOMBRE_PROPIO[locale] })
+            : t("traduccion.original")}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onTraducir}
+          disabled={estado.fase === "traduciendo"}
+          data-testid="boton-traducir"
+          className="underline hover:text-dex-ink disabled:cursor-wait disabled:no-underline disabled:opacity-70"
+          style={{ color: acento }}
+        >
+          {rotuloDeTraducir(estado, t, locale)}
+        </button>
+      )}
+      {estado.fase === "fallo" && (
+        <span role="alert" className="text-amber-200">
+          {t("traduccion.fallo")}
+        </span>
+      )}
+      {estado.fase === "reposo" && !nativo && (
+        <span>{t("traduccion.avisoDescarga")}</span>
+      )}
+      {traducido && <span>{t("traduccion.aviso")}</span>}
     </div>
   );
 }

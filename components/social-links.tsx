@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Redes sociales del VTuber, con icono por plataforma. */
 import { SocialIcon } from "@/components/social-icon";
@@ -9,7 +10,7 @@ export interface SocialLinksProps {
   palette: { accent: string; secondary: string };
 }
 
-export function SocialLinks({ socials, palette }: SocialLinksProps) {
+export function SocialLinks({ socials, palette }: Readonly<SocialLinksProps>) {
   const { t } = useI18n();
   return (
     <section

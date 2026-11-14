@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Catálogo: buscador + facetas + libro de cartas.
@@ -10,10 +11,11 @@
  * Responsive: en escritorio los filtros son una columna fija; en móvil viven en
  * una hoja inferior (los 785 divs del origen obligaban a hacer scroll infinito).
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";
 import { activeFilterCount } from "@/lib/query";
+import type { Facets, SearchParams, SortKey } from "@/lib/types";
 import { CardBinder } from "@/components/card-binder";
 import { BINDER } from "@/components/card3d-config";
 import { FilterPanel } from "@/components/filter-panel";
@@ -34,7 +36,7 @@ export function CatalogPage() {
     });
   const [sheetOpen, setSheetOpen] = useState(false);
   // Premium tiene su propio botón (que también lo apaga): ni cuenta en «Filtros» ni lleva chip.
-  const filterCount = activeFilterCount(params) - (params.premium ? 1 : 0);
+  const filterCount = activeFilterCount(params) - Number(params.premium);
 
   // Bloquea el scroll del fondo cuando la hoja de filtros está abierta.
   useEffect(() => {
@@ -45,7 +47,9 @@ export function CatalogPage() {
   }, [sheetOpen]);
 
   useEffect(() => {
-    if (!sheetOpen) return;
+    if (!sheetOpen) {
+      return undefined;
+    }
     const alTeclear = (e: KeyboardEvent) =>
       e.key === "Escape" && setSheetOpen(false);
     window.addEventListener("keydown", alTeclear);
@@ -55,6 +59,16 @@ export function CatalogPage() {
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
 
+  const buscar = useCallback(
+    (value: string) => setParams({ q: value, page: 1 }),
+    [setParams],
+  );
+  const ordenar = useCallback(
+    (sort: SortKey) => setParams({ sort, page: 1 }),
+    [setParams],
+  );
+  const cerrarFiltros = useCallback(() => setSheetOpen(false), []);
+
   return (
     <div
       data-catalogo
@@ -62,7 +76,7 @@ export function CatalogPage() {
     >
       {/* Los filtros no ocupan una columna fija: viven en un panel que se abre a demanda
           (hoja inferior en celular, cajón lateral en escritorio) para que las cartas tengan
-          todo el ancho. */}
+          el ancho completo. */}
       <VrtonBanners>
         <main className="min-w-0">
           <div className="mb-4 space-y-3">
@@ -71,7 +85,7 @@ export function CatalogPage() {
               <div className="min-w-0 flex-1">
                 <SearchBar
                   value={params.q}
-                  onChange={(value) => setParams({ q: value, page: 1 })}
+                  onChange={buscar}
                   total={total}
                   loading={loading}
                 />
@@ -91,73 +105,19 @@ export function CatalogPage() {
                     </span>
                   )}
                 </button>
-                <SortSelect
-                  value={params.sort}
-                  onChange={(sort) => setParams({ sort, page: 1 })}
-                />
+                <SortSelect value={params.sort} onChange={ordenar} />
                 {/*
                   Sección premium: las cartas gradeadas (en placa de acrílico). Es un filtro más,
                   así que vive en la URL (`?premium=1`) y un enlace compartido la conserva. Va en
                   dorado: es el color de la placa y de su etiqueta.
                 */}
-                <button
-                  type="button"
-                  aria-pressed={params.premium}
-                  onClick={() =>
-                    setParams({ premium: !params.premium, page: 1 })
-                  }
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
-                    params.premium
-                      ? "border-amber-200 bg-gradient-to-b from-amber-200 to-amber-400 text-amber-950 shadow-[0_0_14px_rgb(251_191_36/0.45)]"
-                      : "border-amber-400/70 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 hover:text-amber-200"
-                  }`}
-                >
-                  <span aria-hidden>★</span> {t("catalogo.premium")}
-                </button>
+                <BotonPremium activo={params.premium} setParams={setParams} />
               </div>
             </div>
 
             {/* Chips de filtros activos. */}
             {filterCount > 0 && (
-              <ul className="flex flex-wrap gap-2">
-                {params.q && (
-                  <li key="query">
-                    <button
-                      type="button"
-                      onClick={() => setParams({ q: "", page: 1 })}
-                      className="rounded-full border border-dex-accent/50 bg-dex-accent/10 px-3 py-1 text-xs text-dex-accent"
-                    >
-                      “{params.q}” ✕
-                    </button>
-                  </li>
-                )}
-                {(
-                  [
-                    ["countries", params.countries],
-                    ["languages", params.languages],
-                    ["factions", params.factions],
-                    ["groups", params.groups],
-                    ["artists", params.artists],
-                  ] as const
-                ).flatMap(([key, values]) =>
-                  values.map((value) => (
-                    <li key={`${key}:${value}`}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setParams({
-                            [key]: values.filter((item) => item !== value),
-                            page: 1,
-                          } as never)
-                        }
-                        className="rounded-full border border-dex-line bg-dex-panel px-3 py-1 text-xs text-dex-muted hover:text-dex-ink"
-                      >
-                        {value} ✕
-                      </button>
-                    </li>
-                  )),
-                )}
-              </ul>
+              <ChipsDeFiltros params={params} setParams={setParams} />
             )}
           </div>
 
@@ -168,37 +128,24 @@ export function CatalogPage() {
           )}
 
           {/* Sin preloader: mientras llega la primera página no se dibuja nada en lugar del libro. */}
-          {loading && items.length === 0 ? null : items.length === 0 ? (
-            <div className="rounded-2xl border border-dex-line bg-dex-panel/60 px-6 py-16 text-center">
-              <p className="text-lg font-bold text-dex-ink">
-                {t("catalogo.sinResultados")}
-              </p>
-              <p className="mt-1 text-sm text-dex-muted">
-                {t("catalogo.sinResultadosAyuda")}
-              </p>
-              <button
-                type="button"
-                onClick={reset}
-                className="mt-4 rounded-lg border border-dex-accent/60 px-4 py-2 text-sm text-dex-accent"
-              >
-                {t("catalogo.limpiarBusqueda")}
-              </button>
-            </div>
-          ) : (
-            /*
-              `page` sale de la URL (cambia al instante) y `pageCount` de la respuesta: el
-              libro necesita saber hacia dónde gira ANTES de que lleguen los datos de la
-              página nueva, y mientras tanto mantiene la hoja en pie.
-            */
-            <CardBinder
-              items={items}
-              single={single}
-              page={params.page}
-              pageCount={data?.pageCount ?? 1}
-              loading={loading}
-              onPage={goToPage}
-            />
-          )}
+          {!(loading && items.length === 0) &&
+            (items.length === 0 ? (
+              <SinResultados onReset={reset} />
+            ) : (
+              /*
+                `page` sale de la URL (cambia al instante) y `pageCount` de la respuesta: el
+                libro necesita saber hacia dónde gira ANTES de que lleguen los datos de la
+                página nueva, y mientras tanto mantiene la hoja en pie.
+              */
+              <CardBinder
+                items={items}
+                single={single}
+                page={params.page}
+                pageCount={data?.pageCount ?? 1}
+                loading={loading}
+                onPage={goToPage}
+              />
+            ))}
 
           {data && (
             <Pagination
@@ -212,36 +159,159 @@ export function CatalogPage() {
 
       {/* Panel de filtros: hoja inferior en celular, cajón lateral en escritorio. */}
       {sheetOpen && (
-        <div
-          className="fixed inset-0 z-40"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t("filtros.titulo")}
-        >
+        <HojaDeFiltros
+          facets={data?.facets ?? null}
+          params={params}
+          setParams={setParams}
+          reset={reset}
+          loading={loading}
+          total={total}
+          onClose={cerrarFiltros}
+        />
+      )}
+    </div>
+  );
+}
+
+type SetParams = (patch: Partial<SearchParams>) => void;
+
+/** Un chip por filtro activo (la búsqueda y cada valor de faceta); pulsarlo quita ese filtro. */
+function ChipsDeFiltros({
+  params,
+  setParams,
+}: Readonly<{ params: SearchParams; setParams: SetParams }>) {
+  return (
+    <ul className="flex flex-wrap gap-2">
+      {params.q && (
+        <li key="query">
           <button
             type="button"
-            aria-label={t("filtros.cerrar")}
-            onClick={() => setSheetOpen(false)}
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-          />
-          <div className="absolute inset-x-0 bottom-0 flex max-h-[85vh] flex-col rounded-t-3xl border-t border-dex-line bg-dex-void p-4 pb-8 lg:inset-y-0 lg:right-auto lg:left-0 lg:max-h-none lg:w-[380px] lg:rounded-none lg:rounded-r-3xl lg:border-r lg:border-t-0 lg:pb-4">
-            <FilterPanel
-              facets={data?.facets ?? null}
-              params={params}
-              onChange={setParams}
-              onReset={reset}
-              loading={loading}
-            />
+            onClick={() => setParams({ q: "", page: 1 })}
+            className="rounded-full border border-dex-accent/50 bg-dex-accent/10 px-3 py-1 text-xs text-dex-accent"
+          >
+            “{params.q}” ✕
+          </button>
+        </li>
+      )}
+      {(
+        [
+          ["countries", params.countries],
+          ["languages", params.languages],
+          ["factions", params.factions],
+          ["groups", params.groups],
+          ["artists", params.artists],
+        ] as const
+      ).flatMap(([key, values]) =>
+        values.map((value) => (
+          <li key={`${key}:${value}`}>
             <button
               type="button"
-              onClick={() => setSheetOpen(false)}
-              className="mt-4 w-full rounded-xl bg-dex-accent px-4 py-3 text-sm font-bold text-black"
+              onClick={() =>
+                setParams({
+                  [key]: values.filter((item) => item !== value),
+                  page: 1,
+                } as never)
+              }
+              className="rounded-full border border-dex-line bg-dex-panel px-3 py-1 text-xs text-dex-muted hover:text-dex-ink"
             >
-              {t("filtros.verResultados", { n: total })}
+              {value} ✕
             </button>
-          </div>
-        </div>
+          </li>
+        )),
       )}
+    </ul>
+  );
+}
+
+function BotonPremium({
+  activo,
+  setParams,
+}: Readonly<{ activo: boolean; setParams: SetParams }>) {
+  const { t } = useI18n();
+  return (
+    <button
+      type="button"
+      aria-pressed={activo}
+      onClick={() => setParams({ premium: !activo, page: 1 })}
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${
+        activo
+          ? "border-amber-200 bg-gradient-to-b from-amber-200 to-amber-400 text-amber-950 shadow-[0_0_14px_rgb(251_191_36/0.45)]"
+          : "border-amber-400/70 bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 hover:text-amber-200"
+      }`}
+    >
+      <span aria-hidden>★</span> {t("catalogo.premium")}
+    </button>
+  );
+}
+
+function SinResultados({ onReset }: Readonly<{ onReset: () => void }>) {
+  const { t } = useI18n();
+  return (
+    <div className="rounded-2xl border border-dex-line bg-dex-panel/60 px-6 py-16 text-center">
+      <p className="text-lg font-bold text-dex-ink">
+        {t("catalogo.sinResultados")}
+      </p>
+      <p className="mt-1 text-sm text-dex-muted">
+        {t("catalogo.sinResultadosAyuda")}
+      </p>
+      <button
+        type="button"
+        onClick={onReset}
+        className="mt-4 rounded-lg border border-dex-accent/60 px-4 py-2 text-sm text-dex-accent"
+      >
+        {t("catalogo.limpiarBusqueda")}
+      </button>
+    </div>
+  );
+}
+
+function HojaDeFiltros({
+  facets,
+  params,
+  setParams,
+  reset,
+  loading,
+  total,
+  onClose,
+}: Readonly<{
+  facets: Facets | null;
+  params: SearchParams;
+  setParams: SetParams;
+  reset: () => void;
+  loading: boolean;
+  total: number;
+  onClose: () => void;
+}>) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="fixed inset-0 z-40"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("filtros.titulo")}
+    >
+      <button
+        type="button"
+        aria-label={t("filtros.cerrar")}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+      />
+      <div className="absolute inset-x-0 bottom-0 flex max-h-[85vh] flex-col rounded-t-3xl border-t border-dex-line bg-dex-void p-4 pb-8 lg:inset-y-0 lg:right-auto lg:left-0 lg:max-h-none lg:w-[380px] lg:rounded-none lg:rounded-r-3xl lg:border-r lg:border-t-0 lg:pb-4">
+        <FilterPanel
+          facets={facets}
+          params={params}
+          onChange={setParams}
+          onReset={reset}
+          loading={loading}
+        />
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-4 w-full rounded-xl bg-dex-accent px-4 py-3 text-sm font-bold text-black"
+        >
+          {t("filtros.verResultados", { n: total })}
+        </button>
+      </div>
     </div>
   );
 }

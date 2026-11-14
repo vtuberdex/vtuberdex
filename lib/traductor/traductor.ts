@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Traducción de textos libres (la historia de la ficha) EN EL DISPOSITIVO del visitante: el texto
  * no sale a ningún servicio de terceros y el servidor no gasta CPU en traducir.
@@ -32,8 +33,12 @@ export function rutaDeTraduccion(
   origen: Locale,
   destino: Locale,
 ): Array<[Locale, Locale]> {
-  if (origen === destino) return [];
-  if (MODELOS[`${origen}>${destino}`]) return [[origen, destino]];
+  if (origen === destino) {
+    return [];
+  }
+  if (MODELOS[`${origen}>${destino}`]) {
+    return [[origen, destino]];
+  }
   return [
     [origen, "en"],
     ["en", destino],
@@ -51,31 +56,40 @@ export function trocear(texto: string, max = 380): string[] {
       tramos.push("", "\n");
       continue;
     }
-    const frases = linea.match(/[^.!?。！？]+[.!?。！？]*\s*/g) ?? [linea];
-    let actual = "";
-    for (const frase of frases) {
-      if (actual && actual.length + frase.length > max) {
-        tramos.push(actual.trim());
-        actual = "";
-      }
-      // Una «frase» sin puntuación más larga que el máximo se corta en palabras.
-      if (frase.length > max) {
-        const palabras = frase.split(/(\s+)/);
-        for (const palabra of palabras) {
-          if (actual.length + palabra.length > max) {
-            tramos.push(actual.trim());
-            actual = "";
-          }
-          actual += palabra;
-        }
-      } else {
-        actual += frase;
-      }
-    }
-    if (actual.trim()) tramos.push(actual.trim());
-    tramos.push("\n");
+    tramos.push(...tramosDeLinea(linea, max), "\n");
   }
   tramos.pop();
+  return tramos;
+}
+
+/** Los tramos de UNA línea con texto: frases agrupadas hasta `max` y, si una sola no cabe, partida en palabras. */
+function tramosDeLinea(linea: string, max: number): string[] {
+  const tramos: string[] = [];
+  const frases = linea.match(/[^.!?。！？]+[.!?。！？]*\s*/g) ?? [linea];
+  let actual = "";
+  const cerrar = () => {
+    tramos.push(actual.trim());
+    actual = "";
+  };
+  for (const frase of frases) {
+    if (actual && actual.length + frase.length > max) {
+      cerrar();
+    }
+    if (frase.length <= max) {
+      actual += frase;
+      continue;
+    }
+    // Una «frase» sin puntuación más larga que el máximo se corta en palabras.
+    for (const palabra of frase.split(/(\s+)/)) {
+      if (actual.length + palabra.length > max) {
+        cerrar();
+      }
+      actual += palabra;
+    }
+  }
+  if (actual.trim()) {
+    tramos.push(actual.trim());
+  }
   return tramos;
 }
 
@@ -83,9 +97,14 @@ export function trocear(texto: string, max = 380): string[] {
 function unir(tramos: string[]): string {
   let salida = "";
   for (const tramo of tramos) {
-    if (tramo === "") continue;
-    if (tramo === "\n") salida += "\n";
-    else salida += (salida && !salida.endsWith("\n") ? " " : "") + tramo;
+    if (tramo === "") {
+      continue;
+    }
+    if (tramo === "\n") {
+      salida += "\n";
+    } else {
+      salida += (salida && !salida.endsWith("\n") ? " " : "") + tramo;
+    }
   }
   return salida.trim();
 }
@@ -120,10 +139,14 @@ async function conApiNativa(
   alProgreso?: Progreso,
 ): Promise<string | null> {
   const fabrica = fabricaNativa();
-  if (!fabrica) return null;
+  if (!fabrica) {
+    return null;
+  }
   try {
     const par = { sourceLanguage: origen, targetLanguage: destino };
-    if ((await fabrica.availability(par)) === "unavailable") return null;
+    if ((await fabrica.availability(par)) === "unavailable") {
+      return null;
+    }
     const traductor = await fabrica.create({
       ...par,
       monitor: (m) =>
@@ -134,12 +157,13 @@ async function conApiNativa(
         ),
     });
     const salida: string[] = [];
-    for (const tramo of trocear(texto, 1500))
+    for (const tramo of trocear(texto, 1500)) {
       salida.push(
         tramo === "" || tramo === "\n"
           ? tramo
           : await traductor.translate(tramo),
       );
+    }
     return unir(salida);
   } catch {
     return null;
@@ -180,7 +204,9 @@ function canalDe(modelo: string, alProgreso?: Progreso): Promise<Canal> {
             file?: string;
             progress?: number;
           }) => {
-            if (info.status !== "progress" || !info.file) return;
+            if (info.status !== "progress" || !info.file) {
+              return;
+            }
             porArchivo.set(info.file, info.progress ?? 0);
             const valores = [...porArchivo.values()];
             alProgreso?.(
@@ -238,10 +264,14 @@ export async function traducirTexto(
   destino: Locale,
   alProgreso?: Progreso,
 ): Promise<string> {
-  if (origen === destino) return texto;
+  if (origen === destino) {
+    return texto;
+  }
   const clave = `${origen}>${destino}\n${texto}`;
   const guardado = memoria.get(clave);
-  if (guardado !== undefined) return guardado;
+  if (guardado !== undefined) {
+    return guardado;
+  }
   const resultado =
     (await conApiNativa(texto, origen, destino, alProgreso)) ??
     (await conModelosLocales(texto, origen, destino, alProgreso));

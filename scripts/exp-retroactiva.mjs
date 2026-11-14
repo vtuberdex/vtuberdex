@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Calcula la EXP retroactiva del diario de cambios: crea en `exp_evento` los eventos que faltan
  * (+10 por cada vtuber.crear / editar / estado ya anotado). Es idempotente: repetirlo no suma de nuevo.
@@ -37,8 +38,10 @@ async function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error(`[exp-retroactiva] falló: ${error.message}`);
     process.exitCode = 1;
-  });
+  }
 }

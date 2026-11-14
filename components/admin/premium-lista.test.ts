@@ -55,10 +55,11 @@ describe("perteneceAlFiltro / contarPorFiltro", () => {
   ];
   it("cada grado cae en un solo tramo", () => {
     const tramos = ["bajos", "medios", "diez", "bl", "deterioradas"] as const;
-    for (const r of rows)
+    for (const r of rows) {
       expect(tramos.filter((t) => perteneceAlFiltro(r, t, AHORA))).toHaveLength(
         1,
       );
+    }
   });
   it("los contadores suman al total y «todas» las cuenta a todas", () => {
     const c = contarPorFiltro(rows, AHORA);

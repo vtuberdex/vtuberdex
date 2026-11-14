@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/terminos` — Términos y Condiciones. Es la página que los formularios de inscripción y de baja
  * obligan a aceptar. El texto es dato (`lib/terminos.ts`, con traducciones de cortesía en

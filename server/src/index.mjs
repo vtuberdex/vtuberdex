@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Servidor VTuberDex: API JSON + estáticos de imágenes y (opcional) build web.
  */
@@ -75,7 +76,7 @@ export function createApp({
       standardHeaders: "draft-8",
       legacyHeaders: false,
     });
-    app.get(/^(?!\/api|\/images).*/, limiteSpa, (req, res) => {
+    app.get(/^(?!\/api|\/images).*/, limiteSpa, (_req, res) => {
       res.sendFile(path.join(webRoot, "index.html"));
     });
   }
@@ -86,7 +87,7 @@ export function createApp({
    * quitarlo lo convertiría en un middleware normal). Se marca con `_` en vez de
    * una directiva de eslint para no depender de la posición del comentario.
    */
-  app.use((error, req, res, _next) => {
+  app.use((error, _req, res, _next) => {
     console.error("[api] error no controlado", error);
     res.status(500).json({ error: "error_interno", detail: error.message });
   });

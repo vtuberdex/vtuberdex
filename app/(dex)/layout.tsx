@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 import { AbriendoDetalle } from "@/components/abriendo-detalle";
 import { AppFooter } from "@/components/app-footer";
 import { AppHeader } from "@/components/app-header";
@@ -11,9 +12,9 @@ import { AppHeader } from "@/components/app-header";
  */
 export default function CatalogLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="dex-grid relative min-h-screen">
       <div className="relative z-10">

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Genera el hash de la contraseña del mantenedor para PRODUCCIÓN.
  *

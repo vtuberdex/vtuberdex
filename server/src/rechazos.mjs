@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * RECHAZOS: un registro mínimo de los envíos que los formularios públicos NO aceptaron.
  *
@@ -35,14 +36,20 @@ const conTabla = preparadorDeTablas(DDL);
 
 /** Solo rutas de campo (`socials.0.url`): una lista blanca de caracteres, acotada, sin texto libre. */
 function camposDeLasIssues(issues) {
-  if (!Array.isArray(issues)) return "";
+  if (!Array.isArray(issues)) {
+    return "";
+  }
   const rutas = [];
   for (const issue of issues) {
     const ruta = String(issue?.path ?? "")
       .replace(/[^A-Za-z0-9_.-]/g, "")
       .slice(0, 60);
-    if (ruta && !rutas.includes(ruta)) rutas.push(ruta);
-    if (rutas.length === 5) break;
+    if (ruta && !rutas.includes(ruta)) {
+      rutas.push(ruta);
+    }
+    if (rutas.length === 5) {
+      break;
+    }
   }
   return rutas.join(",");
 }

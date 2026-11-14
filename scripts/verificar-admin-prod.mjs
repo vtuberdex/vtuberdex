@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Comprueba que el mantenedor de PRODUCCIÓN acepta de verdad la credencial nueva.
  *
@@ -41,7 +42,8 @@ const hashPegado = opcion("hash", null);
 const resultados = [];
 const comprobar = (nombre, ok, detalle = "") => {
   resultados.push({ nombre, ok });
-  console.log(`${ok ? "✔" : "✖"} ${nombre}${detalle ? ` — ${detalle}` : ""}`);
+  const sufijo = detalle ? ` — ${detalle}` : "";
+  console.log(`${ok ? "✔" : "✖"} ${nombre}${sufijo}`);
 };
 
 /** POST/GET contra producción sin lanzar por un status no-2xx: el status es el dato. */
@@ -50,7 +52,7 @@ function pedir(ruta, init = {}) {
     `${base}${ruta}`,
     {
       ...init,
-      headers: { "content-type": "application/json", ...(init.headers ?? {}) },
+      headers: { "content-type": "application/json", ...init.headers },
     },
     (texto) => ({ crudo: texto.slice(0, 200) }),
   );
@@ -92,6 +94,25 @@ comprobar(
   `status=${login.status}`,
 );
 
+/** Con la contraseña rechazada: ¿es la clave o el hash guardado está mal formado? */
+function explicarHash(hash) {
+  if (hash?.valido) {
+    console.log(
+      "  El hash guardado está bien formado, así que es la contraseña: o el",
+    );
+    console.log(
+      "  despliegue que sirve es anterior al cambio, o la clave escrita no es la",
+    );
+    console.log(
+      "  que generó el hash. Vuelve a publicarla: node scripts/publicar-admin-prod.mjs",
+    );
+    return;
+  }
+  for (const p of hash?.problemas ?? ["el hash guardado no se pudo leer"]) {
+    console.log(`    · ${p}`);
+  }
+}
+
 if (!okLogin) {
   console.log("");
   const d = login.cuerpo ?? {};
@@ -110,22 +131,7 @@ if (!okLogin) {
       console.log(
         "  La CONTRASEÑA no corresponde al hash que hay en producción.",
       );
-      if (d.hash?.valido) {
-        console.log(
-          "  El hash guardado está bien formado, así que es la contraseña: o el",
-        );
-        console.log(
-          "  despliegue que sirve es anterior al cambio, o la clave escrita no es la",
-        );
-        console.log(
-          "  que generó el hash. Vuelve a publicarla: node scripts/publicar-admin-prod.mjs",
-        );
-      } else {
-        for (const p of d.hash?.problemas ?? [
-          "el hash guardado no se pudo leer",
-        ])
-          console.log(`    · ${p}`);
-      }
+      explicarHash(d.hash);
     }
   } else {
     // Sin campos de diagnóstico: la función desplegada es anterior a esta versión del código.
@@ -182,4 +188,6 @@ const fallos = resultados.filter((r) => !r.ok).length;
 console.log(
   `\n${resultados.length - fallos}/${resultados.length} comprobaciones pasan`,
 );
-if (fallos) process.exitCode = 1;
+if (fallos) {
+  process.exitCode = 1;
+}

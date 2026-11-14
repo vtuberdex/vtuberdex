@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Encabezado de `/inscripcion` y `/modificacion`. La página es de servidor (metadata en español, la que

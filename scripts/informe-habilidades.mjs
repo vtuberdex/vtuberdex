@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Pasa el validador de habilidades (`server/src/habilidades.mjs`) por TODAS las fichas con kit e
  * informa qué reglas se rompen. Solo lee: no corrige nada.
@@ -44,7 +45,9 @@ const leerFacciones = db.prepare(
 
 const informe = [];
 for (const f of fichas) {
-  if (soloSlug && f.slug !== soloSlug) continue;
+  if (soloSlug && f.slug !== soloSlug) {
+    continue;
+  }
   const habilidades = leerHabilidades.all(f.id);
   const facciones = leerFacciones.all(f.id).map((r) => r.slug);
   // Una ficha sin facciones no dice nada de la exclusividad: no se acusa a ciegas.
@@ -52,7 +55,9 @@ for (const f of fichas) {
     habilidades,
     facciones: facciones.length ? facciones : null,
   });
-  if (soloCodigo) problemas = problemas.filter((p) => p.codigo === soloCodigo);
+  if (soloCodigo) {
+    problemas = problemas.filter((p) => p.codigo === soloCodigo);
+  }
   const ultimate = habilidades.find((h) => h.category === "ultimate");
   informe.push({
     ...f,
@@ -78,10 +83,12 @@ if (soloSlug) {
   console.log(
     `${dex(f.dex)} ${f.name} (${f.facciones.join(", ") || "sin facciones"})`,
   );
-  if (!f.problemas.length)
+  if (!f.problemas.length) {
     console.log("  Cumple todas las reglas que se pueden comprobar.");
-  for (const p of f.problemas)
+  }
+  for (const p of f.problemas) {
     console.log(`  [${p.gravedad}] ${p.pieza}: ${p.detalle}  (${p.codigo})`);
+  }
   process.exit(0);
 }
 
@@ -105,7 +112,9 @@ console.log(
 console.log("\nFichas afectadas por regla:");
 for (const [codigo, descripcion] of Object.entries(CODIGOS)) {
   const n = porCodigo.get(codigo) ?? 0;
-  if (n) console.log(`  ${String(n).padStart(4)}  ${descripcion}  (${codigo})`);
+  if (n) {
+    console.log(`  ${String(n).padStart(4)}  ${descripcion}  (${codigo})`);
+  }
 }
 
 const peores = [...conErrores]

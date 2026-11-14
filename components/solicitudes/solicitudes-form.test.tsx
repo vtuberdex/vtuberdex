@@ -124,15 +124,17 @@ async function subirImagen(campo: "imageId" | "logoId") {
 async function llenarPaso4() {
   await subirImagen("imageId");
   await subirImagen("logoId");
-  for (const [etiqueta, valor] of CAMPOS_PASO_2)
+  for (const [etiqueta, valor] of CAMPOS_PASO_2) {
     await userEvent.type(screen.getByLabelText(etiqueta), valor);
+  }
   await userEvent.click(screen.getByRole("button", { name: /siguiente/i }));
 }
 
 /** Paso 5: gustos. */
 async function llenarPaso5() {
-  for (const [etiqueta, valor] of CAMPOS_PASO_3)
+  for (const [etiqueta, valor] of CAMPOS_PASO_3) {
     await userEvent.type(screen.getByLabelText(etiqueta), valor);
+  }
 }
 
 /** Llega hasta el paso 5 con el servidor simulado. */
@@ -184,8 +186,9 @@ describe("InscripcionForm", () => {
     // País y signo son opcionales; el resto, no.
     expect(screen.getByLabelText(/^país/i)).not.toBeRequired();
     expect(screen.getByLabelText(/^signo/i)).not.toBeRequired();
-    for (const [etiqueta] of CAMPOS_PASO_2)
+    for (const [etiqueta] of CAMPOS_PASO_2) {
       expect(screen.getByLabelText(etiqueta)).toBeRequired();
+    }
     // Avatar y logo se SUBEN (ya no se pegan como enlace): no hay campos de URL.
     expect(screen.getByTestId("archivo-imageId")).toBeInTheDocument();
     expect(screen.getByTestId("archivo-logoId")).toBeInTheDocument();
@@ -194,8 +197,9 @@ describe("InscripcionForm", () => {
     expect(screen.getByTestId("inscripcion-paso")).toHaveTextContent(
       /paso 5 de 5/i,
     );
-    for (const [etiqueta] of CAMPOS_PASO_3)
+    for (const [etiqueta] of CAMPOS_PASO_3) {
       expect(screen.getByLabelText(etiqueta)).toBeRequired();
+    }
   });
 
   it("un código malo muestra el error y se queda en el paso 2", async () => {

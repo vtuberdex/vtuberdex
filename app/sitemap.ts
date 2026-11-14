@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/sitemap.xml`: el índice y TODAS las fichas publicadas.
  *

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Máscaras calculadas en CPU y enviadas como texturas propias al shader.
  *
@@ -32,7 +33,9 @@ const pendientes = new Map<number, (out: Uint8ClampedArray) => void>();
 
 /** Un solo worker por pestaña, creado la primera vez que hace falta; `null` si no se puede. */
 function obtenerWorker(): Worker | null {
-  if (worker !== undefined) return worker;
+  if (worker !== undefined) {
+    return worker;
+  }
   try {
     if (typeof Worker === "undefined") {
       worker = null;
@@ -43,7 +46,9 @@ function obtenerWorker(): Worker | null {
       event: MessageEvent<{ id: number; out: Uint8ClampedArray }>,
     ) => {
       const resolver = pendientes.get(event.data.id);
-      if (!resolver) return;
+      if (!resolver) {
+        return;
+      }
       pendientes.delete(event.data.id);
       resolver(event.data.out);
     };
@@ -78,13 +83,16 @@ async function mascaraAsync(
 ): Promise<Uint8ClampedArray> {
   const w = obtenerWorker();
   if (w) {
-    const id = siguienteId++;
+    const id = siguienteId;
+    siguienteId += 1;
     const copia = new Uint8ClampedArray(src.data);
     const resultado = await new Promise<Uint8ClampedArray>((resolve) => {
       pendientes.set(id, resolve);
       w.postMessage({ id, tipo, data: copia }, [copia.buffer]);
     });
-    if (resultado.length === src.data.length) return resultado;
+    if (resultado.length === src.data.length) {
+      return resultado;
+    }
   }
   const out = new Uint8ClampedArray(src.data.length);
   calcularMascara(tipo, src.data, out);
@@ -104,6 +112,18 @@ interface Preparada {
   y: number;
 }
 
+/** El origen como canvas si ya tiene el tamaño pedido (y si en este entorno existe el tipo). */
+function canvasDelMismoTamano(
+  art: CanvasImageSource,
+  width: number,
+  height: number,
+): HTMLCanvasElement | null {
+  if (typeof HTMLCanvasElement === "undefined" || !(art instanceof HTMLCanvasElement)) {
+    return null;
+  }
+  return art.width === width && art.height === height ? art : null;
+}
+
 function prepararTinta(
   art: CanvasImageSource,
   width: number,
@@ -113,21 +133,18 @@ function prepararTinta(
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
+  if (!ctx) {
+    return canvas;
+  }
   /**
    * Si el origen ya es un canvas del tamaño exacto (lo es: `flat` en `completar`), se leen sus
    * píxeles DIRECTAMENTE. Antes se copiaba a un canvas intermedio con `drawImage` (otro lienzo
    * completo por carta y una pasada de pintado) solo para poder llamar a `getImageData`, y el
    * resultado era idéntico: el canvas intermedio no escalaba nada.
    */
-  const directo =
-    typeof HTMLCanvasElement !== "undefined" &&
-    art instanceof HTMLCanvasElement &&
-    art.width === width &&
-    art.height === height
-      ? art.getContext("2d")
-      : null;
-  if (directo)
+  const mismo = canvasDelMismoTamano(art, width, height);
+  const directo = mismo ? mismo.getContext("2d") : null;
+  if (directo) {
     return {
       canvas,
       ctx,
@@ -135,11 +152,14 @@ function prepararTinta(
       x: 0,
       y: 0,
     };
+  }
   const artCanvas = document.createElement("canvas");
   artCanvas.width = width;
   artCanvas.height = height;
   const artCtx = artCanvas.getContext("2d");
-  if (!artCtx) return canvas;
+  if (!artCtx) {
+    return canvas;
+  }
   artCtx.drawImage(art, 0, 0, width, height);
   return {
     canvas,
@@ -160,7 +180,9 @@ function prepararCobertura(
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
+  if (!ctx) {
+    return canvas;
+  }
   const scale = width / CARD_TEXTURE_WIDTH;
   /**
    * Solo se lee y se calcula la REGIÓN del logo, no el lienzo entero.
@@ -189,7 +211,9 @@ function prepararCobertura(
   tmp.width = w;
   tmp.height = h;
   const tmpCtx = tmp.getContext("2d", { willReadFrequently: true });
-  if (!tmpCtx) return canvas;
+  if (!tmpCtx) {
+    return canvas;
+  }
   tmpCtx.translate(-x, -y);
   tmpCtx.scale(scale, scale);
   tmpCtx.drawImage(logo, box.x, box.y, box.w, box.h);
@@ -216,7 +240,9 @@ export function inkAndSkinMask(
   height: number,
 ): HTMLCanvasElement {
   const p = prepararTinta(art, width, height);
-  if (!esPreparada(p)) return p;
+  if (!esPreparada(p)) {
+    return p;
+  }
   const out = new Uint8ClampedArray(p.src.data.length);
   calcularMascara("tinta", p.src.data, out);
   return escribir(p, out);
@@ -228,7 +254,9 @@ export async function inkAndSkinMaskAsync(
   height: number,
 ): Promise<HTMLCanvasElement> {
   const p = prepararTinta(art, width, height);
-  if (!esPreparada(p)) return p;
+  if (!esPreparada(p)) {
+    return p;
+  }
   return escribir(p, await mascaraAsync("tinta", p.src));
 }
 
@@ -239,7 +267,9 @@ export function logoMask(
   height: number,
 ): HTMLCanvasElement {
   const p = prepararCobertura(logo, box, width, height);
-  if (!esPreparada(p)) return p;
+  if (!esPreparada(p)) {
+    return p;
+  }
   const out = new Uint8ClampedArray(p.src.data.length);
   calcularMascara("cobertura", p.src.data, out);
   return escribir(p, out);
@@ -252,7 +282,9 @@ export async function logoMaskAsync(
   height: number,
 ): Promise<HTMLCanvasElement> {
   const p = prepararCobertura(logo, box, width, height);
-  if (!esPreparada(p)) return p;
+  if (!esPreparada(p)) {
+    return p;
+  }
   return escribir(p, await mascaraAsync("cobertura", p.src));
 }
 
@@ -266,7 +298,9 @@ export function logoSticker(
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
+  if (!ctx) {
+    return canvas;
+  }
   ctx.scale(width / CARD_TEXTURE_WIDTH, width / CARD_TEXTURE_WIDTH);
   ctx.drawImage(logo, box.x, box.y, box.w, box.h);
   return canvas;

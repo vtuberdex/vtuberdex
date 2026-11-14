@@ -41,7 +41,9 @@ const tmpDb = () => {
   return path.join(dir, "test.db");
 };
 after(() => {
-  for (const dir of carpetas) fs.rmSync(dir, { recursive: true, force: true });
+  for (const dir of carpetas) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 /**
@@ -217,7 +219,9 @@ test("la base de desarrollo declara el tipo `background` en su CHECK", () => {
     "data",
     "vtuberdex.db",
   );
-  if (!fs.existsSync(dbPath)) return; // sin base local no hay nada que comprobar
+  if (!fs.existsSync(dbPath)) {
+    return; // sin base local no hay nada que comprobar
+  }
   const db = openDatabase(dbPath, { readonly: true });
   const sql = db
     .prepare(

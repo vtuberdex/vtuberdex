@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/minecraft-admin/estado` — jars y configuraciones presentes en el servidor.
  * Exige el rol `mantenedor` en la propia ruta: la página escondida no protege nada.

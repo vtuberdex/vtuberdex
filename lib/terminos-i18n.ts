@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Términos y Condiciones por idioma. El texto en ESPAÑOL (`terminos.ts`) es el autoritativo y el
  * versionado (`TERMINOS_VERSION`); en/ja son traducciones de cortesía que lo siguen cláusula por

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * TOKENS DE UN SOLO USO enviados por correo: verificar una solicitud y entrar al mantenedor.
  *
@@ -100,9 +101,12 @@ export async function envioPermitido(
     "SELECT creado FROM token_correo WHERE email = ? AND proposito = ? AND creado >= ? ORDER BY creado DESC",
     [email, proposito, ahora - 24 * 60 * 60 * 1000],
   );
-  if (rows.length >= maximo) return { ok: false, motivo: "tope_diario" };
-  if (rows[0] && ahora - Number(rows[0].creado) < espera)
+  if (rows.length >= maximo) {
+    return { ok: false, motivo: "tope_diario" };
+  }
+  if (rows[0] && ahora - Number(rows[0].creado) < espera) {
     return { ok: false, motivo: "demasiado_pronto" };
+  }
   return { ok: true };
 }
 
@@ -115,8 +119,9 @@ export async function crearToken(
   ejecutor,
   { proposito, email, solicitudId = null, ahora = Date.now() },
 ) {
-  if (!PROPOSITOS.includes(proposito))
+  if (!PROPOSITOS.includes(proposito)) {
     throw new Error(`propósito de token desconocido: ${proposito}`);
+  }
   const e = await conTablas(ejecutor);
   const token = crypto.randomBytes(32).toString("base64url");
   await e.execute(
@@ -144,8 +149,9 @@ export async function correoDelToken(
   proposito,
   ahora = Date.now(),
 ) {
-  if (typeof token !== "string" || token.length < 20 || token.length > 100)
+  if (typeof token !== "string" || token.length < 20 || token.length > 100) {
     return null;
+  }
   const e = await conTablas(ejecutor);
   const { rows } = await e.execute(
     "SELECT email FROM token_correo WHERE hash = ? AND proposito = ? AND usado = 0 AND expira > ?",
@@ -164,15 +170,18 @@ export async function consumirToken(
   proposito,
   ahora = Date.now(),
 ) {
-  if (typeof token !== "string" || token.length < 20 || token.length > 100)
+  if (typeof token !== "string" || token.length < 20 || token.length > 100) {
     return null;
+  }
   const e = await conTablas(ejecutor);
   const hash = hashDe(token);
   const cambio = await e.execute(
     "UPDATE token_correo SET usado = 1 WHERE hash = ? AND proposito = ? AND usado = 0 AND expira > ?",
     [hash, proposito, ahora],
   );
-  if (cambio.rowsAffected === 0) return null;
+  if (cambio.rowsAffected === 0) {
+    return null;
+  }
   const { rows } = await e.execute(
     "SELECT email, solicitud_id FROM token_correo WHERE hash = ?",
     [hash],
@@ -192,10 +201,11 @@ export async function limpiarTokens(
   { solicitudId = null, ahora = Date.now() } = {},
 ) {
   const e = await conTablas(ejecutor);
-  if (solicitudId != null)
+  if (solicitudId != null) {
     await e.execute("DELETE FROM token_correo WHERE solicitud_id = ?", [
       solicitudId,
     ]);
+  }
   await e.execute(
     "DELETE FROM token_correo WHERE expira < ? AND proposito = ?",
     [ahora - 2 * 24 * 60 * 60 * 1000, "solicitud"],

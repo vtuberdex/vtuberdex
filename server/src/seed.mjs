@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Importa el dataset del scraper a SQLite.
  *
@@ -86,7 +87,9 @@ const POWERS = {
 
 /** Puntaje de "poder" usado para ordenar; 0 si la ficha no trae stats. */
 function powerScore(stats) {
-  if (!stats || stats.length === 0) return 0;
+  if (!stats || stats.length === 0) {
+    return 0;
+  }
   const bySlug = new Map(
     stats.map((stat) => [stat.slug, Number(stat.value) || 0]),
   );
@@ -95,25 +98,38 @@ function powerScore(stats) {
     total += valorEquilibrado(slug, bySlug.get(slug) ?? 0) * weight;
   }
   for (const stat of stats) {
-    if (!(stat.slug in POWERS) && !FUERA_DEL_PODER.has(stat.slug))
+    if (!(stat.slug in POWERS) && !FUERA_DEL_PODER.has(stat.slug)) {
       total += valorEquilibrado(stat.slug, stat.value) * 0.3;
+    }
   }
   return Math.round(total);
 }
 
+/**
+ * Banderas de calidad, en este orden. El logo se cuenta por el ASSET generado, no
+ * por `detail.logo`: el sitio solo sirve el logo en 211 fichas, pero el resto se
+ * recorta de la carta, así que había 785 logos en disco y el panel informaba
+ * "sin logo: 631".
+ */
+const QUALITY_CHECKS = [
+  ["sin-imagen-carta", (card) => !card.assets.card],
+  ["sin-ficha", (_card, detail) => !detail || detail.profile?.length === 0],
+  [
+    "sin-stats",
+    (_card, detail) => !detail || Object.keys(detail.stats ?? {}).length === 0,
+  ],
+  [
+    "sin-skills",
+    (_card, detail) => !detail || (detail.skills?.length ?? 0) === 0,
+  ],
+  ["sin-color", (card) => !card.themeColor],
+  ["sin-logo", (card) => !card.assets.logo],
+];
+
 function detectQualityFlags(card, detail) {
-  const flags = [];
-  if (!card.assets.card) flags.push("sin-imagen-carta");
-  if (!detail || detail.profile?.length === 0) flags.push("sin-ficha");
-  if (!detail || Object.keys(detail.stats ?? {}).length === 0)
-    flags.push("sin-stats");
-  if (!detail || (detail.skills?.length ?? 0) === 0) flags.push("sin-skills");
-  if (!card.themeColor) flags.push("sin-color");
-  // El logo se cuenta por el ASSET generado, no por `detail.logo`: el sitio solo
-  // sirve el logo en 211 fichas, pero el resto se recorta de la carta, así que
-  // había 785 logos en disco y el panel informaba "sin logo: 631".
-  if (!card.assets.logo) flags.push("sin-logo");
-  return flags;
+  return QUALITY_CHECKS.filter(([, falta]) => falta(card, detail)).map(
+    ([flag]) => flag,
+  );
 }
 
 function buildStats(payload) {
@@ -121,31 +137,86 @@ function buildStats(payload) {
   const raw = payload.detail?.stats ?? {};
   for (const [label, rawValue] of Object.entries(raw)) {
     const slug = STAT_SLUGS[normalizeText(label)] ?? slugify(label);
-    if (typeof rawValue === "object" && rawValue !== null) {
-      if (rawValue.current === null && rawValue.max === null) continue;
-      stats.push({
-        label,
-        slug,
-        value: rawValue.current ?? null,
-        valueText: null,
-        max: rawValue.max ?? null,
-      });
-      continue;
-    }
-    if (rawValue === null || rawValue === "") continue;
-    if (typeof rawValue === "number") {
-      stats.push({ label, slug, value: rawValue, valueText: null, max: null });
-    } else {
-      stats.push({
-        label,
-        slug,
-        value: null,
-        valueText: String(rawValue),
-        max: null,
-      });
+    const stat = statFromValue(label, slug, rawValue);
+    if (stat) {
+      stats.push(stat);
     }
   }
   return stats;
+}
+
+/**
+ * Un stat del scrape: barra `{current, max}`, número suelto o texto. `null` si no
+ * trae nada (barra sin valores, celda vacía).
+ */
+function statFromValue(label, slug, rawValue) {
+  if (typeof rawValue === "object" && rawValue !== null) {
+    if (rawValue.current === null && rawValue.max === null) {
+      return null;
+    }
+    return {
+      label,
+      slug,
+      value: rawValue.current ?? null,
+      valueText: null,
+      max: rawValue.max ?? null,
+    };
+  }
+  if (rawValue === null || rawValue === "") {
+    return null;
+  }
+  if (typeof rawValue === "number") {
+    return { label, slug, value: rawValue, valueText: null, max: null };
+  }
+  return { label, slug, value: null, valueText: String(rawValue), max: null };
+}
+
+/** Filas `asset` de la carta, con el tamaño leído del archivo si ya existe en disco. */
+function insertAssets(db, vtuberId, payload) {
+  const assetStmt = db.prepare(
+    "INSERT INTO asset (vtuber_id, kind, path, source_url, width, height, bytes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  );
+  const assets = payload.assets ?? {};
+  /**
+   * Tipos de asset del VTuber. `avatar` ES el personaje (el scraper deja el
+   * personaje en `images/character/` y lo registra en `avatar`), así que no se
+   * añade un `character` aparte: sería la MISMA ruta en dos filas y la API
+   * devolvería la imagen por duplicado bajo dos claves.
+   */
+  const kinds = ["card", "thumb", "logo", "character", "radar", "background"];
+  for (const kind of kinds) {
+    const assetPath = assets[kind];
+    if (!assetPath) {
+      continue;
+    }
+    // Las rutas del dataset vienen como `images/<carpeta>/<slug>.webp`; se guardan
+    // con barra inicial para que el cliente las use como URL absoluta tal cual.
+    const publicPath = assetPath.startsWith("/") ? assetPath : `/${assetPath}`;
+    const absolute = path.join(ROOT, "data", publicPath);
+    let bytes = null;
+    let size = { width: null, height: null };
+    try {
+      // Una sola lectura (sin `stat` previo): el tamaño y la cabecera salen del mismo contenido.
+      const contenido = fs.readFileSync(absolute);
+      bytes = contenido.length;
+      // Las dimensiones se leen de la cabecera del WebP: antes se guardaban en
+      // NULL aunque el archivo ya estuviera en disco, y eso dejaba la ficha sin
+      // datos de tamaño (y hacía que una subida del mantenedor pareciera la única
+      // fuente fiable de ese dato).
+      size = readWebpSize(contenido.subarray(0, 64));
+    } catch {
+      // asset aún no generado
+    }
+    assetStmt.run(
+      vtuberId,
+      kind,
+      publicPath,
+      kind === "card" ? (payload.source?.indexImage ?? null) : null,
+      size.width,
+      size.height,
+      bytes,
+    );
+  }
 }
 
 /** Reemplaza por completo las filas hijas de una carta. */
@@ -212,48 +283,7 @@ function replaceChildren(db, vtuberId, payload) {
     ),
   );
 
-  const assetStmt = db.prepare(
-    "INSERT INTO asset (vtuber_id, kind, path, source_url, width, height, bytes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  );
-  const assets = payload.assets ?? {};
-  /**
-   * Tipos de asset del VTuber. `avatar` ES el personaje (el scraper deja el
-   * personaje en `images/character/` y lo registra en `avatar`), así que no se
-   * añade un `character` aparte: sería la MISMA ruta en dos filas y la API
-   * devolvería la imagen por duplicado bajo dos claves.
-   */
-  const kinds = ["card", "thumb", "logo", "character", "radar", "background"];
-  for (const kind of kinds) {
-    const assetPath = assets[kind];
-    if (!assetPath) continue;
-    // Las rutas del dataset vienen como `images/<carpeta>/<slug>.webp`; se guardan
-    // con barra inicial para que el cliente las use como URL absoluta tal cual.
-    const publicPath = assetPath.startsWith("/") ? assetPath : `/${assetPath}`;
-    const absolute = path.join(ROOT, "data", publicPath);
-    let bytes = null;
-    let size = { width: null, height: null };
-    try {
-      // Una sola lectura (sin `stat` previo): el tamaño y la cabecera salen del mismo contenido.
-      const contenido = fs.readFileSync(absolute);
-      bytes = contenido.length;
-      // Las dimensiones se leen de la cabecera del WebP: antes se guardaban en
-      // NULL aunque el archivo ya estuviera en disco, y eso dejaba la ficha sin
-      // datos de tamaño (y hacía que una subida del mantenedor pareciera la única
-      // fuente fiable de ese dato).
-      size = readWebpSize(contenido.subarray(0, 64));
-    } catch {
-      // asset aún no generado
-    }
-    assetStmt.run(
-      vtuberId,
-      kind,
-      publicPath,
-      kind === "card" ? (payload.source?.indexImage ?? null) : null,
-      size.width,
-      size.height,
-      bytes,
-    );
-  }
+  insertAssets(db, vtuberId, payload);
 
   return stats;
 }
@@ -286,6 +316,18 @@ function upsertTag(db, kind, label) {
 }
 
 /**
+ * Quita las cifras del final (`netherbane2` → `netherbane`). Con un bucle: `/\d+$/`
+ * sin ancla de inicio reintenta desde cada cifra y es cuadrática.
+ */
+function withoutTrailingDigits(text) {
+  let end = text.length;
+  while (end > 0 && text[end - 1] >= "0" && text[end - 1] <= "9") {
+    end -= 1;
+  }
+  return text.slice(0, end);
+}
+
+/**
  * Icono de facción: el sitio sirve los emblemas en `facciones/<Nombre>.png` y
  * `get-faction-logos.mjs` los guarda como images/faction/<slug>.png. El nombre de
  * archivo de origen no coincide con el nombre de la facción (trae sufijos de
@@ -293,25 +335,31 @@ function upsertTag(db, kind, label) {
  */
 function factionIcon(slug) {
   const dir = path.join(ROOT, "data", "images", "faction");
-  if (!fs.existsSync(dir)) return null;
+  if (!fs.existsSync(dir)) {
+    return null;
+  }
   const direct = path.join(dir, `${slug}.png`);
-  if (fs.existsSync(direct)) return `images/faction/${slug}.png`;
+  if (fs.existsSync(direct)) {
+    return `images/faction/${slug}.png`;
+  }
 
   const files = fs.readdirSync(dir);
   // Variantes con sufijo numérico: primal-monarch4, netherbane2, ...
   const withSuffix = files.find((f) =>
-    new RegExp(`^${slug}\\d*\\.png$`).test(f),
+    new RegExp(String.raw`^${slug}\d*\.png$`).test(f),
   );
-  if (withSuffix) return `images/faction/${withSuffix}`;
+  if (withSuffix) {
+    return `images/faction/${withSuffix}`;
+  }
 
   // El sitio tiene erratas en los nombres de archivo (`apex-dualist` para la
   // facción "Apex Duelist"), así que se prueba por prefijo común más largo.
-  const stem = slug.replace(/-/g, "");
+  const stem = slug.replaceAll("-", "");
   const fuzzy = files.find((f) => {
-    const s = f
-      .replace(/\.png$/, "")
-      .replace(/\d+$/, "")
-      .replace(/-/g, "");
+    const s = withoutTrailingDigits(f.replace(/\.png$/, "")).replaceAll(
+      "-",
+      "",
+    );
     return (
       s.length > 4 &&
       (stem.startsWith(s.slice(0, 6)) || s.startsWith(stem.slice(0, 6)))
@@ -328,12 +376,15 @@ function factionIcon(slug) {
  */
 export function readWebpSize(buf) {
   const none = { width: null, height: null };
-  if (!buf || buf.length < 30) return none;
+  if (!buf || buf.length < 30) {
+    return none;
+  }
   if (
     buf.toString("ascii", 0, 4) !== "RIFF" ||
     buf.toString("ascii", 8, 12) !== "WEBP"
-  )
+  ) {
     return none;
+  }
   const type = buf.toString("ascii", 12, 16);
   try {
     if (type === "VP8 ") {
@@ -374,27 +425,158 @@ function upsertFaction(db, rawLabel) {
   return db.prepare("SELECT id FROM faction WHERE slug = ?").get(slug).id;
 }
 
+const RESET_TABLES = [
+  "vtuber_country",
+  "vtuber_language",
+  "vtuber_tag",
+  "vtuber_faction",
+  "profile_field",
+  "stat",
+  "skill",
+  "social",
+  "asset",
+  "vtuber",
+  "country",
+  "language",
+  "tag",
+  "faction",
+  "vtuber_fts",
+];
+
+/** Columnas de `vtuber` que salen del dataset (todas menos `dex_number`, que es la clave). */
+function vtuberColumns(payload, detail) {
+  const rawStats = buildStats(payload);
+  const hp = rawStats.find((stat) => stat.slug === "hp");
+  const mp = rawStats.find((stat) => stat.slug === "mp");
+  const quality = detectQualityFlags(payload, detail);
+  // En el MISMO orden que los `?` de INSERT y UPDATE de `seedDatabase`.
+  return [
+    payload.slug,
+    payload.name,
+    normalizeText(payload.name),
+    payload.alt ?? null,
+    detail.phrase ?? null,
+    detail.phraseHtml ?? null,
+    detail.theme ?? null,
+    detail.favoriteColor ?? null,
+    JSON.stringify(detail.palette ?? []),
+    detail.birthday ?? null,
+    detail.height ?? null,
+    detail.hashtag ?? null,
+    detail.favoriteColor ?? null,
+    detail.level ?? null,
+    detail.experience?.current ?? null,
+    detail.experience?.max ?? null,
+    hp?.value ?? null,
+    hp?.max ?? null,
+    mp?.value ?? null,
+    mp?.max ?? null,
+    powerScore(rawStats),
+    payload.source?.hasDetail ? 1 : 0,
+    payload.source?.indexImage ?? null,
+    payload.source?.detailUrl ?? null,
+    JSON.stringify(quality),
+  ];
+}
+
+/**
+ * Puentes de la carta (países, idiomas, grupos, artistas y facciones), rehechos de
+ * cero. Devuelve las facciones que quedaron (para el texto de búsqueda).
+ */
+function replaceBridges(db, vtuberId, payload, detail, langStmt) {
+  db.prepare("DELETE FROM vtuber_country WHERE vtuber_id = ?").run(vtuberId);
+  db.prepare("DELETE FROM vtuber_language WHERE vtuber_id = ?").run(vtuberId);
+  db.prepare("DELETE FROM vtuber_tag WHERE vtuber_id = ?").run(vtuberId);
+  db.prepare("DELETE FROM vtuber_faction WHERE vtuber_id = ?").run(vtuberId);
+
+  const countryStmt = db.prepare(
+    "INSERT OR IGNORE INTO vtuber_country (vtuber_id, country_id, position) VALUES (?, ?, ?)",
+  );
+  (payload.countries ?? []).forEach((country, index) =>
+    countryStmt.run(vtuberId, upsertCountry(db, country.slug, payload), index),
+  );
+
+  const languageStmt = db.prepare(
+    "INSERT OR IGNORE INTO vtuber_language (vtuber_id, code) VALUES (?, ?)",
+  );
+  for (const code of payload.languages ?? ["es"]) {
+    if (!LANGUAGE_NAMES[code]) {
+      langStmt.run(code, code);
+    }
+    languageStmt.run(vtuberId, code);
+  }
+
+  const tagStmt = db.prepare(
+    "INSERT OR IGNORE INTO vtuber_tag (vtuber_id, tag_id, position) VALUES (?, ?, ?)",
+  );
+  (payload.groups ?? []).forEach((label, index) =>
+    tagStmt.run(vtuberId, upsertTag(db, "group", label), index),
+  );
+  (payload.artists ?? []).forEach((label, index) =>
+    tagStmt.run(vtuberId, upsertTag(db, "artist", label), index),
+  );
+
+  const factionStmt = db.prepare(
+    "INSERT OR IGNORE INTO vtuber_faction (vtuber_id, faction_id, position) VALUES (?, ?, ?)",
+  );
+  // Máximo dos facciones por ficha (la carta tiene dos emblemas): el origen llega a traer 4.
+  // `INSERT OR IGNORE` + la clave (ficha, facción) descartan además los duplicados que
+  // aparecen al fundir las variantes.
+  const facciones = [
+    ...new Set(
+      (detail.factions ?? []).map(
+        (label) => FACCION_ALIAS[slugify(label)] ?? label,
+      ),
+    ),
+  ].slice(0, MAX_FACCIONES);
+  facciones.forEach((label, index) =>
+    factionStmt.run(vtuberId, upsertFaction(db, label), index),
+  );
+  return facciones;
+}
+
+/** Cuerpo de búsqueda full-text (nombre + frase + etiquetas + países). */
+function replaceSearchText(db, vtuberId, payload, detail, facciones) {
+  const tagText = [
+    ...(payload.groups ?? []),
+    ...(payload.artists ?? []),
+    ...(payload.countries ?? []).map((country) => country.name),
+    ...facciones,
+  ].join(" ");
+  db.prepare("DELETE FROM vtuber_fts WHERE rowid = ?").run(vtuberId);
+  db.prepare(
+    "INSERT INTO vtuber_fts (rowid, name, phrase, tags) VALUES (?, ?, ?, ?)",
+  ).run(vtuberId, payload.name, detail.phrase ?? "", tagText);
+}
+
+/** Inserta o actualiza (por `dex_number`) UNA carta del dataset con todo lo que cuelga de ella. */
+function seedOne(db, payload, statements, stats) {
+  const { findStmt, insertStmt, updateStmt, langStmt } = statements;
+  const detail = payload.detail ?? {};
+  const existing = findStmt.get(payload.dexNumber);
+  const columns = vtuberColumns(payload, detail);
+
+  let vtuberId;
+  if (existing) {
+    updateStmt.run(...columns, payload.dexNumber);
+    vtuberId = existing.id;
+    stats.updated += 1;
+  } else {
+    insertStmt.run(payload.dexNumber, ...columns);
+    vtuberId = findStmt.get(payload.dexNumber).id;
+    stats.inserted += 1;
+  }
+
+  const facciones = replaceBridges(db, vtuberId, payload, detail, langStmt);
+  replaceChildren(db, vtuberId, payload);
+  replaceSearchText(db, vtuberId, payload, detail, facciones);
+}
+
 export function seedDatabase({ db, dataset, reset = false }) {
   const started = Date.now();
   if (reset) {
     transaction(db, () => {
-      for (const table of [
-        "vtuber_country",
-        "vtuber_language",
-        "vtuber_tag",
-        "vtuber_faction",
-        "profile_field",
-        "stat",
-        "skill",
-        "social",
-        "asset",
-        "vtuber",
-        "country",
-        "language",
-        "tag",
-        "faction",
-        "vtuber_fts",
-      ]) {
+      for (const table of RESET_TABLES) {
         db.exec(`DELETE FROM ${table}`);
       }
     });
@@ -406,202 +588,35 @@ export function seedDatabase({ db, dataset, reset = false }) {
   const langStmt = db.prepare(
     "INSERT INTO language (code, name) VALUES (?, ?) ON CONFLICT (code) DO UPDATE SET name = excluded.name",
   );
-  for (const [code, name] of Object.entries(LANGUAGE_NAMES))
+  for (const [code, name] of Object.entries(LANGUAGE_NAMES)) {
     langStmt.run(code, name);
+  }
 
-  const findStmt = db.prepare("SELECT id FROM vtuber WHERE dex_number = ?");
-  const insertStmt = db.prepare(
-    `INSERT INTO vtuber (
+  const statements = {
+    langStmt,
+    findStmt: db.prepare("SELECT id FROM vtuber WHERE dex_number = ?"),
+    insertStmt: db.prepare(
+      `INSERT INTO vtuber (
        dex_number, slug, name, search_name, alt, phrase, phrase_html, theme_color, secondary_color,
        palette, birthday, height, hashtag, favorite_color, level, exp_current, exp_max,
        hp_current, hp_max, mp_current, mp_max, power_score, has_detail, status,
        source_index_image, source_detail_url, data_quality
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?)`,
-  );
-  const updateStmt = db.prepare(
-    `UPDATE vtuber SET
+    ),
+    updateStmt: db.prepare(
+      `UPDATE vtuber SET
        slug = ?, name = ?, search_name = ?, alt = ?, phrase = ?, phrase_html = ?,
        theme_color = ?, secondary_color = ?, palette = ?, birthday = ?, height = ?, hashtag = ?,
        favorite_color = ?, level = ?, exp_current = ?, exp_max = ?, hp_current = ?, hp_max = ?,
        mp_current = ?, mp_max = ?, power_score = ?, has_detail = ?,
        source_index_image = ?, source_detail_url = ?, data_quality = ?, updated_at = datetime('now')
      WHERE dex_number = ?`,
-  );
+    ),
+  };
 
   transaction(db, () => {
     for (const payload of dataset.vtubers) {
-      const detail = payload.detail ?? {};
-      const existing = findStmt.get(payload.dexNumber);
-      const rawStats = buildStats(payload);
-      const hp = rawStats.find((stat) => stat.slug === "hp");
-      const mp = rawStats.find((stat) => stat.slug === "mp");
-      const quality = detectQualityFlags(payload, detail);
-
-      const common = {
-        dexNumber: payload.dexNumber,
-        slug: payload.slug,
-        name: payload.name,
-        searchName: normalizeText(payload.name),
-        alt: payload.alt ?? null,
-        phrase: detail.phrase ?? null,
-        phraseHtml: detail.phraseHtml ?? null,
-        themeColor: detail.theme ?? null,
-        secondaryColor: detail.favoriteColor ?? null,
-        palette: JSON.stringify(detail.palette ?? []),
-        birthday: detail.birthday ?? null,
-        height: detail.height ?? null,
-        hashtag: detail.hashtag ?? null,
-        favoriteColor: detail.favoriteColor ?? null,
-        level: detail.level ?? null,
-        expCurrent: detail.experience?.current ?? null,
-        expMax: detail.experience?.max ?? null,
-        hpCurrent: hp?.value ?? null,
-        hpMax: hp?.max ?? null,
-        mpCurrent: mp?.value ?? null,
-        mpMax: mp?.max ?? null,
-        powerScore: powerScore(rawStats),
-        hasDetail: payload.source?.hasDetail ? 1 : 0,
-        sourceIndexImage: payload.source?.indexImage ?? null,
-        sourceDetailUrl: payload.source?.detailUrl ?? null,
-        dataQuality: JSON.stringify(quality),
-      };
-
-      let vtuberId;
-      if (existing) {
-        updateStmt.run(
-          common.slug,
-          common.name,
-          common.searchName,
-          common.alt,
-          common.phrase,
-          common.phraseHtml,
-          common.themeColor,
-          common.secondaryColor,
-          common.palette,
-          common.birthday,
-          common.height,
-          common.hashtag,
-          common.favoriteColor,
-          common.level,
-          common.expCurrent,
-          common.expMax,
-          common.hpCurrent,
-          common.hpMax,
-          common.mpCurrent,
-          common.mpMax,
-          common.powerScore,
-          common.hasDetail,
-          common.sourceIndexImage,
-          common.sourceDetailUrl,
-          common.dataQuality,
-          common.dexNumber,
-        );
-        vtuberId = existing.id;
-        stats.updated += 1;
-      } else {
-        insertStmt.run(
-          common.dexNumber,
-          common.slug,
-          common.name,
-          common.searchName,
-          common.alt,
-          common.phrase,
-          common.phraseHtml,
-          common.themeColor,
-          common.secondaryColor,
-          common.palette,
-          common.birthday,
-          common.height,
-          common.hashtag,
-          common.favoriteColor,
-          common.level,
-          common.expCurrent,
-          common.expMax,
-          common.hpCurrent,
-          common.hpMax,
-          common.mpCurrent,
-          common.mpMax,
-          common.powerScore,
-          common.hasDetail,
-          common.sourceIndexImage,
-          common.sourceDetailUrl,
-          common.dataQuality,
-        );
-        vtuberId = findStmt.get(payload.dexNumber).id;
-        stats.inserted += 1;
-      }
-
-      // Puentes
-      db.prepare("DELETE FROM vtuber_country WHERE vtuber_id = ?").run(
-        vtuberId,
-      );
-      db.prepare("DELETE FROM vtuber_language WHERE vtuber_id = ?").run(
-        vtuberId,
-      );
-      db.prepare("DELETE FROM vtuber_tag WHERE vtuber_id = ?").run(vtuberId);
-      db.prepare("DELETE FROM vtuber_faction WHERE vtuber_id = ?").run(
-        vtuberId,
-      );
-
-      const countryStmt = db.prepare(
-        "INSERT OR IGNORE INTO vtuber_country (vtuber_id, country_id, position) VALUES (?, ?, ?)",
-      );
-      (payload.countries ?? []).forEach((country, index) =>
-        countryStmt.run(
-          vtuberId,
-          upsertCountry(db, country.slug, payload),
-          index,
-        ),
-      );
-
-      const languageStmt = db.prepare(
-        "INSERT OR IGNORE INTO vtuber_language (vtuber_id, code) VALUES (?, ?)",
-      );
-      for (const code of payload.languages ?? ["es"]) {
-        if (!LANGUAGE_NAMES[code]) langStmt.run(code, code);
-        languageStmt.run(vtuberId, code);
-      }
-
-      const tagStmt = db.prepare(
-        "INSERT OR IGNORE INTO vtuber_tag (vtuber_id, tag_id, position) VALUES (?, ?, ?)",
-      );
-      (payload.groups ?? []).forEach((label, index) =>
-        tagStmt.run(vtuberId, upsertTag(db, "group", label), index),
-      );
-      (payload.artists ?? []).forEach((label, index) =>
-        tagStmt.run(vtuberId, upsertTag(db, "artist", label), index),
-      );
-
-      const factionStmt = db.prepare(
-        "INSERT OR IGNORE INTO vtuber_faction (vtuber_id, faction_id, position) VALUES (?, ?, ?)",
-      );
-      // Máximo dos facciones por ficha (la carta tiene dos emblemas): el origen llega a traer 4.
-      // `INSERT OR IGNORE` + la clave (ficha, facción) descartan además los duplicados que
-      // aparecen al fundir las variantes.
-      const facciones = [
-        ...new Set(
-          (detail.factions ?? []).map(
-            (label) => FACCION_ALIAS[slugify(label)] ?? label,
-          ),
-        ),
-      ].slice(0, MAX_FACCIONES);
-      facciones.forEach((label, index) =>
-        factionStmt.run(vtuberId, upsertFaction(db, label), index),
-      );
-
-      replaceChildren(db, vtuberId, payload);
-
-      // Cuerpo de búsqueda full-text (nombre + frase + etiquetas + países).
-      const tagText = [
-        ...(payload.groups ?? []),
-        ...(payload.artists ?? []),
-        ...(payload.countries ?? []).map((country) => country.name),
-        ...facciones,
-      ].join(" ");
-      db.prepare("DELETE FROM vtuber_fts WHERE rowid = ?").run(vtuberId);
-      db.prepare(
-        "INSERT INTO vtuber_fts (rowid, name, phrase, tags) VALUES (?, ?, ?, ?)",
-      ).run(vtuberId, payload.name, detail.phrase ?? "", tagText);
+      seedOne(db, payload, statements, stats);
     }
 
     // Contadores desnormalizados de facetas.
@@ -662,5 +677,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const meta = { generatedAt: getMeta(db, "dataset_generated_at") };
   console.log(`[seed] dataset del ${meta.generatedAt}`);
   db.close();
-  if (!check.ok) process.exit(2);
+  if (!check.ok) {
+    process.exit(2);
+  }
 }

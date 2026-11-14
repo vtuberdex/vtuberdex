@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** Atajos del asistente: un clic añade lo que casi toda ficha lleva. */
 
 export const PROFILE_SUGGESTIONS = [

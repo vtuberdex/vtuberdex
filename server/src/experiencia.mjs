@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 import { rachaDe, rangoDeGrado } from "./premium.mjs";
 
 /**
@@ -207,7 +208,9 @@ export function experienciaConLikes(base, likes, xpJuego = 0) {
   let actual = actualBase + totalLikes * XP_POR_LIKE + extra;
   // Lo que valieron los niveles que la ficha ya traía + su barra + los likes + el juego: no se reinicia nunca.
   let total = actualBase + totalLikes * XP_POR_LIKE + extra;
-  for (let n = 1; n < nivelBase; n += 1) total += umbralDeNivel(n);
+  for (let n = 1; n < nivelBase; n += 1) {
+    total += umbralDeNivel(n);
+  }
   for (
     let vueltas = 0;
     actual >= max && vueltas < MAX_NIVELES_POR_CALCULO;

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Autenticación del mantenedor.
  *
@@ -21,7 +22,9 @@ export function hashPassword(
 /** Comparación en tiempo constante. */
 export function verifyPassword(password, stored) {
   const [scheme, salt, expected] = String(stored ?? "").split("$");
-  if (scheme !== "scrypt" || !salt || !expected) return false;
+  if (scheme !== "scrypt" || !salt || !expected) {
+    return false;
+  }
   const derived = crypto.scryptSync(password, salt, 64).toString("hex");
   const a = Buffer.from(derived, "hex");
   const b = Buffer.from(expected, "hex");
@@ -39,7 +42,9 @@ export function createSessionStore({ ttlMs = SESSION_TTL_MS } = {}) {
     },
     read(token) {
       const session = sessions.get(token);
-      if (!session) return null;
+      if (!session) {
+        return null;
+      }
       if (session.expiresAt < Date.now()) {
         sessions.delete(token);
         return null;

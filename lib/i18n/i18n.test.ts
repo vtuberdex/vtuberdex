@@ -34,8 +34,9 @@ describe("elegirLocale", () => {
 describe("diccionarios", () => {
   it("los tres idiomas tienen exactamente las mismas claves", () => {
     const base = Object.keys(DICCIONARIOS.es).sort();
-    for (const locale of LOCALES)
+    for (const locale of LOCALES) {
       expect(Object.keys(DICCIONARIOS[locale]).sort()).toEqual(base);
+    }
   });
   it("ninguna traducción queda vacía y los marcadores {x} coinciden con el español", () => {
     const marcadores = (texto: string) =>

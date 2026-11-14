@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * La PLACA DE ACRÍLICO de una carta premium (como las de CGC) y su material.
@@ -17,7 +18,17 @@
  * paga nada. Material, geometría y textura se crean UNA vez por carta y se sueltan al desmontar.
  */
 import { useEffect, useMemo, type ReactNode } from "react";
-import * as THREE from "three";
+import {
+  CanvasTexture,
+  Color,
+  ExtrudeGeometry,
+  FrontSide,
+  SRGBColorSpace,
+  ShaderMaterial,
+  Shape,
+  Vector2,
+  Vector3,
+} from "three";
 
 import type { PremiumInfo, VtuberCard } from "@/lib/types";
 import { GEOMETRY, PREMIUM } from "@/components/card3d-config";
@@ -97,10 +108,10 @@ const FRAGMENT = /* glsl */ `
 `;
 
 /** Rectángulo de esquinas redondeadas centrado en el origen. */
-export function formaRedondeada(w: number, h: number, r: number): THREE.Shape {
+export function formaRedondeada(w: number, h: number, r: number): Shape {
   const x = -w / 2;
   const y = -h / 2;
-  const shape = new THREE.Shape();
+  const shape = new Shape();
   shape.moveTo(x + r, y);
   shape.lineTo(x + w - r, y);
   shape.absarc(x + w - r, y + r, r, -Math.PI / 2, 0, false);
@@ -118,7 +129,7 @@ export function formaRedondeada(w: number, h: number, r: number): THREE.Shape {
  * contorno hacia fuera, y sin esto el cuerpo sería mayor que la funda por el grosor del bisel.
  * Ocupa z de `-back` a `+front` (el insert vive entre los dos).
  */
-export function crearCuerpo(layout: SlabLayout): THREE.ExtrudeGeometry {
+export function crearCuerpo(layout: SlabLayout): ExtrudeGeometry {
   const { body, layout: medidas } = PREMIUM;
   const inset = body.bevel;
   const shape = formaRedondeada(
@@ -126,7 +137,7 @@ export function crearCuerpo(layout: SlabLayout): THREE.ExtrudeGeometry {
     layout.height - 2 * inset,
     medidas.cornerRadius - inset,
   );
-  const geometry = new THREE.ExtrudeGeometry(shape, {
+  const geometry = new ExtrudeGeometry(shape, {
     depth: body.front + body.back - 2 * body.bevel,
     bevelEnabled: true,
     bevelThickness: body.bevel,
@@ -139,20 +150,18 @@ export function crearCuerpo(layout: SlabLayout): THREE.ExtrudeGeometry {
   return geometry;
 }
 
-export function crearMaterialDeAcrilico(
-  layout: SlabLayout,
-): THREE.ShaderMaterial {
+export function crearMaterialDeAcrilico(layout: SlabLayout): ShaderMaterial {
   const a = PREMIUM.acrylic;
-  return new THREE.ShaderMaterial({
+  return new ShaderMaterial({
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
     transparent: true,
     depthWrite: false,
-    side: THREE.FrontSide,
+    side: FrontSide,
     uniforms: {
-      uHalf: { value: new THREE.Vector2(layout.width / 2, layout.height / 2) },
-      uTint: { value: new THREE.Color(a.tint) },
-      uLight: { value: new THREE.Vector3(...a.light) },
+      uHalf: { value: new Vector2(layout.width / 2, layout.height / 2) },
+      uTint: { value: new Color(a.tint) },
+      uLight: { value: new Vector3(...a.light) },
       uBase: { value: a.base as number },
       uMaxAlpha: { value: a.maxAlpha as number },
       uFresnel: { value: a.fresnel as number },
@@ -174,15 +183,15 @@ export function crearTexturaDeHoja(
   layout: SlabLayout,
   card: VtuberCard,
   premium: PremiumInfo,
-): THREE.CanvasTexture {
+): CanvasTexture {
   const canvas = dibujarHojaInterior(layout, {
     name: card.name,
     dexNumber: card.dexNumber,
     country: card.countries[0]?.name ?? null,
     premium,
   });
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
   texture.anisotropy = 4;
   return texture;
 }
@@ -195,7 +204,7 @@ export interface PremiumSlabProps {
   /** Holgura de la funda a cada lado: fija el alto de la placa (ver `slabLayout`). */
   outerPad: number;
   /** El humo brillante de la carta: se dibuja detrás de la placa entera, con el tamaño de la placa. */
-  glowMaterial?: THREE.ShaderMaterial;
+  glowMaterial?: ShaderMaterial;
   /** La carta holográfica, que se coloca dentro de la ventana. */
   children: ReactNode;
 }
@@ -208,7 +217,7 @@ export function PremiumSlab({
   outerPad,
   glowMaterial,
   children,
-}: PremiumSlabProps) {
+}: Readonly<PremiumSlabProps>) {
   const layout = useMemo(
     () => slabLayout(cardWidth, cardHeight, outerPad),
     [cardWidth, cardHeight, outerPad],

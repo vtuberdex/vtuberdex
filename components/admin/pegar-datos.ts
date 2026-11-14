@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Parser de «datos pegados»: el mantenedor tenía una hoja que convertía una fila de Excel en
  * bloques `<div class="dato"><div class="titulo">…</div><div class="contenido">…</div></div>`,
@@ -19,7 +20,9 @@ const norm = (text: string) =>
 
 /** Extrae los pares título/contenido; descarta los que vienen sin valor. */
 export function parsearDatos(html: string): ProfileField[] {
-  if (!html.trim()) return [];
+  if (!html.trim()) {
+    return [];
+  }
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const out: ProfileField[] = [];
   // Solo interesa el texto: se descarta todo lo ejecutable/embebido antes de leer textContent.
@@ -27,7 +30,9 @@ export function parsearDatos(html: string): ProfileField[] {
   doc.querySelectorAll('.dato').forEach((row) => {
     const label = (row.querySelector('.titulo')?.textContent ?? '').replace(/\s+/g, ' ').replace(/[:：]\s*$/, '').trim();
     const value = (row.querySelector('.contenido')?.textContent ?? '').replace(/\s+/g, ' ').trim();
-    if (label && value) out.push({ label, value });
+    if (label && value) {
+      out.push({ label, value });
+    }
   });
   return out;
 }
@@ -37,8 +42,11 @@ export function fundirPerfil(actual: ProfileField[], nuevos: ProfileField[]): Pr
   const result = actual.map((field) => ({ ...field }));
   for (const item of nuevos) {
     const i = result.findIndex((field) => norm(field.label) === norm(item.label));
-    if (i >= 0) result[i] = { label: result[i].label, value: item.value };
-    else result.push({ ...item });
+    if (i >= 0) {
+      result[i] = { label: result[i].label, value: item.value };
+    } else {
+      result.push({ ...item });
+    }
   }
   return result;
 }

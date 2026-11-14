@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Medidas canónicas del lienzo de la carta y la tipografía del front.
  */

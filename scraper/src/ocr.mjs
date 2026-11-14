@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Extrae el texto personalizado que viene IMPRESO en la imagen de cada carta.
  *
@@ -67,9 +68,15 @@ const normalize = (s) =>
 export function wordOverlap(a, b) {
   const setA = new Set(normalize(a).split(" ").filter(Boolean));
   const setB = new Set(normalize(b).split(" ").filter(Boolean));
-  if (setA.size === 0 || setB.size === 0) return 0;
+  if (setA.size === 0 || setB.size === 0) {
+    return 0;
+  }
   let comunes = 0;
-  for (const w of setA) if (setB.has(w)) comunes += 1;
+  for (const w of setA) {
+    if (setB.has(w)) {
+      comunes += 1;
+    }
+  }
   return comunes / Math.max(setA.size, setB.size);
 }
 
@@ -105,7 +112,9 @@ async function makeWorker() {
     try {
       return await createWorker(LANGS);
     } catch (error) {
-      if (attempt === 3) throw error;
+      if (attempt === 3) {
+        throw error;
+      }
       await sleep(1500 * attempt);
     }
   }
@@ -119,7 +128,9 @@ async function main() {
   }
   const dataset = JSON.parse(fs.readFileSync(DATASET, "utf8"));
   await mkdir(OUT, { recursive: true });
-  if (KEEP_RAW) await mkdir(RAW_DIR, { recursive: true });
+  if (KEEP_RAW) {
+    await mkdir(RAW_DIR, { recursive: true });
+  }
 
   // Reanudable: se conserva lo ya leído.
   const previous = fs.existsSync(RESULT)
@@ -170,12 +181,14 @@ async function main() {
   };
 
   const results = await mapLimit(pending, CONCURRENCY, async (card) => {
-    const worker = workers[cursor++ % workers.length];
+    const worker = workers[cursor % workers.length];
+    cursor += 1;
     const src = card.source.indexImage;
     try {
       const original = await fetchBinary(src);
-      if (!original)
+      if (!original) {
         return { dexNumber: card.dexNumber, error: "descarga-fallida", src };
+      }
       const { image, box } = await cropForOcr(original);
       const { data } = await worker.recognize(image);
       const text = data.text.replace(/\s+/g, " ").trim();
@@ -184,8 +197,11 @@ async function main() {
         await writeInside(RAW_DIR, path.join(RAW_DIR, `${rawName}.png`), image).catch(() => undefined);
         await writeInside(RAW_DIR, path.join(RAW_DIR, `${rawName}.jpg`), original).catch(() => undefined);
       }
-      if (text.length < 12) empty += 1;
-      else ok += 1;
+      if (text.length < 12) {
+        empty += 1;
+      } else {
+        ok += 1;
+      }
       const result = {
         dexNumber: card.dexNumber,
         slug: card.slug,
@@ -266,8 +282,10 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error("[ocr] ERROR", error);
     process.exit(1);
-  });
+  }
 }

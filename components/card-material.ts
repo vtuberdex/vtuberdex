@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Texturas, uniforms y materiales de UNA carta holográfica, como hook reutilizable.
@@ -38,7 +39,18 @@ import {
   useState,
 } from "react";
 import { useThree } from "@react-three/fiber";
-import * as THREE from "three";
+import {
+  AdditiveBlending,
+  CanvasTexture,
+  Color,
+  FrontSide,
+  PMREMGenerator,
+  SRGBColorSpace,
+  ShaderMaterial,
+  Texture,
+  Vector2,
+  Vector3,
+} from "three";
 
 import type { VtuberCard } from "@/lib/types";
 import metalEnvImport from "./metal-env.webp";
@@ -84,9 +96,9 @@ const CARD_H = CARD_W * CFG.GEOMETRY.aspect;
 
 export interface SharedCardEnv {
   /** Equirectangular del cielo metálico (reflejo de espejo de la cara). */
-  envMap: THREE.Texture | null;
+  envMap: Texture | null;
   /** El mismo cielo prefiltrado con PMREM: lo único que `MeshStandardMaterial` usa. */
-  bodyEnvMap: THREE.Texture | null;
+  bodyEnvMap: Texture | null;
 }
 
 export const CardEnvContext = createContext<SharedCardEnv | null>(null);
@@ -97,15 +109,17 @@ export const CardEnvContext = createContext<SharedCardEnv | null>(null);
  */
 export function useSharedCardEnv(): SharedCardEnv {
   const { gl } = useThree();
-  const [envMap, setEnvMap] = useState<THREE.Texture | null>(null);
+  const [envMap, setEnvMap] = useState<Texture | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     loadImage(metalEnvUrl)
       .then((img) => {
-        if (cancelled || !img) return;
-        const tex = new THREE.CanvasTexture(img);
-        tex.colorSpace = THREE.SRGBColorSpace;
+        if (cancelled || !img) {
+          return;
+        }
+        const tex = new CanvasTexture(img);
+        tex.colorSpace = SRGBColorSpace;
         tex.anisotropy = 8;
         tex.needsUpdate = true;
         setEnvMap(tex);
@@ -117,8 +131,10 @@ export function useSharedCardEnv(): SharedCardEnv {
   }, []);
 
   const bodyEnvMap = useMemo(() => {
-    if (!envMap) return null;
-    const pmrem = new THREE.PMREMGenerator(gl);
+    if (!envMap) {
+      return null;
+    }
+    const pmrem = new PMREMGenerator(gl);
     const prefiltrada = pmrem.fromEquirectangular(envMap).texture;
     pmrem.dispose();
     return prefiltrada;
@@ -154,8 +170,8 @@ export interface CardMaterials {
   /** `true` cuando las capas ya están en la GPU: antes la carta no tiene nada que mostrar. */
   ready: boolean;
   uniforms: CardUniforms;
-  frontMaterial: THREE.ShaderMaterial;
-  glowMaterial: THREE.ShaderMaterial;
+  frontMaterial: ShaderMaterial;
+  glowMaterial: ShaderMaterial;
   cardWidth: number;
   cardHeight: number;
   /** Actualización por frame: tiempo, puntero (NDC) e inclinación (rad) que ve el shader. */
@@ -169,21 +185,21 @@ export interface CardMaterials {
 interface CardTextures {
   /** Color predominante de la superficie: tiñe el foil del fondo (ver `DOMINANT`). */
   dominant: ColorPredominante;
-  layers: THREE.CanvasTexture[];
+  layers: CanvasTexture[];
   /** Canvas de origen de cada capa: dos etapas que comparten canvas comparten textura. */
   canvases: HTMLCanvasElement[];
-  edge: THREE.CanvasTexture;
-  logoMask: THREE.CanvasTexture;
-  logoSticker: THREE.CanvasTexture;
+  edge: CanvasTexture;
+  logoMask: CanvasTexture;
+  logoSticker: CanvasTexture;
   /** Mapa de entorno propio (solo cuando NO hay uno compartido; puede faltar). */
-  envMap: THREE.CanvasTexture | null;
+  envMap: CanvasTexture | null;
   /** Etapa rápida (`false`) o acabado completo (`true`); ver `fabrica.ts`. */
   completa: boolean;
 }
 
 const texturaDeCanvas = (canvas: HTMLCanvasElement, anisotropy: number) => {
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
+  const tex = new CanvasTexture(canvas);
+  tex.colorSpace = SRGBColorSpace;
   tex.anisotropy = anisotropy;
   tex.needsUpdate = true;
   return tex;
@@ -206,14 +222,14 @@ function aTexturasThree(
   return {
     dominant: t.dominant,
     layers: t.layers.map((canvas, i) =>
-      previa && previa.canvases[i] === canvas
+      previa?.canvases[i] === canvas
         ? previa.layers[i]
         : texturaDeCanvas(canvas, 8),
     ),
     canvases: t.layers,
     edge: texturaDeCanvas(t.edge, 4),
-    logoMask: new THREE.CanvasTexture(t.logoMask),
-    logoSticker: new THREE.CanvasTexture(t.logoSticker),
+    logoMask: new CanvasTexture(t.logoMask),
+    logoSticker: new CanvasTexture(t.logoSticker),
     envMap:
       previa?.envMap ??
       (envMap
@@ -224,7 +240,7 @@ function aTexturasThree(
 }
 
 /** Todas las texturas de un juego, para soltarlas o compararlas. */
-const todasLasTexturas = (c: CardTextures): THREE.Texture[] => [
+const todasLasTexturas = (c: CardTextures): Texture[] => [
   ...c.layers,
   c.edge,
   c.logoMask,
@@ -273,20 +289,26 @@ export function useCardMaterials(
      * caché de la fábrica, llega completa de una vez y sin pasar por la cola.
      */
     const publicar = (t: TexturasDeCarta, envMap: HTMLImageElement | null) => {
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
       const siguiente = aTexturasThree(t, envMap, texturasActuales.current);
       texturasActuales.current = siguiente;
       setTextures(siguiente);
     };
     entorno.then((envMap) => {
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
       void generarTexturas(card, {
         width,
         prioridad: "alta",
         cancelada: () => cancelled,
         alRapida: (rapida) => publicar(rapida, envMap),
       }).then((completa) => {
-        if (!completa || cancelled) return;
+        if (!completa || cancelled) {
+          return;
+        }
         soltar = anclar(card, completa.width);
         publicar(completa, envMap);
       });
@@ -308,37 +330,43 @@ export function useCardMaterials(
           ? todasLasTexturas(texturasActuales.current)
           : [],
       );
-      if (textures)
+      if (textures) {
         todasLasTexturas(textures).forEach(
           (tex) => !vigentes.has(tex) && tex.dispose(),
         );
+      }
     },
     [textures],
   );
   useEffect(
     () => () => {
-      if (texturasActuales.current)
+      if (texturasActuales.current) {
         todasLasTexturas(texturasActuales.current).forEach((tex) =>
           tex.dispose(),
         );
+      }
     },
     [],
   );
 
-  const [factionTextures, setFactionTextures] = useState<THREE.Texture[]>([]);
+  const [factionTextures, setFactionTextures] = useState<Texture[]>([]);
   useEffect(() => {
     let cancelled = false;
     // La MISMA lista que usa la textura del título para pintar los engarces.
     const icons = iconosDeFaccion(card);
     setFactionTextures([]);
-    if (icons.length === 0) return undefined;
+    if (icons.length === 0) {
+      return undefined;
+    }
     Promise.all(icons.map((src) => loadImage(src))).then((imgs) => {
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
       const texs = imgs
         .filter((img): img is HTMLImageElement => Boolean(img))
         .map((img) => {
-          const tex = new THREE.Texture(img);
-          tex.colorSpace = THREE.SRGBColorSpace;
+          const tex = new Texture(img);
+          tex.colorSpace = SRGBColorSpace;
           // Anisotropía alta: el emblema es diminuto y se ve inclinado con la carta.
           tex.anisotropy = 8;
           tex.needsUpdate = true;
@@ -357,35 +385,35 @@ export function useCardMaterials(
   );
 
   const uniforms = useMemo<CardUniforms>(() => {
-    const accent = new THREE.Color(palette.accent);
-    const secondary = new THREE.Color(palette.secondary);
+    const accent = new Color(palette.accent);
+    const secondary = new Color(palette.secondary);
     const front: Record<string, { value: unknown }> = {
-      uEdgeMap: { value: null as THREE.Texture | null },
+      uEdgeMap: { value: null as Texture | null },
       uEdgeStrength: { value: CFG.EDGE.strength as number },
-      uFactionMap0: { value: null as THREE.Texture | null },
-      uFactionMap1: { value: null as THREE.Texture | null },
-      uFactionCounts: { value: new THREE.Vector2(0, 0) },
-      uFactionAspect: { value: new THREE.Vector2(1, 1) },
-      uBgDominant: { value: new THREE.Vector3(0, 0, 0) },
+      uFactionMap0: { value: null as Texture | null },
+      uFactionMap1: { value: null as Texture | null },
+      uFactionCounts: { value: new Vector2(0, 0) },
+      uFactionAspect: { value: new Vector2(1, 1) },
+      uBgDominant: { value: new Vector3(0, 0, 0) },
       uBgDominantAmount: { value: 0 },
       uBgDominantMix: { value: CFG.DOMINANT.mix as number },
       uFactionStrength: { value: CFG.FACTION.strength as number },
       uAccent: { value: accent },
       uSecondary: { value: secondary },
-      uPointer: { value: new THREE.Vector2(0, 0) },
-      uTilt: { value: new THREE.Vector2(0, 0) },
+      uPointer: { value: new Vector2(0, 0) },
+      uTilt: { value: new Vector2(0, 0) },
       uTime: { value: 0 },
       uHolo: { value: holo },
       uHasHolo: {
         value: card.themeColor ? 1 : CFG.INTENSITY.holo.noThemeFloor,
       },
       uGloss: { value: gloss },
-      uCardSize: { value: new THREE.Vector2(CARD_W, CARD_H) },
+      uCardSize: { value: new Vector2(CARD_W, CARD_H) },
       uArtZone: {
-        value: new THREE.Vector2(CFG.ART_ZONE.top, CFG.ART_ZONE.bottom),
+        value: new Vector2(CFG.ART_ZONE.top, CFG.ART_ZONE.bottom),
       },
-      uLogoMask: { value: null as THREE.Texture | null },
-      uLogoSticker: { value: null as THREE.Texture | null },
+      uLogoMask: { value: null as Texture | null },
+      uLogoSticker: { value: null as Texture | null },
       uCardRadius: { value: CFG.GEOMETRY.cornerRadius },
       uLayerWeight: { value: CFG.HOLOGRAM.layerWeight as number },
       uGlareStrength: { value: CFG.HOLOGRAM.glareStrength as number },
@@ -412,7 +440,7 @@ export function useCardMaterials(
       uMetalReflect: { value: CFG.METAL_REFLECT.strength as number },
       uMetalBump: { value: CFG.METAL_REFLECT.bump as number },
       uMetalBumpScale: { value: CFG.METAL_REFLECT.bumpScale as number },
-      uMetalEnvMap: { value: null as THREE.Texture | null },
+      uMetalEnvMap: { value: null as Texture | null },
       uMetalGain: { value: CFG.METAL_REFLECT.gain as number },
       uLogoParallax: { value: CFG.LOGO.parallax as number },
       uParallaxFactors: { value: new Float32Array(CFG.LAYER_PARALLAX_FACTORS) },
@@ -430,7 +458,7 @@ export function useCardMaterials(
 
     // Generar uniforms de capas desde la config.
     LAYER_UNIFORM_NAMES.forEach((name) => {
-      front[name] = { value: null as THREE.Texture | null };
+      front[name] = { value: null as Texture | null };
     });
 
     return {
@@ -439,7 +467,7 @@ export function useCardMaterials(
         uGlowColor: { value: accent.clone() },
         uGlowStrength: { value: CFG.GLOW.strength as number },
         uCardRect: {
-          value: new THREE.Vector2(
+          value: new Vector2(
             1 / CFG.GEOMETRY.glowSpread,
             1 / CFG.GEOMETRY.glowSpread,
           ),
@@ -467,17 +495,17 @@ export function useCardMaterials(
    * efecto de layout corre antes de que el navegador pinte, así que no hay hueco.
    */
   useLayoutEffect(() => {
-    if (!textures) return;
+    if (!textures) {
+      return;
+    }
     LAYER_UNIFORM_NAMES.forEach((name, i) => {
-      (uniforms.front[name] as { value: THREE.Texture | null }).value =
+      (uniforms.front[name] as { value: Texture | null }).value =
         textures.layers[i] ?? null;
     });
     uniforms.front.uEdgeMap.value = textures.edge;
     uniforms.front.uLogoMask.value = textures.logoMask;
     uniforms.front.uLogoSticker.value = textures.logoSticker;
-    (uniforms.front.uBgDominant.value as THREE.Vector3).set(
-      ...textures.dominant.rgb,
-    );
+    (uniforms.front.uBgDominant.value as Vector3).set(...textures.dominant.rgb);
     uniforms.front.uBgDominantAmount.value = textures.dominant.amount;
   }, [textures, uniforms]);
 
@@ -497,16 +525,16 @@ export function useCardMaterials(
     const izquierda = segundo ? primero : null;
     uniforms.front.uFactionMap0.value = izquierda ?? null;
     uniforms.front.uFactionMap1.value = derecha;
-    (uniforms.front.uFactionCounts.value as THREE.Vector2).set(
+    (uniforms.front.uFactionCounts.value as Vector2).set(
       izquierda ? 1 : 0,
       derecha ? 1 : 0,
     );
     // Proporción del PNG para encajarlo «contain» en el engarce cuadrado (ver uFactionAspect).
-    const proporcion = (tex: THREE.Texture | null | undefined) => {
+    const proporcion = (tex: Texture | null | undefined) => {
       const img = tex?.image as { width?: number; height?: number } | undefined;
       return img?.width && img?.height ? img.width / img.height : 1;
     };
-    (uniforms.front.uFactionAspect.value as THREE.Vector2).set(
+    (uniforms.front.uFactionAspect.value as Vector2).set(
       proporcion(izquierda),
       proporcion(derecha),
     );
@@ -522,25 +550,25 @@ export function useCardMaterials(
 
   const frontMaterial = useMemo(
     () =>
-      new THREE.ShaderMaterial({
+      new ShaderMaterial({
         vertexShader: cardVertexShader,
         fragmentShader: cardFragmentShader,
         uniforms: uniforms.front,
         transparent: true,
-        side: THREE.FrontSide,
+        side: FrontSide,
       }),
     [uniforms],
   );
 
   const glowMaterial = useMemo(
     () =>
-      new THREE.ShaderMaterial({
+      new ShaderMaterial({
         vertexShader: glowVertexShader,
         fragmentShader: glowFragmentShader,
         uniforms: uniforms.glow,
         transparent: true,
         depthWrite: false,
-        blending: THREE.AdditiveBlending,
+        blending: AdditiveBlending,
       }),
     [uniforms],
   );
@@ -587,16 +615,17 @@ export function useCardMaterials(
         uniforms.front.uBgFoilViewAngle.value = live.bgFoilViewAngle;
         uniforms.front.uBgFoilDesaturation.value = live.bgFoilDesaturation;
         uniforms.front.uBgDominantMix.value = live.bgDominantMix;
-        if (tocada("holo")) uniforms.front.uHolo.value = live.holo * boost.holo;
-        if (tocada("gloss")) uniforms.front.uGloss.value = live.gloss;
+        if (tocada("holo")) {
+          uniforms.front.uHolo.value = live.holo * boost.holo;
+        }
+        if (tocada("gloss")) {
+          uniforms.front.uGloss.value = live.gloss;
+        }
         uniforms.front.uEdgeStrength.value = live.edge * boost.edge;
         uniforms.front.uFactionStrength.value = live.faction * boost.faction;
         uniforms.glow.uGlowStrength.value = live.glow * boost.glow;
         uniforms.glow.uTime.value = t;
-        (uniforms.front.uPointer.value as THREE.Vector2).set(
-          pointer.x,
-          pointer.y,
-        );
+        (uniforms.front.uPointer.value as Vector2).set(pointer.x, pointer.y);
         /**
          * LA CAPA 0 NO SE DESPLAZA: ES LA SUPERFICIE DE LA CARTA.
          *
@@ -631,7 +660,7 @@ export function useCardMaterials(
          */
         (uniforms.front.uParallaxFactors.value as Float32Array)[2] =
           live.logoParallax;
-        (uniforms.front.uTilt.value as THREE.Vector2).set(tilt.x, tilt.y);
+        (uniforms.front.uTilt.value as Vector2).set(tilt.x, tilt.y);
       },
     [uniforms, boost],
   );

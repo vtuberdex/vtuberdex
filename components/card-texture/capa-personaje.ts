@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * CAPA 1 — el personaje, única imagen fuente del VTuber.
  */
@@ -13,7 +14,9 @@ export function drawCharacterLayer({
   width: number;
 }): HTMLCanvasElement {
   const { canvas, ctx, W, H } = createLayer(width);
-  if (!ctx) return canvas;
+  if (!ctx) {
+    return canvas;
+  }
   if (art) {
     const scaleToHeight = H / art.height;
     const dw = art.width * scaleToHeight;

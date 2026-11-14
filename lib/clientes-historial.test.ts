@@ -26,8 +26,9 @@ function almacenSqlite(db = new DatabaseSync(":memory:")) {
       const sql = typeof arg === "string" ? arg : arg.sql;
       const args = (typeof arg === "string" ? [] : (arg.args ?? [])) as never[];
       const sentencia = db.prepare(sql);
-      if (/^\s*select/i.test(sql))
+      if (/^\s*select/i.test(sql)) {
         return { rows: sentencia.all(...args).map((r) => ({ ...r })) };
+      }
       sentencia.run(...args);
       return { rows: [] };
     },
@@ -41,7 +42,9 @@ function almacenSqlite(db = new DatabaseSync(":memory:")) {
       }
       db.exec("BEGIN");
       try {
-        for (const s of sentencias) db.prepare(s.sql).run(...s.args);
+        for (const s of sentencias) {
+          db.prepare(s.sql).run(...s.args);
+        }
         db.exec("COMMIT");
       } catch (e) {
         db.exec("ROLLBACK");

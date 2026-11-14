@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Cómo van las misiones de Minecraft: quién completó cada una y el avance de quienes van en camino. Es el dato para
  * ajustar las metas del catálogo (`server/src/misiones.mjs`) con evidencia. Solo lee.
@@ -15,7 +16,7 @@ if (process.argv.includes('--json')) {
 } else {
   const nombre = new Map(MISIONES.map((m) => [m.id, m.nombre]));
   console.log('misión'.padEnd(26), 'tipo'.padEnd(11), 'completaron'.padStart(11), 'veces'.padStart(6), 'en camino'.padStart(10), 'medio'.padStart(6), 'máx'.padStart(5));
-  for (const f of filas)
+  for (const f of filas) {
     console.log(
       (nombre.get(f.id) ?? f.id).slice(0, 25).padEnd(26),
       f.tipo.padEnd(11),
@@ -25,4 +26,5 @@ if (process.argv.includes('--json')) {
       `${f.avanceMedio}%`.padStart(6),
       `${f.avanceMaximo}%`.padStart(5),
     );
+  }
 }

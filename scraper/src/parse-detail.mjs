@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Parser de las fichas de detalle (`/NombreSlug`).
  *
@@ -7,7 +8,7 @@
  * parser es defensivo: devuelve lo que exista y nunca lanza por un campo
  * ausente.
  */
-import * as cheerio from "cheerio";
+import { load } from "cheerio";
 
 /** Texto plano conservando saltos de línea de los `<br>`. */
 function textWithBreaks($, element) {
@@ -26,9 +27,7 @@ function textWithBreaks($, element) {
 }
 
 function toNumber(value) {
-  const match = String(value ?? "")
-    .replace(/\./g, "")
-    .match(/-?\d+/);
+  const match = /-?\d+/.exec(String(value ?? "").replaceAll(".", ""));
   return match ? Number(match[0]) : null;
 }
 
@@ -41,28 +40,30 @@ function platformFromIcon(src) {
   return file.replace(/\.[a-z0-9]+$/i, "").toLowerCase() || "web";
 }
 
-export function parseDetail(html) {
-  const $ = cheerio.load(html, { decodeEntities: true });
+/** Etiqueta de una fila de la ficha o de stats, sin los dos puntos finales. */
+function rowLabel(row, selector) {
+  return row
+    .find(selector)
+    .text()
+    .replace(/\s+/g, " ")
+    .replace(/[:：]\s*$/, "")
+    .trim();
+}
 
-  // --- Tema de color declarado en el propio script de la ficha ---------------
-  const scriptText = $("script")
-    .map((_, el) => $(el).html() ?? "")
-    .get()
-    .join("\n");
-  const themeMatch = scriptText.match(/const\s+THEME\s*=\s*["']([^"']+)["']/);
-  const theme = themeMatch ? themeMatch[1].trim() : null;
+/** Tema de color declarado en el propio script de la ficha. */
+function readTheme(scriptText) {
+  const themeMatch = /const\s+THEME\s*=\s*["']([^"']+)["']/.exec(scriptText);
+  return themeMatch ? themeMatch[1].trim() : null;
+}
 
-  // --- Logo y frase ---------------------------------------------------------
-  const logo = $("#mainLogo").attr("src")?.trim() ?? null;
-  const phraseHtml = $("#vtuber-phrase").html() ?? "";
-  const phrase = textWithBreaks($, "#vtuber-phrase");
-
-  // --- Redes sociales -------------------------------------------------------
+function readSocials($) {
   const socials = [];
   $(".socials a[href]").each((_, el) => {
     const anchor = $(el);
     const url = anchor.attr("href")?.trim();
-    if (!url) return;
+    if (!url) {
+      return;
+    }
     const icon = anchor.find("img").attr("src")?.trim() ?? null;
     socials.push({
       platform: platformFromIcon(icon),
@@ -71,55 +72,59 @@ export function parseDetail(html) {
       icon,
     });
   });
+  return socials;
+}
 
-  // --- Ficha personal -------------------------------------------------------
+function readProfile($) {
   const profile = [];
   $(".ficha .dato, .ficha .pais").each((_, el) => {
     const row = $(el);
-    const label = row
-      .find(".titulo")
-      .text()
-      .replace(/\s+/g, " ")
-      .replace(/[:：]\s*$/, "")
-      .trim();
+    const label = rowLabel(row, ".titulo");
     const value = textWithBreaks($, row.find(".contenido"));
-    if (label && value) profile.push({ label, value });
+    if (label && value) {
+      profile.push({ label, value });
+    }
   });
-  const birthday =
-    profile.find((row) => /cumplea/i.test(row.label))?.value ?? null;
-  const height =
-    profile.find((row) => /altura/i.test(row.label))?.value ?? null;
-  const hashtag =
-    profile.find((row) => /hashtag/i.test(row.label))?.value ?? null;
-  const favoriteColor =
-    profile.find((row) => /color fav/i.test(row.label))?.value ?? null;
+  return profile;
+}
 
-  // --- Facciones ------------------------------------------------------------
+/** Valor de la primera fila de la ficha cuya etiqueta cumple `pattern`. */
+function profileValue(profile, pattern) {
+  return profile.find((row) => pattern.test(row.label))?.value ?? null;
+}
+
+function looksLikeFilename(value) {
+  return value.includes("%") || /\.(png|jpe?g|webp|gif)$/i.test(value);
+}
+
+function readFactions($) {
   const factions = [];
   $(".tabla-facciones thead th").each((_, el) => {
     const name = $(el).text().replace(/\s+/g, " ").trim();
-    if (name) factions.push(name);
+    if (name) {
+      factions.push(name);
+    }
   });
-  const looksLikeFilename = (value) =>
-    value.includes("%") || /\.(png|jpe?g|webp|gif)$/i.test(value);
   $('img[src*="facciones"]').each((_, el) => {
     const alt = $(el).attr("alt")?.trim();
-    if (!alt || looksLikeFilename(alt)) return;
-    if (!factions.some((name) => name.toLowerCase() === alt.toLowerCase()))
+    if (!alt || looksLikeFilename(alt)) {
+      return;
+    }
+    if (!factions.some((name) => name.toLowerCase() === alt.toLowerCase())) {
       factions.push(alt);
+    }
   });
+  return factions;
+}
 
-  // --- Stats ----------------------------------------------------------------
+function readStats($) {
   const stats = {};
   $(".stats-table tr").each((_, el) => {
     const row = $(el);
-    const label = row
-      .find(".stat-col")
-      .text()
-      .replace(/\s+/g, " ")
-      .replace(/[:：]\s*$/, "")
-      .trim();
-    if (!label) return;
+    const label = rowLabel(row, ".stat-col");
+    if (!label) {
+      return;
+    }
     const cell = row.find(".valor-col");
     if (cell.find(".stat-bar-wrapper").length > 0 || cell.attr("data-max")) {
       stats[label] = {
@@ -131,23 +136,29 @@ export function parseDetail(html) {
       return;
     }
     const value = cell.text().replace(/\s+/g, " ").trim();
-    if (value) stats[label] = toNumber(value) ?? value;
+    if (value) {
+      stats[label] = toNumber(value) ?? value;
+    }
   });
+  return stats;
+}
 
+function readExperience($) {
   const expText = $("#expText").text().trim();
-  const expMatch = expText.match(/([\d.,]+)\s*\/\s*([\d.,]+)/);
-  const level = toNumber($("#nivel").text());
-  const experience = expMatch
+  // El lookbehind impide empezar a mitad de una tira de dígitos: el resultado
+  // es el mismo (el match más a la izquierda empieza siempre al inicio de la
+  // tira) y la búsqueda deja de reintentar cada posición de la tira.
+  const expMatch = /(?<![\d.,])([\d.,]+)\s*\/\s*([\d.,]+)/.exec(expText);
+  return expMatch
     ? { current: toNumber(expMatch[1]), max: toNumber(expMatch[2]) }
     : null;
+}
 
-  // --- Radar ----------------------------------------------------------------
-  const radar = $(".radar-image-wrap img").attr("src")?.trim() ?? null;
-
-  // --- Galería (avatarImages declarado en JS) -------------------------------
+/** Galería: `avatarImages` declarado en JS o, si no, el avatar principal. */
+function readGallery($, scriptText) {
   const gallery = [];
-  const galleryMatch = scriptText.match(
-    /const\s+avatarImages\s*=\s*\[([\s\S]*?)\];/,
+  const galleryMatch = /const\s+avatarImages\s*=\s*\[([\s\S]*?)\];/.exec(
+    scriptText,
   );
   if (galleryMatch) {
     const entryRe =
@@ -169,11 +180,63 @@ export function parseDetail(html) {
       isInline: inlineAvatar.startsWith("data:"),
     });
   }
-  // Solo se guarda el CONTEO de imágenes embebidas; el scraper descarta el
-  // base64 antes de persistir (infla el dataset sin aportar información).
-  const inlineThumbCount = $('img[src^="data:image"]').length;
+  return gallery;
+}
 
-  // --- Skills ---------------------------------------------------------------
+/** Categoría de la tabla de habilidades a partir del título de su sección. */
+function categoryOfSection(section) {
+  if (/active/i.test(section)) {
+    return "active";
+  }
+  if (/passive/i.test(section)) {
+    return "passive";
+  }
+  if (/ultimate/i.test(section)) {
+    return "ultimate";
+  }
+  return (section || "other").toLowerCase();
+}
+
+function readSkillRow($, row, index, category, section) {
+  const cells = $(row).find("td");
+  if (cells.length < 3) {
+    return null;
+  }
+  const factionIcons = cells
+    .eq(0)
+    .find("img")
+    .map((__, img) => ({
+      src: $(img).attr("src")?.trim() ?? null,
+      name: $(img).attr("alt")?.trim() || null,
+    }))
+    .get();
+  const withText = factionIcons.length === 0;
+  const offset = withText ? 0 : 1;
+  const type = cells.eq(offset).text().replace(/\s+/g, " ").trim();
+  const name = cells
+    .eq(offset + 1)
+    .text()
+    .replace(/\s+/g, " ")
+    .trim();
+  const effectNode = cells.eq(offset + 2);
+  const effectHtml = (effectNode.html() ?? "").trim();
+  const effect = textWithBreaks($, effectNode);
+  if (!name && !effect) {
+    return null;
+  }
+  return {
+    category,
+    section: section || null,
+    type: type || null,
+    name: name || null,
+    effect,
+    effectHtml,
+    factions: factionIcons,
+    position: index,
+  };
+}
+
+function readSkills($) {
   const skills = [];
   $(".skills-section .table-wrap").each((_, wrap) => {
     const section = $(wrap)
@@ -182,77 +245,56 @@ export function parseDetail(html) {
       .text()
       .replace(/\s+/g, " ")
       .trim();
-    const category = /active/i.test(section)
-      ? "active"
-      : /passive/i.test(section)
-        ? "passive"
-        : /ultimate/i.test(section)
-          ? "ultimate"
-          : (section || "other").toLowerCase();
+    const category = categoryOfSection(section);
 
     $(wrap)
       .find("table tbody tr")
       .each((index, row) => {
-        const cells = $(row).find("td");
-        if (cells.length < 3) return;
-        const factionIcons = cells
-          .eq(0)
-          .find("img")
-          .map((__, img) => ({
-            src: $(img).attr("src")?.trim() ?? null,
-            name: $(img).attr("alt")?.trim() || null,
-          }))
-          .get();
-        const withText = factionIcons.length === 0;
-        const offset = withText ? 0 : 1;
-        const type = cells.eq(offset).text().replace(/\s+/g, " ").trim();
-        const name = cells
-          .eq(offset + 1)
-          .text()
-          .replace(/\s+/g, " ")
-          .trim();
-        const effectNode = cells.eq(offset + 2);
-        const effectHtml = (effectNode.html() ?? "").trim();
-        const effect = textWithBreaks($, effectNode);
-        if (!name && !effect) return;
-        skills.push({
-          category,
-          section: section || null,
-          type: type || null,
-          name: name || null,
-          effect,
-          effectHtml,
-          factions: factionIcons,
-          position: index,
-        });
+        const skill = readSkillRow($, row, index, category, section);
+        if (skill) {
+          skills.push(skill);
+        }
       });
   });
+  return skills;
+}
 
-  // --- Nivel de riqueza de la ficha ----------------------------------------
-  const sections = $(".panel-header")
-    .map((_, el) => $(el).text().trim())
-    .get();
+export function parseDetail(html) {
+  const $ = load(html, { decodeEntities: true });
+
+  const scriptText = $("script")
+    .map((_, el) => $(el).html() ?? "")
+    .get()
+    .join("\n");
+  const phraseHtml = $("#vtuber-phrase").html() ?? "";
+  const profile = readProfile($);
+  const skills = readSkills($);
 
   return {
-    theme,
-    logo,
-    phrase,
+    theme: readTheme(scriptText),
+    logo: $("#mainLogo").attr("src")?.trim() ?? null,
+    phrase: textWithBreaks($, "#vtuber-phrase"),
     phraseHtml: phraseHtml.trim() || null,
-    socials,
+    socials: readSocials($),
     profile,
-    birthday,
-    height,
-    hashtag,
-    favoriteColor,
-    factions,
-    stats,
-    level,
-    experience,
-    radar,
-    gallery,
-    inlineThumbCount,
+    birthday: profileValue(profile, /cumplea/i),
+    height: profileValue(profile, /altura/i),
+    hashtag: profileValue(profile, /hashtag/i),
+    favoriteColor: profileValue(profile, /color fav/i),
+    factions: readFactions($),
+    stats: readStats($),
+    level: toNumber($("#nivel").text()),
+    experience: readExperience($),
+    radar: $(".radar-image-wrap img").attr("src")?.trim() ?? null,
+    gallery: readGallery($, scriptText),
+    // Solo se guarda el CONTEO de imágenes embebidas; el scraper descarta el
+    // base64 antes de persistir (infla el dataset sin aportar información).
+    inlineThumbCount: $('img[src^="data:image"]').length,
     skills,
-    sections,
+    // Nivel de riqueza de la ficha.
+    sections: $(".panel-header")
+      .map((_, el) => $(el).text().trim())
+      .get(),
     hasSkills: skills.length > 0,
   };
 }

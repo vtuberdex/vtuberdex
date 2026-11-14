@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Compila en reposo los programas de shader que, sin esto, nacen en mitad del primer giro.
@@ -27,7 +28,7 @@
  */
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import * as THREE from "three";
+import { DataTexture, Group } from "three";
 
 import { slabLayout } from "@/components/premium-layout";
 import { crearMaterialDeAcrilico } from "@/components/premium-slab";
@@ -36,8 +37,8 @@ import { crearMaterialDeAcrilico } from "@/components/premium-slab";
 const WARMUP_Z = -5;
 
 /** Un mapa mínimo: para la clave del programa solo importa que EXISTA un mapa. */
-function mapaVacio(): THREE.DataTexture {
-  const t = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+function mapaVacio(): DataTexture {
+  const t = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
   t.needsUpdate = true;
   return t;
 }
@@ -45,8 +46,8 @@ function mapaVacio(): THREE.DataTexture {
 /** Espera a que el navegador esté ocioso: el calentamiento no debe competir con las texturas. */
 function enReposo(fn: () => void): () => void {
   if (typeof window.requestIdleCallback === "function") {
-    const id = window.requestIdleCallback(fn, { timeout: 2000 });
-    return () => window.cancelIdleCallback(id);
+    const idOcio = window.requestIdleCallback(fn, { timeout: 2000 });
+    return () => window.cancelIdleCallback(idOcio);
   }
   const id = window.setTimeout(fn, 600);
   return () => window.clearTimeout(id);
@@ -54,7 +55,7 @@ function enReposo(fn: () => void): () => void {
 
 export function ShaderWarmup() {
   const { gl, scene, camera, invalidate } = useThree();
-  const grupo = useRef<THREE.Group>(null);
+  const grupo = useRef<Group>(null);
   /** 'espera' → compilando; 'dibujando' → visible 1 frame; 'hecho' → oculto para siempre. */
   const fase = useRef<"espera" | "dibujando" | "hecho">("espera");
   const framesDibujando = useRef(0);
@@ -75,9 +76,13 @@ export function ShaderWarmup() {
   useEffect(() => {
     let vivo = true;
     const cancelar = enReposo(() => {
-      if (!vivo) return;
+      if (!vivo) {
+        return;
+      }
       const dibujar = () => {
-        if (!vivo || fase.current !== "espera") return;
+        if (!vivo || fase.current !== "espera") {
+          return;
+        }
         fase.current = "dibujando";
         invalidate();
       };
@@ -91,7 +96,9 @@ export function ShaderWarmup() {
 
   useFrame(() => {
     const g = grupo.current;
-    if (!g || fase.current === "espera") return;
+    if (!g || fase.current === "espera") {
+      return;
+    }
     if (fase.current === "dibujando") {
       if (framesDibujando.current === 0) {
         // Detrás del libro, centrado donde mira la cámara: la profundidad lo esconde.

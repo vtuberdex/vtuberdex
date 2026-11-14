@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `POST /api/modificaciones/verificar` — paso 2 de «actualizar ficha»: canjea el código por un permiso de
  * envío y devuelve las fichas inscritas con ese correo. Las reglas están en `lib/solicitudes.mjs`.

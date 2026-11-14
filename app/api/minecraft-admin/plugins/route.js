@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/minecraft-admin/plugins` — sube un jar de plugin.
  *
@@ -39,12 +40,16 @@ export const config = { api: { bodyParser: false } };
 
 export async function POST(request) {
   const acceso = accesoDeMantenedor(request, {});
-  if (acceso.rechazo) return acceso.rechazo;
+  if (acceso.rechazo) {
+    return acceso.rechazo;
+  }
 
   const url = new URL(request.url);
   const nombre =
     url.searchParams.get("nombre") ?? request.headers.get("x-nombre-archivo");
-  if (!nombre) return respuestaJson({ error: "falta_nombre" }, 400);
+  if (!nombre) {
+    return respuestaJson({ error: "falta_nombre" }, 400);
+  }
 
   // Si el navegador anuncia el tamaño, se corta aquí: no se leen 9 MB para nada.
   const anunciado = Number(request.headers.get("content-length"));
@@ -61,10 +66,13 @@ export async function POST(request) {
 
   const datos = new Uint8Array(await request.arrayBuffer());
   const comprobacion = validarJar({ nombre, tamano: datos.byteLength });
-  if (!comprobacion.ok)
+  if (!comprobacion.ok) {
     return respuestaJson(comprobacion.cuerpo, comprobacion.status);
+  }
 
   const resultado = await guardarJar({ nombre, contenido: datos });
-  if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+  if (!resultado.ok) {
+    return respuestaJson(resultado.cuerpo, resultado.status);
+  }
   return respuestaJson(resultado.metadatos, 201);
 }

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * MINECRAFT: vincular una cuenta del juego a una ficha y sumar a esa ficha la XP que se gana jugando.
  *
@@ -81,7 +82,7 @@ const LARGO_CODIGO = 8;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 // Nombre de Java (3-16, letras, números y _) o de Bedrock vía Floodgate: el mismo con un «.» delante (los espacios del
 // gamertag Floodgate los cambia por _). Solo se guarda para mostrarlo en «Mi ficha»; si no cuadra, el vínculo vale igual.
-const JUGADOR = /^\.?[A-Za-z0-9_]{1,16}$/;
+const JUGADOR = /^\.?\w{1,16}$/;
 
 const DDL = `
   CREATE TABLE IF NOT EXISTS vinculo_minecraft (
@@ -205,7 +206,9 @@ export async function sesionVigente(
   ejecutor,
   { uuid, red = null, ahora = Date.now() },
 ) {
-  if (!requiereSesion(uuid)) return true;
+  if (!requiereSesion(uuid)) {
+    return true;
+  }
   const e = await conTablas(ejecutor);
   const { rows } = red
     ? await e.execute(
@@ -235,8 +238,9 @@ export async function crearCodigoDeVinculo(
   let codigo = "";
   while (codigo.length < LARGO_CODIGO) {
     for (const byte of crypto.randomBytes(16)) {
-      if (byte < limite && codigo.length < LARGO_CODIGO)
+      if (byte < limite && codigo.length < LARGO_CODIGO) {
         codigo += ALFABETO[byte % ALFABETO.length];
+      }
     }
   }
   await e.execute(
@@ -256,6 +260,42 @@ export async function crearCodigoDeVinculo(
 }
 
 /**
+ * Comprueba UUID, código y red ANTES de tocar la base y devuelve el código normalizado. Sin red no
+ * se le podría abrir la sesión: quedaría vinculada pero sin poder jugar. Mejor decirlo antes de
+ * gastar el código.
+ */
+function codigoParaVincular(codigo, uuid, red) {
+  if (!uuidValido(uuid)) {
+    throw new MinecraftError(
+      400,
+      "uuid_invalido",
+      "UUID de Minecraft no válido.",
+    );
+  }
+  const limpio = normalizarCodigo(codigo);
+  if (limpio.length !== LARGO_CODIGO) {
+    throw new MinecraftError(
+      400,
+      "codigo_invalido",
+      "El código tiene 8 caracteres.",
+    );
+  }
+  if (requiereSesion(uuid) && !redValida(red)) {
+    throw new MinecraftError(
+      400,
+      "falta_red",
+      "No se pudo identificar tu conexión. Vuelve a entrar.",
+    );
+  }
+  return limpio;
+}
+
+/** El nombre de jugador tal cual si tiene la forma de uno de Minecraft; si no, `null`. */
+function jugadorValido(jugador) {
+  return typeof jugador === "string" && JUGADOR.test(jugador) ? jugador : null;
+}
+
+/**
  * Canjea un código y ata el UUID de Minecraft a su ficha. Una ficha tiene UNA cuenta y una cuenta UNA ficha:
  * vincular de nuevo reemplaza a la anterior (por los dos lados).
  */
@@ -263,26 +303,7 @@ export async function vincular(
   ejecutor,
   { codigo, uuid, jugador = null, red = null, ahora = Date.now() },
 ) {
-  if (!uuidValido(uuid))
-    throw new MinecraftError(
-      400,
-      "uuid_invalido",
-      "UUID de Minecraft no válido.",
-    );
-  const limpio = normalizarCodigo(codigo);
-  if (limpio.length !== LARGO_CODIGO)
-    throw new MinecraftError(
-      400,
-      "codigo_invalido",
-      "El código tiene 8 caracteres.",
-    );
-  // Sin red no se le podría abrir la sesión: quedaría vinculada pero sin poder jugar. Mejor decirlo antes de gastar el código.
-  if (requiereSesion(uuid) && !redValida(red))
-    throw new MinecraftError(
-      400,
-      "falta_red",
-      "No se pudo identificar tu conexión. Vuelve a entrar.",
-    );
+  const limpio = codigoParaVincular(codigo, uuid, red);
   const e = await conTablas(ejecutor);
   const h = hash(limpio);
   const { rows } = await e.execute(
@@ -294,21 +315,24 @@ export async function vincular(
     rows.length &&
     rows[0].uuid &&
     String(rows[0].uuid) !== uuid.toLowerCase()
-  )
+  ) {
     rows.length = 0;
-  if (!rows.length)
+  }
+  if (!rows.length) {
     throw new MinecraftError(
       410,
       "codigo_caducado",
       "Ese código no existe, ya se usó o caducó. Pide otro en «Mi ficha».",
     );
+  }
   // El cerrojo es el UPDATE: dos canjes a la vez, uno ve 0 filas.
   const gastado = await e.execute(
     "UPDATE codigo_minecraft SET usado = 1 WHERE hash = ? AND usado = 0 AND expira > ?",
     [h, ahora],
   );
-  if (gastado.rowsAffected === 0)
+  if (gastado.rowsAffected === 0) {
     throw new MinecraftError(410, "codigo_caducado", "Ese código ya se usó.");
+  }
   const vtuberId = Number(rows[0].vtuber_id);
   const id = uuid.toLowerCase();
   await e.execute(
@@ -317,20 +341,19 @@ export async function vincular(
   );
   await e.execute(
     "INSERT INTO vinculo_minecraft (uuid, vtuber_id, jugador, creado) VALUES (?, ?, ?, ?)",
-    [
-      id,
-      vtuberId,
-      typeof jugador === "string" && JUGADOR.test(jugador) ? jugador : null,
-      new Date(ahora).toISOString(),
-    ],
+    [id, vtuberId, jugadorValido(jugador), new Date(ahora).toISOString()],
   );
-  if (requiereSesion(id)) await abrirSesion(e, { uuid: id, red, ahora });
+  if (requiereSesion(id)) {
+    await abrirSesion(e, { uuid: id, red, ahora });
+  }
   return { vtuberId };
 }
 
 /** La ficha vinculada a un UUID, o `null`. */
 export async function vinculoDeJugador(ejecutor, uuid) {
-  if (!uuidValido(uuid)) return null;
+  if (!uuidValido(uuid)) {
+    return null;
+  }
   const e = await conTablas(ejecutor);
   const { rows } = await e.execute(
     "SELECT vtuber_id, jugador, creado FROM vinculo_minecraft WHERE uuid = ?",
@@ -376,7 +399,9 @@ export async function desvincular(ejecutor, { vtuberId = null, uuid = null }) {
     );
     cuenta = rows.length ? String(rows[0].uuid) : null;
   }
-  if (!cuenta) return false;
+  if (!cuenta) {
+    return false;
+  }
   await e.execute("DELETE FROM sesion_minecraft WHERE uuid = ?", [cuenta]);
   return (
     (await e.execute("DELETE FROM vinculo_minecraft WHERE uuid = ?", [cuenta]))
@@ -422,68 +447,86 @@ export async function envioDeCodigoPermitido(
         )
       ).rows[0]?.n ?? 0,
     );
-  if ((await contar(correo, ahora - ENVIOS.esperaMs)) > 0)
+  if ((await contar(correo, ahora - ENVIOS.esperaMs)) > 0) {
     return { ok: false, motivo: "espera" };
-  if ((await contar(correo, ahora - UN_DIA_MS)) >= ENVIOS.porCorreoDia)
+  }
+  if ((await contar(correo, ahora - UN_DIA_MS)) >= ENVIOS.porCorreoDia) {
     return { ok: false, motivo: "tope_correo" };
-  if ((await contar(cuenta, ahora - UN_DIA_MS)) >= ENVIOS.porCuentaDia)
+  }
+  if ((await contar(cuenta, ahora - UN_DIA_MS)) >= ENVIOS.porCuentaDia) {
     return { ok: false, motivo: "tope_cuenta" };
-  if (deRed && (await contar(deRed, ahora - UN_DIA_MS)) >= ENVIOS.porRedDia)
+  }
+  if (deRed && (await contar(deRed, ahora - UN_DIA_MS)) >= ENVIOS.porRedDia) {
     return { ok: false, motivo: "tope_red" };
+  }
   await e.execute(
     "INSERT INTO envio_minecraft (clave, creado) VALUES (?, ?), (?, ?)",
     [correo, ahora, cuenta, ahora],
   );
-  if (deRed)
+  if (deRed) {
     await e.execute(
       "INSERT INTO envio_minecraft (clave, creado) VALUES (?, ?)",
       [deRed, ahora],
     );
+  }
   return { ok: true };
 }
 
 /* ------------------------------------------------------------------------- XP */
 
+/** Un motivo conocido con una XP entera de 0 o más; lanza si no. */
+function validarMotivoDeXp(motivo, valor) {
+  if (!MOTIVOS_XP.includes(motivo)) {
+    throw new MinecraftError(
+      400,
+      "motivo_invalido",
+      `Motivo de XP desconocido: ${motivo}.`,
+    );
+  }
+  if (!Number.isInteger(valor) || valor < 0) {
+    throw new MinecraftError(
+      400,
+      "payload_invalido",
+      "La XP es un entero positivo.",
+    );
+  }
+}
+
 /** `{ mob: 12, tiempo: 5 }` validado: solo motivos conocidos, enteros positivos. Lanza si no cuadra. */
 function desgloseValido(detalle) {
-  if (!detalle || typeof detalle !== "object" || Array.isArray(detalle))
+  if (!detalle || typeof detalle !== "object" || Array.isArray(detalle)) {
     throw new MinecraftError(
       400,
       "payload_invalido",
       "Falta el desglose de la XP.",
     );
+  }
   const limpio = {};
   let total = 0;
   for (const [motivo, valor] of Object.entries(detalle)) {
-    if (!MOTIVOS_XP.includes(motivo))
-      throw new MinecraftError(
-        400,
-        "motivo_invalido",
-        `Motivo de XP desconocido: ${motivo}.`,
-      );
-    if (!Number.isInteger(valor) || valor < 0)
-      throw new MinecraftError(
-        400,
-        "payload_invalido",
-        "La XP es un entero positivo.",
-      );
-    if (valor > 0) limpio[motivo] = valor;
+    validarMotivoDeXp(motivo, valor);
+    if (valor > 0) {
+      limpio[motivo] = valor;
+    }
     total += valor;
   }
-  if (total < 1)
+  if (total < 1) {
     throw new MinecraftError(400, "payload_invalido", "El lote no trae XP.");
-  if (MOTIVO_ENTREGA in limpio && Object.keys(limpio).length > 1)
+  }
+  if (MOTIVO_ENTREGA in limpio && Object.keys(limpio).length > 1) {
     throw new MinecraftError(
       400,
       "entrega_aparte",
       "La XP de entrega va en un lote propio, sin mezclar motivos.",
     );
-  if (total > XP_POR_LOTE_MAX)
+  }
+  if (total > XP_POR_LOTE_MAX) {
     throw new MinecraftError(
       400,
       "lote_excesivo",
       `Un lote suma como mucho ${XP_POR_LOTE_MAX} XP.`,
     );
+  }
   return { limpio, total, entrega: MOTIVO_ENTREGA in limpio };
 }
 
@@ -496,36 +539,40 @@ export async function sumarXp(
   ejecutor,
   { uuid, idLote, detalle, dia, ahora = Date.now() },
 ) {
-  if (!uuidValido(idLote))
+  if (!uuidValido(idLote)) {
     throw new MinecraftError(
       400,
       "payload_invalido",
       "El lote necesita un id (UUID).",
     );
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dia)))
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dia))) {
     throw new Error(`día inválido: ${dia}`);
+  }
   const { limpio, total, entrega } = desgloseValido(detalle);
   const tope = entrega ? XP_ENTREGA_MAX_DIA : XP_JUEGO_MAX_DIA;
   const e = await conTablas(ejecutor);
   const vinculo = await vinculoDeJugador(e, uuid);
-  if (!vinculo)
+  if (!vinculo) {
     throw new MinecraftError(
       404,
       "sin_vinculo",
       "Esta cuenta no está vinculada a ninguna ficha.",
     );
+  }
   const id = idLote.toLowerCase();
   const previo = await e.execute(
     "SELECT cantidad FROM xp_juego WHERE id_lote = ?",
     [id],
   );
-  if (previo.rows.length)
+  if (previo.rows.length) {
     return {
       vtuberId: vinculo.vtuberId,
       sumado: Number(previo.rows[0].cantidad),
       duplicado: true,
       ...(await deHoy(e, vinculo.vtuberId, dia)),
     };
+  }
   // «Es de entrega» se lee del desglose guardado: un lote de entrega solo trae ese motivo (ver desgloseValido).
   await e.execute(
     `INSERT INTO xp_juego (id_lote, vtuber_id, uuid, cantidad, detalle, dia, creado)
@@ -588,7 +635,9 @@ export async function xpDeHoy(ejecutor, vtuberId, dia) {
 /** XP de juego de varias fichas en UNA consulta: `Map(id → xp)`. */
 export async function xpDeJuegoVarias(ejecutor, ids) {
   const lista = [...new Set(ids.map(Number).filter(Number.isInteger))];
-  if (!lista.length) return new Map();
+  if (!lista.length) {
+    return new Map();
+  }
   const e = await conTablas(ejecutor);
   const marcas = lista.map(() => "?").join(",");
   const { rows } = await e.execute(
@@ -622,6 +671,29 @@ export async function xpDeJuego(ejecutor, vtuberId) {
 /** Tope de un ajuste manual (en positivo o negativo): lo suficiente para premiar un evento, no para fabricar niveles de un golpe. */
 export const XP_MANUAL_MAX = 10000;
 
+/** El cuerpo del 400 si la XP manual no cuadra; `null` si está bien. */
+function errorDeXpManual(id, n, razon, quien) {
+  if (!Number.isInteger(id) || id <= 0) {
+    return { error: "ficha_invalida" };
+  }
+  if (!Number.isInteger(n) || n === 0 || Math.abs(n) > XP_MANUAL_MAX) {
+    return {
+      error: "cantidad_invalida",
+      detail: `un entero distinto de 0, de hasta ${XP_MANUAL_MAX} en positivo o negativo`,
+    };
+  }
+  if (razon.length < 3 || razon.length > 200 || /\p{Cc}/u.test(razon)) {
+    return {
+      error: "motivo_invalido",
+      detail: "entre 3 y 200 caracteres, en una línea",
+    };
+  }
+  if (!quien) {
+    return { error: "actor_invalido" };
+  }
+  return null;
+}
+
 /**
  * XP dada A MANO por un administrador (o quitada, con una cantidad negativa para corregir un error).
  * Va en su propia tabla, con quién la dio y por qué: no gasta ningún tope diario y no se mezcla con la
@@ -636,28 +708,10 @@ export async function darXpManual(
   const n = Number(cantidad);
   const razon = String(motivo ?? "").trim();
   const quien = String(actor ?? "").trim();
-  if (!Number.isInteger(id) || id <= 0)
-    return { ok: false, status: 400, cuerpo: { error: "ficha_invalida" } };
-  if (!Number.isInteger(n) || n === 0 || Math.abs(n) > XP_MANUAL_MAX)
-    return {
-      ok: false,
-      status: 400,
-      cuerpo: {
-        error: "cantidad_invalida",
-        detail: `un entero distinto de 0, de hasta ${XP_MANUAL_MAX} en positivo o negativo`,
-      },
-    };
-  if (razon.length < 3 || razon.length > 200 || /\p{Cc}/u.test(razon))
-    return {
-      ok: false,
-      status: 400,
-      cuerpo: {
-        error: "motivo_invalido",
-        detail: "entre 3 y 200 caracteres, en una línea",
-      },
-    };
-  if (!quien)
-    return { ok: false, status: 400, cuerpo: { error: "actor_invalido" } };
+  const cuerpo = errorDeXpManual(id, n, razon, quien);
+  if (cuerpo) {
+    return { ok: false, status: 400, cuerpo };
+  }
   const e = await conTablas(ejecutor);
   await e.execute(
     "INSERT INTO xp_manual (vtuber_id, cantidad, motivo, actor, creado) VALUES (?, ?, ?, ?, ?)",
@@ -697,10 +751,13 @@ export async function premiarDirecto(
   ejecutor,
   { vtuberId, plataforma, dia, ahora = Date.now() },
 ) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dia)))
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dia))) {
     throw new Error(`día inválido: ${dia}`);
+  }
   const id = Number(vtuberId);
-  if (!Number.isInteger(id)) throw new Error(`ficha inválida: ${vtuberId}`);
+  if (!Number.isInteger(id)) {
+    throw new Error(`ficha inválida: ${vtuberId}`);
+  }
   const tramo = Math.floor(ahora / (DIRECTO_TRAMO_MIN * 60_000));
   const clave = `directo:${id}:${tramo}`;
   const e = await conTablas(ejecutor);
@@ -715,7 +772,9 @@ export async function premiarDirecto(
       XP_DIRECTO_MAX_DIA - Number(previo.rows[0]?.hoy ?? 0),
     );
   }
-  if (cantidad <= 0) return 0;
+  if (cantidad <= 0) {
+    return 0;
+  }
   const r = await e.execute(
     `INSERT INTO xp_directo (id_tramo, vtuber_id, plataforma, cantidad, dia, creado)
      VALUES (?, ?, ?, ?, ?, ?)

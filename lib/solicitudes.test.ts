@@ -76,7 +76,9 @@ const enviar = async (
     { tipo, ip },
   );
   // Entra `sin_verificar`; la cola la ve solo tras confirmar el correo (lo prueban los tests de verificación).
-  if (resultado.id) await confirmarSolicitud(ejecutor, resultado.id);
+  if (resultado.id) {
+    await confirmarSolicitud(ejecutor, resultado.id);
+  }
   // `id` es `null` solo en el envío descartado por el campo trampa, que tiene su propia prueba.
   return { ...resultado, id: resultado.id ?? 0 };
 };
@@ -248,8 +250,9 @@ describe("validación", () => {
   });
 
   test("hay un tope de envíos por red y por día", async () => {
-    for (let i = 0; i < MAX_POR_RED_Y_DIA; i += 1)
+    for (let i = 0; i < MAX_POR_RED_Y_DIA; i += 1) {
       await enviar(inscripcion({ email: `u${i}@x.cl` }));
+    }
     const error = await rechazo(enviar(inscripcion({ email: "otro@x.cl" })));
     expect(error.status).toBe(429);
     // otra red no está afectada
@@ -420,8 +423,9 @@ describe("POST público", () => {
 describe("texto de los términos", () => {
   test("contiene las cláusulas que los formularios prometen, con su ancla", () => {
     const ids = CLAUSULAS.map((c) => c.id);
-    for (const id of ["salida", "datos-personales", "donaciones"])
+    for (const id of ["salida", "datos-personales", "donaciones"]) {
       expect(ids).toContain(id);
+    }
     expect(new Set(ids).size).toBe(ids.length);
   });
 

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * IMÁGENES DE LAS SOLICITUDES: el avatar (personaje) y el logo que la gente sube desde los formularios
  * públicos de inscripción y modificación, en lugar de pegar un enlace.
@@ -20,7 +21,7 @@
  *   · Dimensiones exactas para el personaje (720x1008, el lienzo de la carta) y topadas para el logo.
  *   · Peso máximo 900 KB: nginx corta en 1 MB, y una imagen de ese lienzo no necesita más.
  *   · Una imagen por tipo y por correo VERIFICADO (subir otra reemplaza la anterior), tope de subidas por
- *     correo y por red y día, y TODO caduca si no se aprueba (ver `LIMITES`: 24 h sin enviar, 30 días en una
+ *     correo y por red y día, y toda imagen caduca si no se aprueba (ver `LIMITES`: 24 h sin enviar, 30 días en una
  *     solicitud pendiente, 7 días en una resuelta).
  *
  * Nada de lo subido es público: se sirve solo a quien lo subió (para su vista previa) y al mantenedor. Al
@@ -117,18 +118,23 @@ const rechazo = (codigo, detalle) => {
  * del propio trozo; si no, las del trozo de imagen.
  */
 function medidasDe(buf, primero) {
-  if (primero === "VP8X")
+  if (primero === "VP8X") {
     return {
       ancho: 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16)),
       alto: 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16)),
     };
+  }
   if (primero === "VP8L") {
-    if (buf[20] !== 0x2f) return null;
+    if (buf[20] !== 0x2f) {
+      return null;
+    }
     const bits = buf.readUInt32LE(21);
     return { ancho: (bits & 0x3fff) + 1, alto: ((bits >> 14) & 0x3fff) + 1 };
   }
   if (primero === "VP8 ") {
-    if (buf[23] !== 0x9d || buf[24] !== 0x01 || buf[25] !== 0x2a) return null;
+    if (buf[23] !== 0x9d || buf[24] !== 0x01 || buf[25] !== 0x2a) {
+      return null;
+    }
     return {
       ancho: buf.readUInt16LE(26) & 0x3fff,
       alto: buf.readUInt16LE(28) & 0x3fff,
@@ -143,78 +149,108 @@ function medidasDe(buf, primero) {
  */
 export function validarWebp(bytes) {
   const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes ?? []);
-  if (buf.length < 30)
+  validarContenedorRiff(buf);
+  const { primero, imagenes } = recorrerTrozos(buf);
+  if (imagenes !== 1) {
+    rechazo("imagen_invalida", "El archivo no contiene una sola imagen.");
+  }
+  const medidas = medidasDe(buf, primero);
+  if (!medidas || !esPositiva(medidas.ancho) || !esPositiva(medidas.alto)) {
+    rechazo("imagen_invalida", "No se pudieron leer las medidas de la imagen.");
+  }
+  return medidas;
+}
+
+/** `true` solo con un número mayor que 0 (un `undefined` o `NaN` no lo es). */
+function esPositiva(n) {
+  return n > 0;
+}
+
+/** Tamaño, firma `RIFF…WEBP` y que el tamaño declarado sea el real. Lanza `SolicitudError`. */
+function validarContenedorRiff(buf) {
+  if (buf.length < 30) {
     rechazo("imagen_invalida", "El archivo está vacío o no es una imagen.");
-  if (buf.length > LIMITES.maxBytes)
+  }
+  if (buf.length > LIMITES.maxBytes) {
     rechazo(
       "imagen_demasiado_grande",
       `La imagen pesa más de ${Math.round(LIMITES.maxBytes / 1024)} KB.`,
     );
+  }
   if (
     buf.toString("ascii", 0, 4) !== "RIFF" ||
     buf.toString("ascii", 8, 12) !== "WEBP"
-  )
+  ) {
     rechazo(
       "imagen_invalida",
       "Solo se aceptan imágenes WebP (el formulario las convierte solo).",
     );
+  }
   // El tamaño declarado debe ser el real: bytes de más al final son una carga escondida.
-  if (buf.readUInt32LE(4) + 8 !== buf.length)
+  if (buf.readUInt32LE(4) + 8 !== buf.length) {
     rechazo("imagen_invalida", "El archivo está dañado o trae datos añadidos.");
+  }
+}
 
+/**
+ * Recorre los trozos del contenedor: solo los permitidos, sin pasarse del final y sin animación ni
+ * metadatos en el `VP8X`. Devuelve el tipo del primero y cuántos son de imagen.
+ */
+function recorrerTrozos(buf) {
   let desplazamiento = 12;
   let primero = null;
   let imagenes = 0;
   while (desplazamiento < buf.length) {
-    if (desplazamiento + 8 > buf.length)
+    if (desplazamiento + 8 > buf.length) {
       rechazo("imagen_invalida", "El archivo está dañado.");
+    }
     const tipo = buf.toString("ascii", desplazamiento, desplazamiento + 4);
     const largo = buf.readUInt32LE(desplazamiento + 4);
-    if (!TROZOS_PERMITIDOS.has(tipo))
+    if (!TROZOS_PERMITIDOS.has(tipo)) {
       rechazo(
         "imagen_invalida",
         "La imagen trae metadatos o animación que no se aceptan.",
       );
+    }
     const siguiente = desplazamiento + 8 + largo + (largo % 2);
-    if (siguiente > buf.length)
+    if (siguiente > buf.length) {
       rechazo("imagen_invalida", "El archivo está dañado.");
-    if (primero === null) primero = tipo;
-    if (TROZOS_DE_IMAGEN.has(tipo)) imagenes += 1;
-    if (tipo === "VP8X") {
-      // Bit 1 (0x02) = animación; 0x08 = EXIF; 0x04 = XMP.
-      if (buf[20] & (0x02 | 0x08 | 0x04))
-        rechazo(
-          "imagen_invalida",
-          "La imagen trae metadatos o animación que no se aceptan.",
-        );
+    }
+    primero ??= tipo;
+    if (TROZOS_DE_IMAGEN.has(tipo)) {
+      imagenes += 1;
+    }
+    // Bit 1 (0x02) = animación; 0x08 = EXIF; 0x04 = XMP.
+    if (tipo === "VP8X" && buf[20] & (0x02 | 0x08 | 0x04)) {
+      rechazo(
+        "imagen_invalida",
+        "La imagen trae metadatos o animación que no se aceptan.",
+      );
     }
     desplazamiento = siguiente;
   }
-  if (imagenes !== 1)
-    rechazo("imagen_invalida", "El archivo no contiene una sola imagen.");
-  const medidas = medidasDe(buf, primero);
-  if (!medidas || !(medidas.ancho > 0) || !(medidas.alto > 0))
-    rechazo("imagen_invalida", "No se pudieron leer las medidas de la imagen.");
-  return medidas;
+  return { primero, imagenes };
 }
 
 /** Que las medidas sean las que pide el tipo. Lanza `SolicitudError`. */
 export function validarMedidas(tipo, { ancho, alto }) {
   if (tipo === "character") {
     const { ancho: a, alto: h } = LIMITES.character;
-    if (ancho !== a || alto !== h)
+    if (ancho !== a || alto !== h) {
       rechazo(
         "imagen_medidas",
         `El personaje debe medir ${a}x${h}. El formulario la ajusta solo; vuelve a elegir el archivo.`,
       );
+    }
     return;
   }
   const { maxLado, minLado } = LIMITES.logo;
-  if (Math.max(ancho, alto) > maxLado || Math.min(ancho, alto) < minLado)
+  if (Math.max(ancho, alto) > maxLado || Math.min(ancho, alto) < minLado) {
     rechazo(
       "imagen_medidas",
       `El logo debe tener entre ${minLado} y ${maxLado} px por lado.`,
     );
+  }
 }
 
 /* -------------------------------------------------------------------- operaciones */
@@ -231,7 +267,9 @@ async function gastarCupo(e, clave, maximo, ahora) {
     "SELECT COUNT(*) AS n FROM imagen_envio WHERE clave = ? AND creado >= ?",
     [clave, ahora - UN_DIA_MS],
   );
-  if (Number(rows[0]?.n ?? 0) >= maximo) return false;
+  if (Number(rows[0]?.n ?? 0) >= maximo) {
+    return false;
+  }
   await e.execute("INSERT INTO imagen_envio (clave, creado) VALUES (?, ?)", [
     clave,
     ahora,
@@ -249,10 +287,12 @@ export async function guardarImagen(
   ejecutor,
   { correo, tipo, formulario, bytes, ip, ahora = new Date() },
 ) {
-  if (!TIPOS_IMAGEN.includes(tipo))
+  if (!TIPOS_IMAGEN.includes(tipo)) {
     throw new SolicitudError(400, "tipo_invalido", "tipo: character | logo");
-  if (!FORMULARIOS.includes(formulario))
+  }
+  if (!FORMULARIOS.includes(formulario)) {
     throw new SolicitudError(400, "formulario_invalido", formulario);
+  }
   const buf = aBuffer(bytes);
   const medidas = validarWebp(buf);
   validarMedidas(tipo, medidas);
@@ -266,12 +306,13 @@ export async function guardarImagen(
     [`r:${hashearRed(ip)}`, LIMITES.porRedDia],
   ];
   for (const [clave, maximo] of topes) {
-    if (!(await gastarCupo(e, clave, maximo, t)))
+    if (!(await gastarCupo(e, clave, maximo, t))) {
       throw new SolicitudError(
         429,
         "demasiadas_imagenes",
         "Subiste muchas imágenes hoy. Inténtalo de nuevo mañana.",
       );
+    }
   }
   // Una por tipo y correo mientras no se envíe el formulario.
   await e.execute(
@@ -305,7 +346,9 @@ export async function guardarImagen(
 
 /** La imagen con sus bytes, o `null`. */
 export async function leerImagen(ejecutor, id) {
-  if (!esIdDeImagen(id)) return null;
+  if (!esIdDeImagen(id)) {
+    return null;
+  }
   const e = await conTablas(ejecutor);
   const { rows } = await e.execute(
     `SELECT id, huella, tipo, formulario, bytes, ancho, alto, size, solicitud_id
@@ -313,7 +356,9 @@ export async function leerImagen(ejecutor, id) {
     [id.toLowerCase()],
   );
   const f = rows[0];
-  if (!f) return null;
+  if (!f) {
+    return null;
+  }
   return {
     id: f.id,
     huella: f.huella,
@@ -345,7 +390,7 @@ export async function validarImagenesDeFormulario(
     ["logoId", "logo", logoId],
   ]) {
     if (!id) {
-      if (obligatorias)
+      if (obligatorias) {
         throw Object.assign(
           new SolicitudError(
             400,
@@ -354,6 +399,7 @@ export async function validarImagenesDeFormulario(
           ),
           { issues: [{ path: campo, message: "falta subir la imagen" }] },
         );
+      }
       continue;
     }
     const { rows } = await e.execute(
@@ -361,7 +407,7 @@ export async function validarImagenesDeFormulario(
       [String(id).toLowerCase()],
     );
     const f = rows[0];
-    if (!f || f.huella !== huella || f.tipo !== tipo || f.solicitud_id != null)
+    if (f?.huella !== huella || f.tipo !== tipo || f.solicitud_id != null) {
       throw Object.assign(
         new SolicitudError(
           400,
@@ -370,6 +416,7 @@ export async function validarImagenesDeFormulario(
         ),
         { issues: [{ path: campo, message: "vuelve a subir la imagen" }] },
       );
+    }
     ids.push(String(id).toLowerCase());
   }
   return ids;
@@ -377,13 +424,16 @@ export async function validarImagenesDeFormulario(
 
 /** Ata las imágenes a la solicitud recién creada (ya no se reemplazan ni caducan). */
 export async function adjuntarImagenes(ejecutor, solicitudId, ids) {
-  if (!ids.length || !solicitudId) return;
+  if (!ids.length || !solicitudId) {
+    return;
+  }
   const e = await conTablas(ejecutor);
-  for (const id of ids)
+  for (const id of ids) {
     await e.execute(
       "UPDATE imagen_solicitud SET solicitud_id = ? WHERE id = ? AND solicitud_id IS NULL",
       [Number(solicitudId), id],
     );
+  }
 }
 
 /** Las imágenes de una solicitud, SIN bytes (para listarlas). */
@@ -412,7 +462,9 @@ export async function imagenesParaAplicar(ejecutor, solicitudId) {
   const salida = [];
   for (const { id } of rows) {
     const img = await leerImagen(e, id);
-    if (img) salida.push(img);
+    if (img) {
+      salida.push(img);
+    }
   }
   return salida;
 }

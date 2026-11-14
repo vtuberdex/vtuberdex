@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 // Copia TODAS las tablas de Turso a un archivo SQLite local (libsql `file:`), para
 // dejar de depender del servicio. Uso:
 //   TURSO_DATABASE_URL=libsql://... TURSO_AUTH_TOKEN=... node scripts/copiar-turso.mjs [-- --salida data/turso-local.db]
@@ -5,6 +6,7 @@
 import { createClient } from "@libsql/client/node";
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { texto } from "./lib/filas.mjs";
 
 const i = process.argv.indexOf("--salida");
 const salida = resolve(i > 0 ? process.argv[i + 1] : "data/turso-local.db");
@@ -15,7 +17,9 @@ if (!url) {
 }
 
 mkdirSync(dirname(salida), { recursive: true });
-for (const s of ["", "-wal", "-shm"]) rmSync(salida + s, { force: true });
+for (const s of ["", "-wal", "-shm"]) {
+  rmSync(salida + s, { force: true });
+}
 
 const origen = createClient({ url, authToken });
 const destino = createClient({ url: `file:${salida}` });
@@ -25,7 +29,9 @@ async function conReintentos(fn, intentos = 5) {
     try {
       return await fn();
     } catch (e) {
-      if (k >= intentos) throw e;
+      if (k >= intentos) {
+        throw e;
+      }
       await new Promise((r) => setTimeout(r, 1000 * k));
     }
   }
@@ -35,11 +41,13 @@ const { rows: objetos } = await origen.execute(
   "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'libsql_%' ORDER BY CASE type WHEN 'table' THEN 0 ELSE 1 END, name",
 );
 const tablas = objetos.filter((o) => o.type === "table");
-for (const t of tablas) await destino.execute(String(t.sql));
+for (const t of tablas) {
+  await destino.execute(texto(t.sql));
+}
 
 for (const t of tablas) {
-  const nombre = String(t.name);
-  const q = `"${nombre.replace(/"/g, '""')}"`;
+  const nombre = texto(t.name);
+  const q = `"${nombre.replaceAll('"', '""')}"`;
   let n = 0;
   const lote = nombre === "asset_remoto" ? 5 : 200; // cada fila de asset lleva una imagen entera
   for (let off = 0; ; off += lote) {
@@ -48,8 +56,12 @@ for (const t of tablas) {
         `SELECT * FROM ${q} ORDER BY rowid LIMIT ${lote} OFFSET ${off}`,
       ),
     );
-    if (!rows.length) break;
-    const sql = `INSERT INTO ${q} (${columns.map((c) => `"${c}"`).join(",")}) VALUES (${columns.map(() => "?").join(",")})`;
+    if (!rows.length) {
+      break;
+    }
+    const nombres = columns.map((c) => `"${c}"`).join(",");
+    const huecos = columns.map(() => "?").join(",");
+    const sql = `INSERT INTO ${q} (${nombres}) VALUES (${huecos})`;
     await destino.batch(
       rows.map((r) => ({ sql, args: columns.map((c) => r[c]) })),
       "write",
@@ -58,11 +70,11 @@ for (const t of tablas) {
   }
   console.log(`${nombre}: ${n} filas`);
 }
-for (const o of objetos.filter((o) => o.type !== "table")) {
+for (const o of objetos.filter((obj) => obj.type !== "table")) {
   try {
-    await destino.execute(String(o.sql));
+    await destino.execute(texto(o.sql));
   } catch (e) {
-    console.warn(`aviso ${o.name}: ${e.message}`);
+    console.warn(`aviso ${texto(o.name)}: ${e.message}`);
   }
 }
 console.log(`✓ copia en ${salida}`);

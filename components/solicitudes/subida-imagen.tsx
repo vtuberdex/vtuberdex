@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Subida de una imagen (avatar o logo) en los formularios públicos de inscripción y modificación, en lugar
@@ -44,6 +45,35 @@ interface Props {
   campo: string;
 }
 
+type Traducir = ReturnType<typeof useI18n>["t"];
+
+/** Medidas de la vista previa: el personaje en la proporción de la carta, el logo apaisado. */
+const MEDIDAS_VISTA: Record<TipoImagenSolicitud, { width: number; height: number }> = {
+  character: { width: 96, height: 134 },
+  logo: { width: 120, height: 96 },
+};
+
+/** Lo que dice la línea de estado (vacía si no hay imagen). */
+function textoDeFase(t: Traducir, fase: Fase): string {
+  if (fase === "preparando") {
+    return t("img.preparando");
+  }
+  if (fase === "subiendo") {
+    return t("img.subiendo");
+  }
+  return fase === "lista" ? t("img.lista") : "";
+}
+
+/** Un fallo al preparar (formato, medidas: `ErrorDeImagen`) tiene su texto; el resto cita el detalle del servidor. */
+function mensajeDelFallo(t: Traducir, fallo: unknown): string {
+  if (fallo instanceof ErrorDeImagen) {
+    return t(`img.error.${fallo.codigo}` as Clave);
+  }
+  return t("img.error.subida", {
+    detalle: fallo instanceof ApiError ? fallo.message : String(fallo),
+  });
+}
+
 export function SubidaImagen({
   formulario,
   credencial,
@@ -55,7 +85,7 @@ export function SubidaImagen({
   onId,
   invalido,
   campo,
-}: Props) {
+}: Readonly<Props>) {
   const { t } = useI18n();
   const entrada = useRef<HTMLInputElement>(null);
   const [fase, setFase] = useState<Fase>(id ? "lista" : "vacia");
@@ -67,7 +97,9 @@ export function SubidaImagen({
   // Las URL de objeto se liberan al cambiarlas y al desmontar.
   useEffect(
     () => () => {
-      if (vista) URL.revokeObjectURL(vista);
+      if (vista) {
+        URL.revokeObjectURL(vista);
+      }
     },
     [vista],
   );
@@ -78,10 +110,14 @@ export function SubidaImagen({
 
   // Borrador recuperado: hay id pero ninguna vista local → se pide al servidor.
   useEffect(() => {
-    if (!id || vistaDe.current === id || !credencial) return;
+    if (!id || vistaDe.current === id || !credencial) {
+      return undefined;
+    }
     let vigente = true;
     void api.imagenDeSolicitud(formulario, credencial, id).then((blob) => {
-      if (!vigente) return;
+      if (!vigente) {
+        return;
+      }
       if (blob) {
         vistaDe.current = id;
         mostrar(blob);
@@ -99,7 +135,9 @@ export function SubidaImagen({
   }, [id, credencial, formulario, mostrar, onId, t]);
 
   const elegir = async (file: File | undefined) => {
-    if (!file) return;
+    if (!file) {
+      return;
+    }
     setError(null);
     setFase("preparando");
     try {
@@ -116,18 +154,16 @@ export function SubidaImagen({
       vistaDe.current = subida.id;
       onId(subida.id);
       setFase("lista");
-    } catch (causa) {
+    } catch (error_) {
       setFase(id ? "lista" : "vacia");
-      if (!id) setVista(null);
-      setError(
-        causa instanceof ErrorDeImagen
-          ? t(`img.error.${causa.codigo}` as Clave)
-          : t("img.error.subida", {
-              detalle: causa instanceof ApiError ? causa.message : String(causa),
-            }),
-      );
+      if (!id) {
+        setVista(null);
+      }
+      setError(mensajeDelFallo(t, error_));
     } finally {
-      if (entrada.current) entrada.current.value = "";
+      if (entrada.current) {
+        entrada.current.value = "";
+      }
     }
   };
 
@@ -140,6 +176,10 @@ export function SubidaImagen({
   };
 
   const ocupado = fase === "preparando" || fase === "subiendo";
+  const abrirSelector = () => entrada.current?.click();
+  const alElegirArchivo = (e: React.ChangeEvent<HTMLInputElement>) =>
+    void elegir(e.target.files?.[0]);
+  const borde = invalido ? "border-rose-400 bg-rose-400/5" : "border-dex-line";
   const tienePreview = vista !== null;
   const requisitos =
     tipo === "character" ? "img.requisitosPersonaje" : "img.requisitosLogo";
@@ -156,16 +196,13 @@ export function SubidaImagen({
       </span>
 
       <div
-        className={`mt-1 flex items-start gap-3 rounded-lg border bg-dex-void p-3 ${
-          invalido ? "border-rose-400 bg-rose-400/5" : "border-dex-line"
-        }`}
+        className={`mt-1 flex items-start gap-3 rounded-lg border bg-dex-void p-3 ${borde}`}
       >
         <div
           data-testid={`vista-${campo}`}
           className="flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-dex-line"
           style={{
-            width: tipo === "character" ? 96 : 120,
-            height: tipo === "character" ? 134 : 96,
+            ...MEDIDAS_VISTA[tipo],
             // Tablero: deja ver la transparencia del recorte.
             backgroundImage:
               "conic-gradient(#2a3140 25%, #1b212d 0 50%, #2a3140 0 75%, #1b212d 0)",
@@ -188,15 +225,13 @@ export function SubidaImagen({
             aria-live="polite"
             data-testid={`estado-${campo}`}
           >
-            {fase === "preparando" && t("img.preparando")}
-            {fase === "subiendo" && t("img.subiendo")}
-            {fase === "lista" && t("img.lista")}
+            {textoDeFase(t, fase)}
           </p>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={ocupado}
-              onClick={() => entrada.current?.click()}
+              onClick={abrirSelector}
               className="rounded-lg border border-dex-line bg-dex-panel px-3 py-1.5 text-xs text-dex-ink hover:border-dex-accent/60 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {id ? t("img.cambiar") : t("img.elegir")}
@@ -220,7 +255,7 @@ export function SubidaImagen({
             tabIndex={-1}
             aria-label={etiqueta}
             data-testid={`archivo-${campo}`}
-            onChange={(e) => void elegir(e.target.files?.[0])}
+            onChange={alElegirArchivo}
           />
         </div>
       </div>

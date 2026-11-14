@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `GET /api/minecraft-admin/registros?plugin=Nombre&lineas=200` — cola del registro del servidor
  * (`logs/latest.log`), opcionalmente solo las líneas de un plugin. Solo lectura; las IP se ocultan.
@@ -17,7 +18,9 @@ export async function GET(request) {
       plugin: url.searchParams.get("plugin") ?? undefined,
       lineas: url.searchParams.get("lineas") ?? undefined,
     });
-    if (!r.ok) return respuestaJson(r.cuerpo, r.status);
+    if (!r.ok) {
+      return respuestaJson(r.cuerpo, r.status);
+    }
     return respuestaJson(r);
   });
 }

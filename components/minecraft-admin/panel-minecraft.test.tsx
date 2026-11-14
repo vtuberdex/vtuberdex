@@ -23,15 +23,22 @@ function montarFetch(
   const mock = vi.fn(async (entrada: unknown, init?: RequestInit) => {
     const url = String(entrada);
     llamadas.push({ url, init });
-    if (url.includes("/api/minecraft-admin/estado")) return respuesta(estado);
-    if (url.includes("/api/minecraft-admin/enlace"))
+    if (url.includes("/api/minecraft-admin/estado")) {
+      return respuesta(estado);
+    }
+    if (url.includes("/api/minecraft-admin/enlace")) {
       return respuesta({ enviado: true });
-    if (url.includes("/api/minecraft-admin/sesion"))
+    }
+    if (url.includes("/api/minecraft-admin/sesion")) {
       return respuesta({ sesion: "dentro" });
-    if (url.includes("/api/minecraft-admin/plugins"))
+    }
+    if (url.includes("/api/minecraft-admin/plugins")) {
       return respuesta({ plugin: "Nuevo.jar" });
+    }
     if (url.includes("/api/minecraft-admin/configuracion")) {
-      if (init?.method === "PUT") return respuesta({ guardado: true });
+      if (init?.method === "PUT") {
+        return respuesta({ guardado: true });
+      }
       return respuesta({ contenido: "motd=Hola\n" });
     }
     return respuesta({});
@@ -52,10 +59,13 @@ function montarSinSesion(resto?: (url: string) => Response | undefined) {
     vi.fn(async (entrada: unknown, init?: RequestInit) => {
       const url = String(entrada);
       llamadas.push({ url, init });
-      if (url.includes("/estado"))
+      if (url.includes("/estado")) {
         return respuesta({ error: "sin_sesion" }, false, 401);
+      }
       const otra = resto?.(url);
-      if (otra) return otra;
+      if (otra) {
+        return otra;
+      }
       return respuesta({ enviado: true });
     }),
   );
@@ -91,7 +101,9 @@ describe("dashboard en vivo", () => {
     mock.mockImplementation(async (entrada: unknown) => {
       const url = String(entrada);
       llamadas.push({ url });
-      if (url.includes("/panorama")) return respuesta(PANORAMA);
+      if (url.includes("/panorama")) {
+        return respuesta(PANORAMA);
+      }
       return respuesta({ plugins: [], rol: "admin" });
     });
     render(<MinecraftAdminPage />);
@@ -108,9 +120,12 @@ describe("dashboard en vivo", () => {
     mock.mockImplementation(async (entrada: unknown, init?: RequestInit) => {
       const url = String(entrada);
       llamadas.push({ url, init });
-      if (url.includes("/panorama")) return respuesta(PANORAMA);
-      if (url.includes("/rcon"))
+      if (url.includes("/panorama")) {
+        return respuesta(PANORAMA);
+      }
+      if (url.includes("/rcon")) {
         return respuesta({ ok: true, respuesta: "ok" });
+      }
       return respuesta({ plugins: [], rol: "admin" });
     });
     render(<MinecraftAdminPage />);
@@ -131,7 +146,7 @@ describe("dashboard en vivo", () => {
     const mock = montarFetch();
     mock.mockImplementation(async (entrada: unknown) => {
       const url = String(entrada);
-      if (url.includes("/panorama"))
+      if (url.includes("/panorama")) {
         return respuesta({
           ...PANORAMA,
           rcon: "caido",
@@ -139,6 +154,7 @@ describe("dashboard en vivo", () => {
           tps: null,
           mspt: null,
         });
+      }
       return respuesta({ plugins: [], rol: "admin" });
     });
     render(<MinecraftAdminPage />);
@@ -177,14 +193,17 @@ describe("experiencia manual", () => {
     mock.mockImplementation(async (entrada: unknown, init?: RequestInit) => {
       const url = String(entrada);
       llamadas.push({ url, init });
-      if (url.includes("/experiencia?q="))
+      if (url.includes("/experiencia?q=")) {
         return respuesta({
           fichas: [{ id: 7, slug: "ana", name: "Ana", dex: 7 }],
         });
-      if (url.includes("/experiencia?ficha="))
+      }
+      if (url.includes("/experiencia?ficha=")) {
         return respuesta({ ficha: FICHA, historial: [], maximo: 10000 });
-      if (url.includes("/experiencia") && init?.method === "POST")
+      }
+      if (url.includes("/experiencia") && init?.method === "POST") {
         return respuesta({ ok: true }, true, 201);
+      }
       return respuesta({ plugins: [], rol: "admin" });
     });
     render(<MinecraftAdminPage />);
@@ -225,12 +244,14 @@ describe("experiencia manual", () => {
     mock.mockImplementation(async (entrada: unknown) => {
       const url = String(entrada);
       llamadas.push({ url });
-      if (url.includes("/experiencia?q="))
+      if (url.includes("/experiencia?q=")) {
         return respuesta({
           fichas: [{ id: 7, slug: "ana", name: "Ana", dex: 7 }],
         });
-      if (url.includes("/experiencia?ficha="))
+      }
+      if (url.includes("/experiencia?ficha=")) {
         return respuesta({ ficha: FICHA, historial: [], maximo: 10000 });
+      }
       return respuesta({ plugins: [], rol: "admin" });
     });
     render(<MinecraftAdminPage />);
@@ -311,8 +332,9 @@ describe("/minecraft-admin", () => {
     mock.mockImplementation(async (entrada: unknown, init?: RequestInit) => {
       const url = String(entrada);
       llamadas.push({ url, init });
-      if (url.includes("/rcon"))
+      if (url.includes("/rcon")) {
         return respuesta({ ok: true, respuesta: "Saved" });
+      }
       return respuesta({ plugins: [], rol: "admin" });
     });
     render(<MinecraftAdminPage />);
@@ -330,8 +352,9 @@ describe("/minecraft-admin", () => {
     mock.mockImplementation(async (entrada: unknown, init?: RequestInit) => {
       const url = String(entrada);
       llamadas.push({ url, init });
-      if (url.includes("/rcon"))
+      if (url.includes("/rcon")) {
         return respuesta({ ok: true, respuesta: "Kicked" });
+      }
       return respuesta({ plugins: [], rol: "admin" });
     });
     render(<MinecraftAdminPage />);
@@ -450,8 +473,9 @@ describe("/minecraft-admin", () => {
       vi.fn(async (entrada: unknown) => {
         const url = String(entrada);
         llamadas.push({ url });
-        if (url.includes("/plugins"))
+        if (url.includes("/plugins")) {
           return respuesta({ error: "solo .jar" }, false);
+        }
         return respuesta({ plugins: [], rol: "admin" });
       }),
     );
@@ -473,8 +497,9 @@ describe("/minecraft-admin", () => {
       vi.fn(async (entrada: unknown) => {
         const url = String(entrada);
         llamadas.push({ url });
-        if (url.includes("/sesion"))
+        if (url.includes("/sesion")) {
           return respuesta({ error: "enlace_invalido" }, false);
+        }
         return respuesta({ plugins: [], rol: "admin" });
       }),
     );
@@ -492,8 +517,9 @@ describe("/minecraft-admin", () => {
       vi.fn(async (entrada: unknown) => {
         const url = String(entrada);
         llamadas.push({ url });
-        if (url.includes("/estado"))
+        if (url.includes("/estado")) {
           return respuesta({ error: "sin_sesion" }, false, 401);
+        }
         throw new Error("sin red");
       }),
     );
@@ -522,8 +548,9 @@ describe("/minecraft-admin", () => {
       vi.fn(async (entrada: unknown) => {
         const url = String(entrada);
         llamadas.push({ url });
-        if (url.includes("/configuracion"))
+        if (url.includes("/configuracion")) {
           return respuesta({ error: "no_existe" }, false);
+        }
         return respuesta({ plugins: [], rol: "admin" });
       }),
     );
@@ -541,7 +568,9 @@ describe("/minecraft-admin", () => {
         const url = String(entrada);
         llamadas.push({ url, init });
         if (url.includes("/configuracion")) {
-          if (init?.method === "PUT") throw new Error("se cayó el guardado");
+          if (init?.method === "PUT") {
+            throw new Error("se cayó el guardado");
+          }
           return respuesta({ contenido: "motd=Hola\n" });
         }
         return respuesta({ plugins: [], rol: "admin" });

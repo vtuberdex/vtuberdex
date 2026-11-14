@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Gobierna CUÁNDO el `<Canvas>` dibuja. Va dentro del canvas, que debe llevar `frameloop="demand"`.
@@ -64,7 +65,9 @@ export function RenderGovernor({
     const tick = (ahora: number) => {
       raf = requestAnimationFrame(tick);
       const activo = busyRef.current?.() === true || ahora < activoHasta;
-      if (!shouldRender(ahora, programado, activo, ritmo)) return;
+      if (!shouldRender(ahora, programado, activo, ritmo)) {
+        return;
+      }
       programado = nextSchedule(ahora, programado, activo, ritmo);
       invalidate();
     };
@@ -75,8 +78,13 @@ export function RenderGovernor({
       raf = 0;
     };
     const sincronizar = () => {
-      if (pausado()) return parar();
-      if (raf) return;
+      if (pausado()) {
+        parar();
+        return;
+      }
+      if (raf) {
+        return;
+      }
       clock.getDelta();
       programado = -Infinity;
       raf = requestAnimationFrame(tick);
@@ -92,20 +100,25 @@ export function RenderGovernor({
         ? null
         : new IntersectionObserver((entradas) => {
             enPantalla = entradas.some((e) => e.isIntersecting);
-            if (enPantalla) activoHasta = performance.now() + RENDER.activeMs;
+            if (enPantalla) {
+              activoHasta = performance.now() + RENDER.activeMs;
+            }
             sincronizar();
           });
     observador?.observe(canvas);
     document.addEventListener("visibilitychange", sincronizar);
-    for (const tipo of SEÑALES)
+    for (const tipo of SEÑALES) {
       window.addEventListener(tipo, alActividad, { passive: true });
+    }
 
     alActividad();
     return () => {
       parar();
       observador?.disconnect();
       document.removeEventListener("visibilitychange", sincronizar);
-      for (const tipo of SEÑALES) window.removeEventListener(tipo, alActividad);
+      for (const tipo of SEÑALES) {
+        window.removeEventListener(tipo, alActividad);
+      }
     };
   }, [gl, invalidate, clock, idleFps]);
 

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/mi-ficha` — donde un VTuber reparte los puntos de habilidad que gana al subir de nivel. Se entra con el
  * enlace mágico del correo (`/mi-ficha#t=…`); sin él, la página pide el correo y lo manda. No se indexa:

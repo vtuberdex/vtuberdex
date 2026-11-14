@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Extrae el logo del VTuber desde la imagen de la CARTA, para las fichas que no
  * tienen página de detalle (el sitio no sirve esos logos por separado).
@@ -84,9 +85,161 @@ export function findLogoBoxInBand(
       band,
       badge,
     );
-    if (found) return found;
+    if (found) {
+      return found;
+    }
   }
   return null;
+}
+
+// Rejilla de contenido: celdas de 4x4 px.
+const CELL = 4;
+
+/**
+ * ¿Este píxel cuenta como logo? Cada modo responde a un tipo de carta:
+ *   sat  → logo colorido sobre fondo apagado (el caso mayoritario).
+ *   both → además brillo alto: rescata logos blancos sobre fondo oscuro.
+ *   dark → píxeles oscuros: cartas de fondo claro con logo oscuro.
+ */
+function isLogoPixel(r, g, b, mode) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const sat = max === 0 ? 0 : ((max - min) / max) * 255;
+  if (mode === "sat") {
+    return sat > MIN_SAT;
+  }
+  if (mode === "both") {
+    return sat > MIN_SAT || max > MIN_VAL;
+  }
+  return max < MAX_DARK;
+}
+
+/**
+ * Rejilla de contenido: primero se marca qué celdas (4x4 px) tienen
+ * saturación, y luego se cuenta por columnas/filas. Así una franja del MARCO
+ * (que es continua) no infla una fila entera como si fuera contenido del logo.
+ * El badge del número (en píxeles) queda fuera.
+ */
+function buildGrid(data, width, channels, mode, area, badgePx) {
+  const gridCols = Math.ceil(width / CELL);
+  const grid = new Uint16Array(gridCols * area.gridRows);
+  let hits = 0;
+  for (let y = area.y0; y < area.y1; y += 1) {
+    const inBadgeRows = y >= badgePx.y0 && y < badgePx.y1;
+    for (let x = area.x0; x < area.x1; x += 1) {
+      const inBadge = inBadgeRows && x >= badgePx.x0 && x < badgePx.x1;
+      const i = (y * width + x) * channels;
+      if (!inBadge && isLogoPixel(data[i], data[i + 1], data[i + 2], mode)) {
+        grid[Math.floor(y / CELL) * gridCols + Math.floor(x / CELL)] += 1;
+        hits += 1;
+      }
+    }
+  }
+  return { grid, gridCols, hits };
+}
+
+/**
+ * Celdas encendidas por columna y por fila. Una celda cuenta solo si está
+ * MAYORITARIAMENTE cubierta (>=8 de 16 píxeles). Esto funciona como una
+ * erosión: el texto del panel tiene trazos finos que no llenan una celda y
+ * desaparecen, mientras el logo es una masa gruesa que sobrevive. Con un
+ * umbral bajo (3/16) el texto contaminaba la caja.
+ */
+function cellHistograms(grid, gridCols, gridRows) {
+  const colHits = new Uint32Array(gridCols);
+  const rowHits = new Uint32Array(gridRows);
+  for (let cy = 0; cy < gridRows; cy += 1) {
+    for (let cx = 0; cx < gridCols; cx += 1) {
+      if (grid[cy * gridCols + cx] >= 8) {
+        colHits[cx] += 1;
+        rowHits[cy] += 1;
+      }
+    }
+  }
+  return { colHits, rowHits };
+}
+
+/** Rango [inicio, fin] que contiene el 92% central de las muestras. */
+function coreRange(hist, from, to) {
+  const total = hist.reduce((s, v) => s + v, 0);
+  if (total === 0) {
+    return null;
+  }
+  const lowThreshold = total * 0.04;
+  const highThreshold = total * 0.96;
+  let acc = 0;
+  let start = from;
+  let end = to - 1;
+  for (let i = from; i < to; i += 1) {
+    acc += hist[i];
+    if (acc >= lowThreshold) {
+      start = i;
+      break;
+    }
+  }
+  acc = 0;
+  for (let i = to - 1; i >= from; i -= 1) {
+    acc += hist[i];
+    if (acc >= total - highThreshold) {
+      end = i;
+      break;
+    }
+  }
+  return end > start ? [start, end] : null;
+}
+
+/**
+ * Fin: última fila que aún supera la mitad del pico, tolerando huecos cortos
+ * (los logos caligráficos tienen valles internos).
+ */
+function lastDenseRow(rowsBand, firstDense, peak) {
+  let lastDense = firstDense;
+  let quiet = 0;
+  const maxQuiet = 3;
+  for (let i = firstDense; i < rowsBand.length && quiet <= maxQuiet; i += 1) {
+    if (rowsBand[i] >= peak * 0.5) {
+      lastDense = i;
+      quiet = 0;
+    } else {
+      quiet += 1;
+    }
+  }
+  return lastDense;
+}
+
+/**
+ * Corte vertical por DENSIDAD (en celdas). El logo es la masa más densa de la
+ * banda; el panel de historia tiene filas mucho menos pobladas. Se toma el
+ * pico y se corta donde la densidad cae por debajo de la mitad del pico de
+ * forma sostenida: así el panel no se arrastra aunque tenga algunas filas
+ * cargadas. Devuelve [primera, última] fila (en celdas, relativas a la banda).
+ */
+function denseRows(rowHits, cellY0, cellY1) {
+  const rowsBand = Array.from(
+    { length: cellY1 - cellY0 },
+    (_, i) => rowHits[cellY0 + i],
+  );
+  const peak = Math.max(...rowsBand);
+  if (peak < 3) {
+    return null;
+  }
+  const firstDense = rowsBand.findIndex((hitsInRow) => hitsInRow >= peak * 0.5);
+  if (firstDense < 0) {
+    return null;
+  }
+  return {
+    firstDense,
+    lastDense: lastDenseRow(rowsBand, firstDense, peak),
+    peak,
+  };
+}
+
+/** Descarta cajas degeneradas (una línea, o que cubran toda la banda). */
+function isDegenerateBox(box, width, height) {
+  if (box.width < 30 || box.height < 24) {
+    return true;
+  }
+  return box.width > width * 0.85 && box.height > height * 0.5;
 }
 
 function detectWithMask(
@@ -98,150 +251,59 @@ function detectWithMask(
   band = BAND,
   badge = BADGE,
 ) {
-  const x0 = Math.floor(width * band.x0);
-  const y0 = Math.floor(height * band.y0);
-  const x1 = Math.floor(width * band.x1);
-  const y1 = Math.floor(height * band.y1);
-  // Rectángulo del badge del número, en píxeles.
-  const bx0 = Math.floor(width * badge.x0);
-  const bx1 = Math.floor(width * badge.x1);
-  const by0 = Math.floor(height * badge.y0);
-  const by1 = Math.floor(height * badge.y1);
-
-  // Rejilla de contenido: primero se marca qué celdas (4x4 px) tienen saturación,
-  // y luego se cuenta por columnas/filas. Así una franja del MARCO (que es
-  // continua) no infla una fila entera como si fuera contenido del logo.
-  const CELL = 4;
-  const gridCols = Math.ceil(width / CELL);
-  const gridRows = Math.ceil(height / CELL);
-  const grid = new Uint16Array(gridCols * gridRows);
-  let hits = 0;
-  for (let y = y0; y < y1; y += 1) {
-    for (let x = x0; x < x1; x += 1) {
-      if (x >= bx0 && x < bx1 && y >= by0 && y < by1) continue;
-      const i = (y * width + x) * channels;
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      const sat = max === 0 ? 0 : ((max - min) / max) * 255;
-      // Cada modo responde a un tipo de carta:
-      //   sat  → logo colorido sobre fondo apagado (el caso mayoritario).
-      //   both → además brillo alto: rescata logos blancos sobre fondo oscuro.
-      //   dark → píxeles oscuros: cartas de fondo claro con logo oscuro.
-      const isLogo =
-        mode === "sat"
-          ? sat > MIN_SAT
-          : mode === "both"
-            ? sat > MIN_SAT || max > MIN_VAL
-            : max < MAX_DARK;
-      if (isLogo) {
-        grid[Math.floor(y / CELL) * gridCols + Math.floor(x / CELL)] += 1;
-        hits += 1;
-      }
-    }
-  }
-  if (hits < 120) return null;
-
-  // Una celda cuenta solo si está MAYORITARIAMENTE cubierta (>=8 de 16 píxeles).
-  // Esto funciona como una erosión: el texto del panel tiene trazos finos que no
-  // llenan una celda y desaparecen, mientras el logo es una masa gruesa que
-  // sobrevive. Con un umbral bajo (3/16) el texto contaminaba la caja.
-  const cellOn = (cx, cy) => grid[cy * gridCols + cx] >= 8;
-
-  const colHits = new Uint32Array(gridCols);
-  const rowHits = new Uint32Array(gridRows);
-  for (let cy = 0; cy < gridRows; cy += 1) {
-    for (let cx = 0; cx < gridCols; cx += 1) {
-      if (cellOn(cx, cy)) {
-        colHits[cx] += 1;
-        rowHits[cy] += 1;
-      }
-    }
-  }
-
-  /** Rango [inicio, fin] que contiene el 92% central de las muestras. */
-  const coreRange = (hist, from, to) => {
-    const total = hist.reduce((s, v) => s + v, 0);
-    if (total === 0) return null;
-    const lowThreshold = total * 0.04;
-    const highThreshold = total * 0.96;
-    let acc = 0;
-    let start = from;
-    let end = to - 1;
-    for (let i = from; i < to; i += 1) {
-      acc += hist[i];
-      if (acc >= lowThreshold) {
-        start = i;
-        break;
-      }
-    }
-    acc = 0;
-    for (let i = to - 1; i >= from; i -= 1) {
-      acc += hist[i];
-      if (acc >= total - highThreshold) {
-        end = i;
-        break;
-      }
-    }
-    return end > start ? [start, end] : null;
+  const area = {
+    x0: Math.floor(width * band.x0),
+    y0: Math.floor(height * band.y0),
+    x1: Math.floor(width * band.x1),
+    y1: Math.floor(height * band.y1),
+    gridRows: Math.ceil(height / CELL),
   };
+  // Rectángulo del badge del número, en píxeles.
+  const badgePx = {
+    x0: Math.floor(width * badge.x0),
+    x1: Math.floor(width * badge.x1),
+    y0: Math.floor(height * badge.y0),
+    y1: Math.floor(height * badge.y1),
+  };
+
+  const { grid, gridCols, hits } = buildGrid(
+    data,
+    width,
+    channels,
+    mode,
+    area,
+    badgePx,
+  );
+  if (hits < 120) {
+    return null;
+  }
+  const { colHits, rowHits } = cellHistograms(grid, gridCols, area.gridRows);
 
   const colsRange = coreRange(
     colHits,
-    Math.floor(x0 / CELL),
-    Math.floor(x1 / CELL),
+    Math.floor(area.x0 / CELL),
+    Math.floor(area.x1 / CELL),
   );
-  if (!colsRange) return null;
+  if (!colsRange) {
+    return null;
+  }
   const cols = [
     colsRange[0] * CELL,
     Math.min(width - 1, colsRange[1] * CELL + CELL - 1),
   ];
 
-  // --- Corte vertical por DENSIDAD (en celdas) --------------------------------
-  // El logo es la masa más densa de la banda; el panel de historia tiene filas
-  // mucho menos pobladas. Se toma el pico y se corta donde la densidad cae por
-  // debajo de la mitad del pico de forma sostenida: así el panel no se arrastra
-  // aunque tenga algunas filas cargadas.
-  const cellY0 = Math.floor(y0 / CELL);
-  const cellY1 = Math.floor(y1 / CELL);
-  const rowsBand = Array.from(
-    { length: cellY1 - cellY0 },
-    (_, i) => rowHits[cellY0 + i],
-  );
-  const peak = Math.max(...rowsBand);
-  if (peak < 3) return null;
-
-  let firstDense = -1;
-  for (let i = 0; i < rowsBand.length; i += 1) {
-    if (rowsBand[i] >= peak * 0.5) {
-      firstDense = i;
-      break;
-    }
+  const cellY0 = Math.floor(area.y0 / CELL);
+  const dense = denseRows(rowHits, cellY0, Math.floor(area.y1 / CELL));
+  if (!dense) {
+    return null;
   }
-  if (firstDense < 0) return null;
-
-  // Fin: última fila que aún supera la mitad del pico, tolerando huecos cortos
-  // (los logos caligráficos tienen valles internos).
-  let lastDense = firstDense;
-  let quiet = 0;
-  const maxQuiet = 3;
-  for (let i = firstDense; i < rowsBand.length; i += 1) {
-    if (rowsBand[i] >= peak * 0.5) {
-      lastDense = i;
-      quiet = 0;
-    } else {
-      quiet += 1;
-      if (quiet > maxQuiet) break;
-    }
-  }
-
   const rows = [
-    Math.max(0, (cellY0 + firstDense) * CELL),
-    Math.min(height - 1, (cellY0 + lastDense) * CELL + CELL - 1),
+    Math.max(0, (cellY0 + dense.firstDense) * CELL),
+    Math.min(height - 1, (cellY0 + dense.lastDense) * CELL + CELL - 1),
   ];
-  if (rows[1] <= rows[0]) return null;
+  if (rows[1] <= rows[0]) {
+    return null;
+  }
 
   const box = {
     left: cols[0],
@@ -252,10 +314,10 @@ function detectWithMask(
   // El badge NO se recorta aquí: algunos logos llegan hasta esa zona y se
   // cortarían. Se borra después, píxel a píxel, solo en la esquina superior
   // derecha del recorte (ver extractLogoFromCard).
-  // Descarta cajas degeneradas (una línea, o que cubran toda la banda).
-  if (box.width < 30 || box.height < 24) return null;
-  if (box.width > width * 0.85 && box.height > height * 0.5) return null;
-  return { box, hits, columnas: cols, filas: rows, peak };
+  if (isDegenerateBox(box, width, height)) {
+    return null;
+  }
+  return { box, hits, columnas: cols, filas: rows, peak: dense.peak };
 }
 
 /** Extrae el logo de una carta. Devuelve {buffer, box, meta} o null. */
@@ -279,7 +341,9 @@ export async function extractLogoFromCard(file) {
   const found = edge
     ? { box: edge.box }
     : findLogoBoxInBand(data, info.width, info.height, info.channels);
-  if (!found) return null;
+  if (!found) {
+    return null;
+  }
 
   const pad = 4;
   const crop = {
@@ -336,7 +400,8 @@ async function main() {
   let cursor = 0;
   const worker = async () => {
     while (cursor < targets.length) {
-      const card = targets[cursor++];
+      const card = targets[cursor];
+      cursor += 1;
       const file = path.join(ROOT, "data", card.assets.card);
       try {
         const found = await extractLogoFromCard(file);
@@ -402,8 +467,10 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error("[logo2] ERROR", error);
     process.exit(1);
-  });
+  }
 }

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paso 1: identidad — nombre, dirección de la página, país y número en la dex. */
 import { CampoCorreoOculto } from "@/components/admin/dato-oculto";
@@ -6,7 +7,110 @@ import { ChipPicker } from "@/components/admin/chip-picker";
 import { slugifyUrl, type EditorForm } from "@/components/admin/form-model";
 import type { StepProps } from "@/components/admin/steps/types";
 import { Field, ghostButton, inputClass } from "@/components/admin/ui";
-import type { Dispatch, SetStateAction } from "react";
+import { useCallback, type Dispatch, type SetStateAction } from "react";
+
+/** La dirección de la página: sale sola del nombre (no se escribe) y avisa si cambiará al guardar. */
+function CampoDeDireccion({
+  slug,
+  currentSlug,
+  origin,
+}: Readonly<{ slug: string; currentSlug: string | null; origin: string }>) {
+  const normalized = slugifyUrl(slug);
+  const slugChanged =
+    currentSlug !== null && normalized !== "" && normalized !== currentSlug;
+  return (
+    <div>
+      <Field
+        label="Dirección de la página"
+        hint={
+          currentSlug !== null
+            ? `Cambia sola con el nombre; la dirección anterior (/v/${currentSlug}) seguirá llevando a la nueva.`
+            : "Bloqueada: se genera sola a partir del nombre."
+        }
+      >
+        <span className="mt-1 flex items-stretch">
+          <span className="flex items-center rounded-l-lg border border-r-0 border-dex-line bg-dex-void/60 px-3 font-mono text-xs text-dex-muted">
+            /v/
+          </span>
+          <input
+            aria-label="Dirección de la página"
+            value={slug}
+            readOnly
+            aria-readonly
+            className="w-full cursor-not-allowed opacity-80 rounded-r-lg border border-dex-line bg-dex-void px-3 py-2 font-mono text-sm text-dex-ink outline-none focus:border-dex-accent"
+          />
+        </span>
+      </Field>
+      <p
+        className="mt-1 break-all font-mono text-[11px] text-dex-muted"
+        data-testid="slug-preview"
+      >
+        {origin}/v/{normalized || "…"}
+        {slugChanged && (
+          <span className="ml-2 text-amber-200">(cambio pendiente)</span>
+        )}
+      </p>
+    </div>
+  );
+}
+
+/** El número en la dex: uno escrito a mano o «Mandar al final» (el siguiente libre al guardar). */
+function CampoDeNumero({
+  form,
+  setForm,
+  nextDex,
+  currentDex,
+}: Readonly<{
+  form: EditorForm;
+  setForm: Dispatch<SetStateAction<EditorForm>>;
+  nextDex: number | null;
+  currentDex: number | null;
+}>) {
+  return (
+    <div className="sm:col-span-2">
+      <Field
+        label="Número en la dex"
+        hint="Es su posición en la lista (como en una Pokédex). Un número ocupado no se intercambia: para usarlo, mueve antes a la ficha que lo tiene a un número libre. Al guardar, el número anterior de esta carta queda libre."
+      >
+        <span className="mt-1 flex flex-wrap items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            aria-label="Número de dex"
+            value={form.dexEnd ? (nextDex ?? "") : form.dexNumber}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                dexNumber: event.target.value,
+                dexEnd: false,
+              }))
+            }
+            className="w-32 rounded-lg border border-dex-line bg-dex-void px-3 py-2 font-mono text-sm text-dex-ink outline-none focus:border-dex-accent"
+          />
+          <button
+            type="button"
+            className={ghostButton}
+            aria-pressed={form.dexEnd}
+            onClick={() =>
+              setForm((current) => ({
+                ...current,
+                dexEnd: !current.dexEnd,
+                dexNumber: currentDex !== null ? String(currentDex) : "",
+              }))
+            }
+          >
+            Mandar al final{nextDex !== null ? ` (#${nextDex})` : ""}
+          </button>
+          {form.dexEnd && (
+            <span className="text-[11px] normal-case text-dex-muted">
+              Se asignará el último número libre al guardar.
+            </span>
+          )}
+        </span>
+      </Field>
+    </div>
+  );
+}
 
 export function IdentityStep({
   form,
@@ -25,7 +129,7 @@ export function IdentityStep({
   emailDirty,
   savingEmail,
   onSaveEmail,
-}: StepProps & {
+}: Readonly<StepProps & {
   setForm: Dispatch<SetStateAction<EditorForm>>;
   mode: "create" | "edit";
   nextDex: number | null;
@@ -43,10 +147,16 @@ export function IdentityStep({
   emailDirty: boolean;
   savingEmail: boolean;
   onSaveEmail: () => void;
-}) {
-  const normalized = slugifyUrl(form.slug);
-  const slugChanged =
-    currentSlug !== null && normalized !== "" && normalized !== currentSlug;
+}>) {
+  // `set` llega estable del asistente (`useCallback`): así el selector recibe siempre la misma función.
+  const cambiarPaises = useCallback(
+    (next: string[]) => set("countries", next),
+    [set],
+  );
+  const cambiarIdiomas = useCallback(
+    (next: string[]) => set("languages", next),
+    [set],
+  );
 
   return (
     <div className="space-y-4">
@@ -68,38 +178,11 @@ export function IdentityStep({
           />
         </Field>
 
-        <div>
-          <Field
-            label="Dirección de la página"
-            hint={
-              currentSlug !== null
-                ? `Cambia sola con el nombre; la dirección anterior (/v/${currentSlug}) seguirá llevando a la nueva.`
-                : "Bloqueada: se genera sola a partir del nombre."
-            }
-          >
-            <span className="mt-1 flex items-stretch">
-              <span className="flex items-center rounded-l-lg border border-r-0 border-dex-line bg-dex-void/60 px-3 font-mono text-xs text-dex-muted">
-                /v/
-              </span>
-              <input
-                aria-label="Dirección de la página"
-                value={form.slug}
-                readOnly
-                aria-readonly
-                className="w-full cursor-not-allowed opacity-80 rounded-r-lg border border-dex-line bg-dex-void px-3 py-2 font-mono text-sm text-dex-ink outline-none focus:border-dex-accent"
-              />
-            </span>
-          </Field>
-          <p
-            className="mt-1 break-all font-mono text-[11px] text-dex-muted"
-            data-testid="slug-preview"
-          >
-            {origin}/v/{normalized || "…"}
-            {slugChanged && (
-              <span className="ml-2 text-amber-200">(cambio pendiente)</span>
-            )}
-          </p>
-        </div>
+        <CampoDeDireccion
+          slug={form.slug}
+          currentSlug={currentSlug}
+          origin={origin}
+        />
 
         <Field
           label="Correo electrónico"
@@ -128,55 +211,19 @@ export function IdentityStep({
           </span>
         </Field>
 
-        <div className="sm:col-span-2">
-          <Field
-            label="Número en la dex"
-            hint="Es su posición en la lista (como en una Pokédex). Un número ocupado no se intercambia: para usarlo, mueve antes a la ficha que lo tiene a un número libre. Al guardar, el número anterior de esta carta queda libre."
-          >
-            <span className="mt-1 flex flex-wrap items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                aria-label="Número de dex"
-                value={form.dexEnd ? (nextDex ?? "") : form.dexNumber}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    dexNumber: event.target.value,
-                    dexEnd: false,
-                  }))
-                }
-                className="w-32 rounded-lg border border-dex-line bg-dex-void px-3 py-2 font-mono text-sm text-dex-ink outline-none focus:border-dex-accent"
-              />
-              <button
-                type="button"
-                className={ghostButton}
-                aria-pressed={form.dexEnd}
-                onClick={() =>
-                  setForm((current) => ({
-                    ...current,
-                    dexEnd: !current.dexEnd,
-                    dexNumber: currentDex !== null ? String(currentDex) : "",
-                  }))
-                }
-              >
-                Mandar al final{nextDex !== null ? ` (#${nextDex})` : ""}
-              </button>
-              {form.dexEnd && (
-                <span className="text-[11px] normal-case text-dex-muted">
-                  Se asignará el último número libre al guardar.
-                </span>
-              )}
-            </span>
-          </Field>
-        </div>
+        <CampoDeNumero
+          form={form}
+          setForm={setForm}
+          nextDex={nextDex}
+          currentDex={currentDex}
+        />
 
         <div className="sm:col-span-2">
           <ChipPicker
             label="País (opcional)"
             options={countryOptions}
             value={form.countries}
-            onChange={(next) => set("countries", next)}
+            onChange={cambiarPaises}
             max={6}
           />
         </div>
@@ -191,7 +238,7 @@ export function IdentityStep({
             label="Idiomas"
             options={languageOptions}
             value={form.languages}
-            onChange={(next) => set("languages", next)}
+            onChange={cambiarIdiomas}
             max={6}
           />
           <Field label="Nivel">

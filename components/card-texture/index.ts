@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Generación de texturas en 7 capas separadas con paralaje propio.
@@ -7,9 +8,8 @@
  * La estrategia es generar un canvas INDEPENDIENTE por capa, y el shader
  * las mezcla. Así cada capa tiene su propio factor de paralaje.
  *
- * En este paso se deja TODO el texto PLANO (sin metal, sin sombras, sin
- * agujeros en el fondo). Después se añadirán efectos capa por capa de forma
- * limpia.
+ * El primer paso dejó cada texto PLANO (sin metal, sin sombras, sin agujeros en
+ * el fondo) y los efectos se fueron añadiendo después, capa por capa.
  */
 
 export {

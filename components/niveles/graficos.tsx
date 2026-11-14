@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 
 /**
@@ -27,12 +28,12 @@ export function Figura({
   texto,
   ejemplo = false,
   children,
-}: {
+}: Readonly<{
   titulo: string;
   texto: string;
   ejemplo?: boolean;
   children: ReactNode;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <figure className="space-y-3">
@@ -53,7 +54,7 @@ export function Figura({
 }
 
 /** Una maqueta no se toca: se mira. `inert` la saca del foco y de los lectores (la explica el pie de la figura). */
-function Maqueta({ children }: { children: ReactNode }) {
+function Maqueta({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div
       className="pointer-events-none select-none overflow-hidden rounded-xl border border-dex-line bg-dex-void/60 p-3"
@@ -132,7 +133,8 @@ export function GraficoBarraYTotal() {
   const puntos = Array.from({ length: LIKES_DEL_EJEMPLO + 1 }, (_, likes) =>
     experienciaConLikes({}, likes),
   );
-  const totalMax = puntos[puntos.length - 1].total;
+  // El arreglo nunca está vacío (LIKES_DEL_EJEMPLO + 1 puntos); el respaldo solo calma al tipo.
+  const totalMax = puntos.at(-1)?.total ?? 0;
 
   // Barra: al cambiar de nivel sube hasta el tope y cae a cero en el mismo like (diente de sierra).
   const barra: string[] = [];
@@ -268,7 +270,8 @@ export function GraficoCurva() {
     nivel: i + 1,
     exp: umbralDeNivel(i + 1),
   }));
-  const maximo = niveles[niveles.length - 1].exp;
+  // Nunca vacío (NIVELES_DE_LA_CURVA filas); el respaldo solo calma al tipo.
+  const maximo = niveles.at(-1)?.exp ?? 0;
   const base = 168;
   const alto = 130;
   const paso = (W - IZQ - DER) / NIVELES_DE_LA_CURVA;
@@ -468,7 +471,7 @@ export function EscalaDeRangos() {
             {t("mificha.rango", { n, max: RANGO_MAXIMO })}
           </span>
           <span className="flex gap-1" aria-hidden>
-            {Array.from({ length: RANGO_MAXIMO }, (_, i) => (
+            {Array.from({ length: RANGO_MAXIMO }, (_hueco, i) => (
               <span
                 key={i}
                 className={`h-2.5 w-2.5 rounded-full ${i < n ? "bg-dex-accent" : "border border-dex-line"}`}

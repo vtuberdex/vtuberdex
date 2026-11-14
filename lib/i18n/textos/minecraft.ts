@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Texto de la página «Cómo entrar al servidor de Minecraft» (`/minecraft`). es / en / ja con las mismas
  * claves. El flujo que describe es el del plugin (`minecraft/`, `server/src/minecraft.mjs`): la web es la

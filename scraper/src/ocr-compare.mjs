@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Compara la calidad de OCR entre la carta reducida (720px, la que usa la app)
  * y el original del sitio (~1920px). Sirve para decidir a qué resolución hay que
@@ -22,7 +23,7 @@ function textBox(width, height) {
   };
 }
 
-async function ocr(worker, input, label) {
+async function ocr(ocrWorker, input, label) {
   const meta = await sharp(input).metadata();
   const box = textBox(meta.width, meta.height);
   const buf = await sharp(input)
@@ -32,7 +33,7 @@ async function ocr(worker, input, label) {
     .normalize()
     .png()
     .toBuffer();
-  const { data } = await worker.recognize(buf);
+  const { data } = await ocrWorker.recognize(buf);
   const text = data.text.replace(/\s+/g, " ").trim();
   console.log(
     `  [${label}] ${meta.width}x${meta.height} -> conf ${Math.round(data.confidence)}`,

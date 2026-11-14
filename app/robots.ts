@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/robots.txt`: se rastrea el sitio público; la API, el mantenedor y las imágenes de la carta
  * no son contenido que deba indexarse. Los assets de Next (`/_next/`) NO se bloquean: el

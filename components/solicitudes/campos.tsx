@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Piezas compartidas por los formularios públicos (inscripción y baja): mismas clases, mismo
@@ -24,14 +25,14 @@ export function Campo({
   obligatorio = false,
   confidencial = false,
   children,
-}: {
+}: Readonly<{
   etiqueta: string;
   ayuda?: ReactNode;
   obligatorio?: boolean;
   /** Marca los datos que NO se publican (correo). */
   confidencial?: boolean;
   children: ReactNode;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <label className={claseEtiqueta}>
@@ -65,10 +66,10 @@ export function Campo({
 export function CampoTrampa({
   valor,
   alCambiar,
-}: {
+}: Readonly<{
   valor: string;
   alCambiar: (v: string) => void;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <div
@@ -99,12 +100,12 @@ export function AceptaTerminos({
   alCambiar,
   idUnico,
   invalida,
-}: {
+}: Readonly<{
   marcada: boolean;
   alCambiar: (v: boolean) => void;
   idUnico: string;
   invalida?: boolean;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <div className="rounded-xl border border-dex-line bg-dex-panel-soft/60 p-4">
@@ -149,26 +150,28 @@ export function AceptaTerminos({
 export function Aviso({
   tipo,
   children,
-}: {
+}: Readonly<{
   tipo: "error" | "ok";
   children: ReactNode;
-}) {
+}>) {
   const color =
     tipo === "error"
       ? "border-rose-400/50 bg-rose-400/10 text-rose-100"
       : "border-emerald-400/50 bg-emerald-400/10 text-emerald-100";
-  return (
-    <div
-      role={tipo === "error" ? "alert" : "status"}
-      className={`rounded-xl border px-4 py-3 text-sm ${color}`}
-    >
-      {children}
-    </div>
-  );
+  const clase = `rounded-xl border px-4 py-3 text-sm ${color}`;
+  if (tipo === "error") {
+    return (
+      <div role="alert" className={clase}>
+        {children}
+      </div>
+    );
+  }
+  // `<output>` ya es una región «status» para los lectores; `block` le devuelve el aspecto del `<div>` de antes.
+  return <output className={`block ${clase}`}>{children}</output>;
 }
 
 /** Título y párrafo de una página de formulario: cliente, para que sigan el idioma elegido (la página de servidor solo pasa claves). */
-export function Encabezado({ titulo, texto }: { titulo: Clave; texto: Clave }) {
+export function Encabezado({ titulo, texto }: Readonly<{ titulo: Clave; texto: Clave }>) {
   const { t } = useI18n();
   return (
     <>

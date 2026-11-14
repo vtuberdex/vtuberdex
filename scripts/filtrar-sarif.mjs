@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Uso: node scripts/filtrar-sarif.mjs <archivo.sarif>...
  * Reescribe cada SARIF sin los hallazgos que `sonar-project.properties` declara revisados.

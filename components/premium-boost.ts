@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Cuánto se refuerza la holografía de una carta gradeada (ver `PREMIUM.boost`).
  *
@@ -46,7 +47,9 @@ export function factorDeGrado(grado: PremiumGrade): number {
 export function refuerzoDeGrado(
   grado: PremiumGrade | null | undefined,
 ): HoloBoost {
-  if (!grado) return SIN_REFUERZO;
+  if (!grado) {
+    return SIN_REFUERZO;
+  }
   if (esGradoDegradado(grado)) {
     // Una carta rota brilla MENOS que una normal: el foil se apaga con el deterioro. Nunca a cero,
     // o el grado 1 dejaría de reaccionar al puntero y parecería una imagen congelada.

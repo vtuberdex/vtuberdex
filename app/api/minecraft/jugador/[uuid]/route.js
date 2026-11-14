@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** `GET|DELETE /api/minecraft/jugador/:uuid` — a qué ficha está vinculado un jugador, o soltar el vínculo (solo el plugin). */
 import {
   desvincularDesdeElJuego,

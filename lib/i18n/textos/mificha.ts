@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Textos de «Mi ficha» (reparto de puntos de habilidad al subir de nivel) y los dos rótulos públicos que
  * nacen con ella: la experiencia TOTAL y el rango de cada habilidad. es / en / ja con las mismas claves.

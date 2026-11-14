@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Tarifas de las cartas premium: cuánto hay que donar para llegar a cada grado.
@@ -12,6 +13,20 @@ import {
   GRADOS_RESERVADOS,
   nombreDeGrado,
 } from "@/lib/premium";
+
+/** La donación de un grado: reservada (la BL no se obtiene donando), sin definir, o el monto. */
+function Monto({
+  reservado,
+  monto,
+}: Readonly<{ reservado: boolean; monto: number | null | undefined }>) {
+  if (reservado) {
+    return <>Reservada</>;
+  }
+  if (monto == null) {
+    return <span className="text-dex-muted">Por definir</span>;
+  }
+  return <>{`${monto} USD`}</>;
+}
 
 export function PremiumRates() {
   return (
@@ -49,13 +64,7 @@ export function PremiumRates() {
                   {nombreDeGrado(grado)}
                 </td>
                 <td className="px-3 py-2 text-dex-ink">
-                  {reservado ? (
-                    "Reservada"
-                  ) : monto == null ? (
-                    <span className="text-dex-muted">Por definir</span>
-                  ) : (
-                    `${monto} USD`
-                  )}
+                  <Monto reservado={reservado} monto={monto} />
                 </td>
               </tr>
             );

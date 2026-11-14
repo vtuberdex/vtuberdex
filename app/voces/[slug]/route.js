@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `GET /voces/<slug>.mp3` — sirve el clip de voz de una ficha.
  *
@@ -26,7 +27,9 @@ function carpeta() {
 /** `bytes=a-b` → { inicio, fin } acotado al archivo, o null si no es un rango válido. */
 function parsearRango(cabecera, tamano) {
   const m = /^bytes=(\d*)-(\d*)$/.exec(cabecera ?? "");
-  if (!m || (m[1] === "" && m[2] === "")) return null;
+  if (!m || (m[1] === "" && m[2] === "")) {
+    return null;
+  }
   let inicio;
   let fin;
   if (m[1] === "") {
@@ -42,8 +45,9 @@ function parsearRango(cabecera, tamano) {
 export async function GET(request, { params }) {
   const { slug: crudo } = await params;
   const slug = String(crudo).replace(/\.mp3$/, "");
-  if (!SLUG_VALIDO.test(slug))
+  if (!SLUG_VALIDO.test(slug)) {
     return Response.json({ error: "no_encontrado" }, { status: 404 });
+  }
 
   const archivo = path.join(carpeta(), `${slug}.mp3`);
   // Un solo descriptor para la fecha y el contenido: sin carrera entre `stat` y la lectura.
@@ -70,11 +74,12 @@ export async function GET(request, { params }) {
   const cabeceraRango = request.headers.get("range");
   if (cabeceraRango) {
     const rango = parsearRango(cabeceraRango, cuerpo.length);
-    if (!rango)
+    if (!rango) {
       return new Response(null, {
         status: 416,
         headers: { "content-range": `bytes */${cuerpo.length}` },
       });
+    }
     const trozo = cuerpo.subarray(rango.inicio, rango.fin + 1);
     return new Response(trozo, {
       status: 206,

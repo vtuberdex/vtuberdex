@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Sonda de tiempos: cuánto cuesta cada pieza del camino de lectura.
  *
@@ -22,9 +23,9 @@ import {
 function mediana(n, fn) {
   const tiempos = [];
   for (let i = 0; i < n; i += 1) {
-    const t0 = performance.now();
+    const inicio = performance.now();
     fn();
-    tiempos.push(performance.now() - t0);
+    tiempos.push(performance.now() - inicio);
   }
   tiempos.sort((a, b) => a - b);
   return Number(tiempos[Math.floor(tiempos.length / 2)].toFixed(2));

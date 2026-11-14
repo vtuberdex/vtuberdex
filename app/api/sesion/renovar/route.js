@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `POST /api/sesion/renovar` — alarga la sesión de visitante SIN repetir la prueba de trabajo.
  *
@@ -17,18 +18,20 @@ export const dynamic = "force-dynamic";
 export function POST(request) {
   const sinCache = { "cache-control": "no-store" };
   const ip = redDeLaPeticion(request.headers);
-  if (!ip || redExenta(ip))
+  if (!ip || redExenta(ip)) {
     return new Response(null, { status: 204, headers: sinCache });
+  }
   const valor = renovarSesion(
     request.headers.get("cookie"),
     ip,
     request.headers.get("user-agent") ?? "",
   );
-  if (!valor)
+  if (!valor) {
     return Response.json(
       { error: "sesion_requerida" },
       { status: 401, headers: sinCache },
     );
+  }
   const seguro = request.headers.get("x-forwarded-proto") === "https";
   return new Response(null, {
     status: 204,

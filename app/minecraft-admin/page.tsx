@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/minecraft-admin` — mantenedor de plugins y configuración del servidor de Minecraft.
  *

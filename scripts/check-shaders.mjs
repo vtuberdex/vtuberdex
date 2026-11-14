@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Guard de los shaders GLSL: lo que NINGÚN otro gate del stack ve.
  *
@@ -174,7 +175,21 @@ const LITERALES_LEGITIMOS = [
   // corte es 0.5 por construcción, no una perilla).
   {
     valor: "0.5",
-    en: /-\s*0\.5\b|vec2\(0\.5\)|\*\s*0\.5\s*\+\s*0\.5|fract\([^)]*\)\s*-\s*0\.5|uFactionCounts\.\w\s*>\s*0\.5|uHasBackground\s*>\s*0\.5|activo\s*<\s*0\.5|float\(i\)\s*\*\s*0\.5|uCardSize\s*\*\s*0\.5|\/\s*size\s*\+\s*0\.5|uUseLayers\s*>\s*0\.5/,
+    // Una LISTA de construcciones (vale cualquiera): en una sola regex con 11 alternativas
+    // nadie podía leer cuál justificaba qué.
+    en: [
+      /-\s*0\.5\b/,
+      /vec2\(0\.5\)/,
+      /\*\s*0\.5\s*\+\s*0\.5/,
+      /fract\([^)]*\)\s*-\s*0\.5/,
+      /uFactionCounts\.\w\s*>\s*0\.5/,
+      /uHasBackground\s*>\s*0\.5/,
+      /activo\s*<\s*0\.5/,
+      /float\(i\)\s*\*\s*0\.5/,
+      /uCardSize\s*\*\s*0\.5/,
+      /\/\s*size\s*\+\s*0\.5/,
+      /uUseLayers\s*>\s*0\.5/,
+    ],
   },
   // Color de fondo por defecto cuando no hay background (capas): gris muy oscuro.
   { valor: "0.031", en: /vec3\(\s*0\.031,\s*0\.035,\s*0\.063\s*\)/ },
@@ -263,6 +278,46 @@ const LITERALES_LEGITIMOS = [
   { valor: "0.5", en: /uv\s*-\s*vec2\(\s*0\.5\s*\)|0\.5\s*\+\s*dir/ },
 ];
 
+/**
+ * Declaración `uniform <tipo> <nombres>;`. La lista de nombres empieza en algo que no es blanco:
+ * con `\s+([^;]+)` los dos cuantificadores se disputaban los espacios y la regex retrocedía.
+ */
+const DECLARACION_UNIFORM = /\buniform\s+\w+\s+([^;\s][^;]*);/g;
+
+/** El nombre sin su índice de array (`uSlots[4]` → `uSlots`), sin regex que retroceda. */
+function sinIndice(nombre) {
+  const abre = nombre.indexOf("[");
+  return abre >= 0 && nombre.endsWith("]") ? nombre.slice(0, abre) : nombre;
+}
+
+/** Nombres (no vacíos, sin índice) de todos los uniforms declarados en un GLSL ya sin comentarios. */
+function nombresDeclarados(glsl) {
+  const nombres = [];
+  for (const decl of glsl.matchAll(DECLARACION_UNIFORM)) {
+    for (const nombre of decl[1].split(",")) {
+      const limpio = sinIndice(nombre.trim());
+      if (limpio) {
+        nombres.push(limpio);
+      }
+    }
+  }
+  return nombres;
+}
+
+/** ¿Justifica alguna regla de `LITERALES_LEGITIMOS` este literal en esta línea? */
+function esLegitimo(valor, linea) {
+  return LITERALES_LEGITIMOS.some(
+    (r) => r.valor === valor && [r.en].flat().some((en) => en.test(linea)),
+  );
+}
+
+/** Literales con decimales de una línea de GLSL que ninguna regla justifica. */
+function literalesSueltos(linea) {
+  return [...linea.matchAll(/(?<![\w$.])(\d+\.\d+)(?![\w.])/g)]
+    .map((lit) => lit[1])
+    .filter((valor) => !esLegitimo(valor, linea));
+}
+
 const problemas = [];
 for (const { cuerpo, linea } of bloques) {
   /**
@@ -282,17 +337,18 @@ for (const { cuerpo, linea } of bloques) {
   const limpio = sinComentarios(cuerpo);
 
   const declarados = new Set();
-  for (const decl of limpio.matchAll(/\buniform\s+\w+\s+([^;]+);/g)) {
-    for (const nombre of decl[1].split(",")) {
-      const sucio = nombre.trim().replace(/\[.*\]$/, "");
-      // Un nombre de uniform es un identificador; si trae espacios o símbolos es
-      // texto que se coló, no una declaración.
-      if (/^[A-Za-z_]\w*$/.test(sucio)) declarados.add(sucio);
+  for (const sucio of nombresDeclarados(limpio)) {
+    // Un nombre de uniform es un identificador; si trae espacios o símbolos es
+    // texto que se coló, no una declaración.
+    if (/^[A-Za-z_]\w*$/.test(sucio)) {
+      declarados.add(sucio);
     }
   }
 
   const usados = new Set();
-  for (const uso of limpio.matchAll(/\bu[A-Z]\w*/g)) usados.add(uso[0]);
+  for (const uso of limpio.matchAll(/\bu[A-Z]\w*/g)) {
+    usados.add(uso[0]);
+  }
 
   for (const nombre of usados) {
     if (!declarados.has(nombre) && !APORTADOS.has(nombre)) {
@@ -315,13 +371,19 @@ for (const { cuerpo, linea } of bloques) {
    * float"). Es la misma trampa en sentido contrario, y el único sitio donde un entero
    * sin decimal es lo correcto. Se detecta por el contexto del encabezado del for.
    */
-  for (const interp of cuerpo.matchAll(/\$\{\s*(?!f\(|vec3\()([^}]*)\}/g)) {
-    if (!/\bCFG\.|slots?\[/.test(interp[1])) continue;
+  // Sin `\s*` delante de la anticipación: `\s*` y `[^}]*` se disputaban los blancos. Es la misma
+  // condición (un blanco tras `\${` ya hacía pasar la anticipación al retroceder).
+  for (const interp of cuerpo.matchAll(/\$\{(?!f\(|vec3\()([^}]*)\}/g)) {
+    if (!/\bCFG\.|slots?\[/.test(interp[1])) {
+      continue;
+    }
     const antes = cuerpo.slice(Math.max(0, interp.index - 60), interp.index);
-    if (/for\s*\(\s*int\s+\w+\s*=[^;]*;[^;]*<\s*$/.test(antes)) continue;
+    if (/for\s*\(\s*int\s+\w+\s*=[^;]*;[^;]*<\s*$/.test(antes)) {
+      continue;
+    }
     problemas.push(
       `interpolación sin f()/vec3() en el shader que empieza en la línea ${linea}: ` +
-        `\${${interp[1]}} — un entero sale sin el .0 y GLSL ES 3.0 no lo promociona ` +
+        `\${${interp[1].trimStart()}} — un entero sale sin el .0 y GLSL ES 3.0 no lo promociona ` +
         "(la carta sale negra en el navegador)",
     );
   }
@@ -339,14 +401,12 @@ for (const { cuerpo, linea } of bloques) {
     // línea entera: saltarla escondía el caso más común, una línea con un `f()` legítimo
     // Y una perilla suelta a la vez (p. ej. `uTilt.y * 1.4 + uTime * ${f(...)}`).
     const sinConfig = l.replace(/\$\{[^}]*\}/g, " ");
-    if (/^\s*(\*|\/\/|\/\*)/.test(sinConfig)) continue; // comentario
-    for (const lit of sinConfig.matchAll(/(?<![\w$.])(\d+\.\d+)(?![\w.])/g)) {
-      const legitimo = LITERALES_LEGITIMOS.some(
-        (r) => r.valor === lit[1] && r.en.test(sinConfig),
-      );
-      if (legitimo) continue;
+    if (/^\s*(\*|\/\/|\/\*)/.test(sinConfig)) {
+      continue; // comentario
+    }
+    for (const valor of literalesSueltos(sinConfig)) {
       problemas.push(
-        `literal ${lit[1]} suelto en el shader que empieza en la línea ${linea} ` +
+        `literal ${valor} suelto en el shader que empieza en la línea ${linea} ` +
           `(línea ${linea + i}): si es una perilla del efecto, va en card3d-config.ts; ` +
           "si es estructura, añádelo a LITERALES_LEGITIMOS con SU construcción justificada",
       );
@@ -381,16 +441,13 @@ if (existsSync(rutaDeclarante)) {
   const declarante = readFileSync(rutaDeclarante, "utf8");
   const enShaders = new Set();
   for (const { cuerpo } of bloques) {
-    for (const decl of sinComentarios(cuerpo).matchAll(
-      /\buniform\s+\w+\s+([^;]+);/g,
-    )) {
-      for (const nombre of decl[1].split(",")) {
-        const limpio = nombre.trim().replace(/\[.*\]$/, "");
-        if (limpio) enShaders.add(limpio);
-      }
+    for (const nombre of nombresDeclarados(sinComentarios(cuerpo))) {
+      enShaders.add(nombre);
     }
   }
-  for (const asignacion of declarante.matchAll(/^\s+(u[A-Z]\w*)\s*:/gm)) {
+  // Sangría de la MISMA línea (`[ \t]`, no `\s`): con `^\s+` y la bandera `m` el blanco podía
+  // cruzar saltos de línea y la regex retrocedía sobre cada `^`.
+  for (const asignacion of declarante.matchAll(/^[ \t]+(u[A-Z]\w*)\s*:/gm)) {
     const nombre = asignacion[1];
     if (!enShaders.has(nombre)) {
       problemas.push(
@@ -408,7 +465,9 @@ if (existsSync(rutaDeclarante)) {
 
 if (problemas.length > 0) {
   console.error(`check-shaders: ${problemas.length} problema(s) en ${ruta}`);
-  for (const p of problemas) console.error(`  · ${p}`);
+  for (const p of problemas) {
+    console.error(`  · ${p}`);
+  }
   process.exit(1);
 }
 

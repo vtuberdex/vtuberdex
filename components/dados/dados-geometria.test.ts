@@ -21,10 +21,11 @@ describe("dados: forma y numeración", () => {
       expect(forma.caras).toHaveLength(CARAS[tipo]);
       for (const cara of forma.caras) {
         // Todos los vértices de la cara en su plano (las cometas del d10 solo son planas con el zigzag justo).
-        for (const p of cara.vertices)
+        for (const p of cara.vertices) {
           expect(
             Math.abs(p.clone().sub(cara.centro).dot(cara.normal)),
           ).toBeLessThan(1e-6);
+        }
       }
       if (tipo !== "d4") {
         expect(forma.caras.map((c) => c.numero).sort((a, b) => a - b)).toEqual(

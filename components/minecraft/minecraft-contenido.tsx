@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 'use client';
 
 /**
@@ -15,7 +16,7 @@ export const MC_HOST = 'vtuberdex.com';
 const PUERTO_JAVA = 25565;
 const PUERTO_BEDROCK = 19132;
 
-function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Seccion({ titulo, children }: Readonly<{ titulo: string; children: React.ReactNode }>) {
   return (
     <section className="rounded-2xl border border-dex-line bg-dex-panel/60 p-5">
       <h2 className="text-lg font-bold text-dex-ink">{titulo}</h2>
@@ -24,12 +25,12 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
   );
 }
 
-function Comando({ texto }: { texto: string }) {
+function Comando({ texto }: Readonly<{ texto: string }>) {
   return <code className="block overflow-x-auto rounded-lg border border-dex-line bg-dex-void px-3 py-2 font-mono text-xs text-dex-accent">{texto}</code>;
 }
 
 /** Copiar con respaldo: sin HTTPS `navigator.clipboard` no existe (misma razón que el botón de donar). */
-function BotonCopiar({ texto }: { texto: string }) {
+function BotonCopiar({ texto }: Readonly<{ texto: string }>) {
   const { t } = useI18n();
   const [hecho, setHecho] = useState(false);
   const copiar = async () => {

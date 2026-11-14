@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Lógica de la LISTA de cartas premium del mantenedor: qué filtros hay, cómo se ordena y se pagina.
  * Pura (sin React) para poder probarla: la pantalla solo la pinta.
@@ -72,7 +73,9 @@ const MEDIOS = new Set(["8", "8.5", "9", "9.5"]);
  */
 export function porSubir(row: VtuberCard, ahora?: string): boolean {
   const p = row.premium;
-  if (!p || esGradoDegradado(p.grade)) return false;
+  if (!p || esGradoDegradado(p.grade)) {
+    return false;
+  }
   return gradoSiguiente(p.grade) !== null && !mismoMes(p.gradedAt, ahora);
 }
 
@@ -82,7 +85,9 @@ export function perteneceAlFiltro(
   ahora?: string,
 ): boolean {
   const g = row.premium?.grade;
-  if (!g) return false;
+  if (!g) {
+    return false;
+  }
   switch (filtro) {
     case "todas":
       return true;
@@ -111,7 +116,9 @@ const limpio = (s: string) =>
 /** Búsqueda local en la lista: por nombre, slug, número de dex (con o sin `#`) o certificado `VTD-…`. */
 export function coincideConTexto(row: VtuberCard, texto: string): boolean {
   const t = limpio(texto.trim());
-  if (!t) return true;
+  if (!t) {
+    return true;
+  }
   const campos = [
     row.name,
     row.slug,
@@ -131,9 +138,13 @@ export function contarPorFiltro(
     FiltroPremium,
     number
   >;
-  for (const row of rows)
-    for (const f of FILTROS)
-      if (perteneceAlFiltro(row, f.id, ahora)) cuenta[f.id] += 1;
+  for (const row of rows) {
+    for (const f of FILTROS) {
+      if (perteneceAlFiltro(row, f.id, ahora)) {
+        cuenta[f.id] += 1;
+      }
+    }
+  }
   return cuenta;
 }
 

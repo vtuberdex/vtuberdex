@@ -27,6 +27,21 @@ describe("analizadores", () => {
     });
     expect(analizarJugadores("otra cosa")).toBeNull();
   });
+  it("jugadores: cifras pegadas a la frase y textos enormes", () => {
+    expect(analizarJugadores("12  OF A MAX OF\t 30")).toMatchObject({
+      enLinea: 12,
+      maximo: 30,
+    });
+    // Sin espacio a un lado no vale, y gana la primera aparición completa.
+    expect(analizarJugadores("1of a max of 2")).toBeNull();
+    expect(analizarJugadores("1 of a max of2")).toBeNull();
+    expect(
+      analizarJugadores("x of a max of 3, 4 of a max of 5"),
+    ).toMatchObject({ enLinea: 4, maximo: 5 });
+    const t0 = performance.now();
+    expect(analizarJugadores(`${"1".repeat(200_000)} of a max `)).toBeNull();
+    expect(performance.now() - t0).toBeLessThan(500);
+  });
   it("tps con colores y asterisco", () => {
     expect(analizarTps(TPS)).toEqual([20, 19.5, 20]);
     expect(analizarTps("nada")).toBeNull();
@@ -47,7 +62,9 @@ describe("obtenerPanorama", () => {
     const llamadas: string[] = [];
     const ejecutar = async (a: string) => {
       llamadas.push(a);
-      if (!ok) return { ok: false, status: 502 };
+      if (!ok) {
+        return { ok: false, status: 502 };
+      }
       return {
         ok: true,
         respuesta:

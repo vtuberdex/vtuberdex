@@ -1,6 +1,7 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paso 4: historia — frase, lore y datos de perfil con atajos. */
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   camposDerivados,
   fundirPerfil,
@@ -13,10 +14,15 @@ import { Field, ghostButton, inputClass } from "@/components/admin/ui";
 
 const LORE_MAX = 4000;
 
-export function StoryStep({ form, set }: StepProps) {
+export function StoryStep({ form, set }: Readonly<StepProps>) {
   const [modo, setModo] = useState<"manual" | "pegar">("manual");
   const [html, setHtml] = useState("");
   const [aviso, setAviso] = useState("");
+  // `set` llega estable del asistente (`useCallback`): el editor recibe siempre la misma función.
+  const cambiarPerfil = useCallback(
+    (next: StepProps["form"]["profile"]) => set("profile", next),
+    [set],
+  );
   const aplicar = () => {
     const nuevos = parsearDatos(html);
     if (nuevos.length === 0) {
@@ -28,10 +34,18 @@ export function StoryStep({ form, set }: StepProps) {
     const perfil = fundirPerfil(form.profile, nuevos);
     set("profile", perfil);
     const derivados = camposDerivados(nuevos);
-    if (derivados.birthday) set("birthday", derivados.birthday);
-    if (derivados.height) set("height", derivados.height);
-    if (derivados.hashtag) set("hashtag", derivados.hashtag);
-    if (derivados.favoriteColor) set("favoriteColor", derivados.favoriteColor);
+    if (derivados.birthday) {
+      set("birthday", derivados.birthday);
+    }
+    if (derivados.height) {
+      set("height", derivados.height);
+    }
+    if (derivados.hashtag) {
+      set("hashtag", derivados.hashtag);
+    }
+    if (derivados.favoriteColor) {
+      set("favoriteColor", derivados.favoriteColor);
+    }
     setAviso(
       `Se aplicaron ${nuevos.length} datos. Revísalos en la pestaña «Manual».`,
     );
@@ -88,9 +102,7 @@ export function StoryStep({ form, set }: StepProps) {
           ))}
         </div>
         {aviso && (
-          <p role="status" className="text-sm text-dex-muted">
-            {aviso}
-          </p>
+          <output className="block text-sm text-dex-muted">{aviso}</output>
         )}
         {modo === "pegar" && (
           <div className="space-y-2">
@@ -138,10 +150,7 @@ export function StoryStep({ form, set }: StepProps) {
           </ul>
         )}
         {modo === "manual" && (
-          <ProfileEditor
-            items={form.profile}
-            onChange={(next) => set("profile", next)}
-          />
+          <ProfileEditor items={form.profile} onChange={cambiarPerfil} />
         )}
       </section>
     </div>

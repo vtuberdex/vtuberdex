@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Carga de imágenes del catálogo con manejo de fallo, memoizada por URL.
  *
@@ -20,7 +21,9 @@ const LIMITE_IMAGENES = 96;
 const memoria = new Map<string, Promise<HTMLImageElement | null>>();
 
 export function loadImage(src: string): Promise<HTMLImageElement | null> {
-  if (!src) return Promise.resolve(null);
+  if (!src) {
+    return Promise.resolve(null);
+  }
   const hit = memoria.get(src);
   if (hit) {
     // LRU: lo recién usado va al final.
@@ -42,7 +45,9 @@ export function loadImage(src: string): Promise<HTMLImageElement | null> {
   memoria.set(src, promesa);
   while (memoria.size > LIMITE_IMAGENES) {
     const masVieja = memoria.keys().next().value;
-    if (masVieja === undefined) break;
+    if (masVieja === undefined) {
+      break;
+    }
     memoria.delete(masVieja);
   }
   return promesa;

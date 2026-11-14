@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** Textos de los formularios públicos (piezas compartidas, baja y verificación) en es / en / ja. Mismas claves en los tres. */
 export const formulariosEs = {
   "form.confidencial": "confidencial · no se publica",

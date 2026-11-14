@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/minecraft-admin/sesion` — canjea el enlace mágico y abre (o cierra) la sesión.
  *
@@ -26,9 +27,13 @@ export async function GET(request) {
 export async function POST(request) {
   const cuerpo = await request.json().catch(() => null);
   const canje = canjearEnlace(cuerpo?.token);
-  if (!canje.ok) return respuestaJson(canje.cuerpo, canje.status);
+  if (!canje.ok) {
+    return respuestaJson(canje.cuerpo, canje.status);
+  }
   const token = crearSesionMantenedor({ email: canje.sesion.email });
-  if (!token) return respuestaJson({ error: "sesion_no_creada" }, 500);
+  if (!token) {
+    return respuestaJson({ error: "sesion_no_creada" }, 500);
+  }
   const seguro = request.headers.get("x-forwarded-proto") === "https";
   return Response.json(
     { ok: true, email: canje.sesion.email, role: canje.sesion.role },

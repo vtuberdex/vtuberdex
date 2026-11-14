@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Detalle: `/v/:slug` — carta 3D + ficha, stats, habilidades y redes.
  *
@@ -31,11 +32,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const card = await fichaPublica(slug).catch(() => null);
   // Sin ficha, `notFound()` de la página decide; aquí solo se evita publicar un título falso.
-  if (!card)
+  if (!card) {
     return {
       title: "VTuber no encontrado",
       robots: { index: false, follow: false },
     };
+  }
 
   const titulo = tituloDeFicha(card);
   const descripcion = descripcionDeFicha(card);
@@ -72,12 +74,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function DetailRoute({ params }: Props) {
+export default async function DetailRoute({ params }: Readonly<Props>) {
   const { slug } = await params;
   const card = await fichaPublica(slug).catch(() => undefined);
   // `undefined` = la lectura falló: se deja pasar al cliente (que pedirá la API) en vez de
   // devolver un 404 falso por una caída transitoria. `null` = la ficha de verdad no existe.
-  if (card === null) notFound();
+  if (card === null) {
+    notFound();
+  }
   return (
     <>
       {card ? (

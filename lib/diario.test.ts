@@ -32,9 +32,12 @@ let fallarInsertCambio = false;
 const clienteFalso = {
   execute: async (arg: string | { sql: string; args?: unknown[] }) => {
     const sql = typeof arg === "string" ? arg : arg.sql;
-    if (/MAX\(seq\)/i.test(sql)) consultasDeClave += 1;
-    if (fallarInsertCambio && /INSERT INTO cambio/i.test(sql))
+    if (/MAX\(seq\)/i.test(sql)) {
+      consultasDeClave += 1;
+    }
+    if (fallarInsertCambio && /INSERT INTO cambio/i.test(sql)) {
       throw new Error("SQLITE_IOERR simulado");
+    }
     const args = (typeof arg === "string" ? [] : (arg.args ?? [])) as never[];
     const sentencia = turso.prepare(sql);
     if (/^\s*(select|pragma)/i.test(sql)) {
@@ -157,9 +160,13 @@ describe("la clave del diario no se pregunta en cada lectura pública", () => {
   test("con TTL, una ráfaga de lecturas comparte UNA consulta; sin TTL, cada lectura pregunta", async () => {
     await diario.dbConDiario({ ttlMs: 60_000 });
     consultasDeClave = 0;
-    for (let i = 0; i < 5; i += 1) await diario.dbConDiario({ ttlMs: 60_000 });
+    for (let i = 0; i < 5; i += 1) {
+      await diario.dbConDiario({ ttlMs: 60_000 });
+    }
     expect(consultasDeClave).toBe(0);
-    for (let i = 0; i < 3; i += 1) await diario.dbConDiario();
+    for (let i = 0; i < 3; i += 1) {
+      await diario.dbConDiario();
+    }
     expect(consultasDeClave).toBe(3);
   });
 
@@ -559,7 +566,9 @@ describe("copias huérfanas en /tmp", () => {
         `vtuberdex-1-3.db`, // pid 1 (init): vivo
         "otra-cosa.db",
       ];
-      for (const n of nombres) fs.writeFileSync(path.join(dir, n), "");
+      for (const n of nombres) {
+        fs.writeFileSync(path.join(dir, n), "");
+      }
       expect(diario.barrerCopiasHuerfanas(dir)).toBe(3);
       expect(fs.readdirSync(dir).sort()).toEqual(
         [

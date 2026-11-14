@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * 利用規約の参考訳（日本語）。法的に有効なのは `terminos.ts` のスペイン語版です。ここでは条項の
  * `id` と各条項の段落数をスペイン語版と同じに保つ（`terminos-i18n.test.ts` が検査する）。

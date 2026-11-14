@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/minecraft` — guía para que un VTuber con ficha entre al servidor de Minecraft de VTuberDex.
  * Texto trilingüe en `lib/i18n/textos/minecraft.ts`; los metadatos del servidor quedan en español.

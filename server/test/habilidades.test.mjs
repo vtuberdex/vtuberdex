@@ -11,6 +11,7 @@ import {
   buscarEstado,
   tieneFaccion,
   estadosEntregados,
+  expandirEstados,
   htmlDeEfecto,
   textoPlanoDe,
   spanDeEstado,
@@ -357,4 +358,28 @@ test("una ficha de una subfacción puede usar los estados exclusivos de su facci
   assert.deepEqual(fortificacionBloqueada(["abyssal"], mapaGlovecaller), [
     "Fortificación",
   ]);
+});
+
+test("los recorridos de texto (sin regex cuadráticas) dan lo mismo que las regex que reemplazan", () => {
+  // `[[Estado]]`: un token sin cerrar, vacío o con `[` dentro se queda como estaba.
+  assert.equal(expandirEstados("[[Miedo]]"), s("Miedo"));
+  assert.equal(expandirEstados("a [[No existe]] b"), "a [[No existe]] b");
+  assert.equal(expandirEstados("[[]] [[Miedo] [[Miedo"), "[[]] [[Miedo] [[Miedo");
+  // Como la regex: el token va del primer `[[` al primer `]`, así que aquí el nombre es «[Miedo».
+  assert.equal(expandirEstados("[[[Miedo]]"), "[[[Miedo]]");
+  // Texto plano: fuera etiquetas (también `<>`), blancos antes de cada salto y `<` sueltos.
+  assert.equal(textoPlanoDe("Hola <b>mundo</b>  \t<br>fin  "), "Hola mundo\nfin");
+  assert.equal(textoPlanoDe("a<>b << c"), "ab  c");
+  // Enumeraciones: «obtienes A, B y C» entrega las tres; un verbo sin span detrás no cuenta.
+  assert.deepEqual(
+    estadosEntregados(`obtienes nada. Aplicas ${s("Miedo")}, ${s("Confusión")} y ${s("Sangrado")}`).map(
+      (e) => `${e.verbo}:${e.texto}`,
+    ),
+    ["aplicas:Miedo", "aplicas:Confusión", "aplicas:Sangrado"],
+  );
+  // Entradas patológicas para las regex de antes: deben acabar al instante.
+  const inicio = performance.now();
+  expandirEstados("[[".repeat(20000) + "]");
+  textoPlanoDe("<".repeat(20000) + " ".repeat(20000) + "x");
+  assert.ok(performance.now() - inicio < 1000);
 });

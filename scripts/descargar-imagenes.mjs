@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Baja a `data/mantenedor/` los reemplazos de imagen que solo existen en Turso.
  *
@@ -106,8 +107,10 @@ const { tiene: has, opcion: value } = leerOpciones(process.argv.slice(2), {
 export function leerEnvFile(ruta) {
   const env = {};
   for (const linea of fs.readFileSync(ruta, "utf8").split("\n")) {
-    const m = linea.match(/^([A-Z0-9_]+)="?(.*?)"?$/);
-    if (m) env[m[1]] = m[2];
+    const m = /^([A-Z0-9_]+)="?(.*?)"?$/.exec(linea);
+    if (m) {
+      env[m[1]] = m[2];
+    }
   }
   return env;
 }
@@ -138,8 +141,9 @@ export function motivoDestinoInseguro(destino) {
     },
   ];
   for (const { ruta, porque } of prohibidos) {
-    if (destino === ruta || destino.startsWith(`${ruta}${path.sep}`))
+    if (destino === ruta || destino.startsWith(`${ruta}${path.sep}`)) {
       return `${path.relative(ROOT, ruta)} (${porque})`;
+    }
   }
   return null;
 }
@@ -167,12 +171,15 @@ export function planDeDescarga(
     const abs = path.join(raiz, rel);
     const local = stat(abs);
     const size = Number(fila.size);
-    if (forzar)
+    if (forzar) {
       plan.push({ ...fila, abs, rel, size, motivo: "forzado", local });
-    else if (local === null)
+    } else if (local === null) {
       plan.push({ ...fila, abs, rel, size, motivo: "falta", local });
-    else if (local !== size)
+    } else if (local !== size) {
       plan.push({ ...fila, abs, rel, size, motivo: "distinto", local });
+    } else {
+      // mismo tamaño en disco que en Turso: al día, no se baja
+    }
   }
   return plan;
 }
@@ -216,41 +223,38 @@ function tamanoDe(abs) {
   }
 }
 
-async function main() {
-  const DRY_RUN = has("dry-run");
-  const FORZAR = has("forzar");
-  const SOLO_EDICIONES = has("solo-ediciones");
-  const SIN_EDICIONES = has("sin-ediciones");
-  const DESTINO = path.resolve(ROOT, value("destino", CARPETA_TEMPORAL));
-  const ENV_FILE = value("env-file", path.join(ROOT, ".env.dev.local"));
-  const EDICIONES = value(
-    "ediciones",
-    path.join(ROOT, "data", "mantenedor-ediciones.json"),
-  );
-
-  const inseguro = motivoDestinoInseguro(DESTINO);
-  if (inseguro) {
-    console.error(`✖ --destino no puede ser ${inseguro}:`);
-    console.error(
-      "  bajarlos ahí mete los reemplazos del mantenedor en el MANIFIESTO, y una corrida",
-    );
-    console.error(
-      "  de publish:images los subiría como origen=catalogo, destruyendo la imagen original",
-    );
-    console.error(
-      `  del catálogo en Turso. Usa la carpeta temporal (${CARPETA_TEMPORAL}).`,
-    );
-    process.exit(1);
+/** Sale con código 1 si `destino` es el árbol publicado (ver `motivoDestinoInseguro`). */
+function exigirDestinoSeguro(destino) {
+  const inseguro = motivoDestinoInseguro(destino);
+  if (!inseguro) {
+    return;
   }
+  console.error(`✖ --destino no puede ser ${inseguro}:`);
+  console.error(
+    "  bajarlos ahí mete los reemplazos del mantenedor en el MANIFIESTO, y una corrida",
+  );
+  console.error(
+    "  de publish:images los subiría como origen=catalogo, destruyendo la imagen original",
+  );
+  console.error(
+    `  del catálogo en Turso. Usa la carpeta temporal (${CARPETA_TEMPORAL}).`,
+  );
+  process.exit(1);
+}
 
+/**
+ * URL y token de Turso: opciones, entorno y, si falta algo, el `.env-file`. Sale con código 1
+ * sin URL. `deArchivo` dice de dónde salieron (para el log).
+ */
+function credencialesDeTurso(envFile) {
   let url = value("turso-url", process.env.TURSO_DATABASE_URL ?? "");
   let token = value("turso-token", process.env.TURSO_AUTH_TOKEN ?? "");
   let deArchivo = null;
-  if ((!url || !token) && fs.existsSync(ENV_FILE)) {
-    const env = leerEnvFile(ENV_FILE);
+  if ((!url || !token) && fs.existsSync(envFile)) {
+    const env = leerEnvFile(envFile);
     url = url || env.TURSO_DATABASE_URL || "";
     token = token || env.TURSO_AUTH_TOKEN || "";
-    deArchivo = ENV_FILE;
+    deArchivo = envFile;
   }
   if (!url) {
     console.error("✖ falta la URL de Turso.");
@@ -265,39 +269,152 @@ async function main() {
     );
     process.exit(1);
   }
-  console.log(
-    `[bajar] Turso: ${url}${deArchivo ? ` (credenciales de ${path.relative(ROOT, deArchivo)})` : " (del entorno)"}`,
+  return { url, token, deArchivo };
+}
+
+/**
+ * Las EDICIONES de texto viven SOLO en Turso y se pierden igual de fácil que las imágenes, así
+ * que se vuelcan en la misma pasada. Es un respaldo legible, no una fuente del build: lo que
+ * sirve la app son las filas de Turso.
+ */
+async function respaldarEdiciones(db, destino) {
+  const { rows: ediciones } = await db.execute(
+    "SELECT slug, campo, valor, actualizado FROM edicion ORDER BY slug, campo",
   );
+  fs.mkdirSync(path.dirname(destino), { recursive: true });
+  fs.writeFileSync(
+    destino,
+    `${JSON.stringify(
+      ediciones.map((r) => ({ ...r })),
+      null,
+      2,
+    )}\n`,
+  );
+  console.log(
+    `[bajar] ediciones respaldadas: ${ediciones.length} -> ${path.relative(ROOT, destino)}`,
+  );
+}
+
+/** Resumen del plan: cuántas al día, cuántas por bajar (y por qué) y una muestra. */
+function informarPlan(filas, plan) {
+  const porMotivo = plan.reduce(
+    (acc, p) => ({ ...acc, [p.motivo]: (acc[p.motivo] ?? 0) + 1 }),
+    {},
+  );
+  const totalMB = (plan.reduce((s, p) => s + p.size, 0) / 1024 / 1024).toFixed(
+    1,
+  );
+  console.log(
+    `[bajar] al día: ${filas.length - plan.length} | por bajar: ${plan.length} (${totalMB} MB) ${JSON.stringify(porMotivo)}`,
+  );
+  for (const p of plan.slice(0, 30)) {
+    console.log(
+      `   · ${p.kind}/${p.slug} ${p.motivo} (${p.local ?? "—"} -> ${p.size})`,
+    );
+  }
+  if (plan.length > 30) {
+    console.log(`   · ... y ${plan.length - 30} más`);
+  }
+}
+
+/**
+ * Baja UNA imagen del plan. Una fila por imagen: los bytes viajan en la respuesta, así que
+ * pedirlos de una en una mantiene la memoria acotada y hace que un fallo aislado no tire el lote
+ * entero. Como la decisión ya está tomada por tamaño, lo que falla se reintenta al volver a
+ * correrlo. Devuelve el motivo del fallo, o `null` si se escribió.
+ */
+async function bajarUna(db, p) {
+  const { rows: contenido } = await db.execute({
+    sql: "SELECT bytes FROM asset_remoto WHERE slug = ? AND kind = ? AND origen = ?",
+    args: [p.slug, p.kind, ORIGEN_QUE_SE_BAJA],
+  });
+  if (contenido.length === 0 || contenido[0].bytes == null) {
+    return "la fila desapareció entre la lista y la descarga";
+  }
+  const bytes = Buffer.from(contenido[0].bytes);
+  fs.mkdirSync(path.dirname(p.abs), { recursive: true });
+  fs.writeFileSync(p.abs, bytes);
+  return null;
+}
+
+/** Ejecuta el plan con progreso cada 15; devuelve `{ escritas, fallos }`. */
+async function bajarPlan(db, plan) {
+  let escritas = 0;
+  const fallos = [];
+  for (const [i, p] of plan.entries()) {
+    try {
+      const fallo = await bajarUna(db, p);
+      if (fallo) {
+        fallos.push({ rel: p.rel, error: fallo });
+      } else {
+        escritas++;
+      }
+    } catch (error) {
+      fallos.push({ rel: p.rel, error: error.message });
+    }
+    if ((i + 1) % 15 === 0 || i + 1 === plan.length) {
+      console.log(
+        `[bajar] ${i + 1}/${plan.length} (escritas ${escritas}, fallos ${fallos.length})`,
+      );
+    }
+  }
+  return { escritas, fallos };
+}
+
+/**
+ * Verificación final leyendo el DISCO, no lo que se creía haber escrito: el tamaño de cada
+ * archivo del índice contra el de su fila en Turso. Es lo que delata una escritura truncada.
+ */
+function verificarEnDisco(indice, destino) {
+  let verificadas = 0;
+  const discrepantes = [];
+  for (const fila of indice) {
+    const ext = EXTENSION_DE_CARPETA[fila.kind] ?? "webp";
+    const abs = path.join(destino, fila.kind, `${fila.slug}.${ext}`);
+    const local = tamanoDe(abs);
+    if (local === fila.size) {
+      verificadas++;
+    } else {
+      discrepantes.push({
+        rel: `${fila.kind}/${fila.slug}`,
+        local,
+        turso: fila.size,
+      });
+    }
+  }
+  return { verificadas, discrepantes };
+}
+
+async function main() {
+  const DRY_RUN = has("dry-run");
+  const FORZAR = has("forzar");
+  const SOLO_EDICIONES = has("solo-ediciones");
+  const SIN_EDICIONES = has("sin-ediciones");
+  const DESTINO = path.resolve(ROOT, value("destino", CARPETA_TEMPORAL));
+  const ENV_FILE = value("env-file", path.join(ROOT, ".env.dev.local"));
+  const EDICIONES = value(
+    "ediciones",
+    path.join(ROOT, "data", "mantenedor-ediciones.json"),
+  );
+
+  exigirDestinoSeguro(DESTINO);
+  const { url, token, deArchivo } = credencialesDeTurso(ENV_FILE);
+  const origenCredenciales = deArchivo
+    ? ` (credenciales de ${path.relative(ROOT, deArchivo)})`
+    : " (del entorno)";
+  console.log(`[bajar] Turso: ${url}${origenCredenciales}`);
   console.log(
     `[bajar] destino: ${path.relative(ROOT, DESTINO)} (temporal, fuera del artefacto desplegable)`,
   );
 
   const db = createClient({ url, authToken: token || undefined });
 
-  /**
-   * Las EDICIONES de texto viven SOLO en Turso y se pierden igual de fácil que las imágenes, así
-   * que se vuelcan en la misma pasada. Es un respaldo legible, no una fuente del build: lo que
-   * sirve la app son las filas de Turso.
-   */
   if (!SIN_EDICIONES) {
-    const { rows } = await db.execute(
-      "SELECT slug, campo, valor, actualizado FROM edicion ORDER BY slug, campo",
-    );
-    fs.mkdirSync(path.dirname(EDICIONES), { recursive: true });
-    fs.writeFileSync(
-      EDICIONES,
-      `${JSON.stringify(
-        rows.map((r) => ({ ...r })),
-        null,
-        2,
-      )}\n`,
-    );
-    console.log(
-      `[bajar] ediciones respaldadas: ${rows.length} -> ${path.relative(ROOT, EDICIONES)}`,
-    );
+    await respaldarEdiciones(db, EDICIONES);
   }
+  // `close()` del cliente de libsql es síncrono: no devuelve promesa que esperar.
   if (SOLO_EDICIONES) {
-    await db.close();
+    db.close();
     return;
   }
 
@@ -324,62 +441,15 @@ async function main() {
     raiz: DESTINO,
     forzar: FORZAR,
   });
-  const porMotivo = plan.reduce(
-    (acc, p) => ({ ...acc, [p.motivo]: (acc[p.motivo] ?? 0) + 1 }),
-    {},
-  );
-  const totalMB = (plan.reduce((s, p) => s + p.size, 0) / 1024 / 1024).toFixed(
-    1,
-  );
-  console.log(
-    `[bajar] al día: ${rows.length - plan.length} | por bajar: ${plan.length} (${totalMB} MB) ${JSON.stringify(porMotivo)}`,
-  );
-  for (const p of plan.slice(0, 30)) {
-    console.log(
-      `   · ${p.kind}/${p.slug} ${p.motivo} (${p.local ?? "—"} -> ${p.size})`,
-    );
-  }
-  if (plan.length > 30) console.log(`   · ... y ${plan.length - 30} más`);
+  informarPlan(rows, plan);
 
   if (DRY_RUN) {
     console.log("[bajar] dry-run: no se escribe nada");
-    await db.close();
+    db.close();
     return;
   }
 
-  let escritas = 0;
-  const fallos = [];
-  for (const [i, p] of plan.entries()) {
-    try {
-      /**
-       * Una fila por imagen: los bytes viajan en la respuesta, así que pedirlos de una en una
-       * mantiene la memoria acotada y hace que un fallo aislado no tire el lote entero. Como la
-       * decisión ya está tomada por tamaño, lo que falla se reintenta al volver a correrlo.
-       */
-      const { rows: contenido } = await db.execute({
-        sql: "SELECT bytes FROM asset_remoto WHERE slug = ? AND kind = ? AND origen = ?",
-        args: [p.slug, p.kind, ORIGEN_QUE_SE_BAJA],
-      });
-      if (contenido.length === 0 || contenido[0].bytes == null) {
-        fallos.push({
-          rel: p.rel,
-          error: "la fila desapareció entre la lista y la descarga",
-        });
-        continue;
-      }
-      const bytes = Buffer.from(contenido[0].bytes);
-      fs.mkdirSync(path.dirname(p.abs), { recursive: true });
-      fs.writeFileSync(p.abs, bytes);
-      escritas++;
-    } catch (error) {
-      fallos.push({ rel: p.rel, error: error.message });
-    }
-    if ((i + 1) % 15 === 0 || i + 1 === plan.length) {
-      console.log(
-        `[bajar] ${i + 1}/${plan.length} (escritas ${escritas}, fallos ${fallos.length})`,
-      );
-    }
-  }
+  const { escritas, fallos } = await bajarPlan(db, plan);
 
   /**
    * El índice se escribe SIEMPRE, también en una corrida que no bajó nada: es la información que
@@ -394,26 +464,9 @@ async function main() {
     `${JSON.stringify(indice, null, 2)}\n`,
   );
 
-  /**
-   * Verificación final leyendo el DISCO, no lo que se creía haber escrito: el tamaño de cada
-   * archivo del índice contra el de su fila en Turso. Es lo que delata una escritura truncada.
-   */
-  let verificadas = 0;
-  const discrepantes = [];
-  for (const fila of indice) {
-    const ext = EXTENSION_DE_CARPETA[fila.kind] ?? "webp";
-    const abs = path.join(DESTINO, fila.kind, `${fila.slug}.${ext}`);
-    const local = tamanoDe(abs);
-    if (local === fila.size) verificadas++;
-    else
-      discrepantes.push({
-        rel: `${fila.kind}/${fila.slug}`,
-        local,
-        turso: fila.size,
-      });
-  }
+  const { verificadas, discrepantes } = verificarEnDisco(indice, DESTINO);
 
-  await db.close();
+  db.close();
 
   console.log(`\n[bajar] escritas: ${escritas} | fallos: ${fallos.length}`);
   console.log(
@@ -422,9 +475,12 @@ async function main() {
   console.log(
     `[bajar] verificación en disco: ${verificadas}/${indice.length} con el tamaño de Turso`,
   );
-  for (const d of discrepantes.slice(0, 10))
+  for (const d of discrepantes.slice(0, 10)) {
     console.log(`   ✖ ${d.rel}: disco ${d.local} vs Turso ${d.turso}`);
-  for (const f of fallos.slice(0, 10)) console.log(`   ✖ ${f.rel}: ${f.error}`);
+  }
+  for (const f of fallos.slice(0, 10)) {
+    console.log(`   ✖ ${f.rel}: ${f.error}`);
+  }
   if (fallos.length > 0 || discrepantes.length > 0) {
     console.log("[bajar] vuelve a ejecutarlo: reintenta solo lo que falta");
     process.exitCode = 1;
@@ -432,8 +488,10 @@ async function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error("[bajar] ERROR", error.message);
     process.exit(1);
-  });
+  }
 }

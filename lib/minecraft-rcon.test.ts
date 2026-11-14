@@ -85,8 +85,11 @@ describe("acciones: no hay comando libre", () => {
     ]) {
       const r = comando("expulsar", { jugador });
       // «Steve » se recorta y es válido; el resto no.
-      if (jugador === "Steve ") expect(r.ok).toBe(true);
-      else expect(r.ok).toBe(false);
+      if (jugador === "Steve ") {
+        expect(r.ok).toBe(true);
+      } else {
+        expect(r.ok).toBe(false);
+      }
     }
   });
 
@@ -113,7 +116,9 @@ describe("acciones: no hay comando libre", () => {
       });
       const primero = String(r.comando ?? "").split(" ")[0];
       expect(["op", "deop"]).not.toContain(primero);
-      if (primero === "stop") expect(nombre).toBe("reiniciar");
+      if (primero === "stop") {
+        expect(nombre).toBe("reiniciar");
+      }
     }
   });
 
@@ -160,7 +165,9 @@ function falsoServidor(responder: (b: Buffer) => Buffer | null) {
     s.write = (b: Buffer) => {
       enviados.push(b);
       const r = responder(b);
-      if (r) queueMicrotask(() => s.emit("data", r));
+      if (r) {
+        queueMicrotask(() => s.emit("data", r));
+      }
       return true;
     };
     queueMicrotask(() => s.emit("connect"));

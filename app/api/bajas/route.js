@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `POST /api/bajas` — el formulario PÚBLICO de baja. Exige los mismos términos que la
  * inscripción. Deja una solicitud `pendiente`; nada del catálogo cambia hasta que el mantenedor

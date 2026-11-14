@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/inscripciones/imagen` — el avatar y el logo del formulario de inscripcion, subidos en lugar de pegados
  * como enlace. `POST ?tipo=character|logo` sube un WebP; `GET ?id=` devuelve la vista previa a quien la
