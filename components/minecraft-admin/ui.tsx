@@ -68,11 +68,11 @@ export function Pildora({
   tono = "neutro",
   children,
   conPunto = true,
-}: {
+}: Readonly<{
   tono?: Tono;
   children: ReactNode;
   conPunto?: boolean;
-}) {
+}>) {
   return (
     <span
       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${TONO_PILDORA[tono]}`}
@@ -95,13 +95,13 @@ export function Seccion({
   acciones,
   children,
   className = "",
-}: {
+}: Readonly<{
   titulo: string;
   bajada?: string;
   acciones?: ReactNode;
   children: ReactNode;
   className?: string;
-}) {
+}>) {
   return (
     <section className={`${CLASE_TARJETA} space-y-4 ${className}`}>
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -120,10 +120,10 @@ export function Seccion({
 export function Tendencia({
   valores,
   tono = "acento",
-}: {
+}: Readonly<{
   valores: number[];
   tono?: Tono;
-}) {
+}>) {
   if (valores.length < 2) {
     return <div className="h-9" aria-hidden="true" />;
   }
@@ -163,13 +163,13 @@ export function Indicador({
   detalle,
   tono = "neutro",
   valores,
-}: {
+}: Readonly<{
   titulo: string;
   valor: string;
   detalle?: string;
   tono?: Tono;
   valores?: number[];
-}) {
+}>) {
   return (
     <div className={`${CLASE_TARJETA} !p-4`}>
       <p className="text-xs uppercase tracking-wider text-dex-muted">

@@ -57,7 +57,7 @@ export function SeccionExperiencia() {
     const q = texto.trim();
     if (q.length < 2) {
       setResultados([]);
-      return;
+      return undefined;
     }
     const t = setTimeout(async () => {
       try {
@@ -101,7 +101,7 @@ export function SeccionExperiencia() {
     setTexto("");
   };
 
-  const enviar = async (evento: React.FormEvent) => {
+  const enviar = async (evento: React.SubmitEvent) => {
     evento.preventDefault();
     if (!ficha) {
       return;

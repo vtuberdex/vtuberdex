@@ -220,7 +220,7 @@ function numerar(
       punto,
       numero: i + 1,
     }));
-    const caras = crudas.map((c) => {
+    const carasDelD4 = crudas.map((c) => {
       const opuesto = verticesNumerados.find(
         (v) => !c.vertices.some((p) => p.distanceToSquared(v.punto) < 1e-10),
       )!;
@@ -230,7 +230,7 @@ function numerar(
         numero: opuesto.numero,
       };
     });
-    return { tipo, caras, verticesNumerados };
+    return { tipo, caras: carasDelD4, verticesNumerados };
   }
   const numeros = new Array<number>(crudas.length).fill(0);
   let siguiente = 1;
@@ -311,8 +311,8 @@ export function uvEnCara(
  */
 export function geometriaBiselada(tipo: TipoDeDado): BufferGeometry {
   const forma = formaDe(tipo);
-  const puntos = forma.caras.flatMap((c) =>
-    c.vertices.map((p) => c.centro.clone().lerp(p, 1 - DADOS.bisel)),
+  const puntos = forma.caras.flatMap((cara) =>
+    cara.vertices.map((p) => cara.centro.clone().lerp(p, 1 - DADOS.bisel)),
   );
   const convexa = new ConvexGeometry(puntos);
   const pos = convexa.getAttribute("position");
@@ -407,7 +407,8 @@ export function tirar(
   aleatorio: (buffer: Uint32Array) => Uint32Array = (b) =>
     crypto.getRandomValues(b),
 ): number {
-  const limite = Math.floor(0x1_0000_0000 / caras) * caras;
+  // 2^32: cuántos valores distintos da un Uint32.
+  const limite = Math.floor(2 ** 32 / caras) * caras;
   const buffer = new Uint32Array(1);
   for (;;) {
     const x = aleatorio(buffer)[0];

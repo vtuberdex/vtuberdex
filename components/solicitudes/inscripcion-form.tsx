@@ -64,6 +64,120 @@ const ESPERA_GUARDADO_MS = 1200;
 const TOTAL_PASOS = 5;
 type Paso = 1 | 2 | 3 | 4 | 5;
 
+type EstadoBorrador = {
+  estado: "guardando" | "guardado" | "error";
+  hora?: string;
+};
+
+/** El borrador guarda el paso en que se quedó, pero nunca antes del 3 (los dos primeros son el correo). */
+function pasoDelBorrador(paso: Paso): 3 | 4 | 5 {
+  if (paso >= 5) {
+    return 5;
+  }
+  return paso >= 4 ? 4 : 3;
+}
+
+/** «Volver» existe en el paso del código (para corregir el correo) y desde el 4; en el 3 no se vuelve al código ya gastado. */
+const tieneVolver = (paso: Paso) => paso === 2 || paso >= 4;
+
+/** La línea bajo la barra de pasos: guardando, guardado (con hora si la hay) o el fallo. Solo desde el paso 3. */
+function EstadoDelBorrador({
+  paso,
+  borrador,
+}: Readonly<{ paso: Paso; borrador: EstadoBorrador | null }>) {
+  const { t } = useI18n();
+  if (paso < 3 || !borrador) {
+    return null;
+  }
+  let texto = t("ins.borradorError");
+  if (borrador.estado === "guardando") {
+    texto = t("ins.borradorGuardando");
+  } else if (borrador.estado === "guardado") {
+    texto = borrador.hora
+      ? t("ins.borradorGuardadoHora", { hora: borrador.hora })
+      : t("ins.borradorGuardado");
+  }
+  return (
+    <p
+      className="mt-2 text-xs text-dex-muted"
+      data-testid="inscripcion-borrador"
+      aria-live="polite"
+    >
+      {texto}
+    </p>
+  );
+}
+
+/** «Recuperamos tu borrador del …»: solo desde el paso 3, cuando el código trajo un borrador. */
+function AvisoRecuperado({
+  paso,
+  fecha,
+}: Readonly<{ paso: Paso; fecha: string | null }>) {
+  const { t } = useI18n();
+  if (!fecha || paso < 3) {
+    return null;
+  }
+  return (
+    <Aviso tipo="ok">
+      <strong>{t("ins.recuperadoTitulo")}</strong>
+      {t("ins.recuperadoTexto", { fecha })}
+    </Aviso>
+  );
+}
+
+/** Un faltante de la lista: lleva el foco a su campo. */
+function BotonDeFalta({
+  campo,
+  texto,
+  alIr,
+}: Readonly<{ campo: string; texto: string; alIr: (campo: string) => void }>) {
+  const ir = () => alIr(campo);
+  return (
+    <li>
+      <button
+        type="button"
+        className="text-left underline underline-offset-2"
+        onClick={ir}
+      >
+        {texto}
+      </button>
+    </li>
+  );
+}
+
+/** La lista completa de lo que falta en el paso (nada si está todo). */
+function ListaDeFaltas({
+  faltas,
+  textoDe,
+  alIr,
+}: Readonly<{
+  faltas: Falta[];
+  textoDe: (f: Falta) => string;
+  alIr: (campo: string) => void;
+}>) {
+  const { t } = useI18n();
+  if (faltas.length === 0) {
+    return null;
+  }
+  return (
+    <div data-testid="inscripcion-faltas">
+      <Aviso tipo="error">
+        <p className="font-bold">{t("ins.falta.titulo")}</p>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          {faltas.map((f) => (
+            <BotonDeFalta
+              key={f.campo}
+              campo={f.campo}
+              texto={textoDe(f)}
+              alIr={alIr}
+            />
+          ))}
+        </ul>
+      </Aviso>
+    </div>
+  );
+}
+
 export function InscripcionForm() {
   const { t, locale } = useI18n();
   const { paises, idiomas } = useOpcionesFicha();
@@ -92,10 +206,7 @@ export function InscripcionForm() {
   const { enviando, error, setError, intentar } = useEnvio();
   const [enviada, setEnviada] = useState(false);
   /** Estado del borrador: lo que se le muestra a la persona. */
-  const [borrador, setBorrador] = useState<{
-    estado: "guardando" | "guardado" | "error";
-    hora?: string;
-  } | null>(null);
+  const [borrador, setBorrador] = useState<EstadoBorrador | null>(null);
   const [recuperado, setRecuperado] = useState<string | null>(null);
 
   const faltas: Falta[] =
@@ -147,7 +258,7 @@ export function InscripcionForm() {
     zodiac,
     ...perfil,
     socials,
-    paso: (paso >= 5 ? 5 : paso >= 4 ? 4 : 3) as 3 | 4 | 5,
+    paso: pasoDelBorrador(paso),
   });
 
   // Autoguardado: mientras hay sesión y se está rellenando (pasos 3 a 5), se guarda un instante después de
@@ -155,7 +266,7 @@ export function InscripcionForm() {
   const huella = JSON.stringify(instantanea());
   useEffect(() => {
     if (!sesion || paso < 3 || enviada) {
-      return;
+      return undefined;
     }
     setBorrador({ estado: "guardando" });
     const espera = setTimeout(() => {
@@ -203,7 +314,7 @@ export function InscripcionForm() {
     );
   };
 
-  const enviar = async (evento: React.FormEvent) => {
+  const enviar = async (evento: React.SubmitEvent) => {
     evento.preventDefault();
     setError(null);
     // La validación es nuestra (el formulario va `noValidate`): la burbuja nativa señala un solo campo y no
@@ -283,6 +394,19 @@ export function InscripcionForm() {
     );
   };
 
+  const cambiarNombre = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setName(e.target.value);
+  const cambiarColor = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setThemeColor(e.target.value);
+  const cambiarFrase = (e: React.ChangeEvent<HTMLInputElement>) =>
+    setPhrase(e.target.value);
+  const cambiarLore = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
+    setCardText(e.target.value);
+  const volver = () => {
+    setError(null);
+    setPaso((paso - 1) as Paso);
+  };
+
   if (enviada) {
     return (
       <FichaRecibida
@@ -307,28 +431,10 @@ export function InscripcionForm() {
         total={TOTAL_PASOS}
         titulo={t(`ins.titulo.${paso}` as Clave)}
       >
-        {paso >= 3 && borrador && (
-          <p
-            className="mt-2 text-xs text-dex-muted"
-            data-testid="inscripcion-borrador"
-            aria-live="polite"
-          >
-            {borrador.estado === "guardando" && t("ins.borradorGuardando")}
-            {borrador.estado === "guardado" &&
-              (borrador.hora
-                ? t("ins.borradorGuardadoHora", { hora: borrador.hora })
-                : t("ins.borradorGuardado"))}
-            {borrador.estado === "error" && t("ins.borradorError")}
-          </p>
-        )}
+        <EstadoDelBorrador paso={paso} borrador={borrador} />
       </BarraDePasos>
 
-      {paso >= 3 && recuperado && (
-        <Aviso tipo="ok">
-          <strong>{t("ins.recuperadoTitulo")}</strong>
-          {t("ins.recuperadoTexto", { fecha: recuperado })}
-        </Aviso>
-      )}
+      <AvisoRecuperado paso={paso} fecha={recuperado} />
 
       {paso === 1 && (
         <PasoCorreo
@@ -349,7 +455,7 @@ export function InscripcionForm() {
               aria-invalid={malo("name")}
               maxLength={160}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={cambiarNombre}
             />
           </Campo>
         </PasoCorreo>
@@ -376,7 +482,7 @@ export function InscripcionForm() {
               aria-label={t("ficha.colorMarca")}
               className="mt-1 h-10 w-full cursor-pointer rounded-lg border border-dex-line bg-dex-void p-1 sm:w-48"
               value={themeColor || "#5eead4"}
-              onChange={(e) => setThemeColor(e.target.value)}
+              onChange={cambiarColor}
             />
           </Campo>
           <SelectorIdiomas
@@ -398,7 +504,7 @@ export function InscripcionForm() {
               className={claseInput}
               maxLength={600}
               value={phrase}
-              onChange={(e) => setPhrase(e.target.value)}
+              onChange={cambiarFrase}
             />
           </Campo>
           <EditorRedes
@@ -492,7 +598,7 @@ export function InscripcionForm() {
                 aria-invalid={malo("cardText")}
                 maxLength={4000}
                 value={cardText}
-                onChange={(e) => setCardText(e.target.value)}
+                onChange={cambiarLore}
               />
             </Campo>
           </fieldset>
@@ -529,37 +635,15 @@ export function InscripcionForm() {
         </>
       )}
 
-      {faltas.length > 0 && (
-        <div data-testid="inscripcion-faltas">
-          <Aviso tipo="error">
-            <p className="font-bold">{t("ins.falta.titulo")}</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              {faltas.map((f) => (
-                <li key={f.campo}>
-                  <button
-                    type="button"
-                    className="text-left underline underline-offset-2"
-                    onClick={() => irAlCampo(f.campo)}
-                  >
-                    {textoDeFalta(f)}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Aviso>
-        </div>
-      )}
+      <ListaDeFaltas faltas={faltas} textoDe={textoDeFalta} alIr={irAlCampo} />
 
       <BotoneraPasos
         paso={paso}
         total={TOTAL_PASOS}
         error={error}
         enviando={enviando}
-        conVolver={paso === 2 || paso >= 4}
-        alVolver={() => {
-          setError(null);
-          setPaso((paso - 1) as Paso);
-        }}
+        conVolver={tieneVolver(paso)}
+        alVolver={volver}
         textoEnviar={t("ins.enviar")}
       />
     </form>

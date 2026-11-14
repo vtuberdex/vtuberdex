@@ -45,7 +45,7 @@ export function BajaForm() {
     null,
   );
 
-  const pedirCodigo = async (evento: React.FormEvent) => {
+  const pedirCodigo = async (evento: React.SubmitEvent) => {
     evento.preventDefault();
     setError(null);
     if (!acepta) {
@@ -63,24 +63,24 @@ export function BajaForm() {
         website,
       });
       setPaso(2);
-    } catch (causa) {
+    } catch (error_) {
       setError(
-        causa instanceof ApiError ? causa.message : t("baja.errorEnviar"),
+        error_ instanceof ApiError ? error_.message : t("baja.errorEnviar"),
       );
     } finally {
       setEnviando(false);
     }
   };
 
-  const confirmar = async (evento: React.FormEvent) => {
+  const confirmar = async (evento: React.SubmitEvent) => {
     evento.preventDefault();
     setError(null);
     setEnviando(true);
     try {
       setResultado(await api.verificarSolicitud(codigo.trim()));
-    } catch (causa) {
+    } catch (error_) {
       setError(
-        causa instanceof ApiError ? causa.message : t("baja.errorConfirmar"),
+        error_ instanceof ApiError ? error_.message : t("baja.errorConfirmar"),
       );
     } finally {
       setEnviando(false);

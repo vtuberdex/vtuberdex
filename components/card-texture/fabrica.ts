@@ -32,7 +32,6 @@
  */
 import type { VtuberCard } from "@/lib/types";
 import { TEXTURAS } from "@/components/card3d-config";
-import { CARD_TEXTURE_FULL_WIDTH } from "./dimensiones";
 import { drawCardLayers } from "./componer";
 import { esFichaDeteriorada, gradoDeDibujo } from "@/lib/premium";
 import {
@@ -523,7 +522,7 @@ export function pregenerar(
 }
 
 /** Ancho de textura por defecto cuando el plan no dice otra cosa. */
-export const ANCHO_POR_DEFECTO = CARD_TEXTURE_FULL_WIDTH;
+export { CARD_TEXTURE_FULL_WIDTH as ANCHO_POR_DEFECTO } from "./dimensiones";
 
 /** Para los tests: olvida la caché. */
 export function __reiniciarFabrica(): void {

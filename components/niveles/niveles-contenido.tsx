@@ -36,10 +36,10 @@ const NIVELES_EN_TABLA = 10;
 function Seccion({
   titulo,
   children,
-}: {
+}: Readonly<{
   titulo: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <section className="rounded-2xl border border-dex-line bg-dex-panel/60 p-5">
       <h2 className="text-lg font-bold text-dex-ink">{titulo}</h2>

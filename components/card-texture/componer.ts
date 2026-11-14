@@ -2,7 +2,6 @@
 /**
  * Ensambla las 7 capas y publica la info de layout medida.
  */
-import { chipDeNivel } from "./chip-nivel";
 import {
   CARD_TEXTURE_WIDTH,
   CARD_TEXTURE_HEIGHT,
@@ -15,6 +14,8 @@ import { drawSurfaceLayer } from "./capa-superficie";
 import { drawCharacterLayer } from "./capa-personaje";
 import { drawTitleLayer } from "./capa-titulo";
 import { drawWordmarkLayer } from "./capa-wordmark";
+import { CHIP_ROW_HEIGHT, chipRowsFor } from "./capa-tags";
+import { stateChipsFor } from "./capa-textos";
 import {
   deteriorarArte,
   deteriorarCabecera,
@@ -22,6 +23,85 @@ import {
   planDeCarta,
   tarjetaParaTitulo,
 } from "./deterioro";
+
+/**
+ * LOGO: ESQUINA INFERIOR DERECHA. El área base (4.9% de la carta) se escala por
+ * `LOGO_SCALE_FACTOR`. Originalmente estaba al doble (factor 2); se redujo a 4/3
+ * (2/3 del tamaño anterior) para que no compita con el personaje.
+ */
+const LOGO_SCALE_FACTOR = 4 / 3;
+
+type LogoBox = { x: number; y: number; w: number; h: number };
+
+/** Caja del logo con el área fija de la marca, pegada a la esquina inferior derecha. */
+function logoBoxFor(
+  logo: CardDrawInfo["logo"],
+  { W, H, pad }: { W: number; H: number; pad: number },
+): LogoBox | null {
+  if (!logo) {
+    return null;
+  }
+  const LOGO_AREA = W * H * 0.049 * LOGO_SCALE_FACTOR * LOGO_SCALE_FACTOR;
+  const scaleLogo = Math.sqrt(LOGO_AREA / (logo.width * logo.height));
+  const dw = logo.width * scaleLogo;
+  const dh = logo.height * scaleLogo;
+  return { x: W - pad - dw, y: H - pad - dh, w: dw, h: dh };
+}
+
+/** Un contexto 2D de prueba solo para medir texto; sin DOM (servidor, worker) no hay y se mide 0. */
+function probeContext(): CanvasRenderingContext2D | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+  return document.createElement("canvas").getContext("2d");
+}
+
+/** Las filas de chips de tipos, medidas igual que las pinta `capa-tags.ts`. */
+function measureChipRows(typesList: string[], maxWidth: number): string[][] {
+  const probe = probeContext();
+  return probe ? chipRowsFor(probe, typesList, maxWidth) : [];
+}
+
+/** Dónde acaba el último chip de estado (se necesita para posicionar otras capas). */
+function stateChipsEndFor(stateChips: string[], pad: number): number {
+  if (stateChips.length === 0) {
+    return pad;
+  }
+  const probe = probeContext();
+  if (!probe) {
+    return pad;
+  }
+  probe.font = `700 24px ${FONT}`;
+  let stateX = pad;
+  for (const chip of stateChips) {
+    const chipW = probe.measureText(chip).width + 30;
+    stateX += chipW + 10;
+  }
+  return stateX - 10;
+}
+
+/** Estropea solo las capas recién dibujadas: las de `reutilizar` ya vienen estropeadas. */
+function deteriorarLoNuevo(
+  plan: NonNullable<ReturnType<typeof planDeCarta>>,
+  reutilizar: CardDrawInfo["reutilizar"],
+  capas: {
+    fondo: HTMLCanvasElement;
+    personaje: HTMLCanvasElement;
+    titulo: HTMLCanvasElement;
+    marca: HTMLCanvasElement;
+  },
+) {
+  if (!reutilizar?.background) {
+    deteriorarArte(capas.fondo, plan);
+  }
+  if (!reutilizar?.character) {
+    deteriorarArte(capas.personaje, plan);
+  }
+  if (!reutilizar?.title) {
+    deteriorarCabecera(capas.titulo, plan);
+  }
+  deteriorarCanto(capas.marca, plan);
+}
 
 /** Genera todas las capas y la información de layout medida. */
 export function drawCardLayers({
@@ -38,74 +118,13 @@ export function drawCardLayers({
   const headerBottom = headerTop + headerH;
   const barY = H - 140;
 
-  // Pre-medir logo.
-  /**
-   * LOGO: ESQUINA INFERIOR DERECHA. El área base (4.9% de la carta) se escala por
-   * `LOGO_SCALE_FACTOR`. Originalmente estaba al doble (factor 2); se redujo a 4/3
-   * (2/3 del tamaño anterior) para que no compita con el personaje.
-   */
-  const LOGO_SCALE_FACTOR = 4 / 3;
-  let logoBox: { x: number; y: number; w: number; h: number } | null = null;
-  const LOGO_AREA = W * H * 0.049 * LOGO_SCALE_FACTOR * LOGO_SCALE_FACTOR;
   const typesList = [...card.factions, ...card.groups].slice(0, 4);
-  const chipFont = `700 24px ${FONT}`;
-  const chipRows: string[][] = [];
-  if (typeof document !== "undefined") {
-    const probe = document.createElement("canvas").getContext("2d");
-    if (probe) {
-      probe.font = chipFont;
-      for (const type of typesList) {
-        const label = type.toUpperCase().slice(0, 22);
-        const tw = probe.measureText(label).width + 32;
-        const row = chipRows[chipRows.length - 1];
-        const used = row
-          ? row.reduce(
-              (sum, item) => sum + probe.measureText(item).width + 32 + 12,
-              0,
-            )
-          : 0;
-        if (row && used + tw <= W - pad * 2) {
-          row.push(label);
-        } else {
-          chipRows.push([label]);
-        }
-      }
-    }
-  }
-  const rowHeight = 54;
-  const typesHeight = chipRows.length * rowHeight + 12;
+  const chipRows = measureChipRows(typesList, W - pad * 2);
+  const typesHeight = chipRows.length * CHIP_ROW_HEIGHT + 12;
   const typesTop = barY - 22 - typesHeight;
-
-  if (logo) {
-    const scaleLogo = Math.sqrt(LOGO_AREA / (logo.width * logo.height));
-    const dw = logo.width * scaleLogo;
-    const dh = logo.height * scaleLogo;
-    const lx = W - pad - dw;
-    const ly = H - pad - dh;
-    logoBox = { x: lx, y: ly, w: dw, h: dh };
-  }
 
   // Límite inferior de la frase.
   const phraseBottomLimit = barY - 22 - typesHeight - 26;
-
-  // Extremo de los chips de estado (se necesita para posicionar otras capas).
-  const stateChips = [
-    chipDeNivel(card.level),
-    card.powerScore ? `PODER ${card.powerScore}` : null,
-    card.hasDetail ? "FICHA COMPLETA" : "SOLO FICHA BÁSICA",
-  ].filter(Boolean) as string[];
-  let stateX = pad;
-  if (typeof document !== "undefined" && stateChips.length > 0) {
-    const probe = document.createElement("canvas").getContext("2d");
-    if (probe) {
-      probe.font = `700 24px ${FONT}`;
-      for (const chip of stateChips) {
-        const chipW = probe.measureText(chip).width + 30;
-        stateX += chipW + 10;
-      }
-      stateX -= 10;
-    }
-  }
 
   const info: CardLayers["info"] = {
     W,
@@ -114,11 +133,11 @@ export function drawCardLayers({
     headerH,
     headerBottom,
     pad,
-    logoBox,
+    logoBox: logoBoxFor(logo, { W, H, pad }),
     typesTop,
     typesRight: pad,
     phraseBottom: phraseBottomLimit,
-    stateChipsEnd: stateChips.length > 0 ? stateX : pad,
+    stateChipsEnd: stateChipsEndFor(stateChipsFor(card), pad),
     barY,
   };
 
@@ -136,16 +155,7 @@ export function drawCardLayers({
     drawTitleLayer({ card: tarjetaParaTitulo(card), width });
   const marca = drawWordmarkLayer({ card, width });
   if (plan) {
-    if (!reutilizar?.background) {
-      deteriorarArte(fondo, plan);
-    }
-    if (!reutilizar?.character) {
-      deteriorarArte(personaje, plan);
-    }
-    if (!reutilizar?.title) {
-      deteriorarCabecera(titulo, plan);
-    }
-    deteriorarCanto(marca, plan);
+    deteriorarLoNuevo(plan, reutilizar, { fondo, personaje, titulo, marca });
   }
 
   return {
@@ -213,15 +223,15 @@ export function drawCardLayers({
 export function drawCardFront(input: CardDrawInfo): HTMLCanvasElement {
   const width = input.width ?? CARD_TEXTURE_WIDTH;
   const { canvas, ctx, W, H } = createLayer(width);
-  if (!ctx) {
-    return canvas;
+  // Sin contexto 2D se devuelve el lienzo vacío (mismo contrato que el resto de capas).
+  if (ctx) {
+    const layers = drawCardLayers({ ...input, width });
+    ctx.drawImage(layers.background, 0, 0, W, H);
+    ctx.drawImage(layers.character, 0, 0, W, H);
+    // (la capa `logo` se omite: va vacía; la marca la pinta el sticker del shader)
+    ctx.drawImage(layers.title, 0, 0, W, H);
+    // (las capas `texts` y `tags` se omiten: salieron de la carta 3D, van vacías)
+    ctx.drawImage(layers.wordmark, 0, 0, W, H);
   }
-  const layers = drawCardLayers({ ...input, width });
-  ctx.drawImage(layers.background, 0, 0, W, H);
-  ctx.drawImage(layers.character, 0, 0, W, H);
-  // (la capa `logo` se omite: va vacía; la marca la pinta el sticker del shader)
-  ctx.drawImage(layers.title, 0, 0, W, H);
-  // (las capas `texts` y `tags` se omiten: salieron de la carta 3D, van vacías)
-  ctx.drawImage(layers.wordmark, 0, 0, W, H);
   return canvas;
 }
