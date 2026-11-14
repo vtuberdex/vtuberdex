@@ -27,6 +27,71 @@ const STATUS_LABEL: Record<VtuberCard["status"], string> = {
 
 const MAX_RESULTADOS = 10;
 
+/** Lo que dice el contador: buscando, cuántas de cuántas (si se cortó en `MAX_RESULTADOS`) o el total. */
+function textoDelConteo(
+  buscando: boolean,
+  mostradas: number,
+  total: number,
+): string {
+  if (buscando) {
+    return "Buscando…";
+  }
+  if (total > mostradas) {
+    return `${mostradas} de ${total} fichas: afina la búsqueda para ver el resto`;
+  }
+  return `${total} ${total === 1 ? "ficha" : "fichas"}`;
+}
+
+type Fila = VtuberCard & { hasEmail?: boolean };
+
+function FilaDeFicha({
+  row,
+  seleccionada,
+  onOpen,
+}: Readonly<{
+  row: Fila;
+  seleccionada: boolean;
+  onOpen: (row: VtuberCard) => void;
+}>) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(row)}
+        className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${
+          seleccionada
+            ? "bg-dex-accent/15 text-dex-ink"
+            : "text-dex-muted hover:bg-white/5"
+        }`}
+      >
+        <span className="font-mono text-[11px] text-dex-muted">
+          #{String(row.dexNumber).padStart(3, "0")}
+        </span>
+        <span className="min-w-0 flex-1 truncate">{row.name}</span>
+        <span
+          className="font-mono text-[10px] text-dex-muted"
+          title="Completitud de la carta"
+          data-testid="row-percent"
+        >
+          {percentOfCard(row)}%
+        </span>
+        <span
+          className={`font-mono text-[10px] ${row.hasEmail ? "text-emerald-300" : "text-dex-muted/60"}`}
+          title={row.hasEmail ? "Tiene correo asociado" : "Sin correo asociado"}
+          data-testid="row-email"
+        >
+          {row.hasEmail ? "✉" : "–"}
+        </span>
+        {row.status !== "published" && (
+          <span className="rounded bg-amber-500/20 px-1.5 text-[10px] text-amber-200">
+            {STATUS_LABEL[row.status]}
+          </span>
+        )}
+      </button>
+    </li>
+  );
+}
+
 export function VtuberList({
   token,
   selectedId,
@@ -45,7 +110,7 @@ export function VtuberList({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<AdminStatusFilter>("all");
   const [correo, setCorreo] = useState<AdminCorreoFilter>("todos");
-  const [rows, setRows] = useState<(VtuberCard & { hasEmail?: boolean })[]>([]);
+  const [rows, setRows] = useState<Fila[]>([]);
   const [total, setTotal] = useState(0);
   /**
    * Hay una búsqueda en vuelo. Sin esto no se sabía si la búsqueda había empezado, y mientras llegaba la
@@ -61,7 +126,7 @@ export function VtuberList({
       setRows([]);
       setTotal(0);
       setBuscando(false);
-      return;
+      return undefined;
     }
     const controller = new AbortController();
     setBuscando(true);
@@ -139,57 +204,21 @@ export function VtuberList({
         </select>
       </label>
       {filtrando && (
-        <p
-          className="mt-3 text-xs text-dex-muted"
+        <output
+          className="mt-3 block text-xs text-dex-muted"
           data-testid="list-count"
-          role="status"
         >
-          {buscando
-            ? "Buscando…"
-            : total > rows.length
-              ? `${rows.length} de ${total} fichas: afina la búsqueda para ver el resto`
-              : `${total} ${total === 1 ? "ficha" : "fichas"}`}
-        </p>
+          {textoDelConteo(buscando, rows.length, total)}
+        </output>
       )}
       <ul className="dex-scroll mt-2 max-h-[60vh] space-y-1 overflow-y-auto">
         {rows.map((row) => (
-          <li key={row.id}>
-            <button
-              type="button"
-              onClick={() => onOpen(row)}
-              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${
-                selectedId === row.id
-                  ? "bg-dex-accent/15 text-dex-ink"
-                  : "text-dex-muted hover:bg-white/5"
-              }`}
-            >
-              <span className="font-mono text-[11px] text-dex-muted">
-                #{String(row.dexNumber).padStart(3, "0")}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{row.name}</span>
-              <span
-                className="font-mono text-[10px] text-dex-muted"
-                title="Completitud de la carta"
-                data-testid="row-percent"
-              >
-                {percentOfCard(row)}%
-              </span>
-              <span
-                className={`font-mono text-[10px] ${row.hasEmail ? "text-emerald-300" : "text-dex-muted/60"}`}
-                title={
-                  row.hasEmail ? "Tiene correo asociado" : "Sin correo asociado"
-                }
-                data-testid="row-email"
-              >
-                {row.hasEmail ? "✉" : "–"}
-              </span>
-              {row.status !== "published" && (
-                <span className="rounded bg-amber-500/20 px-1.5 text-[10px] text-amber-200">
-                  {STATUS_LABEL[row.status]}
-                </span>
-              )}
-            </button>
-          </li>
+          <FilaDeFicha
+            key={row.id}
+            row={row}
+            seleccionada={selectedId === row.id}
+            onOpen={onOpen}
+          />
         ))}
         {!filtrando && (
           <li
