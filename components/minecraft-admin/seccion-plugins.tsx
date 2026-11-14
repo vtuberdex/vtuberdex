@@ -487,33 +487,40 @@ export function SeccionPlugins({
   const plugins: PluginInfo[] = lista ?? pluginsDeRespaldo(respaldo);
   const actual = plugins.find((p) => p.archivo === elegido) ?? null;
 
-  const cambiarEstado = async (p: PluginInfo, habilitado: boolean) => {
-    setError(null);
-    setAviso(null);
-    setOcupado(true);
-    try {
-      const r = await fetch("/api/minecraft-admin/plugins/estado", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ archivo: p.archivo, habilitado }),
-      });
-      if (!r.ok) {
-        setError(await leerError(r, "no se pudo cambiar el estado"));
-        return;
+  // Manejadores en `useCallback`: van a la fila y a la ficha del plugin, y recreados en cada
+  // render obligaban a repintar la lista entera al teclear en la configuración.
+  const cambiarEstado = useCallback(
+    async (p: PluginInfo, habilitado: boolean) => {
+      setError(null);
+      setAviso(null);
+      setOcupado(true);
+      try {
+        const r = await fetch("/api/minecraft-admin/plugins/estado", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ archivo: p.archivo, habilitado }),
+        });
+        if (!r.ok) {
+          setError(await leerError(r, "no se pudo cambiar el estado"));
+          return;
+        }
+        setAviso(
+          `${p.nombre} quedó ${habilitado ? "habilitado" : "deshabilitado"}. Se aplica al reiniciar el servidor.`,
+        );
+        setElegido(null);
+        await cargar();
+      } finally {
+        setOcupado(false);
       }
-      setAviso(
-        `${p.nombre} quedó ${habilitado ? "habilitado" : "deshabilitado"}. Se aplica al reiniciar el servidor.`,
-      );
-      setElegido(null);
-      await cargar();
-    } finally {
-      setOcupado(false);
-    }
-  };
-  const cambiarEstadoSinEsperar = (p: PluginInfo, habilitado: boolean) =>
-    void cambiarEstado(p, habilitado);
+    },
+    [cargar],
+  );
+  const cambiarEstadoSinEsperar = useCallback(
+    (p: PluginInfo, habilitado: boolean) => void cambiarEstado(p, habilitado),
+    [cambiarEstado],
+  );
 
-  const abrirConfig = async (archivo: string) => {
+  const abrirConfig = useCallback(async (archivo: string) => {
     setArchivoConfig(archivo);
     setError(null);
     const q = new URLSearchParams({ tipo: "plugin", archivo });
@@ -525,47 +532,53 @@ export function SeccionPlugins({
       return;
     }
     setTexto(((await r.json()) as { contenido?: string }).contenido ?? "");
-  };
-  const abrirConfigSinEsperar = (archivo: string) => void abrirConfig(archivo);
+  }, []);
+  const abrirConfigSinEsperar = useCallback(
+    (archivo: string) => void abrirConfig(archivo),
+    [abrirConfig],
+  );
 
-  const guardarConfig = async (evento: React.SubmitEvent) => {
-    evento.preventDefault();
-    if (!archivoConfig) {
-      return;
-    }
-    setError(null);
-    setAviso(null);
-    setOcupado(true);
-    try {
-      const r = await fetch("/api/minecraft-admin/configuracion", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          tipo: "plugin",
-          archivo: archivoConfig,
-          contenido: texto,
-        }),
-      });
-      if (!r.ok) {
-        setError(await leerError(r, "no se pudo guardar"));
+  const guardarConfig = useCallback(
+    async (evento: React.SubmitEvent) => {
+      evento.preventDefault();
+      if (!archivoConfig) {
         return;
       }
-      setAviso(
-        `${archivoConfig} guardado. El plugin lo relee al reiniciar el servidor.`,
-      );
-    } finally {
-      setOcupado(false);
-    }
-  };
+      setError(null);
+      setAviso(null);
+      setOcupado(true);
+      try {
+        const r = await fetch("/api/minecraft-admin/configuracion", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            tipo: "plugin",
+            archivo: archivoConfig,
+            contenido: texto,
+          }),
+        });
+        if (!r.ok) {
+          setError(await leerError(r, "no se pudo guardar"));
+          return;
+        }
+        setAviso(
+          `${archivoConfig} guardado. El plugin lo relee al reiniciar el servidor.`,
+        );
+      } finally {
+        setOcupado(false);
+      }
+    },
+    [archivoConfig, texto],
+  );
 
-  const elegir = (p: PluginInfo) => {
+  const elegir = useCallback((p: PluginInfo) => {
     setElegido(p.archivo);
     setVista("info");
     setArchivoConfig(null);
     setTexto("");
     setError(null);
     setAviso(null);
-  };
+  }, []);
 
   return (
     <div className="space-y-6">
