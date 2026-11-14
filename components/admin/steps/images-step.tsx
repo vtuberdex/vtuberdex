@@ -21,14 +21,13 @@ export function ImagesStep({
         puede omitir y volver después.
       </p>
       {!detail.images.character && (
-        <p
-          role="status"
+        <output
           data-testid="no-character-warning"
-          className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-100"
+          className="block rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-100"
         >
           Sin imagen de personaje la carta se verá vacía. Puedes seguir, pero
           conviene subirla.
-        </p>
+        </output>
       )}
       <ImageManager token={token} detail={detail} onUpdated={onUpdated} />
     </div>
