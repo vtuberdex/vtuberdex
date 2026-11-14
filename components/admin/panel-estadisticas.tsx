@@ -220,6 +220,14 @@ function BarraDeEstados({ estados }: Readonly<{ estados: AdminStats["estados"] }
   );
 }
 
+/** Una columna vacía va del color de la línea; con fichas, deteriorada o premium. */
+function colorDeColumna(n: number, esDegradada: boolean): string {
+  if (n <= 0) {
+    return "var(--color-dex-line)";
+  }
+  return esDegradada ? COLOR.degradada : COLOR.principal;
+}
+
 /** Columnas por grado, de la baja (1) a la Black Label; las degradadas en otro color y con leyenda. */
 function ColumnasDeGrados({ grados }: Readonly<{ grados: AdminStats["grados"] }>) {
   const cuenta = new Map(grados.map((fila) => [fila.grade, fila.count]));
@@ -257,12 +265,7 @@ function ColumnasDeGrados({ grados }: Readonly<{ grados: AdminStats["grados"] }>
                 className="w-full rounded-t"
                 style={{
                   height: n > 0 ? `${Math.max(4, (n / max) * 100)}%` : 2,
-                  background:
-                    n > 0
-                      ? esDegradada
-                        ? COLOR.degradada
-                        : COLOR.principal
-                      : "var(--color-dex-line)",
+                  background: colorDeColumna(n, esDegradada),
                 }}
               />
               <span className="mt-1 font-mono text-[10px] text-dex-muted">
@@ -422,7 +425,7 @@ export function PanelEstadisticas({
         <Tarjeta titulo="Top 10 países">
           <Barras
             filas={stats.paises.map((p) => ({
-              label: `${p.flag ? `${p.flag} ` : ""}${p.name}`,
+              label: p.flag ? `${p.flag} ${p.name}` : p.name,
               value: p.count,
             }))}
           />

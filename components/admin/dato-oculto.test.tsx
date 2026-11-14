@@ -7,6 +7,7 @@ import {
   DatoOculto,
   MASCARA_CORREO,
   QuizasCorreo,
+  pareceCorreo,
 } from "@/components/admin/dato-oculto";
 
 describe("datos ocultos (streaming)", () => {
@@ -63,5 +64,34 @@ describe("datos ocultos (streaming)", () => {
       target: { value: "n" },
     });
     expect(screen.getByLabelText("Correo")).toHaveValue("n");
+  });
+});
+
+describe("pareceCorreo", () => {
+  const ANTIGUA = /\S+@\S+/;
+  it("dice lo mismo que la regex anterior", () => {
+    const casos = [
+      "ana@ejemplo.com",
+      "admin",
+      "@ana",
+      "ana@",
+      "ana @ ejemplo",
+      "a@b",
+      "@@",
+      "a@@",
+      "x @y@z",
+      "correo: ana@ejemplo.com hoy",
+      "",
+      " @ ",
+    ];
+    for (const texto of casos) {
+      expect(pareceCorreo(texto), texto).toBe(ANTIGUA.test(texto));
+    }
+    expect(pareceCorreo(null)).toBe(false);
+    expect(pareceCorreo(undefined)).toBe(false);
+  });
+
+  it("es lineal con un texto largo sin «@»", () => {
+    expect(pareceCorreo("a".repeat(200_000))).toBe(false);
   });
 });

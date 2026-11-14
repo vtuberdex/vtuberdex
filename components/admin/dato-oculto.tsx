@@ -21,9 +21,22 @@ const MASCARA_TEXTO = "••••••••";
 const botonChico =
   "ml-1.5 rounded border border-dex-line px-1.5 py-0 text-[10px] uppercase tracking-[0.08em] text-dex-muted hover:text-dex-ink";
 
-/** ¿Parece un correo? Lo que no lo parece (un usuario «admin») se muestra tal cual. */
-export const pareceCorreo = (texto: string | null | undefined) =>
-  /\S+@\S+/.test(texto ?? "");
+const esEspacio = (c: string | undefined) => c === undefined || /\s/.test(c);
+
+/**
+ * ¿Parece un correo? Lo que no lo parece (un usuario «admin») se muestra tal cual. Es lo mismo que
+ * `/\S+@\S+/` (una «@» con algo que no es espacio justo antes y justo después), pero mirando solo los
+ * vecinos de cada «@»: la regex sin anclar reintentaba desde cada carácter (coste cuadrático).
+ */
+export const pareceCorreo = (texto: string | null | undefined): boolean => {
+  const t = texto ?? "";
+  for (let at = t.indexOf("@"); at !== -1; at = t.indexOf("@", at + 1)) {
+    if (!esEspacio(t[at - 1]) && !esEspacio(t[at + 1])) {
+      return true;
+    }
+  }
+  return false;
+};
 
 /**
  * Un dato que se ve como máscara hasta pulsar «Mostrar». `children` permite revelar algo con formato
