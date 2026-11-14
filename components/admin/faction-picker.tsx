@@ -31,7 +31,10 @@ export function FactionPicker({
   const toggle = (slug: string) => {
     if (value.includes(slug)) {
       onChange(value.filter((current) => current !== slug));
-    } else if (!full) {
+      return;
+    }
+    // Con el cupo lleno no se añade: hay que quitar una antes (el contador lo dice).
+    if (!full) {
       onChange([...value, slug]);
     }
   };
