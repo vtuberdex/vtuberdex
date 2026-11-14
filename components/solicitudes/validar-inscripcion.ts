@@ -11,6 +11,7 @@
  * tiene que ser lo mismo que allá, o el paso pasaría y el envío final rebotaría.
  */
 import { CAMPOS_PERFIL, type ClavePerfil } from '@/components/solicitudes/campos-ficha';
+import { esCorreoBienFormado } from '@/lib/correo-formato.mjs';
 
 export interface Falta {
   /** Valor de `data-campo` del control (o del grupo) donde está el problema. */
@@ -35,21 +36,12 @@ export interface EstadoInscripcion {
   acepta: boolean;
 }
 
-const ESPACIO = /\s/;
-
 /**
- * Lo mismo que pedía la expresión `^[^\s@]+@[^\s@]+\.[^\s@]+$`, sin expresión: una sola arroba con algo
- * delante, sin espacios, y un punto en el dominio que no sea ni el primer ni el último carácter. La
- * expresión retrocedía en tiempo cuadrático con dominios largos sin punto (los dos `+` se disputaban
- * los mismos caracteres); recorrer la cadena es lineal.
+ * Lo mismo que pedía la expresión `^[^\s@]+@[^\s@]+\.[^\s@]+$` (dominio con un punto que no sea ni el
+ * primer ni el último carácter): es la variante `tldMinimo: 1` de la regla común, escrita sin regex en
+ * `lib/correo-formato.mjs` porque la expresión retrocedía en tiempo cuadrático (Sonar S8786).
  */
-const pareceCorreo = (valor: string): boolean => {
-  const arroba = valor.indexOf('@');
-  if (arroba < 1 || arroba !== valor.lastIndexOf('@') || ESPACIO.test(valor)) {
-    return false;
-  }
-  return valor.slice(arroba + 1).slice(1, -1).includes('.');
-};
+const pareceCorreo = (valor: string): boolean => esCorreoBienFormado(valor, { tldMinimo: 1 });
 
 export const esEnlaceHttp = (valor: string): boolean => {
   try {
