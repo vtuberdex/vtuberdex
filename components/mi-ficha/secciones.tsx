@@ -343,6 +343,113 @@ function MisionSecundaria({ mision: m }: Readonly<{ mision: MisionVista }>) {
   );
 }
 
+/** El «¿seguro?» de reclamar un grado, o el botón que lo abre. */
+function ReclamoDeGrado({
+  mision,
+  grado,
+  ocupada,
+  confirmando,
+  alPedirConfirmar,
+  alReclamar,
+}: Readonly<{
+  mision: string;
+  grado: string;
+  ocupada: string | null;
+  confirmando: boolean;
+  alPedirConfirmar: (mision: string | null) => void;
+  alReclamar: (mision: string, grado: string) => void;
+}>) {
+  const { t } = useI18n();
+  const reclamar = () => {
+    alPedirConfirmar(null);
+    alReclamar(mision, grado);
+  };
+  const cancelar = () => alPedirConfirmar(null);
+  const pedirConfirmar = () => alPedirConfirmar(mision);
+  if (!confirmando) {
+    return (
+      <div className="mt-2 space-y-2">
+        <button
+          type="button"
+          disabled={ocupada !== null}
+          onClick={pedirConfirmar}
+          className={claseBoton}
+        >
+          {t("mificha.misionesReclamar", { grado })}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2 space-y-2">
+      <p className="text-xs text-dex-ink/85">
+        {t("mificha.misionesConfirmar", { grado })}
+      </p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={ocupada !== null}
+          onClick={reclamar}
+          className={claseBoton}
+        >
+          {ocupada === mision
+            ? t("mificha.misionesReclamando")
+            : t("mificha.misionesSi")}
+        </button>
+        <button type="button" onClick={cancelar} className={claseSecundario}>
+          {t("mificha.misionesNo")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Lo que sigue a una misión de grado completada y sin reclamar: «Reclamar» si se puede, o el motivo por el
+ * que no. Nada en cualquier otro caso.
+ */
+function AccionDeGrado({
+  mision: m,
+  grado,
+  ocupada,
+  confirmando,
+  alPedirConfirmar,
+  alReclamar,
+}: Readonly<{
+  mision: MisionVista;
+  grado: string;
+  ocupada: string | null;
+  confirmando: boolean;
+  alPedirConfirmar: (mision: string | null) => void;
+  alReclamar: (mision: string, grado: string) => void;
+}>) {
+  const { t } = useI18n();
+  const porReclamar = m.completada && !m.reclamada;
+  if (!porReclamar) {
+    return null;
+  }
+  if (m.reclamable) {
+    return (
+      <ReclamoDeGrado
+        mision={m.id}
+        grado={grado}
+        ocupada={ocupada}
+        confirmando={confirmando}
+        alPedirConfirmar={alPedirConfirmar}
+        alReclamar={alReclamar}
+      />
+    );
+  }
+  if (!m.motivo) {
+    return null;
+  }
+  return (
+    <p className="mt-2 text-xs text-dex-muted">
+      {t(`mificha.misionesMotivo.${m.motivo}`)}
+    </p>
+  );
+}
+
 /**
  * Una misión de grado: completada y sin reclamar ofrece «Reclamar» (con su «¿seguro?», porque cambia la carta
  * pública) o explica por qué no se puede. `confirmando` lo guarda la sección: solo una a la vez pide confirmar.
@@ -363,11 +470,6 @@ function MisionDeGrado({
   const { t } = useI18n();
   const texto = useTextoDeMision();
   const grado = m.grado ?? "";
-  const porReclamar = m.completada && !m.reclamada;
-  const reclamar = () => {
-    alPedirConfirmar(null);
-    alReclamar(m.id, grado);
-  };
   return (
     <li
       className="rounded-xl border border-dex-line p-3"
@@ -387,50 +489,14 @@ function MisionDeGrado({
         {texto(`mision.${m.id}.descripcion`, m.descripcion)}
       </p>
       {!m.completada && <BarrasDeMision mision={m} />}
-      {porReclamar && m.reclamable && (
-        <div className="mt-2 space-y-2">
-          {confirmando ? (
-            <>
-              <p className="text-xs text-dex-ink/85">
-                {t("mificha.misionesConfirmar", { grado })}
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={ocupada !== null}
-                  onClick={reclamar}
-                  className={claseBoton}
-                >
-                  {ocupada === m.id
-                    ? t("mificha.misionesReclamando")
-                    : t("mificha.misionesSi")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => alPedirConfirmar(null)}
-                  className={claseSecundario}
-                >
-                  {t("mificha.misionesNo")}
-                </button>
-              </div>
-            </>
-          ) : (
-            <button
-              type="button"
-              disabled={ocupada !== null}
-              onClick={() => alPedirConfirmar(m.id)}
-              className={claseBoton}
-            >
-              {t("mificha.misionesReclamar", { grado })}
-            </button>
-          )}
-        </div>
-      )}
-      {porReclamar && !m.reclamable && m.motivo && (
-        <p className="mt-2 text-xs text-dex-muted">
-          {t(`mificha.misionesMotivo.${m.motivo}`)}
-        </p>
-      )}
+      <AccionDeGrado
+        mision={m}
+        grado={grado}
+        ocupada={ocupada}
+        confirmando={confirmando}
+        alPedirConfirmar={alPedirConfirmar}
+        alReclamar={alReclamar}
+      />
     </li>
   );
 }

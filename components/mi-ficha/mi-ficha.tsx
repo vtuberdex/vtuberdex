@@ -191,119 +191,186 @@ export function MiFicha() {
     }
   }, [cargar]);
 
-  /** Un enlace caducado vuelve a pedir el enlace; cualquier otro fallo se avisa sin perder la ficha. */
-  const avisarFallo = (causa: unknown) => {
-    if (causa instanceof ApiError && causa.status === 410) {
-      setError({ tipo: "caducado" });
-    } else {
-      setAviso({
-        tipo: "error",
-        texto:
-          causa instanceof ApiError ? causa.message : t("mificha.errorGeneral"),
-      });
-    }
-  };
+  // Todos los manejadores van en `useCallback` y ANTES de los retornos tempranos (las reglas de los
+  // hooks): la vista los recibe estables. La ficha sobre la que actúan es la de `datos` de este
+  // render, la misma que se ve; sin datos no hay botones que los llamen.
 
-  const aplicar = async (
-    accion: AccionDePuntos,
-    ficha: VistaMiFicha,
-    clave?: string,
-    nombre?: string,
-  ) => {
-    if (!token) {
-      return;
-    }
-    setOcupada(clave ?? "reiniciar");
-    setAviso(null);
-    // El sobrante se lee ANTES de convertir: después ya es 0 y el aviso diría «pasaste 0».
-    const convertidos =
-      accion === CONVERTIR_SOBRANTES ? (ficha.puntos.sobrantes ?? 0) : 0;
-    try {
-      const r = await api.repartirPuntos(token, ficha.slug, accion, clave);
-      setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
-      const texto = textoTrasRepartir(t, accion, r.ficha, {
-        clave,
-        nombre: nombre ?? "",
-        convertidos,
-      });
-      if (texto === null) {
-        setConfirmando(false);
-        setConfirmandoStats(false);
+  /** Un enlace caducado vuelve a pedir el enlace; cualquier otro fallo se avisa sin perder la ficha. */
+  const avisarFallo = useCallback(
+    (causa: unknown) => {
+      if (causa instanceof ApiError && causa.status === 410) {
+        setError({ tipo: "caducado" });
       } else {
-        setAviso({ tipo: "ok", texto });
+        setAviso({
+          tipo: "error",
+          texto:
+            causa instanceof ApiError
+              ? causa.message
+              : t("mificha.errorGeneral"),
+        });
       }
-    } catch (error_) {
-      avisarFallo(error_);
-    } finally {
-      setOcupada(null);
-    }
-  };
+    },
+    [t],
+  );
+
+  const aplicar = useCallback(
+    async (accion: AccionDePuntos, clave?: string, nombre?: string) => {
+      if (!token || !datos) {
+        return;
+      }
+      const vista = datos.ficha;
+      setOcupada(clave ?? "reiniciar");
+      setAviso(null);
+      // El sobrante se lee ANTES de convertir: después ya es 0 y el aviso diría «pasaste 0».
+      const convertidos =
+        accion === CONVERTIR_SOBRANTES ? (vista.puntos.sobrantes ?? 0) : 0;
+      try {
+        const r = await api.repartirPuntos(token, vista.slug, accion, clave);
+        setDatos((actual) =>
+          actual ? { ...actual, ficha: r.ficha } : actual,
+        );
+        const texto = textoTrasRepartir(t, accion, r.ficha, {
+          clave,
+          nombre: nombre ?? "",
+          convertidos,
+        });
+        if (texto === null) {
+          setConfirmando(false);
+          setConfirmandoStats(false);
+        } else {
+          setAviso({ tipo: "ok", texto });
+        }
+      } catch (error_) {
+        avisarFallo(error_);
+      } finally {
+        setOcupada(null);
+      }
+    },
+    [token, datos, t, avisarFallo],
+  );
 
   // Los seis atributos se guardan de una vez (la distribución completa): el servidor valida el tope
   // de 200 puntos y de 100 por atributo antes de escribirlos.
-  const guardarAtributos = async (
-    ficha: VistaMiFicha,
-    atributos: Record<string, number>,
-  ) => {
-    if (!token) {
-      return;
-    }
-    setOcupada("atributos");
-    setAviso(null);
-    try {
-      const r = await api.guardarAtributosDeMiFicha(
-        token,
-        ficha.slug,
-        atributos,
-      );
-      setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
-      setAviso({ tipo: "ok", texto: t("mificha.atrGuardado") });
-    } catch (error_) {
-      avisarFallo(error_);
-    } finally {
-      setOcupada(null);
-    }
-  };
-
-  const minecraft = async (
-    accion: "codigo" | "desvincular",
-    ficha: VistaMiFicha,
-  ) => {
-    if (!token) {
-      return;
-    }
-    setOcupada("minecraft");
-    setAviso(null);
-    try {
-      const r = await api.minecraftDeMiFicha(token, ficha.slug, accion);
-      setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
-      setCodigoMinecraft(r.codigo?.codigo ?? null);
-      if (accion === "desvincular") {
-        setAviso({ tipo: "ok", texto: t("mificha.minecraftDesvinculado") });
+  const guardarAtributos = useCallback(
+    async (vista: VistaMiFicha, atributos: Record<string, number>) => {
+      if (!token) {
+        return;
       }
-    } catch (error_) {
-      avisarFallo(error_);
-    } finally {
-      setOcupada(null);
-    }
-  };
+      setOcupada("atributos");
+      setAviso(null);
+      try {
+        const r = await api.guardarAtributosDeMiFicha(
+          token,
+          vista.slug,
+          atributos,
+        );
+        setDatos((actual) =>
+          actual ? { ...actual, ficha: r.ficha } : actual,
+        );
+        setAviso({ tipo: "ok", texto: t("mificha.atrGuardado") });
+      } catch (error_) {
+        avisarFallo(error_);
+      } finally {
+        setOcupada(null);
+      }
+    },
+    [token, t, avisarFallo],
+  );
 
-  const reclamarGrado = async (mision: string, grado: string, ficha: VistaMiFicha) => {
-    if (!token) {
-      return;
-    }
-    setOcupada(mision);
-    setAviso(null);
-    try {
-      const r = await api.reclamarGradoDeMision(token, ficha.slug, mision);
-      setDatos((actual) => (actual ? { ...actual, ficha: r.ficha } : actual));
-      setAviso({ tipo: "ok", texto: t("mificha.misionesReclamado", { grado }) });
-    } catch (error_) {
-      avisarFallo(error_);
-    } finally {
-      setOcupada(null);
-    }
-  };
+  const minecraft = useCallback(
+    async (accion: "codigo" | "desvincular") => {
+      if (!token || !datos) {
+        return;
+      }
+      setOcupada("minecraft");
+      setAviso(null);
+      try {
+        const r = await api.minecraftDeMiFicha(token, datos.ficha.slug, accion);
+        setDatos((actual) =>
+          actual ? { ...actual, ficha: r.ficha } : actual,
+        );
+        setCodigoMinecraft(r.codigo?.codigo ?? null);
+        if (accion === "desvincular") {
+          setAviso({ tipo: "ok", texto: t("mificha.minecraftDesvinculado") });
+        }
+      } catch (error_) {
+        avisarFallo(error_);
+      } finally {
+        setOcupada(null);
+      }
+    },
+    [token, datos, t, avisarFallo],
+  );
+
+  const reclamarGrado = useCallback(
+    async (mision: string, grado: string) => {
+      if (!token || !datos) {
+        return;
+      }
+      setOcupada(mision);
+      setAviso(null);
+      try {
+        const r = await api.reclamarGradoDeMision(
+          token,
+          datos.ficha.slug,
+          mision,
+        );
+        setDatos((actual) =>
+          actual ? { ...actual, ficha: r.ficha } : actual,
+        );
+        setAviso({
+          tipo: "ok",
+          texto: t("mificha.misionesReclamado", { grado }),
+        });
+      } catch (error_) {
+        avisarFallo(error_);
+      } finally {
+        setOcupada(null);
+      }
+    },
+    [token, datos, t, avisarFallo],
+  );
+
+  const subirStat = useCallback(
+    (slug: string, nombre: string) => void aplicar("subir-stat", slug, nombre),
+    [aplicar],
+  );
+  const reiniciarStats = useCallback(
+    () => void aplicar("reiniciar-stats"),
+    [aplicar],
+  );
+  const pedirCodigo = useCallback(() => void minecraft("codigo"), [minecraft]);
+  const desvincular = useCallback(
+    () => void minecraft("desvincular"),
+    [minecraft],
+  );
+  const reclamar = useCallback(
+    (mision: string, grado: string) => void reclamarGrado(mision, grado),
+    [reclamarGrado],
+  );
+  const elegirFicha = useCallback(
+    (slug: string) => {
+      setCodigoMinecraft(null);
+      if (token) {
+        void cargar(token, slug);
+      }
+    },
+    [token, cargar],
+  );
+  const subir = useCallback(
+    (clave: string, nombre: string) => void aplicar("subir", clave, nombre),
+    [aplicar],
+  );
+  const reiniciar = useCallback(() => void aplicar("reiniciar"), [aplicar]);
+  const convertir = useCallback(
+    () => void aplicar(CONVERTIR_SOBRANTES),
+    [aplicar],
+  );
+  const guardar = useCallback(
+    (vista: VistaMiFicha, atributos: Record<string, number>) =>
+      void guardarAtributos(vista, atributos),
+    [guardarAtributos],
+  );
 
   if (!listo) {
     return <p className="text-sm text-dex-muted">{t("mificha.cargando")}</p>;
@@ -327,28 +394,6 @@ export function MiFicha() {
       </p>
     );
   }
-
-  // Los manejadores llevan nombre (no flechas sueltas en el JSX): la vista los recibe ya atados a la ficha que se ve.
-  const { ficha } = datos;
-  const subirStat = (slug: string, nombre: string) =>
-    void aplicar("subir-stat", ficha, slug, nombre);
-  const reiniciarStats = () => void aplicar("reiniciar-stats", ficha);
-  const pedirCodigo = () => void minecraft("codigo", ficha);
-  const desvincular = () => void minecraft("desvincular", ficha);
-  const reclamar = (mision: string, grado: string) =>
-    void reclamarGrado(mision, grado, ficha);
-  const elegirFicha = (slug: string) => {
-    setCodigoMinecraft(null);
-    if (token) {
-      void cargar(token, slug);
-    }
-  };
-  const subir = (clave: string, nombre: string) =>
-    void aplicar("subir", ficha, clave, nombre);
-  const reiniciar = () => void aplicar("reiniciar", ficha);
-  const convertir = () => void aplicar(CONVERTIR_SOBRANTES, ficha);
-  const guardar = (fichaVista: VistaMiFicha, atributos: Record<string, number>) =>
-    void guardarAtributos(fichaVista, atributos);
 
   return (
     <MiFichaVista
@@ -649,8 +694,10 @@ export function MiFichaVista({
   const sobrantes = puntos.sobrantes ?? 0;
   const elegirFicha = (e: React.ChangeEvent<HTMLSelectElement>) =>
     alElegirFicha(e.target.value);
-  const guardarAtributos = (atributos: Record<string, number>) =>
-    alGuardarAtributos(ficha, atributos);
+  const guardarAtributos = useCallback(
+    (atributos: Record<string, number>) => alGuardarAtributos(ficha, atributos),
+    [alGuardarAtributos, ficha],
+  );
 
   return (
     <div className="space-y-6" data-testid="mificha">

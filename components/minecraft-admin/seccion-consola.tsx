@@ -44,7 +44,8 @@ export function SeccionConsola({ esAdmin }: Readonly<{ esAdmin: boolean }>) {
         : [c?.error ?? `error ${r.status}`, c?.detail]
             .filter(Boolean)
             .join(": ");
-      const id = siguienteLinea.current++;
+      const id = siguienteLinea.current;
+      siguienteLinea.current += 1;
       setLineas((l) => [
         ...l.slice(-199),
         { id, comando: texto, salida, ok: r.ok },
