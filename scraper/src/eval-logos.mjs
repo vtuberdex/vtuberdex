@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Mide el detector de logos contra el GROUND TRUTH de calibración.
  *
@@ -41,6 +42,93 @@ function intersection(a, b) {
   return ix * iy;
 }
 
+/** Suma una caja detectada (o su ausencia) al acumulador de un detector. */
+function acumular(acc, box, g, gArea) {
+  if (!box) {
+    acc.nulos += 1;
+    return;
+  }
+  const inter = intersection(box, g);
+  const rec = inter / gArea;
+  const pre = inter / (box.width * box.height);
+  acc.recall.push(rec);
+  acc.prec.push(pre);
+  if (rec > 0.85 && pre > 0.7) {
+    acc.buenos += 1;
+  }
+}
+
+/** Evalúa una carta con los dos detectores; devuelve el fallo de bordes, si lo hay. */
+function evaluarCarta({ data, info }, g, det, den) {
+  const gArea = g.width * g.height;
+  acumular(
+    det,
+    findLogoBox(data, info.width, info.height, info.channels, EDGE_OPTIONS)
+      ?.box,
+    g,
+    gArea,
+  );
+  acumular(
+    den,
+    findLogoBoxInBand(data, info.width, info.height, info.channels)?.box,
+    g,
+    gArea,
+  );
+
+  const boxDet = findLogoBox(
+    data,
+    info.width,
+    info.height,
+    info.channels,
+    EDGE_OPTIONS,
+  )?.box;
+  if (!boxDet) {
+    return null;
+  }
+  const rec = intersection(boxDet, g) / gArea;
+  const pre = intersection(boxDet, g) / (boxDet.width * boxDet.height);
+  return rec <= 0.85 || pre <= 0.7
+    ? `r${rec.toFixed(2)}/p${pre.toFixed(2)}`
+    : null;
+}
+
+function media(a) {
+  return a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0;
+}
+
+function resumenDe(acc, evaluadas) {
+  return {
+    recallMedio: Number(media(acc.recall).toFixed(3)),
+    precisionMedia: Number(media(acc.prec).toFixed(3)),
+    ajusteFino: `${acc.buenos}/${evaluadas}`,
+    pctAjusteFino: Number(((acc.buenos / evaluadas) * 100).toFixed(1)),
+    nulos: acc.nulos,
+  };
+}
+
+function imprimir(report, fallos) {
+  console.log(
+    `pares de ground truth: ${report.paresGroundTruth} | evaluadas: ${report.evaluadas}`,
+  );
+  console.log("\nbordes (detector actual):");
+  console.log(`  recall medio    ${report.bordes.recallMedio}`);
+  console.log(`  precision media ${report.bordes.precisionMedia}`);
+  console.log(
+    `  ajuste fino     ${report.bordes.ajusteFino} (${report.bordes.pctAjusteFino}%)`,
+  );
+  console.log(`  nulos           ${report.bordes.nulos}`);
+  console.log("\ndensidad (detector anterior):");
+  console.log(`  recall medio    ${report.densidad.recallMedio}`);
+  console.log(`  precision media ${report.densidad.precisionMedia}`);
+  console.log(
+    `  ajuste fino     ${report.densidad.ajusteFino} (${report.densidad.pctAjusteFino}%)`,
+  );
+  if (fallos.length) {
+    console.log(`\npeores casos de bordes (${fallos.length}):`);
+    console.log("  " + fallos.slice(0, 12).join(" | "));
+  }
+}
+
 async function main() {
   const gt = JSON.parse(fs.readFileSync(GT, "utf8"));
   const pairs = gt.results.filter((r) => r.found && r.found.score < MAX_SCORE);
@@ -52,102 +140,39 @@ async function main() {
 
   for (const r of pairs) {
     const p = path.join(ROOT, "data", "images", "card", `${r.slug}.webp`);
-    if (!fs.existsSync(p)) continue;
-    const { data, info } = await sharp(p)
+    if (!fs.existsSync(p)) {
+      continue;
+    }
+    const raw = await sharp(p)
       .ensureAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
-    const g = r.found;
-    const gArea = g.width * g.height;
     evaluadas += 1;
-
-    for (const [acc, box] of [
-      [
-        det,
-        findLogoBox(data, info.width, info.height, info.channels, EDGE_OPTIONS)
-          ?.box,
-      ],
-      [
-        den,
-        findLogoBoxInBand(data, info.width, info.height, info.channels)?.box,
-      ],
-    ]) {
-      if (!box) {
-        acc.nulos += 1;
-        continue;
-      }
-      const inter = intersection(box, g);
-      const rec = inter / gArea;
-      const pre = inter / (box.width * box.height);
-      acc.recall.push(rec);
-      acc.prec.push(pre);
-      if (rec > 0.85 && pre > 0.7) acc.buenos += 1;
-    }
-
-    const boxDet = findLogoBox(
-      data,
-      info.width,
-      info.height,
-      info.channels,
-      EDGE_OPTIONS,
-    )?.box;
-    if (boxDet) {
-      const rec = intersection(boxDet, g) / gArea;
-      const pre = intersection(boxDet, g) / (boxDet.width * boxDet.height);
-      if (rec <= 0.85 || pre <= 0.7)
-        fallos.push(`${r.slug}:r${rec.toFixed(2)}/p${pre.toFixed(2)}`);
+    const fallo = evaluarCarta(raw, r.found, det, den);
+    if (fallo) {
+      fallos.push(`${r.slug}:${fallo}`);
     }
   }
 
-  const media = (a) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
   const report = {
     paresGroundTruth: pairs.length,
     evaluadas,
-    bordes: {
-      recallMedio: Number(media(det.recall).toFixed(3)),
-      precisionMedia: Number(media(det.prec).toFixed(3)),
-      ajusteFino: `${det.buenos}/${evaluadas}`,
-      pctAjusteFino: Number(((det.buenos / evaluadas) * 100).toFixed(1)),
-      nulos: det.nulos,
-    },
-    densidad: {
-      recallMedio: Number(media(den.recall).toFixed(3)),
-      precisionMedia: Number(media(den.prec).toFixed(3)),
-      ajusteFino: `${den.buenos}/${evaluadas}`,
-      pctAjusteFino: Number(((den.buenos / evaluadas) * 100).toFixed(1)),
-      nulos: den.nulos,
-    },
+    bordes: resumenDe(det, evaluadas),
+    densidad: resumenDe(den, evaluadas),
   };
 
   if (asJson) {
     console.log(JSON.stringify(report, null, 1));
   } else {
-    console.log(
-      `pares de ground truth: ${pairs.length} | evaluadas: ${evaluadas}`,
-    );
-    console.log("\nbordes (detector actual):");
-    console.log(`  recall medio    ${report.bordes.recallMedio}`);
-    console.log(`  precision media ${report.bordes.precisionMedia}`);
-    console.log(
-      `  ajuste fino     ${report.bordes.ajusteFino} (${report.bordes.pctAjusteFino}%)`,
-    );
-    console.log(`  nulos           ${report.bordes.nulos}`);
-    console.log("\ndensidad (detector anterior):");
-    console.log(`  recall medio    ${report.densidad.recallMedio}`);
-    console.log(`  precision media ${report.densidad.precisionMedia}`);
-    console.log(
-      `  ajuste fino     ${report.densidad.ajusteFino} (${report.densidad.pctAjusteFino}%)`,
-    );
-    if (fallos.length) {
-      console.log(`\npeores casos de bordes (${fallos.length}):`);
-      console.log("  " + fallos.slice(0, 12).join(" | "));
-    }
+    imprimir(report, fallos);
   }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error("[eval] ERROR", error);
     process.exit(1);
-  });
+  }
 }

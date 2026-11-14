@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Cliente de la API. Única puerta de salida a la red: el resto de la app
  * consume funciones tipadas y nunca arma URLs a mano.
@@ -15,6 +16,7 @@ import type {
   VtuberDetail,
   VtuberPatch,
   SearchParams,
+  SkillCategory,
 } from "@/lib/types";
 import { searchParamsToQuery } from "@/lib/query";
 import { asegurarSesion } from "@/lib/sesion-cliente";
@@ -43,11 +45,21 @@ export interface LikeResumen {
   xpPorLike: number;
 }
 
+/** Los tres formularios públicos que llenan la cola del mantenedor. */
+export type TipoDeSolicitud = "inscripcion" | "baja" | "modificacion";
+
+/** Estado de una solicitud en la cola (las `sin_verificar` no llegan al mantenedor). */
+export type EstadoDeSolicitud =
+  | "pendiente"
+  | "aprobada"
+  | "rechazada"
+  | "procesada";
+
 /** Una solicitud de la cola del mantenedor (inscripción, baja o modificación). El contacto es confidencial: solo llega con sesión. */
 export interface SolicitudAdmin {
   id: number;
-  tipo: "inscripcion" | "baja" | "modificacion";
-  estado: "pendiente" | "aprobada" | "rechazada" | "procesada";
+  tipo: TipoDeSolicitud;
+  estado: EstadoDeSolicitud;
   datos: Record<string, unknown>;
   contacto: { email?: string; realName?: string } | null;
   terminosVersion: string;
@@ -71,7 +83,7 @@ export interface FichaResumen {
 
 /** Lo que pasaría si se aprueba una solicitud (ver `server/src/solicitud-vista.mjs`). */
 export interface VistaPreviaSolicitud {
-  tipo: "inscripcion" | "baja" | "modificacion";
+  tipo: TipoDeSolicitud;
   estado: string;
   puedeAprobar: boolean;
   problema: {
@@ -106,7 +118,7 @@ export type BorradorDeInscripcion = Record<string, unknown> & {
 /** Lo que responde `POST /api/verificar`: `fichas` solo viene con `baja_aplicada` (las que se dieron de baja). */
 export interface ResultadoDeVerificacion {
   ok: true;
-  tipo: "inscripcion" | "baja" | "modificacion";
+  tipo: TipoDeSolicitud;
   resultado: "en_revision" | "baja_aplicada" | "sin_ficha";
   fichas?: string[];
 }
@@ -153,25 +165,33 @@ export function motivoDeError(status: number, payload: unknown): string {
     detail?: string;
     issues?: unknown;
   };
-  if (typeof datos.detail === "string" && datos.detail.trim())
+  if (typeof datos.detail === "string" && datos.detail.trim()) {
     return datos.detail;
+  }
   const codigo = typeof datos.error === "string" ? datos.error : "";
   const explicado = EXPLICACIONES[codigo];
-  if (explicado) return explicado;
-  // Un 400 de validación traía `issues` (qué campo y por qué) y se perdía: la pantalla solo decía
-  // «payload_invalido» y nadie sabía qué corregir. Se añade el primero al mensaje.
-  const primero = Array.isArray(datos.issues)
-    ? (datos.issues[0] as { path?: string; message?: string } | undefined)
-    : undefined;
-  const que = primero?.path
-    ? ` (${primero.path}: ${primero.message ?? "no válido"})`
-    : "";
+  if (explicado) {
+    return explicado;
+  }
   if (!codigo) {
     return status >= 500
       ? "La web no pudo atender el envío. Inténtalo de nuevo en unos minutos."
       : "No se pudo completar el envío. Inténtalo de nuevo.";
   }
-  return `No se pudo completar (${codigo}). Inténtalo de nuevo.${que}`;
+  return `No se pudo completar (${codigo}). Inténtalo de nuevo.${primerProblema(datos.issues)}`;
+}
+
+/**
+ * Un 400 de validación traía `issues` (qué campo y por qué) y se perdía: la pantalla solo decía
+ * «payload_invalido» y nadie sabía qué corregir. Se añade el primero al mensaje (o nada).
+ */
+function primerProblema(issues: unknown): string {
+  const primero = Array.isArray(issues)
+    ? (issues[0] as { path?: string; message?: string } | undefined)
+    : undefined;
+  return primero?.path
+    ? ` (${primero.path}: ${primero.message ?? "no válido"})`
+    : "";
 }
 
 /** Formularios públicos que suben imágenes y su carpeta en `/api`. */
@@ -197,7 +217,7 @@ async function request<T>(
   try {
     response = await fetch(`${BASE}${path}`, {
       ...rest,
-      headers: { "content-type": "application/json", ...(extraHeaders ?? {}) },
+      headers: { "content-type": "application/json", ...extraHeaders },
     });
   } catch {
     // Sin red (o la web caída) `fetch` lanza un TypeError que NO es `ApiError`: el formulario lo tapaba con su
@@ -243,7 +263,7 @@ const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 export interface HabilidadMejorable {
   clave: string;
   name: string;
-  category: "active" | "passive" | "ultimate" | "other";
+  category: SkillCategory;
   type: string | null;
   effect: string | null;
   rango: number;
@@ -315,6 +335,20 @@ export interface VistaMiFicha {
   misiones?: MisionesDeFicha | null;
 }
 
+/** Por qué una misión de grado completada no se puede reclamar. */
+export type MotivoDeReclamoNegado =
+  | "ya_tiene_igual_o_mayor"
+  | "ficha_deteriorada"
+  | "grado_no_ganable";
+
+/** Qué hace `repartirPuntos`: gastar o devolver puntos de habilidad o de stats. */
+export type AccionDePuntos =
+  | "subir"
+  | "reiniciar"
+  | "subir-stat"
+  | "reiniciar-stats"
+  | "convertir-sobrantes";
+
 export interface MisionVista {
   id: string;
   tipo: "secundaria" | "grado";
@@ -328,7 +362,7 @@ export interface MisionVista {
   grado?: string;
   reclamada?: boolean;
   reclamable?: boolean;
-  motivo?: "ya_tiene_igual_o_mayor" | "ficha_deteriorada" | "grado_no_ganable" | null;
+  motivo?: MotivoDeReclamoNegado | null;
 }
 
 export interface ReclamoDeMision {
@@ -521,13 +555,22 @@ export const api = {
     signal?: AbortSignal,
   ) {
     const query = new URLSearchParams();
-    if (params.q) query.set("q", params.q);
+    if (params.q) {
+      query.set("q", params.q);
+    }
     query.set("status", params.status ?? "all");
-    if (params.premium) query.set("premium", "1");
-    if (params.correo && params.correo !== "todos")
+    if (params.premium) {
+      query.set("premium", "1");
+    }
+    if (params.correo && params.correo !== "todos") {
       query.set("correo", params.correo);
-    if (params.page) query.set("page", String(params.page));
-    if (params.perPage) query.set("perPage", String(params.perPage));
+    }
+    if (params.page) {
+      query.set("page", String(params.page));
+    }
+    if (params.perPage) {
+      query.set("perPage", String(params.perPage));
+    }
     return request<AdminListResponse>(`/api/admin/vtubers?${query}`, {
       headers: bearer(token),
       signal,
@@ -789,12 +832,7 @@ export const api = {
   repartirPuntos(
     token: string,
     slug: string,
-    accion:
-      | "subir"
-      | "reiniciar"
-      | "subir-stat"
-      | "reiniciar-stats"
-      | "convertir-sobrantes",
+    accion: AccionDePuntos,
     clave?: string,
   ) {
     return request<{ ok: true; ficha: VistaMiFicha }>("/api/mi-ficha/puntos", {
@@ -868,7 +906,7 @@ export const api = {
   solicitudes(
     token: string,
     estado: string = "pendiente",
-    tipo?: "inscripcion" | "baja" | "modificacion",
+    tipo?: TipoDeSolicitud,
   ) {
     const query = new URLSearchParams({ estado, ...(tipo ? { tipo } : {}) });
     return request<{

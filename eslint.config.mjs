@@ -234,4 +234,16 @@ export default defineConfig([
       },
     },
   },
+
+  /**
+   * Llaves SIEMPRE en `if`/`else`/bucles, también con una sola sentencia. Lo exige el perfil de
+   * Sonar del proyecto (S121) y eran ~1.500 alertas; con la regla aquí, `npm run lint:fix` las
+   * corrige solas y el lint impide que vuelvan. Va al final para aplicarse a todos los bloques.
+   */
+  {
+    files: ["**/*.{js,mjs,jsx,ts,tsx}"],
+    rules: {
+      curly: ["error", "all"],
+    },
+  },
 ]);

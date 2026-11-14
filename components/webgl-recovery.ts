@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Recuperación de un contexto WebGL perdido.
@@ -69,7 +70,9 @@ export function useWebGLRecovery(
     (canvas: HTMLCanvasElement) => {
       vigente.current = canvas;
       canvas.addEventListener("webglcontextlost", (event) => {
-        if (vigente.current !== canvas) return;
+        if (vigente.current !== canvas) {
+          return;
+        }
         event.preventDefault();
         alPerderse();
       });

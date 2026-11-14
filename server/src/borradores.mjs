@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * BORRADORES de la inscripción: lo que la persona lleva escrito, guardado en el servidor y atado a su
  * CORREO VERIFICADO para que pueda cerrar la pestaña y volver (correo + código nuevo) a donde se quedó.
@@ -64,14 +65,16 @@ export function sanearBorrador(entrada) {
   const datos = entrada && typeof entrada === "object" ? entrada : {};
   /** @type {Record<string, any>} */
   const limpio = {};
-  for (const [clave, max] of Object.entries(TEXTOS))
+  for (const [clave, max] of Object.entries(TEXTOS)) {
     limpio[clave] = comoTexto(datos[clave], max);
+  }
   // Solo el ID de la imagen subida (nunca bytes): la imagen sin enviar caduca a las 24 h, así que un borrador
   // viejo puede apuntar a una que ya no existe. El formulario lo comprueba al restaurar y pide subirla de nuevo.
-  for (const clave of ["imageId", "logoId"])
+  for (const clave of ["imageId", "logoId"]) {
     limpio[clave] = esIdDeImagen(datos[clave])
       ? datos[clave].toLowerCase()
       : "";
+  }
   limpio.languages = Array.isArray(datos.languages)
     ? datos.languages
         .filter((c) => typeof c === "string")
@@ -87,7 +90,7 @@ export function sanearBorrador(entrada) {
           url: comoTexto(r.url, 500),
         }))
     : [];
-  limpio.paso = datos.paso === 5 ? 5 : datos.paso === 4 ? 4 : 3;
+  limpio.paso = [4, 5].includes(datos.paso) ? datos.paso : 3;
   return limpio;
 }
 
@@ -98,12 +101,13 @@ export async function guardarBorrador(
 ) {
   const limpio = sanearBorrador(datos);
   const json = JSON.stringify(limpio);
-  if (json.length > MAX_BYTES)
+  if (json.length > MAX_BYTES) {
     throw new SolicitudError(
       413,
       "borrador_demasiado_grande",
       "El borrador es demasiado grande para guardarlo.",
     );
+  }
   const e = await conTablas(ejecutor);
   const marca = ahora.toISOString();
   await e.execute(
@@ -127,12 +131,15 @@ export async function leerBorrador(
     "SELECT datos, actualizado FROM borrador WHERE email = ? AND tipo = ?",
     [email, tipo],
   );
-  if (!rows[0]) return null;
+  if (!rows[0]) {
+    return null;
+  }
   if (
     String(rows[0].actualizado) <
     new Date(ahora.getTime() - VIDA_BORRADOR_MS).toISOString()
-  )
+  ) {
     return null;
+  }
   try {
     return {
       datos: sanearBorrador(JSON.parse(rows[0].datos)),

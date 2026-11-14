@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Quita de un SARIF los hallazgos que `sonar-project.properties` ya declara revisados
  * (`sonar.issue.ignore.multicriteria.*`: regla + archivo).
@@ -15,11 +16,14 @@
 export function exclusionesDeSonar(texto) {
   const valores = new Map();
   for (const linea of texto.split(/\r?\n/)) {
-    const m = /^\s*sonar\.issue\.ignore\.multicriteria\.([^.=\s]+)\.(ruleKey|resourceKey)\s*=\s*(.*?)\s*$/.exec(linea);
+    // La clave se reconoce con la regex y el valor se toma con trim(): un `\s*(.*?)\s*$` al final
+    // retrocede en tiempo cuadrático con espacios de más (Sonar S8786).
+    const m = /^\s*sonar\.issue\.ignore\.multicriteria\.([^.=\s]+)\.(ruleKey|resourceKey)\s*=(.*)$/.exec(linea);
     if (!m) {
       continue;
     }
-    const [, id, campo, valor] = m;
+    const [, id, campo, crudo] = m;
+    const valor = crudo.trim();
     const actual = valores.get(id) ?? {};
     actual[campo] = valor;
     valores.set(id, actual);

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/minecraft-admin/rcon` — ejecuta una ACCIÓN sobre el servidor por RCON.
  *
@@ -24,12 +25,18 @@ export async function POST(request) {
       return respuestaJson({ error: "cuerpo_invalido" }, 400);
     }
     const preparada = prepararAccion(cuerpo.accion, cuerpo);
-    if (!preparada.ok) return respuestaJson(preparada.cuerpo, preparada.status);
+    if (!preparada.ok) {
+      return respuestaJson(preparada.cuerpo, preparada.status);
+    }
     const permiso = autorizar(acceso.sesion, preparada.minimo);
-    if (!permiso.ok) return respuestaJson(permiso.cuerpo, permiso.status);
+    if (!permiso.ok) {
+      return respuestaJson(permiso.cuerpo, permiso.status);
+    }
 
     const resultado = await ejecutarAccion(cuerpo.accion, cuerpo);
-    if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
     return respuestaJson({
       ok: true,
       accion: resultado.accion,

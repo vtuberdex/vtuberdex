@@ -124,7 +124,7 @@ describe("ImageManager", () => {
       (t) => t === "Subir" || t === "Reemplazar",
     ).length;
     expect(gestionados).toBeGreaterThan(0);
-    expect(screen.getAllByText("sin imagen").length).toBe(gestionados);
+    expect(screen.getAllByText("sin imagen")).toHaveLength(gestionados);
   });
 
   test('"Reemplazar" aparece cuando hay imagen y "Subir" cuando no hay', () => {

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Atlas de números de un dado: UN lienzo en escala de grises con una casilla por cara.
  *
@@ -65,7 +66,9 @@ function texto(
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(String(valor), 0, px * 0.04);
-  if (subrayar) ctx.fillRect(-px * 0.28, px * 0.48, px * 0.56, px * 0.09);
+  if (subrayar) {
+    ctx.fillRect(-px * 0.28, px * 0.48, px * 0.56, px * 0.09);
+  }
   ctx.restore();
 }
 
@@ -76,7 +79,9 @@ export function crearAtlas(tipo: TipoDeDado): CanvasTexture {
   lienzo.width = LADO_PX;
   lienzo.height = LADO_PX;
   const ctx = lienzo.getContext("2d");
-  if (!ctx) throw new Error("sin_canvas_2d");
+  if (!ctx) {
+    throw new Error("sin_canvas_2d");
+  }
   ctx.fillStyle = FONDO;
   ctx.fillRect(0, 0, LADO_PX, LADO_PX);
   ctx.fillStyle = TRAZO;

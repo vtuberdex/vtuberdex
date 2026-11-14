@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Distintivo de una carta premium para el DOM: la misma nota que lleva la etiqueta de la placa
  * 3D, para las vistas que no son 3D (ficha, respaldo sin WebGL, mantenedor).
@@ -43,11 +44,11 @@ export function PremiumBadge({
   premium,
   className = "",
   compacto = false,
-}: {
+}: Readonly<{
   premium: PremiumInfo;
   className?: string;
   compacto?: boolean;
-}) {
+}>) {
   const { t } = useI18n();
   const meses = rachaDe(premium);
   const racha = meses > 0 ? t("premium.racha", { n: meses }) : null;
@@ -57,25 +58,22 @@ export function PremiumBadge({
     ? `${nombreDeGrado(premium.grade)} ${premium.grade} · ${t("premium.deteriorada")}`
     : leyendaDePremium(premium);
   const estilo = ESTILO_POR_GRADO[premium.grade] ?? ESTILO_POR_GRADO["8"];
+  const tipo = degradada
+    ? t("premium.cartaDeteriorada")
+    : t("premium.cartaPremium");
+  const partesDelTitulo = [tipo, leyenda, premium.cert];
+  if (racha) {
+    partesDelTitulo.push(racha);
+  }
   return (
     <span
       data-testid="premium-badge"
       data-grade={premium.grade}
-      title={`${degradada ? t("premium.cartaDeteriorada") : t("premium.cartaPremium")} · ${leyenda} · ${premium.cert}${racha ? ` · ${racha}` : ""}`}
+      title={partesDelTitulo.join(" · ")}
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em] ${estilo} ${className}`}
     >
-      <span aria-hidden>
-        {esBlackLabel(premium.grade)
-          ? "◆"
-          : esGradoDegradado(premium.grade)
-            ? "✕"
-            : "★"}
-      </span>
-      {compacto
-        ? esBlackLabel(premium.grade)
-          ? "BL"
-          : premium.grade
-        : leyenda}
+      <span aria-hidden>{simboloDeGrado(premium.grade)}</span>
+      {compacto ? notaCompacta(premium.grade) : leyenda}
       {!compacto && racha && (
         <span
           data-testid="premium-streak"
@@ -86,6 +84,19 @@ export function PremiumBadge({
       )}
     </span>
   );
+}
+
+/** ◆ para la Black Label, ✕ para una carta deteriorada y ★ para el resto de las premium. */
+function simboloDeGrado(grade: PremiumInfo["grade"]): string {
+  if (esBlackLabel(grade)) {
+    return "◆";
+  }
+  return esGradoDegradado(grade) ? "✕" : "★";
+}
+
+/** La nota sola, como en las listas densas: `BL` o el número del grado. */
+function notaCompacta(grade: PremiumInfo["grade"]): string {
+  return esBlackLabel(grade) ? "BL" : grade;
 }
 
 export default PremiumBadge;

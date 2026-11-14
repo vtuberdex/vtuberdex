@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/minecraft-admin/archivos` — explorador de archivos del servidor.
  *
@@ -30,17 +31,19 @@ export async function GET(request) {
     // Sin `ruta` es navegar: `?carpeta=plugins/MythicMobs` abre esa carpeta y sin `carpeta`
     // se abre la raíz (archivos de Paper/Bukkit/Spigot y las carpetas navegables).
     if (!ruta) {
-      const resultado = await listarCarpeta({
+      const listado = await listarCarpeta({
         ruta: params.get("carpeta"),
         rol: acceso.sesion.role,
       });
-      if (!resultado.ok) {
-        return respuestaJson(resultado.cuerpo, resultado.status);
+      if (!listado.ok) {
+        return respuestaJson(listado.cuerpo, listado.status);
       }
-      return respuestaJson(resultado);
+      return respuestaJson(listado);
     }
     const resultado = await leerArchivo({ ruta, rol: acceso.sesion.role });
-    if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
     return respuestaJson(resultado);
   });
 }
@@ -63,7 +66,9 @@ export async function PUT(request) {
       detalle: String(cuerpo.ruta ?? ""),
       ok: resultado.ok,
     });
-    if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
     return respuestaJson({
       ok: true,
       ruta: resultado.ruta,
@@ -117,7 +122,9 @@ export async function POST(request) {
       detalle: `${carpeta ?? ""}/${nombre ?? ""}`,
       ok: resultado.ok,
     });
-    if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
     return respuestaJson(resultado, 201);
   });
 }

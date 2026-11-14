@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Worker de las máscaras: recibe los píxeles RGBA de origen y devuelve los de la máscara.
  *
@@ -22,7 +23,9 @@ const canal = self as unknown as {
 
 canal.onmessage = (event) => {
   // Un worker dedicado solo recibe de quien lo creó (origen vacío o el propio); cualquier otro se ignora.
-  if (event.origin && event.origin !== self.location.origin) return;
+  if (event.origin && event.origin !== self.location.origin) {
+    return;
+  }
   const { id, tipo, data } = event.data;
   const out = new Uint8ClampedArray(data.length);
   calcularMascara(tipo, data, out);

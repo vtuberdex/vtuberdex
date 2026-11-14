@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Simulacro del recálculo de experiencia: pasa TODAS las fichas por la fórmula única
  * (`experienciaDeFicha`, `server/src/experiencia.mjs`) y compara con el nivel que traían. Solo lee.
@@ -28,7 +29,9 @@ for (let page = 1, paginas = 1; page <= paginas; page += 1) {
 }
 const filas = [];
 for (const card of cartas) {
-  if (slug && card.slug !== slug) continue;
+  if (slug && card.slug !== slug) {
+    continue;
+  }
   const [likes, xpJuego] = await Promise.all([
     contarLikes(card.id),
     xpJuegoDe(card.id),

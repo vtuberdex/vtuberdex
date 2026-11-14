@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Modelo del formulario del editor: de `VtuberDetail` a estado de formulario y de
  * vuelta a un PATCH con SOLO lo que cambió.
@@ -90,13 +91,48 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 
 /** Misma normalización que el servidor (ascii minúscula con guiones), para mostrar la vista previa. */
 export function slugifyUrl(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return (
+    value
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      // Tras colapsar, en cada extremo queda a lo sumo UN guion: `-+$` reintentaba desde cada guion
+      // (backtracking cuadrático con cadenas largas) para el mismo resultado.
+      .replace(/^-|-$/g, "")
+  );
 }
+
+const textoONulo = (valor: number | null | undefined): string =>
+  valor === null || valor === undefined ? "" : String(valor);
+
+const statDeDetalle = (stat: VtuberDetail["stats"][number]): StatForm => ({
+  label: stat.label,
+  value: textoONulo(stat.value),
+  max: textoONulo(stat.max),
+  valueText: stat.valueText ?? "",
+  slug: stat.slug ?? "",
+});
+
+const skillDeDetalle = (skill: VtuberDetail["skills"][number]): SkillForm => ({
+  category: skill.category,
+  section: skill.section ?? "",
+  type: skill.type ?? "",
+  name: skill.name ?? "",
+  effect: skill.effect ?? "",
+  effectHtml: skill.effectHtml ?? null,
+  // Se conservan tal cual: no se crean a mano y perderlas borraría los emblemas.
+  factions: skill.factions ?? [],
+});
+
+const socialDeDetalle = (
+  social: VtuberDetail["socials"][number],
+): SocialForm => ({
+  platform: social.platform,
+  label: social.label ?? "",
+  url: social.url,
+  icon: social.icon ?? "",
+});
 
 export function formFromDetail(detail: VtuberDetail): EditorForm {
   return {
@@ -112,10 +148,7 @@ export function formFromDetail(detail: VtuberDetail): EditorForm {
     height: detail.height ?? "",
     hashtag: detail.hashtag ?? "",
     favoriteColor: detail.favoriteColor ?? "",
-    level:
-      detail.level === null || detail.level === undefined
-        ? ""
-        : String(detail.level),
+    level: textoONulo(detail.level),
     status: detail.status,
     countries: detail.countries.map((country) => country.slug),
     languages: [...detail.languages],
@@ -129,29 +162,9 @@ export function formFromDetail(detail: VtuberDetail): EditorForm {
       label: field.label,
       value: field.value,
     })),
-    stats: detail.stats.map((stat) => ({
-      label: stat.label,
-      value: stat.value === null ? "" : String(stat.value),
-      max: stat.max === null ? "" : String(stat.max),
-      valueText: stat.valueText ?? "",
-      slug: stat.slug ?? "",
-    })),
-    skills: detail.skills.map((skill) => ({
-      category: skill.category,
-      section: skill.section ?? "",
-      type: skill.type ?? "",
-      name: skill.name ?? "",
-      effect: skill.effect ?? "",
-      effectHtml: skill.effectHtml ?? null,
-      // Se conservan tal cual: no se crean a mano y perderlas borraría los emblemas.
-      factions: skill.factions ?? [],
-    })),
-    socials: detail.socials.map((social) => ({
-      platform: social.platform,
-      label: social.label ?? "",
-      url: social.url,
-      icon: social.icon ?? "",
-    })),
+    stats: detail.stats.map(statDeDetalle),
+    skills: detail.skills.map(skillDeDetalle),
+    socials: detail.socials.map(socialDeDetalle),
   };
 }
 
@@ -187,66 +200,84 @@ const splitList = (value: string): string[] =>
 
 export type PayloadErrors = Partial<Record<keyof VtuberPatch, string>>;
 
-/** Todo el formulario como payload completo, más los errores de validación POR CAMPO. */
-export function toPayload(form: EditorForm): {
-  payload: VtuberPatch;
-  errors: PayloadErrors;
-} {
-  const errors: PayloadErrors = {};
+/*
+ * `toPayload` lee cada sección con su propio lector: todos comparten el MISMO objeto de errores (el último
+ * error de una sección es el que se muestra, como antes) y devuelven solo lo válido.
+ */
 
-  if (!form.name.trim()) errors.name = "El nombre es obligatorio.";
-  if (form.slug.trim() && !slugifyUrl(form.slug))
-    errors.slug = "La URL necesita letras o números.";
-  if (!HEX.test(form.themeColor))
-    errors.themeColor = "El color de marca debe ser #rrggbb.";
-
-  let dexNumber: number | "end" | undefined;
-  if (form.dexEnd) dexNumber = "end";
-  else if (form.dexNumber.trim()) {
-    const parsed = Number(form.dexNumber);
-    if (Number.isInteger(parsed) && parsed >= 1) dexNumber = parsed;
-    else errors.dexNumber = "El número debe ser un entero positivo.";
+function leerDexNumber(
+  form: EditorForm,
+  errors: PayloadErrors,
+): number | "end" | undefined {
+  if (form.dexEnd) {
+    return "end";
   }
-
-  let level: number | null = null;
-  if (form.level.trim()) {
-    const parsed = Number(form.level);
-    if (Number.isInteger(parsed) && parsed >= 0) level = parsed;
-    else errors.level = "El nivel debe ser un entero.";
+  if (!form.dexNumber.trim()) {
+    return undefined;
   }
+  const parsed = Number(form.dexNumber);
+  if (Number.isInteger(parsed) && parsed >= 1) {
+    return parsed;
+  }
+  errors.dexNumber = "El número debe ser un entero positivo.";
+  return undefined;
+}
 
-  if (form.factions.length > MAX_FACTIONS)
-    errors.factions = `Máximo ${MAX_FACTIONS} facciones.`;
+function leerNivel(form: EditorForm, errors: PayloadErrors): number | null {
+  if (!form.level.trim()) {
+    return null;
+  }
+  const parsed = Number(form.level);
+  if (Number.isInteger(parsed) && parsed >= 0) {
+    return parsed;
+  }
+  errors.level = "El nivel debe ser un entero.";
+  return null;
+}
 
+function leerPerfil(form: EditorForm, errors: PayloadErrors): ProfileField[] {
   const profile: ProfileField[] = [];
   for (const field of form.profile) {
     const label = field.label.trim();
     const value = field.value.trim();
-    if (!label && !value) continue;
-    if (!label) errors.profile = "Cada dato del perfil necesita un nombre.";
-    else profile.push({ label, value });
+    if (!label && !value) {
+      continue;
+    }
+    if (label) {
+      profile.push({ label, value });
+    } else {
+      errors.profile = "Cada dato del perfil necesita un nombre.";
+    }
   }
+  return profile;
+}
 
+const statVacio = (stat: StatForm): boolean =>
+  !stat.label.trim() &&
+  !stat.value.trim() &&
+  !stat.max.trim() &&
+  !stat.valueText.trim();
+
+const enteroONulo = (texto: string): number | null =>
+  texto.trim() === "" ? null : Number(texto);
+
+const noEsEntero = (valor: number | null): boolean =>
+  valor !== null && !Number.isInteger(valor);
+
+function leerStats(form: EditorForm, errors: PayloadErrors): StatInput[] {
   const stats: StatInput[] = [];
   for (const stat of form.stats) {
-    const label = stat.label.trim();
-    if (
-      !label &&
-      !stat.value.trim() &&
-      !stat.max.trim() &&
-      !stat.valueText.trim()
-    )
+    if (statVacio(stat)) {
       continue;
+    }
+    const label = stat.label.trim();
     if (!label) {
       errors.stats = "Cada atributo necesita un nombre.";
       continue;
     }
-    const value = stat.value.trim() === "" ? null : Number(stat.value);
-    const max = stat.max.trim() === "" ? null : Number(stat.max);
-    if (
-      (value !== null && !Number.isInteger(value)) ||
-      (max !== null && !Number.isInteger(max))
-    ) {
+    const value = enteroONulo(stat.value);
+    const max = enteroONulo(stat.max);
+    if (noEsEntero(value) || noEsEntero(max)) {
       errors.stats = `El valor y el máximo de «${label}» deben ser enteros.`;
       continue;
     }
@@ -256,20 +287,24 @@ export function toPayload(form: EditorForm): {
       max,
       valueText: orNull(stat.valueText),
     };
-    if (stat.slug.trim()) input.slug = stat.slug.trim();
+    if (stat.slug.trim()) {
+      input.slug = stat.slug.trim();
+    }
     stats.push(input);
   }
+  return stats;
+}
 
-  const skills: SkillInput[] = [];
-  for (const skill of form.skills) {
-    if (
-      !skill.name.trim() &&
-      !skill.effect.trim() &&
-      !skill.section.trim() &&
-      !skill.type.trim()
-    )
-      continue;
-    skills.push({
+const skillVacia = (skill: SkillForm): boolean =>
+  !skill.name.trim() &&
+  !skill.effect.trim() &&
+  !skill.section.trim() &&
+  !skill.type.trim();
+
+function leerSkills(form: EditorForm): SkillInput[] {
+  return form.skills
+    .filter((skill) => !skillVacia(skill))
+    .map((skill) => ({
       category: skill.category,
       section: orNull(skill.section),
       type: orNull(skill.type),
@@ -277,25 +312,61 @@ export function toPayload(form: EditorForm): {
       effect: orNull(skill.effect),
       effectHtml: skill.effectHtml || null,
       factions: skill.factions,
-    });
-  }
+    }));
+}
 
+function leerSocials(form: EditorForm, errors: PayloadErrors): SocialInput[] {
   const socials: SocialInput[] = [];
   for (const social of form.socials) {
     const url = social.url.trim();
     const platform = social.platform.trim();
-    if (!url && !platform && !social.label.trim()) continue;
-    if (!platform) errors.socials = "Cada red necesita una plataforma.";
-    else if (!HTTP_URL.test(url))
-      errors.socials = `La URL de «${platform}» debe empezar con http:// o https://.`;
-    else
+    if (!url && !platform && !social.label.trim()) {
+      continue;
+    }
+    if (!platform) {
+      errors.socials = "Cada red necesita una plataforma.";
+    } else if (HTTP_URL.test(url)) {
       socials.push({
         platform,
         label: orNull(social.label),
         url,
         icon: orNull(social.icon),
       });
+    } else {
+      errors.socials = `La URL de «${platform}» debe empezar con http:// o https://.`;
+    }
   }
+  return socials;
+}
+
+/** Todo el formulario como payload completo, más los errores de validación POR CAMPO. */
+export function toPayload(form: EditorForm): {
+  payload: VtuberPatch;
+  errors: PayloadErrors;
+} {
+  const errors: PayloadErrors = {};
+
+  if (!form.name.trim()) {
+    errors.name = "El nombre es obligatorio.";
+  }
+  if (form.slug.trim() && !slugifyUrl(form.slug)) {
+    errors.slug = "La URL necesita letras o números.";
+  }
+  if (!HEX.test(form.themeColor)) {
+    errors.themeColor = "El color de marca debe ser #rrggbb.";
+  }
+
+  const dexNumber = leerDexNumber(form, errors);
+  const level = leerNivel(form, errors);
+
+  if (form.factions.length > MAX_FACTIONS) {
+    errors.factions = `Máximo ${MAX_FACTIONS} facciones.`;
+  }
+
+  const profile = leerPerfil(form, errors);
+  const stats = leerStats(form, errors);
+  const skills = leerSkills(form);
+  const socials = leerSocials(form, errors);
 
   const payload: VtuberPatch = {
     name: form.name.trim(),
@@ -321,7 +392,9 @@ export function toPayload(form: EditorForm): {
     skills,
     socials,
   };
-  if (dexNumber !== undefined) payload.dexNumber = dexNumber;
+  if (dexNumber !== undefined) {
+    payload.dexNumber = dexNumber;
+  }
   return { payload, errors };
 }
 
@@ -338,8 +411,9 @@ export function buildPatch(
   const { payload, errors } = toPayload(form);
   const patch: Record<string, unknown> = {};
   for (const key of Object.keys(payload) as Array<keyof VtuberPatch>) {
-    if (JSON.stringify(payload[key]) !== JSON.stringify(base[key]))
+    if (JSON.stringify(payload[key]) !== JSON.stringify(base[key])) {
       patch[key] = payload[key];
+    }
   }
   /**
    * Los errores se miran contra el FORMULARIO crudo, no contra el payload: un elemento
@@ -354,7 +428,9 @@ export function buildPatch(
       key === "dexNumber"
         ? form.dexNumber !== baseForm.dexNumber || form.dexEnd
         : JSON.stringify(form[raw]) !== JSON.stringify(baseForm[raw]);
-    if (touched && errors[key]) messages.push(errors[key] as string);
+    if (touched && errors[key]) {
+      messages.push(errors[key] as string);
+    }
   }
   return { patch: patch as VtuberPatch, errors: messages };
 }
@@ -394,17 +470,23 @@ export function createBody(form: EditorForm): {
   problem: string | null;
 } {
   const name = form.name.trim();
-  if (!name)
+  if (!name) {
     return { body: null, problem: "Escribe un nombre para continuar." };
+  }
   const body: VtuberCreate = { name };
   const slug = slugifyUrl(form.slug);
-  if (slug) body.slug = slug;
+  if (slug) {
+    body.slug = slug;
+  }
   if (!form.dexEnd && form.dexNumber.trim()) {
     const parsed = Number(form.dexNumber);
-    if (!Number.isInteger(parsed) || parsed < 1)
+    if (!Number.isInteger(parsed) || parsed < 1) {
       return { body: null, problem: "El número debe ser un entero positivo." };
+    }
     body.dexNumber = parsed;
   }
-  if (form.countries.length > 0) body.countries = form.countries;
+  if (form.countries.length > 0) {
+    body.countries = form.countries;
+  }
   return { body, problem: null };
 }

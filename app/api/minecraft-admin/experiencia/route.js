@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/minecraft-admin/experiencia` — dar (o quitar) experiencia a mano a cualquier ficha.
  *
@@ -59,14 +60,19 @@ export async function GET(request) {
       const ficha = url.searchParams.get("ficha");
       if (ficha !== null) {
         const id = Number(ficha);
-        if (!Number.isInteger(id) || id <= 0)
+        if (!Number.isInteger(id) || id <= 0) {
           return respuestaJson({ error: "ficha_invalida" }, 400);
+        }
         const fila = db.prepare("SELECT slug FROM vtuber WHERE id = ?").get(id);
-        if (!fila) return respuestaJson({ error: "no_encontrada" }, 404);
+        if (!fila) {
+          return respuestaJson({ error: "no_encontrada" }, 404);
+        }
         // Por slug y con los ocultos: buscar por texto (FTS) fallaba con slugs con guiones y no
         // devolvía las fichas en borrador o dadas de baja, que también pueden recibir XP.
         const card = getVtuberBySlug(db, fila.slug, { includeHidden: true });
-        if (!card) return respuestaJson({ error: "no_encontrada" }, 404);
+        if (!card) {
+          return respuestaJson({ error: "no_encontrada" }, 404);
+        }
         const e = await ejecutorDeSolicitudes();
         return respuestaJson({
           ficha: await vistaDeExperiencia(card, e),
@@ -75,7 +81,9 @@ export async function GET(request) {
         });
       }
       const q = (url.searchParams.get("q") ?? "").trim();
-      if (q.length < 2) return respuestaJson({ fichas: [] });
+      if (q.length < 2) {
+        return respuestaJson({ fichas: [] });
+      }
       const { items } = searchVtubers(db, {
         includeHidden: true,
         q: q.replace(/^#/, ""),
@@ -92,15 +100,17 @@ export async function POST(request) {
     request,
     async (acceso) => {
       const cuerpo = await request.json().catch(() => null);
-      if (!cuerpo || typeof cuerpo !== "object")
+      if (!cuerpo || typeof cuerpo !== "object") {
         return respuestaJson({ error: "cuerpo_invalido" }, 400);
+      }
       const db = await dbConDiario();
       const id = Number(cuerpo.ficha);
       if (
         !Number.isInteger(id) ||
         !db.prepare("SELECT 1 FROM vtuber WHERE id = ?").get(id)
-      )
+      ) {
         return respuestaJson({ error: "no_encontrada" }, 404);
+      }
       const e = await ejecutorDeSolicitudes();
       const r = await darXpManual(e, {
         vtuberId: id,
@@ -108,7 +118,9 @@ export async function POST(request) {
         motivo: cuerpo.motivo,
         actor: acceso.sesion.email,
       });
-      if (!r.ok) return respuestaJson(r.cuerpo, r.status);
+      if (!r.ok) {
+        return respuestaJson(r.cuerpo, r.status);
+      }
       return respuestaJson(
         { ok: true, cantidad: r.cantidad, xpDeJuego: r.xpTotal },
         201,

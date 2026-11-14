@@ -27,7 +27,9 @@ const WORKFLOW = path.join(RAIZ, ".github", "workflows", "sonar.yml");
 let salidaTemporal: string | null = null;
 
 afterEach(() => {
-  if (salidaTemporal) rmSync(salidaTemporal, { recursive: true, force: true });
+  if (salidaTemporal) {
+    rmSync(salidaTemporal, { recursive: true, force: true });
+  }
   salidaTemporal = null;
 });
 
@@ -161,13 +163,21 @@ describe("workflow de Sonar", () => {
         pasos.push(actual);
         continue;
       }
-      if (!actual) continue;
+      if (!actual) {
+        continue;
+      }
       const condicion = /^\s{8}if:\s*(.+)$/.exec(linea);
-      if (condicion) actual.condicion = condicion[1].trim();
+      if (condicion) {
+        actual.condicion = condicion[1].trim();
+      }
       const nombre = /^\s{8}name:\s*(.+)$/.exec(linea);
-      if (nombre) actual.nombre = nombre[1].trim();
+      if (nombre) {
+        actual.nombre = nombre[1].trim();
+      }
       const run = /^\s{8}run:\s*(.+)$/.exec(linea);
-      if (run) actual.run = run[1].trim();
+      if (run) {
+        actual.run = run[1].trim();
+      }
     }
 
     return pasos;

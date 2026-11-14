@@ -26,8 +26,9 @@ describe("gastarFichas", () => {
   });
 
   it("repetir fichas ya vistas no gasta cupo", () => {
-    for (let i = 0; i < 50; i++)
+    for (let i = 0; i < 50; i++) {
       expect(gastarFichas("1.2.3.4", ids(1, 8), 1000 + i).permitido).toBe(true);
+    }
   });
 
   it("el tope diario (600) impide completar el catálogo desde una red", () => {
@@ -50,8 +51,9 @@ describe("gastarFichas", () => {
   });
 
   it("loopback y VPN están exentos", () => {
-    for (const ip of ["127.0.0.1", "::1", "10.8.0.5", null])
+    for (const ip of ["127.0.0.1", "::1", "10.8.0.5", null]) {
       expect(gastarFichas(ip, ids(1, 5000)).permitido).toBe(true);
+    }
   });
 });
 

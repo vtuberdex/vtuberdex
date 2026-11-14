@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** Chip de país con bandera; tolera países sin bandera en el dataset. */
 import type { CountryRef } from "@/lib/types";
 
@@ -6,10 +7,10 @@ const FALLBACK_FLAG = "🏳️";
 export function CountryBadge({
   country,
   showName = false,
-}: {
+}: Readonly<{
   country: CountryRef;
   showName?: boolean;
-}) {
+}>) {
   const flag = country.flag?.trim() || FALLBACK_FLAG;
   return (
     <span

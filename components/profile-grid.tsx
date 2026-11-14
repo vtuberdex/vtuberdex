@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Ficha personal (cumpleaños, altura, gustos…). */
 import { useI18n } from "@/lib/i18n";
@@ -9,7 +10,7 @@ export interface ProfileGridProps {
   palette: { accent: string; secondary: string };
 }
 
-export function ProfileGrid({ profile, palette }: ProfileGridProps) {
+export function ProfileGrid({ profile, palette }: Readonly<ProfileGridProps>) {
   const { t, locale } = useI18n();
   if (profile.length === 0) {
     return (

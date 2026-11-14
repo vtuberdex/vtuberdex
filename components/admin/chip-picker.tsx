@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Selección múltiple compacta (países, idiomas): chips quitables más un desplegable para agregar. */
 import { inputClass, labelClass } from "@/components/admin/ui";
@@ -13,13 +14,13 @@ export function ChipPicker({
   value,
   onChange,
   max,
-}: {
+}: Readonly<{
   label: string;
   options: ChipOption[];
   value: string[];
   onChange: (next: string[]) => void;
   max?: number;
-}) {
+}>) {
   const labelOf = (slug: string) =>
     options.find((option) => option.value === slug)?.label ?? slug;
   const available = options.filter((option) => !value.includes(option.value));

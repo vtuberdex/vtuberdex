@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Cuerpo de `/terminos` en el idioma de la interfaz. Es cliente porque el idioma se elige en el
@@ -37,8 +38,8 @@ export function TerminosContenido() {
       )}
 
       <div className="mt-6 space-y-3 text-sm leading-relaxed text-dex-ink/90">
-        {preambulo.map((parrafo, i) => (
-          <p key={i}>{parrafo}</p>
+        {preambulo.map((parrafo) => (
+          <p key={parrafo}>{parrafo}</p>
         ))}
       </div>
 
@@ -75,8 +76,8 @@ export function TerminosContenido() {
               {c.titulo}
             </h2>
             <div className="mt-3 space-y-3 text-sm leading-relaxed text-dex-ink/85">
-              {c.parrafos.map((parrafo, i) => (
-                <p key={i}>{parrafo}</p>
+              {c.parrafos.map((parrafo) => (
+                <p key={parrafo}>{parrafo}</p>
               ))}
             </div>
           </section>

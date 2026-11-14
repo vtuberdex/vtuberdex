@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 // Respaldo de la base local (la única copia de las ediciones y de las imágenes del mantenedor).
 // Uso: node scripts/respaldo-db.mjs [origen.db] [carpeta] [conservar]
 // `VACUUM INTO` da una copia consistente con el servicio encendido y la base en WAL;
@@ -16,7 +17,7 @@ const sello = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
 const destino = join(carpeta, `turso-local-${sello}.db`);
 
 const db = new DatabaseSync(origen, { readOnly: true });
-db.exec(`VACUUM INTO '${destino.replace(/'/g, "''")}'`);
+db.exec(`VACUUM INTO '${destino.replaceAll("'", "''")}'`);
 db.close();
 
 const check = new DatabaseSync(destino, { readOnly: true });
@@ -27,11 +28,20 @@ if (ok !== "ok") {
   process.exit(1);
 }
 
+/** Orden por unidades de código (el de `<`), no `localeCompare`: los sellos ISO ordenan así por fecha. */
+function compararTexto(a, b) {
+  if (a < b) {
+    return -1;
+  }
+  return a > b ? 1 : 0;
+}
+
 const copias = readdirSync(carpeta)
   .filter((f) => /^turso-local-.*\.db$/.test(f))
-  .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-for (const f of copias.slice(0, Math.max(0, copias.length - conservar)))
+  .sort(compararTexto);
+for (const f of copias.slice(0, Math.max(0, copias.length - conservar))) {
   rmSync(join(carpeta, f));
+}
 console.log(
   `✓ ${destino} (${(statSync(destino).size / 1048576).toFixed(0)} MB); ${Math.min(copias.length, conservar)} copias`,
 );

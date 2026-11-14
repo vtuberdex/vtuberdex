@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Prueba de OCR del texto personalizado que viene "cocido" en la imagen de la
  * carta (recuadro oscuro inferior derecho). Mide aciertos sobre cartas conocidas

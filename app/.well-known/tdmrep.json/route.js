@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/.well-known/tdmrep.json` — reserva de derechos de minería de textos y datos (protocolo TDM del W3C).
  * Declara que el sitio NO autoriza la extracción automatizada para entrenar sistemas; la política

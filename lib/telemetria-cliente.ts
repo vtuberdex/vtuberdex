@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Latido anónimo de rendimiento del navegador hacia `/api/stats` (ver `lib/clientes-stats.mjs`).
  *
@@ -18,8 +19,12 @@ export type Ruta = "catalogo" | "ficha" | "otra";
 
 /** La ruta como CATEGORÍA. */
 export function categoriaDeRuta(pathname: string): Ruta {
-  if (pathname === "/") return "catalogo";
-  if (/^\/v\/[^/]+\/?$/.test(pathname)) return "ficha";
+  if (pathname === "/") {
+    return "catalogo";
+  }
+  if (/^\/v\/[^/]+\/?$/.test(pathname)) {
+    return "ficha";
+  }
   return "otra";
 }
 
@@ -30,7 +35,9 @@ export function categoriaDeRuta(pathname: string): Ruta {
  */
 export function fichaDeRuta(pathname: string): string | null {
   const m = /^\/v\/([^/]+)\/?$/.exec(pathname);
-  if (!m) return null;
+  if (!m) {
+    return null;
+  }
   try {
     return decodeURIComponent(m[1]).slice(0, 120);
   } catch {
@@ -56,17 +63,24 @@ export function idDeSesion(): string {
 }
 
 export function medianaDe(valores: number[]): number | null {
-  if (!valores.length) return null;
+  if (!valores.length) {
+    return null;
+  }
   const v = [...valores].sort((a, b) => a - b);
   const m = Math.floor(v.length / 2);
   return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
 }
 
+/** Qué clase de GPU dibuja la página (`desconocida` si el navegador no lo dice). */
+export type ClaseDeGpu = "hardware" | "software" | "desconocida";
+
 /** `software` si el renderizador es un rasterizador por CPU (SwiftShader, llvmpipe…): explica un 3D lento. */
 export function clasificarGpu(
   renderer: string | null | undefined,
-): "hardware" | "software" | "desconocida" {
-  if (!renderer) return "desconocida";
+): ClaseDeGpu {
+  if (!renderer) {
+    return "desconocida";
+  }
   return /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic|lavapipe/i.test(
     renderer,
   )
@@ -74,11 +88,13 @@ export function clasificarGpu(
     : "hardware";
 }
 
-function detectarGpu(): "hardware" | "software" | "desconocida" {
+function detectarGpu(): ClaseDeGpu {
   try {
     const canvas = document.createElement("canvas");
     const gl = canvas.getContext("webgl") as WebGLRenderingContext | null;
-    if (!gl) return "desconocida";
+    if (!gl) {
+      return "desconocida";
+    }
     const info = gl.getExtension("WEBGL_debug_renderer_info");
     const renderer = info
       ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))
@@ -96,9 +112,11 @@ function medirFps(): Promise<number | null> {
     const inicio = performance.now();
     const paso = (ahora: number) => {
       cuadros += 1;
-      if (ahora - inicio >= 1000)
+      if (ahora - inicio >= 1000) {
         resolver(Math.round((cuadros * 1000) / (ahora - inicio)));
-      else requestAnimationFrame(paso);
+      } else {
+        requestAnimationFrame(paso);
+      }
     };
     requestAnimationFrame(paso);
     setTimeout(() => resolver(null), 2500); // pestaña en segundo plano: rAF no corre y no se espera
@@ -119,12 +137,14 @@ const SIN_TELEMETRIA: Telemetria = {
 };
 
 export function iniciarTelemetria(): Telemetria {
-  if (typeof window === "undefined" || !seDebeMedir()) return SIN_TELEMETRIA;
+  if (typeof window === "undefined" || !seDebeMedir()) {
+    return SIN_TELEMETRIA;
+  }
 
   const sid = idDeSesion();
   let largas = { n: 0, ms: 0 };
   let lcp: number | null = null;
-  let gpu: "hardware" | "software" | "desconocida" | null = null;
+  let gpu: ClaseDeGpu | null = null;
   let latidos = 0;
   let marcasVistas = 0;
   const observadores: PerformanceObserver[] = [];
@@ -194,8 +214,9 @@ export function iniciarTelemetria(): Telemetria {
           "/api/stats",
           new Blob([texto], { type: "text/plain" }),
         )
-      )
+      ) {
         throw new Error("beacon");
+      }
     } catch {
       void fetch("/api/stats", {
         method: "POST",
@@ -225,7 +246,9 @@ export function iniciarTelemetria(): Telemetria {
   const avisarRuta = () => {
     // Se avisa si cambió la categoría O la ficha: pasar de una ficha a otra es una vista nueva de esa otra ficha.
     const clave = claveDeRuta();
-    if (clave === ultimaClave) return;
+    if (clave === ultimaClave) {
+      return;
+    }
     ultimaClave = clave;
     const ruta = categoriaDeRuta(location.pathname);
     enviar({
@@ -248,7 +271,9 @@ export function iniciarTelemetria(): Telemetria {
     enviar(await construir());
   };
   const alOcultar = () => {
-    if (document.visibilityState === "hidden") void construir().then(enviar);
+    if (document.visibilityState === "hidden") {
+      void construir().then(enviar);
+    }
   };
   const alSalir = () => enviar({ sid, bye: true });
 
@@ -258,7 +283,9 @@ export function iniciarTelemetria(): Telemetria {
     void latir();
   }, 3000);
   const reloj = window.setInterval(() => {
-    if (document.visibilityState === "visible") void latir();
+    if (document.visibilityState === "visible") {
+      void latir();
+    }
   }, INTERVALO_MS);
   document.addEventListener("visibilitychange", alOcultar);
   window.addEventListener("pagehide", alSalir);

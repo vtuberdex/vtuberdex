@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `GET /api/minecraft/reglas` — curva de experiencia, topes de XP de juego, stats que suben y catálogo de estados
  * para el plugin de Minecraft. Público: son las mismas reglas que explica `/niveles`.

@@ -257,7 +257,9 @@ describe("Asistente de carta: edición", () => {
     });
     // Si la ficha ya trae correo, nace oculto (streaming): hay que pedir verlo para editarlo.
     const mostrar = screen.queryByRole("button", { name: /Mostrar y editar/ });
-    if (mostrar) fireEvent.click(mostrar);
+    if (mostrar) {
+      fireEvent.click(mostrar);
+    }
     fireEvent.change(screen.getByLabelText("Correo electrónico"), {
       target: { value: " Ana@Ejemplo.com " },
     });

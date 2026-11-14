@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `POST /api/minecraft-admin/plugins/estado` `{ archivo, habilitado }` — habilita o deshabilita un
  * plugin renombrando su jar. Surte efecto al reiniciar el servidor. Los plugins de VTuberDex
@@ -14,13 +15,16 @@ export const dynamic = "force-dynamic";
 export async function POST(request) {
   return conMantenedor(request, async () => {
     const cuerpo = await request.json().catch(() => null);
-    if (!cuerpo || typeof cuerpo !== "object")
+    if (!cuerpo || typeof cuerpo !== "object") {
       return respuestaJson({ error: "cuerpo_invalido" }, 400);
+    }
     const r = await cambiarEstadoPlugin({
       archivo: cuerpo.archivo,
       habilitado: cuerpo.habilitado,
     });
-    if (!r.ok) return respuestaJson(r.cuerpo, r.status);
+    if (!r.ok) {
+      return respuestaJson(r.cuerpo, r.status);
+    }
     return respuestaJson({
       ok: true,
       archivo: r.archivo,

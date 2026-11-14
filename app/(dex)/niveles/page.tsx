@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/niveles` — explica cómo funcionan la experiencia, los niveles, la EXP total y los puntos de habilidad.
  * Texto trilingüe en `lib/i18n/textos/niveles.ts`; los metadatos del servidor quedan en español, como en el resto

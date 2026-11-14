@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Cabecera de la app: menú lateral (hamburguesa), marca, enlace a Minecraft y el botón «Inscribir mi ficha».

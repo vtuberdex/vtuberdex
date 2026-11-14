@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/verificar` — destino del enlace de los correos de confirmación (inscripción, cambios y baja).
  * No se indexa: es una página de un solo uso. El token llega en el fragmento de la URL.

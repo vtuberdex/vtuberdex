@@ -1,5 +1,8 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paso 3: color de marca y facciones (hasta 2, con emblema). */
+import { useCallback } from "react";
+
 import type { FactionRow } from "@/lib/types";
 import { FactionPicker } from "@/components/admin/faction-picker";
 import { BRAND_SWATCHES } from "@/components/admin/suggestions";
@@ -11,8 +14,13 @@ export function ColorsStep({
   set,
   factions,
   onCreateFaction,
-}: StepProps & { factions: FactionRow[]; onCreateFaction: () => void }) {
+}: Readonly<StepProps & { factions: FactionRow[]; onCreateFaction: () => void }>) {
   const valid = /^#[0-9a-fA-F]{6}$/.test(form.themeColor);
+  // `set` llega estable del asistente (`useCallback`): el selector recibe siempre la misma función.
+  const cambiarFacciones = useCallback(
+    (next: string[]) => set("factions", next),
+    [set],
+  );
   return (
     <div className="space-y-6">
       <section className="space-y-3">
@@ -75,7 +83,7 @@ export function ColorsStep({
         <FactionPicker
           factions={factions}
           value={form.factions}
-          onChange={(next) => set("factions", next)}
+          onChange={cambiarFacciones}
         />
         <button type="button" className={ghostButton} onClick={onCreateFaction}>
           ¿No está? Crea una facción

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Hook de búsqueda: estado en URL, fetch cancelable y facetas. */
 import { useRouter, useSearchParams } from "next/navigation";
@@ -14,7 +15,6 @@ import {
 import { guardarCatalogo } from "@/lib/volver-al-catalogo";
 import {
   DEFAULT_PER_PAGE,
-  DEFAULT_SEARCH,
   searchParamsFromUrl,
   searchParamsToUrl,
 } from "@/lib/query";
@@ -44,13 +44,18 @@ export interface UseVtuberSearchOptions {
  * delante del usuario. El ancho es el mismo que usa el libro (`card-binder.tsx`).
  */
 const calentarImagenes = (items: VtuberCard[]) => {
-  if (typeof Image === "undefined") return;
-  for (const src of imagenesDeCartas(items)) void loadImage(src);
+  if (typeof Image === "undefined") {
+    return;
+  }
+  for (const src of imagenesDeCartas(items)) {
+    void loadImage(src);
+  }
   if (
     typeof document === "undefined" ||
     typeof HTMLCanvasElement === "undefined"
-  )
+  ) {
     return;
+  }
   pregenerar(items, TEXTURAS.ancho);
 };
 
@@ -123,17 +128,23 @@ export function useVtuberSearch({
     setLoading(true);
     pedirPagina(params, controller.signal)
       .then((response) => {
-        if (requestId.current !== id) return;
+        if (requestId.current !== id) {
+          return;
+        }
         guardarPagina(params, response);
         setData(response);
         programarPrecarga(response);
       })
       .catch((cause: unknown) => {
-        if (controller.signal.aborted || requestId.current !== id) return;
+        if (controller.signal.aborted || requestId.current !== id) {
+          return;
+        }
         setError(cause instanceof Error ? cause.message : "error desconocido");
       })
       .finally(() => {
-        if (requestId.current === id) setLoading(false);
+        if (requestId.current === id) {
+          setLoading(false);
+        }
       });
 
     return () => {
@@ -182,4 +193,4 @@ export function useVtuberSearch({
   return { params, data, loading, error, setParams, reset, goToPage };
 }
 
-export { DEFAULT_SEARCH };
+export { DEFAULT_SEARCH } from "@/lib/query";

@@ -98,19 +98,29 @@ describe("diagnosticarCredenciales", () => {
     // OJO: `process.env.X = undefined` NO borra la variable, guarda la CADENA "undefined"
     // (que es truthy) y `credencialesConfiguradas()` daría true. Para el caso "sin hash" hay
     // que borrarla de verdad con `delete`.
-    if (hash === undefined) delete process.env.VTUBERDEX_ADMIN_PASSWORD_HASH;
-    else process.env.VTUBERDEX_ADMIN_PASSWORD_HASH = hash;
-    if (usuario === undefined) delete process.env.VTUBERDEX_ADMIN_USER;
-    else process.env.VTUBERDEX_ADMIN_USER = usuario;
+    if (hash === undefined) {
+      delete process.env.VTUBERDEX_ADMIN_PASSWORD_HASH;
+    } else {
+      process.env.VTUBERDEX_ADMIN_PASSWORD_HASH = hash;
+    }
+    if (usuario === undefined) {
+      delete process.env.VTUBERDEX_ADMIN_USER;
+    } else {
+      process.env.VTUBERDEX_ADMIN_USER = usuario;
+    }
     try {
       return fn();
     } finally {
-      if (HASH_ORIGINAL === undefined)
+      if (HASH_ORIGINAL === undefined) {
         delete process.env.VTUBERDEX_ADMIN_PASSWORD_HASH;
-      else process.env.VTUBERDEX_ADMIN_PASSWORD_HASH = HASH_ORIGINAL;
-      if (USUARIO_ORIGINAL === undefined)
+      } else {
+        process.env.VTUBERDEX_ADMIN_PASSWORD_HASH = HASH_ORIGINAL;
+      }
+      if (USUARIO_ORIGINAL === undefined) {
         delete process.env.VTUBERDEX_ADMIN_USER;
-      else process.env.VTUBERDEX_ADMIN_USER = USUARIO_ORIGINAL;
+      } else {
+        process.env.VTUBERDEX_ADMIN_USER = USUARIO_ORIGINAL;
+      }
     }
   };
 

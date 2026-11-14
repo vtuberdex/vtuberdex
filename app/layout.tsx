@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Layout raíz.
  *
@@ -36,7 +37,7 @@ const asul = Asul({
 });
 
 /**
- * Metadatos por defecto de TODO el sitio; cada página los afina (`generateMetadata`).
+ * Metadatos por defecto de todo el sitio; cada página los afina (`generateMetadata`).
  * `metadataBase` hace que Next convierta las rutas relativas (canonical, imágenes sociales) en
  * URLs absolutas, que es lo único que aceptan los buscadores y las vistas previas.
  */
@@ -65,9 +66,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="es" className={`${knewave.variable} ${asul.variable}`}>
       <body>

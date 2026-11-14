@@ -67,7 +67,9 @@ describe("DadosPanel", () => {
     render(<DadosPanel />);
     for (let i = 0; i < DADOS.maximo; i++) {
       const boton = screen.getByRole("button", { name: "+ d8" });
-      if (boton.hasAttribute("disabled")) break;
+      if (boton.hasAttribute("disabled")) {
+        break;
+      }
       fireEvent.click(boton);
     }
     expect(screen.getAllByRole("button", { name: /^Quitar / })).toHaveLength(

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Idiomas de la interfaz y cómo se elige uno.
  *
@@ -47,10 +48,14 @@ export function elegirLocale(
   guardado: string | null | undefined,
   preferidos: readonly string[] = [],
 ): Locale {
-  if (esLocale(guardado)) return guardado;
+  if (esLocale(guardado)) {
+    return guardado;
+  }
   for (const etiqueta of preferidos) {
     const locale = localeDeEtiqueta(etiqueta);
-    if (locale) return locale;
+    if (locale) {
+      return locale;
+    }
   }
   return LOCALE_POR_DEFECTO;
 }

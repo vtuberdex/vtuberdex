@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/baja` — formulario público para darse de baja. Acepta los mismos términos que la inscripción.
  * La baja no borra la ficha (cláusula de salida): queda como solicitud en espera.

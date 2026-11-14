@@ -5,7 +5,9 @@ import { RANGOS, rangoDeNivel } from '../src/rangos.mjs';
 
 test('la escalera está ordenada, empieza en el nivel 1 y no repite ids', () => {
   assert.equal(RANGOS[0].desde, 1);
-  for (let i = 1; i < RANGOS.length; i += 1) assert.ok(RANGOS[i].desde > RANGOS[i - 1].desde);
+  for (let i = 1; i < RANGOS.length; i += 1) {
+    assert.ok(RANGOS[i].desde > RANGOS[i - 1].desde);
+  }
   assert.equal(new Set(RANGOS.map((r) => r.id)).size, RANGOS.length);
 });
 
@@ -21,6 +23,8 @@ test('cada nivel cae en el rango correcto y calcula cuánto falta para el siguie
 });
 
 test('entradas absurdas no rompen: cuentan como nivel 1', () => {
-  for (const x of [0, -3, NaN, undefined, null, 'abc']) assert.equal(rangoDeNivel(x).id, 'novato');
+  for (const x of [0, -3, NaN, undefined, null, 'abc']) {
+    assert.equal(rangoDeNivel(x).id, 'novato');
+  }
   assert.equal(rangoDeNivel('12').id, 'veterano');
 });

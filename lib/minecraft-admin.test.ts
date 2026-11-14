@@ -333,7 +333,9 @@ describe("saneado de rutas antes de escribir en disco", () => {
         base: dir,
         carpeta: "plugins",
       });
-      if (!destino.ok) continue;
+      if (!destino.ok) {
+        continue;
+      }
       expect(path.dirname(destino.ruta)).toBe(path.join(dir, "plugins"));
       expect(path.relative(dir, destino.ruta).startsWith("..")).toBe(false);
     }
@@ -398,5 +400,17 @@ describe("ramas de error del mantenedor", () => {
     expect(r.ok).toBe(false);
     expect(r.status).toBe(400);
     expect(r.cuerpo.error).toBe("contenido_invalido");
+  });
+});
+
+describe("conUnSaltoFinal", () => {
+  it("deja un solo salto final, sin importar cuántos traiga", () => {
+    expect(admin.conUnSaltoFinal("")).toBe("\n");
+    expect(admin.conUnSaltoFinal("a")).toBe("a\n");
+    expect(admin.conUnSaltoFinal("a\n\n\n")).toBe("a\n");
+    expect(admin.conUnSaltoFinal("a\n\nb")).toBe("a\n\nb\n");
+    expect(admin.conUnSaltoFinal("\n".repeat(50_000) + "x")).toBe(
+      "\n".repeat(50_000) + "x\n",
+    );
   });
 });

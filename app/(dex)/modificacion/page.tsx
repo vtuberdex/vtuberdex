@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/modificacion` — formulario público para actualizar una ficha ya registrada. Acepta los mismos
  * términos que la inscripción y no cambia nada por sí solo: queda en espera de revisión.

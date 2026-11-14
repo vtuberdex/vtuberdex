@@ -11,11 +11,13 @@ describe("shouldRender", () => {
     for (let i = 0; i < 144; i += 1) {
       const t = i * (1000 / 144);
       if (shouldRender(t, ultimo, true, cfg)) {
-        if (ultimo > 0) gaps.push(t - ultimo);
+        if (ultimo > 0) {
+          gaps.push(t - ultimo);
+        }
         ultimo = t;
       }
     }
-    expect(gaps.length).toBe(142);
+    expect(gaps).toHaveLength(142);
     expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(0.01);
   });
 
@@ -26,7 +28,9 @@ describe("shouldRender", () => {
     for (let i = 0; i < 144; i += 1) {
       const t = i * (1000 / 144);
       if (shouldRender(t, ultimo, true, cfg)) {
-        if (ultimo > 0) gaps.push(t - ultimo);
+        if (ultimo > 0) {
+          gaps.push(t - ultimo);
+        }
         ultimo = t;
       }
     }

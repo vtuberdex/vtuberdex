@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Caché de páginas del catálogo y precarga de las vecinas.
  *
@@ -60,7 +61,9 @@ export function guardarPagina(
   cache.set(clave, response);
   while (cache.size > LIMITE_PAGINAS) {
     const masVieja = cache.keys().next().value;
-    if (masVieja === undefined) break;
+    if (masVieja === undefined) {
+      break;
+    }
     cache.delete(masVieja);
   }
 }
@@ -72,8 +75,9 @@ export function paginasVecinas(
 ): SearchParams[] {
   const vecinas: SearchParams[] = [];
   for (const page of [params.page - 1, params.page + 1]) {
-    if (page >= 1 && page <= pageCount && page !== params.page)
+    if (page >= 1 && page <= pageCount && page !== params.page) {
       vecinas.push({ ...params, page });
+    }
   }
   return vecinas;
 }
@@ -86,11 +90,19 @@ export function imagenesDeCartas(items: readonly VtuberCard[]): string[] {
   const urls = new Set<string>();
   for (const card of items) {
     const arte = card.images.character ?? card.images.card;
-    if (arte) urls.add(arte);
-    if (card.images.logo) urls.add(card.images.logo);
-    if (card.images.background) urls.add(card.images.background);
+    if (arte) {
+      urls.add(arte);
+    }
+    if (card.images.logo) {
+      urls.add(card.images.logo);
+    }
+    if (card.images.background) {
+      urls.add(card.images.background);
+    }
     for (const faccion of card.factionIcons ?? []) {
-      if (faccion.icon) urls.add(faccion.icon);
+      if (faccion.icon) {
+        urls.add(faccion.icon);
+      }
     }
   }
   return [...urls];
@@ -113,7 +125,9 @@ export function precargarVecinas(
       calentar?.(cache.get(clave)!.items);
       return Promise.resolve();
     }
-    if (enVuelo.has(clave)) return Promise.resolve();
+    if (enVuelo.has(clave)) {
+      return Promise.resolve();
+    }
     enVuelo.add(clave);
     return pedir(vecina)
       .then((response) => {

@@ -122,8 +122,9 @@ describe("caché de texturas", () => {
     const primera = makeCard({ id: 1 });
     guardarEnCache(primera, texturas(512));
     const soltar = anclar(primera, 512);
-    for (let id = 2; id <= caben + 3; id += 1)
+    for (let id = 2; id <= caben + 3; id += 1) {
       guardarEnCache(makeCard({ id }), texturas(512));
+    }
     expect(__estadoCache().pixeles).toBeLessThanOrEqual(
       TEXTURAS.cacheMaxPixels + porCarta,
     );
@@ -133,8 +134,9 @@ describe("caché de texturas", () => {
     // Al soltar el ancla (la consulta anterior la rejuveneció: LRU), con suficientes
     // inserciones nuevas cae como cualquier otra.
     soltar();
-    for (let id = 100; id < 100 + caben + 3; id += 1)
+    for (let id = 100; id < 100 + caben + 3; id += 1) {
       guardarEnCache(makeCard({ id }), texturas(512));
+    }
     expect(buscarEnCache(primera, 512)).toBeNull();
   });
 });

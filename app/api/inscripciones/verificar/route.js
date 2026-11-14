@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `POST /api/inscripciones/verificar` — paso 2 de la inscripción: canjea el código por una sesión y
  * devuelve el borrador que esa persona dejó a medias (si lo hay). Las reglas están en `lib/solicitudes.mjs`.

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paso 2: imágenes — reutiliza el gestor (arrastrar y soltar, vista previa) y avisa de lo que falta. */
 import type { VtuberDetail } from "@/lib/types";
@@ -7,11 +8,11 @@ export function ImagesStep({
   token,
   detail,
   onUpdated,
-}: {
+}: Readonly<{
   token: string;
   detail: VtuberDetail;
   onUpdated: (detail: VtuberDetail) => void;
-}) {
+}>) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-dex-muted">
@@ -20,14 +21,13 @@ export function ImagesStep({
         puede omitir y volver después.
       </p>
       {!detail.images.character && (
-        <p
-          role="status"
+        <output
           data-testid="no-character-warning"
-          className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-100"
+          className="block rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-100"
         >
           Sin imagen de personaje la carta se verá vacía. Puedes seguir, pero
           conviene subirla.
-        </p>
+        </output>
       )}
       <ImageManager token={token} detail={detail} onUpdated={onUpdated} />
     </div>

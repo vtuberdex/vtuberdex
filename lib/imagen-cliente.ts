@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Utilidades de imagen que corren EN EL NAVEGADOR, compartidas por el gestor de
  * imágenes de las fichas y por el mantenedor de emblemas de facción.
@@ -15,7 +16,9 @@
 export async function cargarBitmap(file: Blob): Promise<ImageBitmap | null> {
   // Se comprueba ANTES de llamarla: en navegadores antiguos invocarla lanzaría un
   // TypeError síncrono y el `.catch()` no llegaría a engancharse.
-  if (typeof createImageBitmap !== "function") return null;
+  if (typeof createImageBitmap !== "function") {
+    return null;
+  }
   return createImageBitmap(file).catch(() => null);
 }
 
@@ -46,9 +49,13 @@ export async function aPngCuadrado(
 ): Promise<Blob> {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-  if (!ctx) return file;
+  if (!ctx) {
+    return file;
+  }
   const bitmap = await cargarBitmap(file);
-  if (!bitmap) return file;
+  if (!bitmap) {
+    return file;
+  }
 
   const lado = Math.min(maxLado, Math.max(bitmap.width, bitmap.height));
   const escala = Math.min(lado / bitmap.width, lado / bitmap.height, 1);
@@ -96,38 +103,22 @@ export const IMAGEN_SOLICITUD = {
 } as const;
 
 /** Código del error: la interfaz lo traduce a un texto (`img.error.*`). */
+export type CodigoDeErrorDeImagen = "tipo" | "peso" | "chica" | "grande" | "navegador";
+
 export class ErrorDeImagen extends Error {
-  constructor(readonly codigo: "tipo" | "peso" | "chica" | "grande" | "navegador") {
+  constructor(readonly codigo: CodigoDeErrorDeImagen) {
     super(codigo);
     this.name = "ErrorDeImagen";
   }
 }
 
-/**
- * Convierte lo elegido a un WebP del tamaño del tipo. El personaje se encuadra como lo hace el mantenedor
- * (`cover` anclado arriba, 720x1008); el logo conserva su proporción, topado a 900 px por lado y con
- * transparencia. Baja la calidad por pasos hasta que cabe en el peso máximo.
- */
-export async function normalizarImagenDeSolicitud(
-  file: File,
+/** Dibuja el bitmap en el lienzo con el encuadre de su tipo (ver `normalizarImagenDeSolicitud`). */
+function encuadrar(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  bitmap: ImageBitmap,
   tipo: TipoImagenSolicitud,
-): Promise<Blob> {
-  if (file.size > IMAGEN_SOLICITUD.entradaMaxBytes) throw new ErrorDeImagen("peso");
-  if (!file.type.startsWith("image/")) throw new ErrorDeImagen("tipo");
-  const bitmap = await cargarBitmap(file);
-  if (!bitmap) throw new ErrorDeImagen("tipo");
-  const minimo = tipo === "character" ? IMAGEN_SOLICITUD.character.minLado : IMAGEN_SOLICITUD.logo.minLado;
-  if (Math.min(bitmap.width, bitmap.height) < minimo) {
-    bitmap.close?.();
-    throw new ErrorDeImagen("chica");
-  }
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    bitmap.close?.();
-    throw new ErrorDeImagen("navegador");
-  }
+): void {
   if (tipo === "character") {
     const { ancho, alto } = IMAGEN_SOLICITUD.character;
     canvas.width = ancho;
@@ -142,12 +133,50 @@ export async function normalizarImagenDeSolicitud(
     canvas.height = Math.max(1, Math.round(bitmap.height * escala));
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   }
+}
+
+/**
+ * Convierte lo elegido a un WebP del tamaño del tipo. El personaje se encuadra como lo hace el mantenedor
+ * (`cover` anclado arriba, 720x1008); el logo conserva su proporción, topado a 900 px por lado y con
+ * transparencia. Baja la calidad por pasos hasta que cabe en el peso máximo.
+ */
+export async function normalizarImagenDeSolicitud(
+  file: File,
+  tipo: TipoImagenSolicitud,
+): Promise<Blob> {
+  if (file.size > IMAGEN_SOLICITUD.entradaMaxBytes) {
+    throw new ErrorDeImagen("peso");
+  }
+  if (!file.type.startsWith("image/")) {
+    throw new ErrorDeImagen("tipo");
+  }
+  const bitmap = await cargarBitmap(file);
+  if (!bitmap) {
+    throw new ErrorDeImagen("tipo");
+  }
+  const minimo = tipo === "character" ? IMAGEN_SOLICITUD.character.minLado : IMAGEN_SOLICITUD.logo.minLado;
+  if (Math.min(bitmap.width, bitmap.height) < minimo) {
+    bitmap.close?.();
+    throw new ErrorDeImagen("chica");
+  }
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close?.();
+    throw new ErrorDeImagen("navegador");
+  }
+  encuadrar(canvas, ctx, bitmap, tipo);
   bitmap.close?.();
 
   for (const calidad of [0.92, 0.85, 0.75, 0.65, 0.5]) {
     const webp = await canvasABlob(canvas, "image/webp", calidad);
-    if (!webp || webp.type !== "image/webp") throw new ErrorDeImagen("navegador");
-    if (webp.size <= IMAGEN_SOLICITUD.salidaMaxBytes) return webp;
+    if (webp?.type !== "image/webp") {
+      throw new ErrorDeImagen("navegador");
+    }
+    if (webp.size <= IMAGEN_SOLICITUD.salidaMaxBytes) {
+      return webp;
+    }
   }
   throw new ErrorDeImagen("grande");
 }

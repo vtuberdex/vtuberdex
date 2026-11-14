@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * DDL perezoso por ejecutor: cada módulo con tablas propias (solicitudes, borradores, likes…)
  * crea las suyas la primera vez que las toca, sin un paso de migración aparte.

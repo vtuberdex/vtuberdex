@@ -59,8 +59,9 @@ describe("los correos usan el sistema de diseño", () => {
       expect(html).toContain(DISENO.fuentesUrl);
       // Todo color hexadecimal que aparece es un token (no quedan los grises/azules del diseño anterior).
       const permitidos = new Set(Object.values(DISENO.color));
-      for (const hex of html.match(/#[0-9a-fA-F]{6}\b/g) ?? [])
+      for (const hex of html.match(/#[0-9a-fA-F]{6}\b/g) ?? []) {
         expect(permitidos.has(hex.toLowerCase())).toBe(true);
+      }
     },
   );
 

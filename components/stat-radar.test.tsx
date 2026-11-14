@@ -27,7 +27,9 @@ describe("lib/radar", () => {
   it("normaliza cada eje contra su referencia y respeta el orden del gráfico", () => {
     const v = verticesDeRadar(completo);
     expect(v.map((x) => x.slug)).toEqual(EJES_DE_RADAR.map((e) => e.slug));
-    for (const x of v) expect(x.ratio).toBeCloseTo(0.5);
+    for (const x of v) {
+      expect(x.ratio).toBeCloseTo(0.5);
+    }
   });
   it("acota por arriba y deja un piso para que un valor bajo no desaparezca", () => {
     const v = verticesDeRadar([

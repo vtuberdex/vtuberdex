@@ -89,7 +89,9 @@ describe("menú lateral", () => {
     render(<SideMenu />);
     await userEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
     const dialogo = screen.getByRole("dialog");
-    for (let i = 0; i < 20; i++) await userEvent.tab();
+    for (let i = 0; i < 20; i++) {
+      await userEvent.tab();
+    }
     expect(dialogo.contains(document.activeElement)).toBe(true);
   });
 

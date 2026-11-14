@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Listado del mantenedor con el dato del correo: marca cada ficha (`hasEmail`) y permite filtrar por
  * las que tienen o no correo. Lo comparten el Express local y la ruta de Next.
@@ -45,7 +46,9 @@ export async function listarConCorreo(
       perPage: POR_PAGINA_MAX,
     });
     todas.push(...marcar(bloque.items));
-    if (p >= bloque.pageCount) break;
+    if (p >= bloque.pageCount) {
+      break;
+    }
   }
   const filtradas = todas.filter(
     (item) => item.hasEmail === (correo === "con"),

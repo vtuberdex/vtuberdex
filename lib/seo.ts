@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * SEO: URL del sitio, descripciones y datos estructurados (JSON-LD).
  *
@@ -16,6 +17,22 @@ export const NOMBRE_SITIO = "VTuberDex";
 export const DESCRIPCION_SITIO =
   "VTuberDex: catálogo buscable de VTubers hispanohablantes con carta holográfica 3D, ficha, atributos y habilidades.";
 
+const esBarra = (c: string) => c === "/";
+const esRellenoFinal = (c: string) => /^[\s,.;:]$/.test(c);
+
+/**
+ * El texto sin los caracteres del final que cumplen `quitar`. Sustituye a `/\/+$/` y
+ * `/[\s,.;:]+$/`, que reintentaban desde cada carácter del grupo y eran cuadráticos con una
+ * racha larga de ellos en medio del texto: aquí se recorre una sola vez desde el final.
+ */
+function sinFinal(texto: string, quitar: (c: string) => boolean): string {
+  let fin = texto.length;
+  while (fin > 0 && quitar(texto[fin - 1])) {
+    fin -= 1;
+  }
+  return texto.slice(0, fin);
+}
+
 /**
  * Origen público del sitio, sin barra final.
  *
@@ -27,16 +44,20 @@ export function siteUrl(
   env: Record<string, string | undefined> = process.env,
 ): string {
   const explicita = env.SITE_URL?.trim();
-  if (explicita) return explicita.replace(/\/+$/, "");
+  if (explicita) {
+    return sinFinal(explicita, esBarra);
+  }
   const vercel = env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (vercel)
-    return `https://${vercel.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
+  if (vercel) {
+    return `https://${sinFinal(vercel.replace(/^https?:\/\//, ""), esBarra)}`;
+  }
   return `http://localhost:${env.PORT ?? 3000}`;
 }
 
 /** URL absoluta de una ruta del sitio. */
 export function urlAbsoluta(ruta: string, base: string = siteUrl()): string {
-  return `${base}${ruta.startsWith("/") ? ruta : `/${ruta}`}`;
+  const absoluta = ruta.startsWith("/") ? ruta : `/${ruta}`;
+  return `${base}${absoluta}`;
 }
 
 /** Ruta pública de una ficha. El slug es ASCII, pero se codifica por si el mantenedor mete otra cosa. */
@@ -46,11 +67,14 @@ const MAX_DESCRIPCION = 160;
 
 function recortar(texto: string, max = MAX_DESCRIPCION): string {
   const limpio = texto.replace(/\s+/g, " ").trim();
-  if (limpio.length <= max) return limpio;
+  if (limpio.length <= max) {
+    return limpio;
+  }
   // Se corta en el último espacio para no partir una palabra, y se marca con puntos suspensivos.
   const corte = limpio.slice(0, max - 1);
   const espacio = corte.lastIndexOf(" ");
-  return `${(espacio > max * 0.6 ? corte.slice(0, espacio) : corte).replace(/[\s,.;:]+$/, "")}…`;
+  const entero = espacio > max * 0.6 ? corte.slice(0, espacio) : corte;
+  return `${sinFinal(entero, esRellenoFinal)}…`;
 }
 
 type FichaSeo = Pick<
@@ -73,17 +97,22 @@ type FichaSeo = Pick<
 export function descripcionDeFicha(card: FichaSeo): string {
   const partes: string[] = [];
   const pais = card.countries[0]?.name;
+  const dePais = pais ? ` de ${pais}` : "";
   partes.push(
-    `${card.name}, VTuber${pais ? ` de ${pais}` : ""}, carta #${String(card.dexNumber).padStart(3, "0")} de la ${NOMBRE_SITIO}.`,
+    `${card.name}, VTuber${dePais}, carta #${String(card.dexNumber).padStart(3, "0")} de la ${NOMBRE_SITIO}.`,
   );
-  if (card.phrase?.trim()) partes.push(`«${card.phrase.trim()}»`);
-  if (card.factions.length)
+  if (card.phrase?.trim()) {
+    partes.push(`«${card.phrase.trim()}»`);
+  }
+  if (card.factions.length) {
     partes.push(`Facciones: ${card.factions.join(", ")}.`);
+  }
   const habilidades = (card.skills ?? [])
     .map((s) => s.name)
     .filter((n): n is string => Boolean(n));
-  if (habilidades.length)
+  if (habilidades.length) {
     partes.push(`Habilidades: ${habilidades.slice(0, 3).join(", ")}.`);
+  }
   return recortar(partes.join(" "));
 }
 
@@ -213,4 +242,4 @@ export function jsonLdDelIndice(
  * mantenedor con `</script>` cerraría la etiqueta e inyectaría HTML.
  */
 export const serializarJsonLd = (datos: unknown) =>
-  JSON.stringify(datos).replace(/</g, "\\u003c");
+  JSON.stringify(datos).replaceAll("<", String.raw`\u003c`);

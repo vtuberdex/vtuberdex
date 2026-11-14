@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Cartas PREMIUM: la escala de grados y sus reglas. UNA sola definición.
  *
@@ -59,7 +60,7 @@ export const TODOS_LOS_GRADOS = Object.freeze([
 export const GRADO_INICIAL = GRADOS[0];
 
 /** Grado máximo: la Black Label. Por encima de él no hay nada. */
-export const GRADO_MAXIMO = GRADOS[GRADOS.length - 1];
+export const GRADO_MAXIMO = GRADOS.at(-1);
 
 /**
  * Nombre de cada grado, como el de las etiquetas de CGC. El `10` es «Gem Mint» y la `BL` es la
@@ -112,7 +113,9 @@ export const DONACION_POR_GRADO = Object.freeze({
  * degradadas (5…1) siguen su propia escala rota (`severidadDeGrado`).
  */
 export function desgasteLeveDeGrado(grado) {
-  if (grado === null || grado === undefined || grado === "") return 1;
+  if (grado === null || grado === undefined || grado === "") {
+    return 1;
+  }
   const rango = ["6", "6.5", "7", "7.5"].indexOf(grado);
   return rango < 0 ? 0 : 0.8 - rango * 0.2;
 }
@@ -140,7 +143,9 @@ export function esGradoDegradado(grado) {
  * saber del grado; las perillas de cada efecto viven en `DETERIORO` (`card3d-config.ts`).
  */
 export function severidadDeGrado(grado) {
-  if (!esGradoDegradado(grado)) return 0;
+  if (!esGradoDegradado(grado)) {
+    return 0;
+  }
   return (8 - Number(grado)) / 7;
 }
 
@@ -155,7 +160,9 @@ export function rangoDeGrado(grado) {
  */
 export function gradoSiguiente(grado) {
   const rango = rangoDeGrado(grado);
-  if (rango < 0 || rango >= GRADOS.length - 1) return null;
+  if (rango < 0 || rango >= GRADOS.length - 1) {
+    return null;
+  }
   return GRADOS[rango + 1];
 }
 
@@ -189,7 +196,9 @@ export function hoy(ahora = new Date()) {
 export function mesesCalendario(desde, hasta) {
   const [ay, am] = String(desde).split("-").map(Number);
   const [by, bm] = String(hasta).split("-").map(Number);
-  if (![ay, am, by, bm].every(Number.isFinite)) return 0;
+  if (![ay, am, by, bm].every(Number.isFinite)) {
+    return 0;
+  }
   return (by - ay) * 12 + (bm - am);
 }
 
@@ -205,10 +214,16 @@ export function mesesCalendario(desde, hasta) {
  *     (se queda en los meses alcanzados) en vez de apagarse sola a quien ya llegó arriba.
  */
 export function rachaDe(premium, ahora = hoy()) {
-  if (!premium || !GRADOS.includes(premium.grade)) return 0;
+  if (!premium || !GRADOS.includes(premium.grade)) {
+    return 0;
+  }
   const meses = mesesCalendario(premium.since, premium.gradedAt) + 1;
-  if (meses < 2) return 0;
+  if (meses < 2) {
+    return 0;
+  }
   const enLoAlto = premium.grade === "10" || premium.grade === GRADO_MAXIMO;
-  if (!enLoAlto && mesesCalendario(premium.gradedAt, ahora) > 1) return 0;
+  if (!enLoAlto && mesesCalendario(premium.gradedAt, ahora) > 1) {
+    return 0;
+  }
   return meses;
 }

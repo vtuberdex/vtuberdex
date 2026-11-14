@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Descarga los logos de FACCIÓN que el sitio sirve en `facciones/<Nombre>.png`.
  *
@@ -9,11 +10,10 @@
  * así que se descarta la respuesta comparando su tamaño con el del index.
  */
 
-import fs from "node:fs";
-import { promises as fsP } from "node:fs";
+import fs, { promises as fsP } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import * as cheerio from "cheerio";
+import { load } from "cheerio";
 import sharp from "sharp";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -30,13 +30,19 @@ let indexSize = 0;
 export function collectFactionFiles(cacheDir = CACHE) {
   const files = new Set();
   for (const f of fs.readdirSync(cacheDir)) {
-    if (!f.endsWith(".html")) continue;
-    const $ = cheerio.load(fs.readFileSync(path.join(cacheDir, f), "utf8"));
+    if (!f.endsWith(".html")) {
+      continue;
+    }
+    const $ = load(fs.readFileSync(path.join(cacheDir, f), "utf8"));
     $("img").each((_, el) => {
       const src = $(el).attr("src") ?? "";
-      if (!src.includes("facciones/")) return;
+      if (!src.includes("facciones/")) {
+        return;
+      }
       const name = src.split("facciones/")[1];
-      if (name) files.add(name);
+      if (name) {
+        files.add(name);
+      }
     });
   }
   return [...files];
@@ -103,8 +109,10 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error("[faction] ERROR", error);
     process.exit(1);
-  });
+  }
 }

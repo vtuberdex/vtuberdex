@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/minecraft-admin/enlace` — pide el enlace mágico del mantenedor.
  *
@@ -14,6 +15,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request) {
   const cuerpo = await request.json().catch(() => null);
   const resultado = await enviarEnlaceMantenedor({ email: cuerpo?.email });
-  if (!resultado.ok) return respuestaJson(resultado.cuerpo, resultado.status);
+  if (!resultado.ok) {
+    return respuestaJson(resultado.cuerpo, resultado.status);
+  }
   return respuestaJson({ ok: true });
 }

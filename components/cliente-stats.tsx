@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Latido anónimo de rendimiento (ver `lib/telemetria-cliente.ts`). No pinta nada. */
 import { usePathname } from "next/navigation";

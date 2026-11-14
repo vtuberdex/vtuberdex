@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Aplica a PRODUCCIÓN un parche de ficha (un JSON con los campos de `vtuberUpdateSchema`) y
  * COMPRUEBA que quedó publicado.
@@ -50,8 +51,9 @@ try {
 const validado = vtuberUpdateSchema.safeParse(crudo);
 if (!validado.success) {
   console.error("✖ el archivo no cumple el esquema del mantenedor:");
-  for (const { path: ruta, message } of formatIssues(validado.error))
+  for (const { path: ruta, message } of formatIssues(validado.error)) {
     console.error(`  · ${ruta}: ${message}`);
+  }
   process.exit(1);
 }
 const parche = validado.data;
@@ -60,9 +62,11 @@ console.log(
 );
 
 /* ------------------------------------------------------------ credenciales */
-function pedir(ruta, { token, ...init } = {}) {
+function pedir(ruta, { token: sesion, ...init } = {}) {
   const cabeceras = { "content-type": "application/json" };
-  if (token) cabeceras.authorization = ["Bearer", token].join(" ");
+  if (sesion) {
+    cabeceras.authorization = ["Bearer", sesion].join(" ");
+  }
   return pedirJson(`${URL_BASE}${ruta}`, { ...init, headers: cabeceras });
 }
 
@@ -75,12 +79,12 @@ if (actual.status !== 200) {
   process.exit(1);
 }
 const hoy = actual.cuerpo;
-const resumir = (valor) =>
+const estaVacio = (valor) =>
   valor === null ||
   valor === undefined ||
-  (Array.isArray(valor) && valor.length === 0)
-    ? "(vacío)"
-    : JSON.stringify(valor);
+  (Array.isArray(valor) && valor.length === 0);
+const resumir = (valor) =>
+  estaVacio(valor) ? "(vacío)" : JSON.stringify(valor);
 const proyeccion = {
   phrase: hoy.phrase,
   birthday: hoy.birthday,
@@ -102,7 +106,9 @@ console.log(
   `\nFicha «${hoy.name}» (#${hoy.dexNumber}, id ${hoy.id}) — cambios respecto de producción:`,
 );
 for (const campo of Object.keys(parche)) {
-  if (campo === "premium") continue;
+  if (campo === "premium") {
+    continue;
+  }
   const igual =
     JSON.stringify(proyeccion[campo]) === JSON.stringify(parche[campo]);
   console.log(
@@ -182,8 +188,9 @@ const comprobaciones = [
       publico.factions?.length === parche.factions.length,
   ],
 ];
-for (const [nombre, ok] of comprobaciones)
+for (const [nombre, ok] of comprobaciones) {
   console.log(`${ok ? "✔" : "✖"} ${nombre}`);
+}
 if (comprobaciones.some(([, ok]) => !ok)) {
   console.log(
     "(si algo sale ✖ espera ~30 s: la ficha pública se cachea en el borde y vuelve a comprobar con el ensayo)",

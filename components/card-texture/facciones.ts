@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Qué emblemas de facción lleva una carta. Lo comparten la textura (que pinta los engarces y
  * reserva el ancho en la cabecera) y el componente 3D (que carga los emblemas para el shader):
@@ -26,6 +27,8 @@ export function anchoDeEngarces(
   gap: number,
   separacion: number,
 ): number {
-  if (cantidad <= 0) return 0;
+  if (cantidad <= 0) {
+    return 0;
+  }
   return cantidad * size + (cantidad - 1) * gap + separacion;
 }

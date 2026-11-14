@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Lógica PURA del ritmo de render (sin three ni DOM), para poder probarla: el componente que
  * la usa (`render-governor.tsx`) solo la cablea al bucle de R3F, y ese bucle no corre en jsdom.
@@ -22,13 +23,17 @@ export function shouldRender(
   cfg: PacingConfig = RENDER,
 ): boolean {
   const fps = fpsFor(active, cfg);
-  if (fps <= 0) return active;
+  if (fps <= 0) {
+    return active;
+  }
   return now - scheduledAt >= 1000 / fps - cfg.toleranceMs;
 }
 
 /** fps vigentes: el reposo nunca supera el tope activo (si lo hay). 0 = sin tope (activo) / apagado (reposo). */
 function fpsFor(active: boolean, cfg: PacingConfig): number {
-  if (active) return cfg.activeFps;
+  if (active) {
+    return cfg.activeFps;
+  }
   return cfg.activeFps > 0 ? Math.min(cfg.idleFps, cfg.activeFps) : cfg.idleFps;
 }
 
@@ -45,7 +50,9 @@ export function nextSchedule(
   cfg: PacingConfig = RENDER,
 ): number {
   const fps = fpsFor(active, cfg);
-  if (fps <= 0) return now;
+  if (fps <= 0) {
+    return now;
+  }
   const paso = 1000 / fps;
   const siguiente = scheduledAt + paso;
   return now - siguiente > paso ? now : siguiente;

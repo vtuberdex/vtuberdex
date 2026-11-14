@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Fábrica de texturas de carta: cola con prioridades, generación progresiva, caché
@@ -31,7 +32,6 @@
  */
 import type { VtuberCard } from "@/lib/types";
 import { TEXTURAS } from "@/components/card3d-config";
-import { CARD_TEXTURE_FULL_WIDTH } from "./dimensiones";
 import { drawCardLayers } from "./componer";
 import { esFichaDeteriorada, gradoDeDibujo } from "@/lib/premium";
 import {
@@ -71,9 +71,11 @@ const enOcio = (fn: () => void) => {
       opts?: { timeout: number },
     ) => number;
   };
-  if (typeof w.requestIdleCallback === "function")
+  if (typeof w.requestIdleCallback === "function") {
     w.requestIdleCallback(fn, { timeout: TEXTURAS.esperaOciosaMaxMs });
-  else setTimeout(fn, TEXTURAS.retrasoOciosoMs);
+  } else {
+    setTimeout(fn, TEXTURAS.retrasoOciosoMs);
+  }
 };
 
 async function ejecutar(entrada: { trabajo: Trabajo; listo: () => void }) {
@@ -89,7 +91,9 @@ async function ejecutar(entrada: { trabajo: Trabajo; listo: () => void }) {
 }
 
 function bombear() {
-  if (corriendo) return;
+  if (corriendo) {
+    return;
+  }
   const alta = colaAlta.shift();
   if (alta) {
     corriendo = true;
@@ -98,7 +102,9 @@ function bombear() {
     return;
   }
   const baja = colaBaja.shift();
-  if (!baja) return;
+  if (!baja) {
+    return;
+  }
   corriendo = true;
   enOcio(() => {
     // Si mientras esperaba el hueco ocioso llegó trabajo de prioridad alta, le cede el
@@ -340,8 +346,12 @@ const pixelesDe = (t: TexturasDeCarta) =>
 
 function podar() {
   for (const [clave, entrada] of cache) {
-    if (pixelesEnCache <= TEXTURAS.cacheMaxPixels) return;
-    if (entrada.anclas > 0) continue;
+    if (pixelesEnCache <= TEXTURAS.cacheMaxPixels) {
+      return;
+    }
+    if (entrada.anclas > 0) {
+      continue;
+    }
     cache.delete(clave);
     pixelesEnCache -= entrada.pixeles;
   }
@@ -361,8 +371,9 @@ export function buscarEnCache(
   const prefijo = `${card.id}|`;
   const sufijo = `|${gradoDeCarta(card)}|${urlsDeCarta(card).join("|")}`;
   for (const [clave, entrada] of cache) {
-    if (clave.startsWith(prefijo) && clave.endsWith(sufijo))
+    if (clave.startsWith(prefijo) && clave.endsWith(sufijo)) {
       return entrada.texturas;
+    }
   }
   return null;
 }
@@ -371,7 +382,9 @@ export function guardarEnCache(
   card: VtuberCard,
   texturas: TexturasDeCarta,
 ): void {
-  if (!texturas.completa) return;
+  if (!texturas.completa) {
+    return;
+  }
   const clave = claveDe(card, texturas.width);
   const previa = cache.get(clave);
   if (previa) {
@@ -388,14 +401,20 @@ export function guardarEnCache(
 export function anclar(card: VtuberCard, width: number): () => void {
   const clave = claveDe(card, width);
   const entrada = cache.get(clave);
-  if (!entrada) return () => undefined;
+  if (!entrada) {
+    return () => undefined;
+  }
   entrada.anclas += 1;
   let suelta = false;
   return () => {
-    if (suelta) return;
+    if (suelta) {
+      return;
+    }
     suelta = true;
     const actual = cache.get(clave);
-    if (actual) actual.anclas = Math.max(0, actual.anclas - 1);
+    if (actual) {
+      actual.anclas = Math.max(0, actual.anclas - 1);
+    }
     podar();
   };
 }
@@ -453,21 +472,31 @@ export async function generarTexturas(
 
   precalentarMascaras();
   const fuentes = await cargarFuentes(card);
-  if (cancelada()) return null;
+  if (cancelada()) {
+    return null;
+  }
 
   let rapida: TexturasDeCarta | null = null;
   let completa: TexturasDeCarta | null = null;
   await encolarTrabajo(() => {
-    if (cancelada()) return;
+    if (cancelada()) {
+      return;
+    }
     const t0 = performance.now();
     rapida = generarRapida(card, fuentes, width);
     medir(`textura-rapida:${width}`, performance.now() - t0);
-    if (prioridad === "alta") alRapida?.(rapida);
+    if (prioridad === "alta") {
+      alRapida?.(rapida);
+    }
   }, prioridad);
-  if (!rapida || cancelada()) return null;
+  if (!rapida || cancelada()) {
+    return null;
+  }
 
   await encolarTrabajo(async () => {
-    if (cancelada() || !rapida) return;
+    if (cancelada() || !rapida) {
+      return;
+    }
     const t0 = performance.now();
     const resultado = await completar(card, fuentes, rapida);
     completa = resultado.texturas;
@@ -493,7 +522,7 @@ export function pregenerar(
 }
 
 /** Ancho de textura por defecto cuando el plan no dice otra cosa. */
-export const ANCHO_POR_DEFECTO = CARD_TEXTURE_FULL_WIDTH;
+export { CARD_TEXTURE_FULL_WIDTH as ANCHO_POR_DEFECTO } from "./dimensiones";
 
 /** Para los tests: olvida la caché. */
 export function __reiniciarFabrica(): void {

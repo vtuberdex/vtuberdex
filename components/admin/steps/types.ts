@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 import type { EditorForm } from "@/components/admin/form-model";
 import type { FactionRow } from "@/lib/types";
 

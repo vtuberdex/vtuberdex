@@ -14,7 +14,9 @@ describe("conContadoresDiferidos", () => {
   it("recalcula UNA vez al final en vez de una por operación", () => {
     const { db, llamadas } = baseFalsa();
     conContadoresDiferidos(db as never, () => {
-      for (let i = 0; i < 500; i += 1) refreshFacetCounters(db as never);
+      for (let i = 0; i < 500; i += 1) {
+        refreshFacetCounters(db as never);
+      }
       expect(llamadas).toHaveLength(0);
     });
     expect(llamadas).toHaveLength(1);

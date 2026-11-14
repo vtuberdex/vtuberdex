@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * EXP automática por el diario de cambios: +10 por cada acción crear / modificar / aprobar.
  *
@@ -24,9 +25,13 @@ async function tabla(ejecutor) {
 
 /** Otorga EXP por un cambio del diario. Devuelve lo sumado (0 si el tipo no cuenta o ya estaba otorgado). */
 export async function otorgarExp(ejecutor, { cambioId, tipo, actor, ahora = Date.now() }) {
-  if (!TIPOS_CON_EXP.includes(tipo)) return 0;
+  if (!TIPOS_CON_EXP.includes(tipo)) {
+    return 0;
+  }
   const id = Number(cambioId);
-  if (!Number.isInteger(id)) throw new Error(`cambio inválido: ${cambioId}`);
+  if (!Number.isInteger(id)) {
+    throw new Error(`cambio inválido: ${cambioId}`);
+  }
   const e = await tabla(ejecutor);
   const r = await e.execute(
     "INSERT OR IGNORE INTO exp_evento (cambio_id, actor, tipo, cantidad, creado) VALUES (?, ?, ?, ?, ?)",

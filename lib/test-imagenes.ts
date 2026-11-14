@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Ayudas de PRUEBA para las imágenes de las solicitudes: un WebP mínimo pero bien formado y una función
  * que sube de verdad (`guardarImagen`) las imágenes que un formulario de prueba marca con `SUBIR`.
@@ -80,7 +81,9 @@ export async function conImagenes<T extends Record<string, unknown>>(
     ["imageId", "character"],
     ["logoId", "logo"],
   ] as const) {
-    if (salida[campo] !== SUBIR) continue;
+    if (salida[campo] !== SUBIR) {
+      continue;
+    }
     n += 1;
     const { id } = await guardarImagen(ejecutor as never, {
       correo,

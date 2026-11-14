@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * La matemática de las máscaras, sin DOM: recorre píxeles RGBA y escribe píxeles RGBA.
  *
@@ -19,23 +20,29 @@ export function mascaraTintaYPiel(
 ): void {
   for (let i = 0; i < a.length; i += 4) {
     const alpha = a[i + 3];
-    if (alpha < 8) continue;
+    if (alpha < 8) {
+      continue;
+    }
     const r = a[i];
     const g = a[i + 1];
     const b = a[i + 2];
 
     const maxCh = Math.max(r, g, b);
     const minCh = Math.min(r, g, b);
-    const ink = maxCh < 92 ? 1 - maxCh / 92 : 0;
+    // Tinta: 1 en el negro, bajando hasta 0 en un canal máximo de 92 (más claro ya no es lineart).
+    const ink = Math.max(0, 1 - maxCh / 92);
 
     const esCalido = r > g && g >= b && r - b > 12 && r - b < 120;
     const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     const sat = maxCh === 0 ? 0 : (maxCh - minCh) / maxCh;
-    const piel = esCalido && lum > 70 && lum < 250 && sat < 0.62 ? 1 : 0;
+    const luzDePiel = lum > 70 && lum < 250 && sat < 0.62;
+    const piel = esCalido && luzDePiel ? 1 : 0;
     const skinWeight = 0.55;
 
     const intensidad = Math.max(ink, piel * skinWeight);
-    if (intensidad <= 0) continue;
+    if (intensidad <= 0) {
+      continue;
+    }
 
     const v = Math.round(Math.min(255, intensidad * 255));
     o[i] = v;
@@ -66,6 +73,9 @@ export function calcularMascara(
   a: Uint8ClampedArray,
   o: Uint8ClampedArray,
 ): void {
-  if (tipo === "tinta") mascaraTintaYPiel(a, o);
-  else mascaraCobertura(a, o);
+  if (tipo === "tinta") {
+    mascaraTintaYPiel(a, o);
+  } else {
+    mascaraCobertura(a, o);
+  }
 }

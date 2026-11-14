@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** Utilidades de color: derivan la paleta holográfica desde el color del dato. */
 
 export interface Rgb {
@@ -115,8 +116,9 @@ export function colorDesdeNombre(
   // Gana el primer color que se menciona: es el dominante en frases como «Rojo y negro».
   for (const [patron, hex] of COLORES_POR_NOMBRE) {
     const encontrado = patron.exec(limpio);
-    if (encontrado && (!mejor || encontrado.index < mejor.indice))
+    if (encontrado && (!mejor || encontrado.index < mejor.indice)) {
       mejor = { indice: encontrado.index, hex };
+    }
   }
   return mejor?.hex ?? null;
 }

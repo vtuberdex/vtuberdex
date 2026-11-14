@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Ajuste EN VIVO del efecto de la carta (banco de trabajo, no producción).
  *
@@ -516,7 +517,9 @@ export function cambios(): Partial<LiveKnobs> {
   for (const [clave, valor] of Object.entries(live) as Array<
     [keyof LiveKnobs, number]
   >) {
-    if (tocadas.has(clave) && valor !== DEFAULTS[clave]) out[clave] = valor;
+    if (tocadas.has(clave) && valor !== DEFAULTS[clave]) {
+      out[clave] = valor;
+    }
   }
   return out;
 }

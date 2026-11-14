@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `PUT /api/inscripciones/borrador` — guarda lo que la persona lleva escrito, atado a su correo verificado,
  * para que pueda volver a continuar. Las reglas están en `lib/solicitudes.mjs` y `server/src/borradores.mjs`.

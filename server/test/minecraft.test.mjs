@@ -181,8 +181,9 @@ test("el tope diario recorta el último lote y deja pasar al día siguiente", as
   const e = nuevo();
   await vinculado(e);
   let sumado = 0;
-  while (sumado < XP_JUEGO_MAX_DIA)
+  while (sumado < XP_JUEGO_MAX_DIA) {
     sumado += (await sumarXp(e, lote({ mob: 70 }))).sumado;
+  }
   assert.equal(sumado, XP_JUEGO_MAX_DIA);
   const topado = await sumarXp(e, lote({ mob: 70 }));
   assert.equal(topado.sumado, 0);
@@ -198,7 +199,9 @@ test('la XP de entrega tiene su tope aparte y no resta del de siempre', async ()
   const e = nuevo();
   await vinculado(e);
   let entrega = 0;
-  while (entrega < XP_ENTREGA_MAX_DIA) entrega += (await sumarXp(e, lote({ entrega: 100 }))).sumado;
+  while (entrega < XP_ENTREGA_MAX_DIA) {
+    entrega += (await sumarXp(e, lote({ entrega: 100 }))).sumado;
+  }
   assert.equal(entrega, XP_ENTREGA_MAX_DIA);
   assert.equal((await sumarXp(e, lote({ entrega: 100 }))).sumado, 0);
   // Topada la entrega, el resto de la XP del día sigue entera.
@@ -213,7 +216,9 @@ test('el tope de lo de siempre no se come la XP de entrega', async () => {
   const e = nuevo();
   await vinculado(e);
   let sumado = 0;
-  while (sumado < XP_JUEGO_MAX_DIA) sumado += (await sumarXp(e, lote({ mob: 70 }))).sumado;
+  while (sumado < XP_JUEGO_MAX_DIA) {
+    sumado += (await sumarXp(e, lote({ mob: 70 }))).sumado;
+  }
   assert.equal((await sumarXp(e, lote({ entrega: 80 }))).sumado, 80);
 });
 
@@ -304,12 +309,13 @@ test("/vtd email: espera de un minuto y topes por correo y por cuenta", async ()
   );
   // Una cuenta que prueba correo tras correo también se topa.
   const f = nuevo();
-  for (let i = 0; i < ENVIOS.porCuentaDia; i += 1)
+  for (let i = 0; i < ENVIOS.porCuentaDia; i += 1) {
     await envioDeCodigoPermitido(f, {
       email: `x${i}@example.com`,
       uuid: JUGADOR,
       ahora: t0,
     });
+  }
   assert.equal(
     (
       await envioDeCodigoPermitido(f, {
@@ -516,7 +522,8 @@ test("premiar un directo: una vez por tramo, sin tope y sumado a la XP de la fic
   for (let i = 2; i < 40; i += 1) {
     const pago = await pagar(t0 + tramo * i);
     assert.equal(pago, xpDirectoDelTramo(i));
-    assert.ok(pago >= XP_DIRECTO_MINIMO && pago <= anterior);
+    assert.ok(pago >= XP_DIRECTO_MINIMO, `el tramo ${i} paga menos del mínimo`);
+    assert.ok(pago <= anterior, `el tramo ${i} paga más que el anterior`);
     anterior = pago;
     total += pago;
   }

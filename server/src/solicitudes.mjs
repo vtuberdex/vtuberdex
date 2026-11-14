@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * SOLICITUDES: las inscripciones de fichas y las bajas que llegan desde el formulario PÚBLICO.
  *
@@ -116,11 +117,12 @@ export function ejecutorSqlite(db) {
   return {
     async execute(sql, args = []) {
       const sentencia = db.prepare(sql);
-      if (/^\s*select/i.test(sql))
+      if (/^\s*select/i.test(sql)) {
         return {
           rows: sentencia.all(...args).map((fila) => ({ ...fila })),
           rowsAffected: 0,
         };
+      }
       const info = sentencia.run(...args);
       return {
         rows: [],
@@ -168,10 +170,27 @@ const correo = z
   .toLowerCase()
   .max(200)
   .refine(
-    (valor) =>
-      valor.length <= 200 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(valor),
+    (valor) => valor.length <= 200 && esCorreoValido(valor),
     "correo no válido",
   );
+
+/**
+ * Lo mismo que `/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/`, sin regex: el punto también cabe en `[^\s@]+`, así
+ * que la regex probaba cada punto del dominio y era polinómica. Sin blancos, UNA arroba con algo a
+ * cada lado, y en el dominio un punto que no sea el primer carácter con al menos dos detrás.
+ */
+function esCorreoValido(valor) {
+  if (/\s/.test(valor)) {
+    return false;
+  }
+  const arroba = valor.indexOf("@");
+  if (arroba < 1 || valor.indexOf("@", arroba + 1) >= 0) {
+    return false;
+  }
+  const dominio = valor.slice(arroba + 1);
+  const punto = dominio.indexOf(".", 1);
+  return punto >= 1 && punto <= dominio.length - 3;
+}
 
 /**
  * El «he leído y acepto». `z.literal(true)` y no `z.boolean()`: un `false` o un campo ausente
@@ -342,9 +361,9 @@ const ESQUEMAS = {
 /* ------------------------------------------------------------------ operaciones */
 
 const aJson = (valor) => JSON.stringify(valor);
-const deJson = (texto) => {
+const deJson = (json) => {
   try {
-    return texto ? JSON.parse(texto) : null;
+    return json ? JSON.parse(json) : null;
   } catch {
     return null;
   }
@@ -378,31 +397,124 @@ export async function crearSolicitud(
     propositoPermiso = "permiso",
   },
 ) {
-  if (!TIPOS.includes(tipo))
+  if (!TIPOS.includes(tipo)) {
     throw new SolicitudError(400, "tipo_invalido", tipo);
-  const esquema = ESQUEMAS[tipo];
-  // Con `permiso` el correo YA está verificado (lo canjeó por un código): sale del permiso, no de lo que
-  // diga el cuerpo, y la solicitud nace `pendiente` sin segundo correo. Se mira sin gastarlo: un error de
-  // validación de abajo no debe quemar el permiso, que cuesta rellenar un formulario largo.
-  let correoVerificado = null;
-  if (permiso !== null) {
-    correoVerificado = await correoDelToken(
-      ejecutor,
-      permiso,
-      propositoPermiso,
-      ahora.getTime(),
+  }
+  const correoVerificado = await correoDelPermiso(ejecutor, {
+    permiso,
+    propositoPermiso,
+    ahora,
+  });
+  const validados = datosValidados(ESQUEMAS[tipo], entrada, correoVerificado);
+  const { terminosVersion, website, email } = validados;
+  // Un bot rellena el campo oculto. Se responde como si todo fuera bien (sin pista de qué lo delató)
+  // pero no se guarda nada.
+  if (website) {
+    return { id: null, descartada: true };
+  }
+  if (terminosVersion !== TERMINOS_VERSION) {
+    throw new SolicitudError(
+      409,
+      "terminos_desactualizados",
+      "los términos cambiaron: recarga la página y vuelve a aceptarlos",
     );
-    if (!correoVerificado) {
+  }
+  const datos = { ...validados };
+  // Términos, versión, trampa y correo no son DATOS de la solicitud: van en sus columnas o se descartan.
+  delete datos.aceptaTerminos;
+  delete datos.terminosVersion;
+  delete datos.website;
+  delete datos.email;
+
+  const e = await conTablas(ejecutor);
+  const red = hashearRed(ip);
+  await comprobarCupos(e, { red, ahora, tipo, email });
+
+  // Las imágenes subidas tienen que ser de ESTE correo, del tipo que tocan y no estar en otra solicitud. Se
+  // mira antes de gastar el permiso, como el resto de la validación.
+  const imagenesIds =
+    tipo === "inscripcion" || tipo === "modificacion"
+      ? await validarImagenesDeFormulario(e, {
+          correo: email,
+          imageId: datos.imageId,
+          logoId: datos.logoId,
+          obligatorias: tipo === "inscripcion",
+        })
+      : [];
+
+  const fila = {
+    tipo,
+    datos,
+    contacto: { email },
+    red,
+    terminosVersion,
+    fecha: ahora.toISOString(),
+  };
+  if (correoVerificado) {
+    // Se gasta AHORA, con todo lo demás ya validado, y de forma atómica: dos envíos a la vez con el mismo
+    // permiso no crean dos solicitudes (el segundo ve 0 filas cambiadas).
+    if (!(await consumirToken(e, permiso, propositoPermiso, ahora.getTime()))) {
       throw new SolicitudError(
         410,
         "permiso_invalido",
         "La verificación de tu correo caducó o ya se usó. Vuelve al paso 1 y pide un código nuevo.",
       );
     }
+    const idDirecta = await insertarSolicitud(e, fila, "pendiente");
+    await adjuntarImagenes(e, idDirecta, imagenesIds);
+    return {
+      id: idDirecta,
+      descartada: false,
+      email,
+      tipo,
+      verificada: true,
+    };
   }
+  await reemplazarSinConfirmar(e, { tipo, email, ahora });
+  const idNueva = await insertarSolicitud(e, fila, "sin_verificar");
+  await adjuntarImagenes(e, idNueva, imagenesIds);
+  return {
+    id: idNueva,
+    descartada: false,
+    email,
+    tipo,
+  };
+}
+
+/**
+ * Con `permiso` el correo YA está verificado (lo canjeó por un código): sale del permiso, no de lo que
+ * diga el cuerpo, y la solicitud nace `pendiente` sin segundo correo. Se mira sin gastarlo: un error de
+ * validación de abajo no debe quemar el permiso, que cuesta rellenar un formulario largo.
+ * @returns {Promise<{ email: string } | null>} `null` si no vino permiso.
+ */
+async function correoDelPermiso(
+  ejecutor,
+  { permiso, propositoPermiso, ahora },
+) {
+  if (permiso === null) {
+    return null;
+  }
+  const correoVerificado = await correoDelToken(
+    ejecutor,
+    permiso,
+    propositoPermiso,
+    ahora.getTime(),
+  );
+  if (!correoVerificado) {
+    throw new SolicitudError(
+      410,
+      "permiso_invalido",
+      "La verificación de tu correo caducó o ya se usó. Vuelve al paso 1 y pide un código nuevo.",
+    );
+  }
+  return correoVerificado;
+}
+
+/** El cuerpo pasado por el esquema de su tipo (con el correo del permiso, si lo hay). Lanza un 400. */
+function datosValidados(esquema, entrada, correoVerificado) {
   const parsed = esquema.safeParse(
     correoVerificado
-      ? { ...(entrada ?? {}), email: correoVerificado.email }
+      ? { ...entrada, email: correoVerificado.email }
       : (entrada ?? {}),
   );
   if (!parsed.success) {
@@ -419,26 +531,11 @@ export async function crearSolicitud(
       { issues },
     );
   }
-  const {
-    aceptaTerminos: _acepta,
-    terminosVersion,
-    website,
-    email,
-    ...datos
-  } = parsed.data;
-  // Un bot rellena el campo oculto. Se responde como si todo fuera bien (sin pista de qué lo delató)
-  // pero no se guarda nada.
-  if (website) return { id: null, descartada: true };
-  if (terminosVersion !== TERMINOS_VERSION) {
-    throw new SolicitudError(
-      409,
-      "terminos_desactualizados",
-      "los términos cambiaron: recarga la página y vuelve a aceptarlos",
-    );
-  }
+  return parsed.data;
+}
 
-  const e = await conTablas(ejecutor);
-  const red = hashearRed(ip);
+/** Tope de envíos por red y día, y un solo pendiente por correo y tipo. Lanza 429/409. */
+async function comprobarCupos(e, { red, ahora, tipo, email }) {
   const desde = new Date(ahora.getTime() - 24 * 60 * 60 * 1000).toISOString();
   const { rows } = await e.execute(
     "SELECT COUNT(*) AS n FROM solicitud WHERE red = ? AND creado >= ?",
@@ -464,54 +561,41 @@ export async function crearSolicitud(
       "ya hay una solicitud tuya en espera de revisión",
     );
   }
+}
 
-  // Las imágenes subidas tienen que ser de ESTE correo, del tipo que tocan y no estar en otra solicitud. Se
-  // mira antes de gastar el permiso, como el resto de la validación.
-  const imagenesIds =
-    tipo === "inscripcion" || tipo === "modificacion"
-      ? await validarImagenesDeFormulario(e, {
-          correo: email,
-          imageId: datos.imageId,
-          logoId: datos.logoId,
-          obligatorias: tipo === "inscripcion",
-        })
-      : [];
-
-  const contacto = { email };
-  const fecha = ahora.toISOString();
-  if (correoVerificado) {
-    // Se gasta AHORA, con todo lo demás ya validado, y de forma atómica: dos envíos a la vez con el mismo
-    // permiso no crean dos solicitudes (el segundo ve 0 filas cambiadas).
-    if (!(await consumirToken(e, permiso, propositoPermiso, ahora.getTime()))) {
-      throw new SolicitudError(
-        410,
-        "permiso_invalido",
-        "La verificación de tu correo caducó o ya se usó. Vuelve al paso 1 y pide un código nuevo.",
-      );
-    }
-    const directa = await e.execute(
-      `INSERT INTO solicitud (tipo, estado, datos, contacto, red, terminos_version, terminos_aceptados_en, creado)
-       VALUES (?, 'pendiente', ?, ?, ?, ?, ?, ?)`,
-      [tipo, aJson(datos), aJson(contacto), red, terminosVersion, fecha, fecha],
-    );
-    const { rows: ultima } = await e.execute(
-      "SELECT MAX(id) AS id FROM solicitud WHERE red = ?",
-      [red],
-    );
-    const idDirecta =
-      Number(directa.lastInsertRowid ?? ultima[0]?.id ?? 0) || null;
-    await adjuntarImagenes(e, idDirecta, imagenesIds);
-    return {
-      id: idDirecta,
-      descartada: false,
-      email,
+/** Inserta la solicitud en `estado` y devuelve su id. */
+async function insertarSolicitud(
+  e,
+  { tipo, datos, contacto, red, terminosVersion, fecha },
+  estado,
+) {
+  const insertada = await e.execute(
+    `INSERT INTO solicitud (tipo, estado, datos, contacto, red, terminos_version, terminos_aceptados_en, creado)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
       tipo,
-      verificada: true,
-    };
-  }
-  // Una solicitud sin confirmar del mismo correo y tipo se REEMPLAZA (la persona volvió a enviar porque
-  // el correo no le llegó): no se acumulan. Y las que nadie confirmó en días se borran aquí mismo, sin
-  // un trabajo aparte.
+      estado,
+      aJson(datos),
+      aJson(contacto),
+      red,
+      terminosVersion,
+      fecha,
+      fecha,
+    ],
+  );
+  const { rows: ultima } = await e.execute(
+    "SELECT MAX(id) AS id FROM solicitud WHERE red = ?",
+    [red],
+  );
+  return Number(insertada.lastInsertRowid ?? ultima[0]?.id ?? 0) || null;
+}
+
+/**
+ * Una solicitud sin confirmar del mismo correo y tipo se REEMPLAZA (la persona volvió a enviar porque
+ * el correo no le llegó): no se acumulan. Y las que nadie confirmó en días se borran aquí mismo, sin
+ * un trabajo aparte.
+ */
+async function reemplazarSinConfirmar(e, { tipo, email, ahora }) {
   const sinConfirmar = await e.execute(
     "SELECT id, contacto, creado FROM solicitud WHERE tipo = ? AND estado = 'sin_verificar'",
     [tipo],
@@ -530,24 +614,6 @@ export async function crearSolicitud(
       );
     }
   }
-  const insertada = await e.execute(
-    `INSERT INTO solicitud (tipo, estado, datos, contacto, red, terminos_version, terminos_aceptados_en, creado)
-     VALUES (?, 'sin_verificar', ?, ?, ?, ?, ?, ?)`,
-    [tipo, aJson(datos), aJson(contacto), red, terminosVersion, fecha, fecha],
-  );
-  const { rows: ultimo } = await e.execute(
-    "SELECT MAX(id) AS id FROM solicitud WHERE red = ?",
-    [red],
-  );
-  const idNueva =
-    Number(insertada.lastInsertRowid ?? ultimo[0]?.id ?? 0) || null;
-  await adjuntarImagenes(e, idNueva, imagenesIds);
-  return {
-    id: idNueva,
-    descartada: false,
-    email,
-    tipo,
-  };
 }
 
 /**
@@ -600,10 +666,13 @@ export async function fichasDelTitular(
     if (
       String(deJson(fila.contacto)?.email ?? "").toLowerCase() !==
       String(email).toLowerCase()
-    )
+    ) {
       continue;
+    }
     const ficha = resolverFicha(fila.vtuber_slug);
-    if (!ficha || vistas.has(ficha.id)) continue;
+    if (!ficha || vistas.has(ficha.id)) {
+      continue;
+    }
     vistas.add(ficha.id);
     salida.push({ inscripcion: Number(fila.id), ficha });
   }
@@ -616,9 +685,13 @@ export async function fichasDelTitular(
     );
     for (const m of manuales) {
       const id = Number(m.vtuber_id);
-      if (vistas.has(id)) continue;
+      if (vistas.has(id)) {
+        continue;
+      }
       const ficha = resolverPorId(id);
-      if (!ficha) continue;
+      if (!ficha) {
+        continue;
+      }
       vistas.add(id);
       salida.push({ inscripcion: null, ficha });
     }
@@ -637,14 +710,20 @@ export async function correoDeLaFicha(ejecutor, { fichaId, resolverFicha }) {
     "SELECT email FROM ficha_correo WHERE vtuber_id = ?",
     [Number(fichaId)],
   );
-  if (manual.rows[0]?.email) return String(manual.rows[0].email);
+  if (manual.rows[0]?.email) {
+    return String(manual.rows[0].email);
+  }
   const { rows } = await e.execute(
     "SELECT contacto, vtuber_slug FROM solicitud WHERE tipo = 'inscripcion' AND estado = 'aprobada' AND vtuber_slug IS NOT NULL ORDER BY id",
   );
   for (const fila of rows) {
     const email = deJson(fila.contacto)?.email;
-    if (!email) continue;
-    if (resolverFicha(fila.vtuber_slug)?.id === fichaId) return String(email);
+    if (!email) {
+      continue;
+    }
+    if (resolverFicha(fila.vtuber_slug)?.id === fichaId) {
+      return String(email);
+    }
   }
   return null;
 }
@@ -664,13 +743,16 @@ export async function correosDeFichas(ejecutor, { resolverFicha }) {
   for (const fila of rows) {
     const email = deJson(fila.contacto)?.email;
     const id = email ? resolverFicha(fila.vtuber_slug)?.id : null;
-    if (id != null) mapa.set(id, String(email));
+    if (id != null) {
+      mapa.set(id, String(email));
+    }
   }
   const { rows: manuales } = await e.execute(
     "SELECT vtuber_id, email FROM ficha_correo",
   );
-  for (const fila of manuales)
+  for (const fila of manuales) {
     mapa.set(Number(fila.vtuber_id), String(fila.email));
+  }
   return mapa;
 }
 
@@ -684,12 +766,16 @@ export async function correoTieneFicha(ejecutor, email) {
   const limpio = String(email ?? "")
     .trim()
     .toLowerCase();
-  if (!limpio) return false;
+  if (!limpio) {
+    return false;
+  }
   const manual = await e.execute(
     "SELECT 1 AS ok FROM ficha_correo WHERE email = ? LIMIT 1",
     [limpio],
   );
-  if (manual.rows.length) return true;
+  if (manual.rows.length) {
+    return true;
+  }
   const inscrita = await e.execute(
     "SELECT 1 AS ok FROM solicitud WHERE tipo = 'inscripcion' AND estado = 'aprobada' AND json_extract(contacto, '$.email') = ? LIMIT 1",
     [limpio],
@@ -732,8 +818,9 @@ export async function fijarGraduado(
 /** Valida y normaliza un correo (minúsculas); lanza `SolicitudError` 400 si no lo es. */
 export function normalizarCorreo(valor) {
   const parsed = correo.safeParse(valor);
-  if (!parsed.success)
+  if (!parsed.success) {
     throw new SolicitudError(400, "correo_invalido", "El correo no es válido.");
+  }
   return parsed.data;
 }
 
@@ -814,7 +901,9 @@ export async function listarSolicitudes(
     "SELECT tipo, COUNT(*) AS n FROM solicitud WHERE estado = 'pendiente' GROUP BY tipo",
   );
   const pendientes = { inscripcion: 0, baja: 0, modificacion: 0 };
-  for (const c of cuentas) pendientes[c.tipo] = Number(c.n);
+  for (const c of cuentas) {
+    pendientes[c.tipo] = Number(c.n);
+  }
   return { items: rows.map(mapear), pendientes };
 }
 
@@ -841,16 +930,18 @@ export async function resolverSolicitud(
   id,
   { estado, actor, nota = "", vtuberSlug = null, ahora = new Date() },
 ) {
-  if (!["aprobada", "rechazada", "procesada"].includes(estado))
+  if (!["aprobada", "rechazada", "procesada"].includes(estado)) {
     throw new SolicitudError(400, "estado_invalido", estado);
+  }
   const e = await conTablas(ejecutor);
   const actual = await leerSolicitud(e, id);
-  if (!actual)
+  if (!actual) {
     throw new SolicitudError(
       404,
       "no_encontrado",
       `no existe la solicitud ${id}`,
     );
+  }
   const permitido =
     actual.tipo === "baja"
       ? ["procesada", "rechazada"]
@@ -878,15 +969,18 @@ export async function resolverSolicitud(
       Number(id),
     ],
   );
-  if (cambio.rowsAffected === 0)
+  if (cambio.rowsAffected === 0) {
     throw new SolicitudError(
       409,
       "ya_resuelta",
       "esta solicitud ya fue resuelta",
     );
+  }
   // Rechazada: lo subido se borra en el acto. Aprobada: quien aprueba las copia a la ficha y las borra
   // después (si no pudo, caducan solas: `LIMITES.vidaResueltaMs`).
-  if (estado !== "aprobada") await borrarImagenesDeSolicitud(e, id);
+  if (estado !== "aprobada") {
+    await borrarImagenesDeSolicitud(e, id);
+  }
   return leerSolicitud(e, id);
 }
 
@@ -908,8 +1002,12 @@ export function fichaDesdeInscripcion(solicitud) {
   };
   const { columnas, modeler, perfil } = camposDeFicha(d);
   Object.assign(ficha, columnas);
-  if (modeler) ficha.artists = [modeler];
-  if (perfil.length) ficha.profile = perfil;
+  if (modeler) {
+    ficha.artists = [modeler];
+  }
+  if (perfil.length) {
+    ficha.profile = perfil;
+  }
   return ficha;
 }
 
@@ -928,7 +1026,9 @@ export function camposDeFicha(d) {
     "hashtag",
     "favoriteColor",
   ]) {
-    if (d[clave]) columnas[clave] = d[clave];
+    if (d[clave]) {
+      columnas[clave] = d[clave];
+    }
   }
   const perfil = PERFIL_ETIQUETAS.filter(([, clave]) => d[clave]).map(
     ([label, clave]) => ({ label, value: d[clave] }),

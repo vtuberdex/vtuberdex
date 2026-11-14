@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paso 6: revisar y publicar — checklist con saltos directos a lo que falta. */
 import Link from "next/link";
@@ -14,12 +15,12 @@ export function ReviewStep({
   slug,
   onJump,
   stepLabel,
-}: StepProps & {
+}: Readonly<StepProps & {
   items: CheckItem[];
   slug: string;
   onJump: (step: StepId) => void;
   stepLabel: (step: StepId) => string;
-}) {
+}>) {
   const total = percent(items);
   return (
     <div className="space-y-5">
@@ -76,7 +77,7 @@ export function ReviewStep({
             onChange={() => set("status", "published")}
           />
           <span>
-            Publicar ahora
+            Publicar ahora{" "}
             <span className="block text-xs text-dex-muted">
               La carta aparece en el catálogo y su página es pública.
             </span>
@@ -90,7 +91,7 @@ export function ReviewStep({
             onChange={() => set("status", "draft")}
           />
           <span>
-            Dejar en borrador
+            Dejar en borrador{" "}
             <span className="block text-xs text-dex-muted">
               Solo la ves tú aquí; puedes publicarla cuando esté lista.
             </span>
@@ -99,7 +100,7 @@ export function ReviewStep({
         <label className="flex items-start gap-2 text-sm text-dex-ink">
           <input type="radio" name="visibilidad" checked={form.status === "hidden"} onChange={() => set("status", "hidden")} />
           <span>
-            Ocultar
+            Ocultar{" "}
             <span className="block text-xs text-dex-muted">No sale en el catálogo ni tiene página pública; tú la sigues viendo aquí.</span>
           </span>
         </label>

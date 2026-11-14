@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Valores de la carta holográfica 3D. **Este archivo es el mando del efecto.**
  *
@@ -1413,7 +1414,7 @@ export const TEXTURAS = {
  * --------------------------------------------------
  * `MeshPhysicalMaterial` con `transmission` obliga a renderizar la escena entera otra vez en
  * un framebuffer aparte, y en el libro hay 8 cartas en un solo canvas: ese coste lo pagaría
- * todo el catálogo por una carta premium. El acrílico es un plano casi transparente cuya
+ * el catálogo entero por una carta premium. El acrílico es un plano casi transparente cuya
  * gracia está en el BORDE (fresnel + bisel) y en un reflejo que se mueve con la inclinación:
  * eso se calcula en un fragment shader mínimo, sin samplers y sin segundo pase.
  *
@@ -1593,7 +1594,7 @@ export const DETERIORO = {
     from: 0.1,
     gain: 1.15,
     unreadableFrom: 0.95,
-    glyphs: "#%&@*?/\\~=+<>",
+    glyphs: String.raw`#%&@*?/\~=+<>`,
   },
   /** Con esta severidad la bandera del país ya no se imprime. */
   hideCountryFrom: 0.55,

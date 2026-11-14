@@ -23,6 +23,14 @@
 :root {
   color-scheme: dark;
   --dex-glow: 0 0 24px rgb(94 234 212 / 0.25);
+  /* 0 salvo que el estandarte de VRTon esté en la página (`VRTON_VISIBLE`): ver `:has(.pendon-h)`. */
+  --estandarte-alto: 0rem;
+  /* Alto que NO es el libro en el catálogo (cabecera + barra + paginación + pie), MEDIDO en 1440x900:
+     17,13 rem sin chips de filtros activos, más un margen. Era con el pie de enlaces (una fila de 2,25 rem); hoy el
+     pie es el aviso de derechos (1 línea de 1 rem + 1,25 rem de relleno = 2,25 rem): MISMA altura, y la cabecera
+     no cambia (el botón del menú cabe en su fila). En celular (< md) los valores son otros (más abajo). */
+  --binder-chrome: 17.6rem;
+  --binder-min-width: 22rem;
 }
 
 html,
@@ -106,16 +114,8 @@ h6 {
   padding-block: 0.625rem;
 }
 
-/* Alto que NO es el libro en el catálogo (cabecera + barra + paginación + pie), MEDIDO en 1440x900:
-   17,13 rem sin chips de filtros activos, más un margen. Era con el pie de enlaces (una fila de 2,25 rem); hoy el
-   pie es el aviso de derechos (1 línea de 1 rem + 1,25 rem de relleno = 2,25 rem): MISMA altura, y la cabecera
-   no cambia (el botón del menú cabe en su fila). En celular (< md) los valores son otros (ver abajo). */
-:root {
-  /* 0 salvo que el estandarte de VRTon esté en la página (`VRTON_VISIBLE`): ver `:has(.pendon-h)`. */
-  --estandarte-alto: 0rem;
-  --binder-chrome: 17.6rem;
-  --binder-min-width: 22rem;
-}
+/* `--binder-chrome`, `--binder-min-width` y `--estandarte-alto` se declaran en el `:root` de arriba (un solo
+   bloque `:root`); aquí van sus variantes por estandarte y por ancho. */
 :root:has(.pendon-h) {
   --estandarte-alto: 7.2rem;
 }

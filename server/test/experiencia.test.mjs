@@ -51,8 +51,9 @@ test("puede subir varios niveles de una vez y el total de XP se conserva", () =>
   const likes = 200;
   const r = experienciaConLikes({}, likes);
   let gastado = r.current;
-  for (let nivel = 1; nivel < r.level; nivel += 1)
+  for (let nivel = 1; nivel < r.level; nivel += 1) {
     gastado += umbralDeNivel(nivel);
+  }
   assert.equal(gastado, likes * XP_POR_LIKE);
   assert.ok(r.level > 3);
   assert.ok(r.current < r.max);
@@ -65,10 +66,9 @@ test("entradas absurdas no cuelgan ni dan NaN", () => {
     { level: 1, current: 0, max: 1 },
   ]) {
     const r = experienciaConLikes(base, 1e9);
-    assert.ok(
-      Number.isFinite(r.level) && Number.isFinite(r.current) && r.max > 0,
-      JSON.stringify(base),
-    );
+    assert.ok(Number.isFinite(r.level), JSON.stringify(base));
+    assert.ok(Number.isFinite(r.current), JSON.stringify(base));
+    assert.ok(r.max > 0, JSON.stringify(base));
   }
   assert.equal(experienciaConLikes({}, -3).likes, 0);
   assert.equal(experienciaConLikes({}, "abc").likes, 0);
@@ -116,8 +116,9 @@ test("los puntos de habilidad salen solo de los niveles GANADOS con likes, no de
 });
 
 test("cada nivel pide más que el anterior: sube más lento a medida que avanza", () => {
-  for (let n = 1; n < 60; n += 1)
+  for (let n = 1; n < 60; n += 1) {
     assert.ok(umbralDeNivel(n + 1) > umbralDeNivel(n));
+  }
 });
 
 /* ------------------------------------------------- fórmula única (experienciaDeFicha) */
@@ -159,10 +160,11 @@ test("el multiplicador premium sube 0,05 por grado hasta 1,50 en la BL y no exis
   assert.equal(multiplicadorPremium("3"), 1);
   assert.equal(multiplicadorPremium(GRADOS[0]), 1.05);
   assert.equal(multiplicadorPremium("BL"), 1.5);
-  for (let i = 1; i < GRADOS.length; i += 1)
+  for (let i = 1; i < GRADOS.length; i += 1) {
     assert.ok(
       multiplicadorPremium(GRADOS[i]) > multiplicadorPremium(GRADOS[i - 1]),
     );
+  }
 });
 
 test("un premium gana más que una ficha normal con los mismos datos, y la racha suma aparte con tope", () => {

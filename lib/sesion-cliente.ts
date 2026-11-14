@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Cliente de la sesión de visitante (ver `lib/sesion-visitante.mjs`): pide un reto, lo resuelve y
  * deja la cookie. Una sola resolución a la vez aunque varias peticiones la pidan a la vez.
@@ -37,13 +38,17 @@ export async function resolverReto(
       }),
     );
     const hallado = lote.find((n) => n >= 0);
-    if (hallado !== undefined) return String(hallado);
+    if (hallado !== undefined) {
+      return String(hallado);
+    }
   }
 }
 
 async function abrir(): Promise<void> {
   const r = await fetch("/api/sesion", { cache: "no-store" });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  if (!r.ok) {
+    throw new Error(`HTTP ${r.status}`);
+  }
   const { reto, bits } = (await r.json()) as { reto: string; bits: number };
   const solucion = await resolverReto(reto, bits);
   const p = await fetch("/api/sesion", {
@@ -51,7 +56,9 @@ async function abrir(): Promise<void> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ reto, solucion }),
   });
-  if (!p.ok) throw new Error(`HTTP ${p.status}`);
+  if (!p.ok) {
+    throw new Error(`HTTP ${p.status}`);
+  }
 }
 
 /** Asegura una sesión vigente. Un fallo no se memoiza: la próxima llamada reintenta. */
@@ -72,10 +79,14 @@ const RENOVAR_CADA_MS = 3 * 60 * 1000;
  */
 export function mantenerSesion(): () => void {
   const renovar = async () => {
-    if (document.visibilityState !== "visible") return;
+    if (document.visibilityState !== "visible") {
+      return;
+    }
     try {
       const r = await fetch("/api/sesion/renovar", { method: "POST" });
-      if (r.status === 401) await asegurarSesion();
+      if (r.status === 401) {
+        await asegurarSesion();
+      }
     } catch {
       /* sin red: se reintenta en el siguiente turno */
     }

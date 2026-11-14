@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** `GET /api/minecraft/misiones/:uuid` — las misiones de la ficha vinculada a un jugador (solo el plugin). */
 import { misionesDelJugador } from "../../../../../lib/minecraft.mjs";
 

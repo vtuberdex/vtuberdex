@@ -75,8 +75,9 @@ describe("POST /api/stats (latido)", () => {
   });
 
   it("un cuerpo basura o inválido tampoco da pistas: 204 y no cuenta", async () => {
-    for (const malo of ["no es json", "{", "null", "[]", '{"sid":"corto"}'])
+    for (const malo of ["no es json", "{", "null", "[]", '{"sid":"corto"}']) {
       expect((await latido(malo)).status, malo).toBe(204);
+    }
     expect((await (await resumen(TOKEN)).json()).conectados).toBe(0);
   });
 

@@ -32,9 +32,13 @@ test("retroactivo sobre ~60 cartas es 10 x válidas e idempotente", async () => 
   for (let i = 0; i < 60; i++) {
     const t = tipos[i % 4];
     anotar(t);
-    if (t !== "faccion.editar") validas++;
+    if (t !== "faccion.editar") {
+      validas++;
+    }
   }
-  for (let i = 0; i < 5; i++) anotar("vtuber.crear", "otro");
+  for (let i = 0; i < 5; i++) {
+    anotar("vtuber.crear", "otro");
+  }
   assert.equal(await expRetroactiva(ej, "yo"), validas * 10);
   assert.equal(await expDePerfil(ej, "yo"), validas * 10);
   assert.equal(await expRetroactiva(ej, "yo"), 0);

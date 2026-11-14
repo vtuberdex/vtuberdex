@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Pinta el DETERIORO de una carta degradada sobre sus capas 2D (grados 7…1).
  *
@@ -37,13 +38,14 @@ import { CARD_TEXTURE_HEIGHT, CARD_TEXTURE_WIDTH, HEADER } from "./dimensiones";
  */
 export function planDeCarta(card: VtuberCard): PlanDeDeterioro | null {
   const grado = gradoDeDibujo(card);
-  if (grado && esGradoDegradado(grado))
+  if (grado && esGradoDegradado(grado)) {
     return planDeDeterioro(
       grado,
       card.id,
       CARD_TEXTURE_WIDTH,
       CARD_TEXTURE_HEIGHT,
     );
+  }
   return planDeDesgasteLeve(
     grado,
     card.id,
@@ -59,7 +61,9 @@ export function planDeCarta(card: VtuberCard): PlanDeDeterioro | null {
  */
 export function tarjetaParaTitulo(card: VtuberCard): VtuberCard {
   const grado = gradoDeDibujo(card);
-  if (!grado || !esGradoDegradado(grado)) return card;
+  if (!grado || !esGradoDegradado(grado)) {
+    return card;
+  }
   const plan = planDeDeterioro(
     grado,
     card.id,
@@ -80,7 +84,9 @@ function conLienzo(
   dibujar: (ctx: CanvasRenderingContext2D) => void,
 ) {
   const ctx = canvas.getContext("2d");
-  if (!ctx || canvas.width < 2) return;
+  if (!ctx || canvas.width < 2) {
+    return;
+  }
   const escala = canvas.width / CARD_TEXTURE_WIDTH;
   ctx.save();
   ctx.setTransform(escala, 0, 0, escala, 0, 0);
@@ -97,7 +103,9 @@ function teselaDeRuido(semilla: number): HTMLCanvasElement {
   const lado = DETERIORO.noise.tile;
   const clave = `${semilla}|${lado}`;
   const guardada = teselas.get(clave);
-  if (guardada) return guardada;
+  if (guardada) {
+    return guardada;
+  }
   const tesela = document.createElement("canvas");
   tesela.width = lado;
   tesela.height = lado;
@@ -113,16 +121,22 @@ function teselaDeRuido(semilla: number): HTMLCanvasElement {
     }
     ctx.putImageData(datos, 0, 0);
   }
-  if (teselas.size > 32) teselas.clear();
+  if (teselas.size > 32) {
+    teselas.clear();
+  }
   teselas.set(clave, tesela);
   return tesela;
 }
 
 /** Grano sobre lo que YA está pintado (`source-atop`: no ensucia los huecos transparentes). */
 function aplicarRuido(ctx: CanvasRenderingContext2D, plan: PlanDeDeterioro) {
-  if (plan.ruido <= 0) return;
+  if (plan.ruido <= 0) {
+    return;
+  }
   const patron = ctx.createPattern(teselaDeRuido(plan.semilla), "repeat");
-  if (!patron) return;
+  if (!patron) {
+    return;
+  }
   ctx.save();
   ctx.globalCompositeOperation = "source-atop";
   ctx.globalAlpha = Math.min(1, plan.ruido);
@@ -152,7 +166,9 @@ function perderFoco(
   plan: PlanDeDeterioro,
   exento?: { x: number; y: number; w: number; h: number },
 ) {
-  if (plan.bloque <= 1) return;
+  if (plan.bloque <= 1) {
+    return;
+  }
   const escala = canvas.width / CARD_TEXTURE_WIDTH;
   const chico = document.createElement("canvas");
   chico.width = Math.max(2, Math.round(canvas.width / (plan.bloque * escala)));
@@ -162,7 +178,9 @@ function perderFoco(
   );
   const cctx = chico.getContext("2d");
   const ctx = canvas.getContext("2d");
-  if (!cctx || !ctx) return;
+  if (!cctx || !ctx) {
+    return;
+  }
 
   // La zona exenta se guarda ANTES de estropear nada y se repone después.
   let guardada: HTMLCanvasElement | null = null;
@@ -265,6 +283,51 @@ export function deteriorarCabecera(
   });
 }
 
+type LadoDelCanto = "arriba" | "abajo" | "izquierda" | "derecha";
+type Punto = [number, number];
+
+/**
+ * Geometría de cada franja del canto: cuánto mide el lado, dónde cae el punto `a` del recorrido a
+ * profundidad `d` del borde, y los dos vértices de la orilla que cierran el polígono por fuera.
+ */
+const FRANJAS: Record<
+  LadoDelCanto,
+  { largo: number; punto: (a: number, d: number) => Punto; orilla: Punto[] }
+> = {
+  arriba: {
+    largo: CARD_TEXTURE_WIDTH,
+    punto: (a, d) => [a, d],
+    orilla: [
+      [CARD_TEXTURE_WIDTH, 0],
+      [0, 0],
+    ],
+  },
+  abajo: {
+    largo: CARD_TEXTURE_WIDTH,
+    punto: (a, d) => [a, CARD_TEXTURE_HEIGHT - d],
+    orilla: [
+      [CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT],
+      [0, CARD_TEXTURE_HEIGHT],
+    ],
+  },
+  izquierda: {
+    largo: CARD_TEXTURE_HEIGHT,
+    punto: (a, d) => [d, a],
+    orilla: [
+      [0, CARD_TEXTURE_HEIGHT],
+      [0, 0],
+    ],
+  },
+  derecha: {
+    largo: CARD_TEXTURE_HEIGHT,
+    punto: (a, d) => [CARD_TEXTURE_WIDTH - d, a],
+    orilla: [
+      [CARD_TEXTURE_WIDTH, CARD_TEXTURE_HEIGHT],
+      [CARD_TEXTURE_WIDTH, 0],
+    ],
+  },
+};
+
 /** Capa 6 (la de arriba): canto blanqueado, trozos que faltan y rayones. */
 export function deteriorarCanto(
   canvas: HTMLCanvasElement,
@@ -272,50 +335,19 @@ export function deteriorarCanto(
 ): void {
   const { whitening, window: ventana } = DETERIORO;
   conLienzo(canvas, (ctx) => {
-    const W = CARD_TEXTURE_WIDTH;
-    const H = CARD_TEXTURE_HEIGHT;
-
     // Canto blanqueado: cuatro franjas con el borde interior quebrado, más anchas cuanto peor el grado.
     const azar = crearAzar(plan.semilla ^ 0x51ed270b);
     ctx.fillStyle = whitening.color;
     ctx.globalAlpha = whitening.alpha * Math.min(1, 0.35 + plan.severidad);
-    const franja = (lado: "arriba" | "abajo" | "izquierda" | "derecha") => {
-      const largo = lado === "arriba" || lado === "abajo" ? W : H;
+    const franja = (lado: LadoDelCanto) => {
+      const { largo, punto, orilla } = FRANJAS[lado];
       const pasos = Math.round(largo / 24);
       const puntos: Array<[number, number]> = [];
       for (let i = 0; i <= pasos; i += 1) {
         const a = (largo * i) / pasos;
         const d = plan.canto * (0.35 + 0.65 * azar());
-        puntos.push(
-          lado === "arriba"
-            ? [a, d]
-            : lado === "abajo"
-              ? [a, H - d]
-              : lado === "izquierda"
-                ? [d, a]
-                : [W - d, a],
-        );
+        puntos.push(punto(a, d));
       }
-      const orilla: Array<[number, number]> =
-        lado === "arriba"
-          ? [
-              [W, 0],
-              [0, 0],
-            ]
-          : lado === "abajo"
-            ? [
-                [W, H],
-                [0, H],
-              ]
-            : lado === "izquierda"
-              ? [
-                  [0, H],
-                  [0, 0],
-                ]
-              : [
-                  [W, H],
-                  [W, 0],
-                ];
       trazarPoligono(ctx, [...puntos, ...orilla]);
       ctx.fill();
     };

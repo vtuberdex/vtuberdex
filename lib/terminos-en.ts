@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Courtesy translation (English) of the Terms and Conditions. The Spanish text in `terminos.ts` is the
  * authoritative, versioned one; this file must keep the same clause ids and the same number of

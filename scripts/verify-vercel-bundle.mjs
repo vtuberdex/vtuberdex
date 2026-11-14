@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Verifica el artefacto desplegable SIN depender de Vercel.
  *
@@ -32,10 +33,17 @@ const BLOB_BASE =
   process.env.VTUBERDEX_BLOB_BASE ??
   "https://verify.public.blob.vercel-storage.com";
 
+/** La base empaquetada: el nombre que buscan la auditoría, la traza de Next y el build. */
+const DB_ARCHIVO = "vtuberdex.db";
+/** Ficha que se pide de punta a punta (detalle, imágenes, ruta profunda). */
+const FICHA = "gkuro-monochrome";
+const IMAGEN_FICHA = `${FICHA}.webp`;
+
 const results = [];
 const check = (name, ok, detail = "") => {
   results.push({ name, ok, detail });
-  console.log(`${ok ? "✔" : "✖"} ${name}${detail ? ` — ${detail}` : ""}`);
+  const sufijo = detail ? ` — ${detail}` : "";
+  console.log(`${ok ? "✔" : "✖"} ${name}${sufijo}`);
 };
 
 /** Puerto libre, para no chocar con un dev-server en marcha. */
@@ -58,7 +66,7 @@ function freePort() {
  * función). Se comprueba también que NO esté en un lugar accesible por HTTP.
  */
 function auditArtifact() {
-  const dbPath = path.join(ROOT, "deploy", "data", "vtuberdex.db");
+  const dbPath = path.join(ROOT, "deploy", "data", DB_ARCHIVO);
   const probe = spawnSync(
     process.execPath,
     [
@@ -109,12 +117,18 @@ function auditArtifact() {
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (/\.(db|sqlite|sqlite3|wal|shm)$/i.test(entry.name))
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (/\.(db|sqlite|sqlite3|wal|shm)$/i.test(entry.name)) {
         leaked.push(path.relative(publicDir, full));
+      } else {
+        // cualquier otro archivo público es inofensivo
+      }
     }
   };
-  if (fs.existsSync(publicDir)) walk(publicDir);
+  if (fs.existsSync(publicDir)) {
+    walk(publicDir);
+  }
   check(
     "la base NO quedó en la carpeta pública",
     leaked.length === 0,
@@ -124,14 +138,20 @@ function auditArtifact() {
   // La traza de la función sí debe incluirla: sin esto el deploy arranca vacío.
   const traced = [];
   const scanNft = (dir) => {
-    if (!fs.existsSync(dir)) return;
+    if (!fs.existsSync(dir)) {
+      return;
+    }
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) scanNft(full);
-      else if (entry.name.endsWith(".nft.json")) {
-        const raw = fs.readFileSync(full, "utf8");
-        if (raw.includes("vtuberdex.db"))
-          traced.push(path.relative(ROOT, full));
+      if (entry.isDirectory()) {
+        scanNft(full);
+      } else if (
+        entry.name.endsWith(".nft.json") &&
+        fs.readFileSync(full, "utf8").includes(DB_ARCHIVO)
+      ) {
+        traced.push(path.relative(ROOT, full));
+      } else {
+        // otra traza (o un archivo que no es traza): no lleva la base
       }
     }
   };
@@ -165,12 +185,16 @@ function stage() {
     "deploy",
   ]);
   for (const entry of fs.readdirSync(ROOT)) {
-    if (skip.has(entry)) continue;
+    if (skip.has(entry)) {
+      continue;
+    }
     const from = path.join(ROOT, entry);
     const to = path.join(STAGE, entry);
-    if (fs.statSync(from).isDirectory())
+    if (fs.statSync(from).isDirectory()) {
       fs.cpSync(from, to, { recursive: true });
-    else fs.copyFileSync(from, to);
+    } else {
+      fs.copyFileSync(from, to);
+    }
   }
   fs.cpSync(path.join(ROOT, "deploy"), path.join(STAGE, "deploy"), {
     recursive: true,
@@ -214,8 +238,10 @@ function mismoOrigen(url, base) {
   }
 }
 
-async function main() {
-  // 1. El artefacto de datos.
+/**
+ * 1. El artefacto de datos. Devuelve si se construyó (sin él no tiene sentido seguir).
+ */
+function construirArtefacto() {
   /**
    * `--if-missing` SOLO cuando no hay base de desarrollo.
    *
@@ -233,7 +259,7 @@ async function main() {
    * siendo válido: no se salta ninguna comprobación.
    */
   const hayBaseDeDesarrollo = fs.existsSync(
-    path.join(ROOT, "data", "vtuberdex.db"),
+    path.join(ROOT, "data", DB_ARCHIVO),
   );
   const argsBuild = hayBaseDeDesarrollo ? [] : ["--if-missing"];
   const built = spawnSync(
@@ -251,26 +277,27 @@ async function main() {
       ? ""
       : "sin base de desarrollo: se reutiliza deploy/ (igual que Vercel)",
   );
-  if (built.status !== 0) return finish();
-  auditArtifact();
+  return built.status === 0;
+}
 
-  // 2. El build de Next, del que depende todo lo demás.
+/** 2. El build de Next, del que depende todo lo demás. Devuelve si está disponible. */
+function asegurarBuildDeNext() {
   if (!fs.existsSync(path.join(ROOT, ".next", "BUILD_ID"))) {
     const build = spawnSync(process.execPath, [NEXT_BIN, "build"], {
       cwd: ROOT,
       stdio: "inherit",
     });
     check("build de Next disponible", build.status === 0);
-    if (build.status !== 0) return finish();
-  } else {
-    check("build de Next disponible", true, "reutiliza .next existente");
+    return build.status === 0;
   }
+  check("build de Next disponible", true, "reutiliza .next existente");
+  return true;
+}
 
-  stage();
-  check("escenario montado sin los datos crudos de desarrollo", true, STAGE);
-
-  // 3. El servidor real.
-  const port = await freePort();
+/**
+ * 3. El servidor real. Devuelve cómo matarlo y su salida acumulada (`salida()`).
+ */
+function arrancarServidor(port) {
   /**
    * `detached: true` para que el servidor tenga su PROPIO grupo de procesos.
    *
@@ -312,29 +339,24 @@ async function main() {
   let output = "";
   child.stdout.on("data", (d) => (output += d.toString()));
   child.stderr.on("data", (d) => (output += d.toString()));
+  return { matarServidor, salida: () => output };
+}
 
-  // Sondeo de arranque en vez de una espera fija.
-  let up = false;
-  for (let i = 0; i < 80 && !up; i += 1) {
+/** Sondeo de arranque en vez de una espera fija. */
+async function esperarArranque(port) {
+  for (let i = 0; i < 80; i += 1) {
     try {
       await request(port, "/api/health");
-      up = true;
+      return true;
     } catch {
       await new Promise((r) => setTimeout(r, 250));
     }
   }
-  if (!up) {
-    check(
-      "el servidor arranca sin los datos de desarrollo",
-      false,
-      output.slice(-700),
-    );
-    matarServidor();
-    return finish(output);
-  }
-  check("el servidor arranca sin los datos de desarrollo", true);
+  return false;
+}
 
-  // --- catálogo ------------------------------------------------------------
+// --- catálogo ------------------------------------------------------------
+async function comprobarCatalogo(port) {
   const health = await request(port, "/api/health");
   const healthJson = JSON.parse(health.body || "{}");
   check(
@@ -351,7 +373,7 @@ async function main() {
     `total=${listJson.total}`,
   );
 
-  const detail = await request(port, "/api/vtubers/gkuro-monochrome");
+  const detail = await request(port, `/api/vtubers/${FICHA}`);
   const detailJson = JSON.parse(detail.body || "{}");
   check(
     "detalle con skills, stats y assets",
@@ -401,19 +423,21 @@ async function main() {
     badSlug.status === 404,
     `status=${badSlug.status}`,
   );
+}
 
-  // --- imágenes ------------------------------------------------------------
+// --- imágenes ------------------------------------------------------------
+async function comprobarImagenes(port) {
   const manifest = JSON.parse(
     fs.readFileSync(path.join(ROOT, "deploy/data/images.json"), "utf8"),
   );
-  const img = await request(port, "/images/character/gkuro-monochrome.webp");
+  const img = await request(port, `/images/character/${IMAGEN_FICHA}`);
   check(
     "imagen publicada redirige a Vercel Blob",
     img.status === 301 && mismoOrigen(img.location, BLOB_BASE),
     `${img.status} -> ${img.location}`,
   );
 
-  const logo = await request(port, "/images/logo/gkuro-monochrome.webp");
+  const logo = await request(port, `/images/logo/${IMAGEN_FICHA}`);
   check("logo redirige a Blob", logo.status === 301, `status=${logo.status}`);
 
   const factionKey = Object.keys(manifest.images).find((key) =>
@@ -435,10 +459,10 @@ async function main() {
 
   // Carpetas retiradas a propósito: deben dar 404, no un redirect ni un 500.
   for (const [folder, file] of [
-    ["thumb", "gkuro-monochrome.webp"],
-    ["radar", "gkuro-monochrome.webp"],
-    ["ficha", "gkuro-monochrome.webp"],
-    ["avatar", "gkuro-monochrome.webp"],
+    ["thumb", IMAGEN_FICHA],
+    ["radar", IMAGEN_FICHA],
+    ["ficha", IMAGEN_FICHA],
+    ["avatar", IMAGEN_FICHA],
   ]) {
     const retired = await request(port, `/images/${folder}/${file}`);
     check(
@@ -468,8 +492,10 @@ async function main() {
     requeridas && manifest.count === esperado,
     `${manifest.count} imágenes ${JSON.stringify(carpetas)}`,
   );
+}
 
-  // --- seguridad -----------------------------------------------------------
+// --- seguridad -----------------------------------------------------------
+async function comprobarSeguridad(port) {
   /**
    * La base no puede ser descargable. OJO con la comprobación ingenua: pedir
    * `/deploy/data/vtuberdex.db` puede devolver 200 aunque NO se sirva, porque un
@@ -522,8 +548,10 @@ async function main() {
     adminSinTurso ? adminStats.status === 404 : adminStats.status === 401,
     `status=${adminStats.status} (esperado ${adminSinTurso ? "404 sin Turso" : "401 sin sesión"})`,
   );
+}
 
-  // --- front ---------------------------------------------------------------
+// --- front ---------------------------------------------------------------
+async function comprobarFront(port) {
   const home = await request(port, "/");
   check(
     "el front se sirve",
@@ -531,7 +559,7 @@ async function main() {
     `status=${home.status}`,
   );
 
-  const deep = await request(port, "/v/gkuro-monochrome");
+  const deep = await request(port, `/v/${FICHA}`);
   check(
     "una ruta profunda del SPA responde 200 (no 500)",
     deep.status === 200 && home.body.length > 0,
@@ -544,9 +572,43 @@ async function main() {
     query.status === 200,
     `status=${query.status}`,
   );
+}
+
+async function main() {
+  if (!construirArtefacto()) {
+    finish();
+    return;
+  }
+  auditArtifact();
+  if (!asegurarBuildDeNext()) {
+    finish();
+    return;
+  }
+
+  stage();
+  check("escenario montado sin los datos crudos de desarrollo", true, STAGE);
+
+  const port = await freePort();
+  const { matarServidor, salida } = arrancarServidor(port);
+  if (!(await esperarArranque(port))) {
+    check(
+      "el servidor arranca sin los datos de desarrollo",
+      false,
+      salida().slice(-700),
+    );
+    matarServidor();
+    finish(salida());
+    return;
+  }
+  check("el servidor arranca sin los datos de desarrollo", true);
+
+  await comprobarCatalogo(port);
+  await comprobarImagenes(port);
+  await comprobarSeguridad(port);
+  await comprobarFront(port);
 
   matarServidor();
-  finish(output);
+  finish(salida());
 }
 
 function finish(output = "") {
@@ -554,13 +616,27 @@ function finish(output = "") {
   console.log(
     `\n${results.length - failed.length}/${results.length} comprobaciones pasan`,
   );
-  if (output && failed.length > 0)
+  if (output && failed.length > 0) {
     console.log(`\nsalida del servidor:\n${output.slice(-900)}`);
+  }
   // El escenario se deja a propósito para poder inspeccionarlo si algo falla.
-  if (failed.length === 0) unstage();
+  if (failed.length === 0) {
+    unstage();
+  }
   if (failed.length) {
     console.log(`\nFALLAN: ${failed.map((f) => f.name).join(" | ")}`);
     process.exitCode = 1;
+  }
+}
+
+/** Quita un enlace simbólico si lo es (no sigue el enlace ni borra lo que apunta). */
+function quitarEnlace(target) {
+  try {
+    if (fs.lstatSync(target).isSymbolicLink()) {
+      fs.unlinkSync(target);
+    }
+  } catch {
+    /* no existía */
   }
 }
 
@@ -571,12 +647,7 @@ function unstage() {
     // un árbol enorme puede quedarse recorriéndolo, y el escenario no se
     // limpiaría nunca.
     for (const link of ["node_modules", ".next"]) {
-      const target = path.join(STAGE, link);
-      try {
-        if (fs.lstatSync(target).isSymbolicLink()) fs.unlinkSync(target);
-      } catch {
-        /* no existía */
-      }
+      quitarEnlace(path.join(STAGE, link));
     }
     fs.rmSync(STAGE, { recursive: true, force: true });
   } catch {
@@ -584,8 +655,10 @@ function unstage() {
   }
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   console.error("[verify] ERROR", error);
   unstage();
   process.exit(1);
-});
+}

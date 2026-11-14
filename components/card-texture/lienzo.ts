@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Creación de los canvas de capa: uno por capa, con la escala ya aplicada.
  */

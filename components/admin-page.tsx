@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /**
  * Mantenedor: orquestador. Login y las pestañas (Fichas, Emblemas y facciones, Premium, Tarifas,
@@ -65,15 +66,7 @@ export function AdminPage() {
   const [tokenDeEnlace, setTokenDeEnlace] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [audit, setAudit] = useState<
-    Array<{
-      id: number;
-      actor: string;
-      action: string;
-      entityId: number | null;
-      createdAt: string;
-    }>
-  >([]);
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [factions, setFactions] = useState<FactionRow[]>([]);
   const [countryOptions, setCountryOptions] = useState<ChipOption[]>([]);
   const [languageOptions, setLanguageOptions] = useState<ChipOption[]>([]);
@@ -87,7 +80,9 @@ export function AdminPage() {
   // `localStorage`. Este efecto corre solo en el cliente.
   useEffect(() => {
     const stored = window.localStorage.getItem(TOKEN_KEY);
-    if (stored) setToken(stored);
+    if (stored) {
+      setToken(stored);
+    }
     // El enlace del correo se gasta con un BOTÓN, no al abrirlo: los antivirus y clientes de correo
     // abren los enlaces y lo quemarían. El fragmento se borra de la barra en cuanto se lee.
     const deEnlace = new URLSearchParams(
@@ -101,7 +96,9 @@ export function AdminPage() {
 
   // Sesión guardada -> validar contra la API.
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     api
       .session(token)
       .then((response) => setUser(response.user))
@@ -112,7 +109,9 @@ export function AdminPage() {
   }, [token]);
 
   const loadAdmin = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     try {
       const [statsResponse, auditResponse] = await Promise.all([
         api.adminStats(token),
@@ -121,7 +120,7 @@ export function AdminPage() {
       setStats(statsResponse);
       setAudit(auditResponse.items);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "error");
+      setError(mensajeDeError(cause, "error"));
     }
   }, [token]);
 
@@ -131,7 +130,9 @@ export function AdminPage() {
 
   // Catálogo de facciones y opciones de país/idioma para los selectores del asistente.
   const loadFactions = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     try {
       setFactions((await api.factions(token)).items);
     } catch {
@@ -140,7 +141,9 @@ export function AdminPage() {
   }, [token]);
 
   useEffect(() => {
-    if (!user || !token) return;
+    if (!user || !token) {
+      return;
+    }
     void loadFactions();
     // Las facetas salen de la API pública (`facet=all`): una página de 1 ficha basta.
     api
@@ -162,7 +165,7 @@ export function AdminPage() {
       .catch(() => undefined);
   }, [user, token, loadFactions]);
 
-  const pedirEnlace = async (event: React.FormEvent) => {
+  const pedirEnlace = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
     setEnviandoEnlace(true);
@@ -170,16 +173,16 @@ export function AdminPage() {
       await api.pedirEnlaceDeAcceso(correo.trim());
       setEnlaceEnviado(true);
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "no se pudo enviar el enlace",
-      );
+      setError(mensajeDeError(cause, "no se pudo enviar el enlace"));
     } finally {
       setEnviandoEnlace(false);
     }
   };
 
   const entrarConEnlace = async () => {
-    if (!tokenDeEnlace) return;
+    if (!tokenDeEnlace) {
+      return;
+    }
     setError(null);
     try {
       const response = await api.entrarConEnlace(tokenDeEnlace);
@@ -189,9 +192,7 @@ export function AdminPage() {
       setTokenDeEnlace(null);
     } catch (cause) {
       setTokenDeEnlace(null);
-      setError(
-        cause instanceof Error ? cause.message : "el enlace no es válido",
-      );
+      setError(mensajeDeError(cause, "el enlace no es válido"));
     }
   };
 
@@ -204,35 +205,42 @@ export function AdminPage() {
     setFactions([]);
   };
 
-  const startCreate = () => {
+  // Los manejadores que bajan a componentes del mantenedor van en `useCallback`: así cada
+  // render no les entrega una función nueva (y los hijos no ven props «cambiadas» sin motivo).
+  const startCreate = useCallback(() => {
     setSection("fichas");
     setView((current) => ({
       kind: "create",
       n: current.kind === "create" ? current.n + 1 : 0,
     }));
-  };
+  }, []);
 
-  const openEditor = async (id: number) => {
-    if (!token) return;
-    setError(null);
-    try {
-      // Por id y por la ruta del mantenedor: `api.detail(slug)` da 404 en borradores y ocultos.
-      const detail = await api.adminDetail(token, id);
-      setView({ kind: "edit", detail, epoch: 0 });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "error");
-    }
-  };
+  const openEditor = useCallback(
+    async (id: number) => {
+      if (!token) {
+        return;
+      }
+      setError(null);
+      try {
+        // Por id y por la ruta del mantenedor: `api.detail(slug)` da 404 en borradores y ocultos.
+        const detail = await api.adminDetail(token, id);
+        setView({ kind: "edit", detail, epoch: 0 });
+      } catch (cause) {
+        setError(mensajeDeError(cause, "error"));
+      }
+    },
+    [token],
+  );
 
   /** Tras guardar o crear: la lista, las métricas y los conteos de facciones cambian. */
-  const changed = () => {
+  const changed = useCallback(() => {
     setListVersion((current) => current + 1);
     void loadAdmin();
     void loadFactions();
-  };
+  }, [loadAdmin, loadFactions]);
 
   /** Fusionar/eliminar una facción cambia las fichas: la abierta se recarga para no pisar el cambio al guardar. */
-  const factionStructureChanged = () => {
+  const factionStructureChanged = useCallback(() => {
     setListVersion((current) => current + 1);
     void loadAdmin();
     if (view.kind === "edit" && token) {
@@ -242,97 +250,35 @@ export function AdminPage() {
         .then((detail) => setView({ kind: "edit", detail, epoch }))
         .catch(() => undefined);
     }
-  };
+  }, [loadAdmin, token, view]);
+
+  const irAEmblemas = useCallback(() => setSection("emblemas"), []);
+  const irASolicitudes = useCallback(() => setSection("solicitudes"), []);
+  const cerrarEditor = useCallback(() => setView({ kind: "none" }), []);
+
+  const asignarFaccion = useCallback(() => {
+    setSection("fichas");
+    notify(
+      "ok",
+      "Abre una ficha y elige la facción en el paso «Colores y facciones».",
+    );
+  }, [notify]);
 
   if (!user) {
     if (tokenDeEnlace) {
-      return (
-        <div className="mx-auto max-w-md px-4 py-16">
-          <div
-            className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-6"
-            data-testid="admin-enlace"
-          >
-            <h1 className="text-xl font-extrabold text-dex-ink">
-              Mantenedor VTuberDex
-            </h1>
-            <p className="text-sm text-dex-muted">
-              Tu enlace es válido. Pulsa el botón para iniciar sesión.
-            </p>
-            {error && <p className="text-sm text-red-300">{error}</p>}
-            <button
-              type="button"
-              onClick={entrarConEnlace}
-              className="w-full rounded-xl bg-dex-accent px-4 py-2.5 text-sm font-bold text-black"
-            >
-              Entrar al mantenedor
-            </button>
-          </div>
-        </div>
-      );
+      return <AccesoConEnlace error={error} onEntrar={entrarConEnlace} />;
     }
     return (
-      <div className="mx-auto max-w-md px-4 py-16">
-        <div
-          className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-6"
-          data-testid="admin-login"
-        >
-          <h1 className="text-xl font-extrabold text-dex-ink">
-            Mantenedor VTuberDex
-          </h1>
-          {enlaceEnviado ? (
-            <p
-              className="text-sm text-dex-muted"
-              data-testid="admin-enlace-enviado"
-            >
-              Si ese correo es de un administrador, te enviamos un enlace para
-              entrar. Vale 15 minutos y sirve una sola vez. Revisa también el
-              spam.
-            </p>
-          ) : (
-            <form onSubmit={pedirEnlace} className="space-y-4">
-              <p className="text-sm text-dex-muted">
-                Escribe tu correo de administrador y te enviamos un enlace para
-                entrar.
-              </p>
-              <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
-                Correo
-                <input
-                  type="email"
-                  value={correo}
-                  onChange={(event) => setCorreo(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm text-dex-ink outline-none focus:border-dex-accent"
-                  autoComplete="email"
-                />
-              </label>
-              {error && <p className="text-sm text-red-300">{error}</p>}
-              <button
-                type="submit"
-                className="w-full rounded-xl bg-dex-accent px-4 py-2.5 text-sm font-bold text-black disabled:opacity-50"
-                disabled={!correo || enviandoEnlace}
-              >
-                {enviandoEnlace ? "Enviando…" : "Enviarme el enlace"}
-              </button>
-            </form>
-          )}
-          <p className="text-center text-xs text-dex-muted">
-            <Link href="/" className="hover:text-dex-ink">
-              ← Volver al catálogo
-            </Link>
-          </p>
-        </div>
-      </div>
+      <PedirEnlace
+        correo={correo}
+        onCorreo={setCorreo}
+        enviado={enlaceEnviado}
+        enviando={enviandoEnlace}
+        error={error}
+        onSubmit={pedirEnlace}
+      />
     );
   }
-
-  const sections: Array<{ id: Section; label: string }> = [
-    { id: "fichas", label: "Fichas" },
-    { id: "emblemas", label: "Emblemas y facciones" },
-    { id: "premium", label: "Premium" },
-    { id: "tarifas", label: "Tarifas" },
-    { id: "solicitudes", label: "Solicitudes" },
-    { id: "estadisticas", label: "Estadísticas" },
-    { id: "dados", label: "Dados" },
-  ];
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-6 sm:px-6 lg:px-8">
@@ -372,36 +318,234 @@ export function AdminPage() {
         </p>
       )}
 
-      <GettingStarted
-        onGoFactions={() => setSection("emblemas")}
-        onNewCard={startCreate}
+      <GettingStarted onGoFactions={irAEmblemas} onNewCard={startCreate} />
+
+      <PestanasDelMantenedor section={section} onSection={setSection} />
+
+      <PanelesDeSeccion
+        section={section}
+        token={token}
+        stats={stats}
+        factions={factions}
+        onFactions={setFactions}
+        onStructureChanged={factionStructureChanged}
+        onAssign={asignarFaccion}
+        onVerSolicitudes={irASolicitudes}
+        notify={notify}
+        onChanged={changed}
       />
 
       <div
-        role="tablist"
-        aria-label="Secciones del mantenedor"
-        className="mb-6 flex gap-1 border-b border-dex-line"
+        role="tabpanel"
+        id="section-fichas"
+        aria-labelledby="section-tab-fichas"
+        hidden={section !== "fichas"}
       >
-        {sections.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            id={`section-tab-${item.id}`}
-            aria-selected={section === item.id}
-            aria-controls={`section-${item.id}`}
-            onClick={() => setSection(item.id)}
-            className={`border-b-2 px-4 py-2.5 text-sm font-semibold ${
-              section === item.id
-                ? "border-dex-accent text-dex-ink"
-                : "border-transparent text-dex-muted hover:text-dex-ink"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
+        {token && (
+          <PanelDeFichas
+            token={token}
+            view={view}
+            listVersion={listVersion}
+            factions={factions}
+            countryOptions={countryOptions}
+            languageOptions={languageOptions}
+            notify={notify}
+            onChanged={changed}
+            onFactionsChanged={setFactions}
+            onOpen={openEditor}
+            onCreate={startCreate}
+            onExit={cerrarEditor}
+          />
+        )}
       </div>
 
+      <ActividadReciente audit={audit} />
+    </div>
+  );
+}
+
+type Notify = ReturnType<typeof useToasts>["add"];
+
+type AuditEntry = {
+  id: number;
+  actor: string;
+  action: string;
+  entityId: number | null;
+  createdAt: string;
+};
+
+function mensajeDeError(cause: unknown, porDefecto: string): string {
+  return cause instanceof Error ? cause.message : porDefecto;
+}
+
+/** Pantalla del enlace mágico ya abierto: se gasta con un botón (ver el efecto de montaje). */
+function AccesoConEnlace({
+  error,
+  onEntrar,
+}: Readonly<{ error: string | null; onEntrar: () => void }>) {
+  return (
+    <div className="mx-auto max-w-md px-4 py-16">
+      <div
+        className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-6"
+        data-testid="admin-enlace"
+      >
+        <h1 className="text-xl font-extrabold text-dex-ink">
+          Mantenedor VTuberDex
+        </h1>
+        <p className="text-sm text-dex-muted">
+          Tu enlace es válido. Pulsa el botón para iniciar sesión.
+        </p>
+        {error && <p className="text-sm text-red-300">{error}</p>}
+        <button
+          type="button"
+          onClick={onEntrar}
+          className="w-full rounded-xl bg-dex-accent px-4 py-2.5 text-sm font-bold text-black"
+        >
+          Entrar al mantenedor
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Pantalla de acceso: pide el correo y avisa (siempre igual) de que el enlace va en camino. */
+function PedirEnlace({
+  correo,
+  onCorreo,
+  enviado,
+  enviando,
+  error,
+  onSubmit,
+}: Readonly<{
+  correo: string;
+  onCorreo: (correo: string) => void;
+  enviado: boolean;
+  enviando: boolean;
+  error: string | null;
+  onSubmit: (event: React.SubmitEvent<HTMLFormElement>) => void;
+}>) {
+  return (
+    <div className="mx-auto max-w-md px-4 py-16">
+      <div
+        className="space-y-4 rounded-2xl border border-dex-line bg-dex-panel/70 p-6"
+        data-testid="admin-login"
+      >
+        <h1 className="text-xl font-extrabold text-dex-ink">
+          Mantenedor VTuberDex
+        </h1>
+        {enviado ? (
+          <p
+            className="text-sm text-dex-muted"
+            data-testid="admin-enlace-enviado"
+          >
+            Si ese correo es de un administrador, te enviamos un enlace para
+            entrar. Vale 15 minutos y sirve una sola vez. Revisa también el
+            spam.
+          </p>
+        ) : (
+          <form onSubmit={onSubmit} className="space-y-4">
+            <p className="text-sm text-dex-muted">
+              Escribe tu correo de administrador y te enviamos un enlace para
+              entrar.
+            </p>
+            <label className="block text-xs uppercase tracking-[0.14em] text-dex-muted">
+              Correo{" "}
+              <input
+                type="email"
+                value={correo}
+                onChange={(event) => onCorreo(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-dex-line bg-dex-void px-3 py-2 text-sm text-dex-ink outline-none focus:border-dex-accent"
+                autoComplete="email"
+              />
+            </label>
+            {error && <p className="text-sm text-red-300">{error}</p>}
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-dex-accent px-4 py-2.5 text-sm font-bold text-black disabled:opacity-50"
+              disabled={!correo || enviando}
+            >
+              {enviando ? "Enviando…" : "Enviarme el enlace"}
+            </button>
+          </form>
+        )}
+        <p className="text-center text-xs text-dex-muted">
+          <Link href="/" className="hover:text-dex-ink">
+            ← Volver al catálogo
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const SECTIONS: ReadonlyArray<{ id: Section; label: string }> = [
+  { id: "fichas", label: "Fichas" },
+  { id: "emblemas", label: "Emblemas y facciones" },
+  { id: "premium", label: "Premium" },
+  { id: "tarifas", label: "Tarifas" },
+  { id: "solicitudes", label: "Solicitudes" },
+  { id: "estadisticas", label: "Estadísticas" },
+  { id: "dados", label: "Dados" },
+];
+
+function PestanasDelMantenedor({
+  section,
+  onSection,
+}: Readonly<{ section: Section; onSection: (section: Section) => void }>) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Secciones del mantenedor"
+      className="mb-6 flex gap-1 border-b border-dex-line"
+    >
+      {SECTIONS.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          role="tab"
+          id={`section-tab-${item.id}`}
+          aria-selected={section === item.id}
+          aria-controls={`section-${item.id}`}
+          onClick={() => onSection(item.id)}
+          className={`border-b-2 px-4 py-2.5 text-sm font-semibold ${
+            section === item.id
+              ? "border-dex-accent text-dex-ink"
+              : "border-transparent text-dex-muted hover:text-dex-ink"
+          }`}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Todas las pestañas salvo «Fichas» (que tiene su propio panel con lista y asistente). */
+function PanelesDeSeccion({
+  section,
+  token,
+  stats,
+  factions,
+  onFactions,
+  onStructureChanged,
+  onAssign,
+  onVerSolicitudes,
+  notify,
+  onChanged,
+}: Readonly<{
+  section: Section;
+  token: string | null;
+  stats: AdminStats | null;
+  factions: FactionRow[];
+  onFactions: (items: FactionRow[]) => void;
+  onStructureChanged: () => void;
+  onAssign: () => void;
+  onVerSolicitudes: () => void;
+  notify: Notify;
+  onChanged: () => void;
+}>) {
+  return (
+    <>
       {/* Las dos secciones se montan siempre y la inactiva se oculta: así cambiar de pestaña no descarta lo que hay escrito en el asistente. */}
       <div
         role="tabpanel"
@@ -413,15 +557,9 @@ export function AdminPage() {
           <FactionManager
             token={token}
             factions={factions}
-            onItems={setFactions}
-            onStructureChanged={factionStructureChanged}
-            onAssign={() => {
-              setSection("fichas");
-              notify(
-                "ok",
-                "Abre una ficha y elige la facción en el paso «Colores y facciones».",
-              );
-            }}
+            onItems={onFactions}
+            onStructureChanged={onStructureChanged}
+            onAssign={onAssign}
             notify={notify}
           />
         )}
@@ -435,10 +573,18 @@ export function AdminPage() {
         hidden={section !== "premium"}
       >
         {token && section === "premium" && (
-          <PremiumManager token={token} notify={notify} onChanged={changed} />
-        )}
-        {token && section === "premium" && (
-          <ReclamosMisiones token={token} notify={notify} onChanged={changed} />
+          <>
+            <PremiumManager
+              token={token}
+              notify={notify}
+              onChanged={onChanged}
+            />
+            <ReclamosMisiones
+              token={token}
+              notify={notify}
+              onChanged={onChanged}
+            />
+          </>
         )}
       </div>
 
@@ -461,7 +607,7 @@ export function AdminPage() {
           <SolicitudesManager
             token={token}
             notify={notify}
-            onChanged={changed}
+            onChanged={onChanged}
           />
         )}
       </div>
@@ -478,7 +624,7 @@ export function AdminPage() {
         {stats && (
           <PanelEstadisticas
             stats={stats}
-            onVerSolicitudes={() => setSection("solicitudes")}
+            onVerSolicitudes={onVerSolicitudes}
           />
         )}
       </div>
@@ -492,99 +638,129 @@ export function AdminPage() {
       >
         {section === "dados" && <DadosPanel />}
       </div>
+    </>
+  );
+}
 
-      <div
-        role="tabpanel"
-        id="section-fichas"
-        aria-labelledby="section-tab-fichas"
-        hidden={section !== "fichas"}
-      >
-        <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-          <div className="space-y-4">
+/** Pestaña «Fichas»: la lista a la izquierda y, a la derecha, el asistente (crear o editar) o el aviso vacío. */
+function PanelDeFichas({
+  token,
+  view,
+  listVersion,
+  factions,
+  countryOptions,
+  languageOptions,
+  notify,
+  onChanged,
+  onFactionsChanged,
+  onOpen,
+  onCreate,
+  onExit,
+}: Readonly<{
+  token: string;
+  view: View;
+  listVersion: number;
+  factions: FactionRow[];
+  countryOptions: ChipOption[];
+  languageOptions: ChipOption[];
+  notify: Notify;
+  onChanged: () => void;
+  onFactionsChanged: (items: FactionRow[]) => void;
+  onOpen: (id: number) => void;
+  onCreate: () => void;
+  onExit: () => void;
+}>) {
+  const abrirFila = useCallback(
+    (row: { id: number }) => onOpen(row.id),
+    [onOpen],
+  );
+  return (
+    <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={onCreate}
+          className={`${primaryButton} w-full py-3`}
+        >
+          Nueva carta
+        </button>
+        <VtuberList
+          token={token}
+          selectedId={view.kind === "edit" ? view.detail.id : null}
+          refreshKey={listVersion}
+          onOpen={abrirFila}
+          onCreate={onCreate}
+        />
+      </div>
+
+      <section className="min-w-0">
+        {view.kind === "create" && (
+          <CardWizard
+            key={`new-${view.n}`}
+            token={token}
+            mode="create"
+            initial={null}
+            factions={factions}
+            countryOptions={countryOptions}
+            languageOptions={languageOptions}
+            notify={notify}
+            onChanged={onChanged}
+            onFactionsChanged={onFactionsChanged}
+            onExit={onExit}
+            onCreateAnother={onCreate}
+          />
+        )}
+        {view.kind === "edit" && (
+          <CardWizard
+            key={`${view.detail.id}:${view.epoch}`}
+            token={token}
+            mode="edit"
+            initial={view.detail}
+            factions={factions}
+            countryOptions={countryOptions}
+            languageOptions={languageOptions}
+            notify={notify}
+            onChanged={onChanged}
+            onFactionsChanged={onFactionsChanged}
+            onExit={onExit}
+          />
+        )}
+        {view.kind === "none" && (
+          <div className="rounded-2xl border border-dashed border-dex-line px-6 py-16 text-center">
+            <p className="text-sm text-dex-muted">
+              Elige una ficha de la lista para editarla, o crea una nueva.
+            </p>
             <button
               type="button"
-              onClick={startCreate}
-              className={`${primaryButton} w-full py-3`}
+              onClick={onCreate}
+              className={`${primaryButton} mt-4`}
             >
               Nueva carta
             </button>
-            {token && (
-              <VtuberList
-                token={token}
-                selectedId={view.kind === "edit" ? view.detail.id : null}
-                refreshKey={listVersion}
-                onOpen={(row) => openEditor(row.id)}
-                onCreate={startCreate}
-              />
-            )}
           </div>
-
-          <section className="min-w-0">
-            {token && view.kind === "create" && (
-              <CardWizard
-                key={`new-${view.n}`}
-                token={token}
-                mode="create"
-                initial={null}
-                factions={factions}
-                countryOptions={countryOptions}
-                languageOptions={languageOptions}
-                notify={notify}
-                onChanged={changed}
-                onFactionsChanged={setFactions}
-                onExit={() => setView({ kind: "none" })}
-                onCreateAnother={startCreate}
-              />
-            )}
-            {token && view.kind === "edit" && (
-              <CardWizard
-                key={`${view.detail.id}:${view.epoch}`}
-                token={token}
-                mode="edit"
-                initial={view.detail}
-                factions={factions}
-                countryOptions={countryOptions}
-                languageOptions={languageOptions}
-                notify={notify}
-                onChanged={changed}
-                onFactionsChanged={setFactions}
-                onExit={() => setView({ kind: "none" })}
-              />
-            )}
-            {view.kind === "none" && (
-              <div className="rounded-2xl border border-dashed border-dex-line px-6 py-16 text-center">
-                <p className="text-sm text-dex-muted">
-                  Elige una ficha de la lista para editarla, o crea una nueva.
-                </p>
-                <button
-                  type="button"
-                  onClick={startCreate}
-                  className={`${primaryButton} mt-4`}
-                >
-                  Nueva carta
-                </button>
-              </div>
-            )}
-          </section>
-        </div>
-      </div>
-
-      <section className="mt-6 rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
-        <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">
-          Actividad reciente
-        </h2>
-        <ul className="mt-3 space-y-1 font-mono text-xs text-dex-muted">
-          {audit.slice(0, 12).map((entry) => (
-            <li key={entry.id}>
-              {entry.createdAt} · <QuizasCorreo texto={entry.actor} /> ·{" "}
-              {entry.action}
-              {entry.entityId ? ` · #${entry.entityId}` : ""}
-            </li>
-          ))}
-          {audit.length === 0 && <li key="empty">Sin registros todavía.</li>}
-        </ul>
+        )}
       </section>
     </div>
+  );
+}
+
+function ActividadReciente({ audit }: Readonly<{ audit: AuditEntry[] }>) {
+  return (
+    <section className="mt-6 rounded-2xl border border-dex-line bg-dex-panel/60 p-4">
+      <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-dex-muted">
+        Actividad reciente
+      </h2>
+      <ul className="mt-3 space-y-1 font-mono text-xs text-dex-muted">
+        {audit.slice(0, 12).map((entry) => (
+          <li key={entry.id}>
+            {entry.createdAt} · <QuizasCorreo texto={entry.actor} /> ·{" "}
+            {entry.action}
+            {entry.entityId ? ` · #${entry.entityId}` : ""}
+          </li>
+        ))}
+        {audit.length === 0 && <li key="empty">Sin registros todavía.</li>}
+      </ul>
+    </section>
   );
 }
 

@@ -17,7 +17,9 @@ import {
 function resolver(reto: string): string {
   for (let n = 0; ; n++) {
     const d = createHash("sha256").update(`${reto}:${n}`).digest();
-    if (bitsInicialesEnCero(d) >= BITS_PRUEBA) return String(n);
+    if (bitsInicialesEnCero(d) >= BITS_PRUEBA) {
+      return String(n);
+    }
   }
 }
 
@@ -88,8 +90,9 @@ describe("cookie de sesión", () => {
   });
 
   it("limita las sesiones nuevas por red y hora", () => {
-    for (let i = 0; i < MAX_SESIONES_POR_RED_HORA; i++)
+    for (let i = 0; i < MAX_SESIONES_POR_RED_HORA; i++) {
       expect(sesionesAgotadas("r", 1000)).toBe(false);
+    }
     expect(sesionesAgotadas("r", 1000)).toBe(true);
     expect(sesionesAgotadas("r", 1000 + 3_600_001)).toBe(false);
   });

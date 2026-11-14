@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Recuerda DÓNDE estaba el visitante en el catálogo (página, filtros, orden) para que el
  * «← Catálogo» de la ficha lo devuelva ahí y no a la página 1.

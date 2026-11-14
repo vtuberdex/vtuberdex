@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Paginación simple con ventana de páginas. */
 import { useI18n } from "@/lib/i18n";
@@ -12,14 +13,24 @@ function windowedPages(page: number, pageCount: number, span = 2): number[] {
   const start = Math.max(1, Math.min(page - span, pageCount - span * 2));
   const end = Math.min(pageCount, Math.max(page + span, span * 2 + 1));
   const pages: number[] = [];
-  for (let value = start; value <= end; value += 1) pages.push(value);
+  for (let value = start; value <= end; value += 1) {
+    pages.push(value);
+  }
   return pages;
 }
 
-export function Pagination({ page, pageCount, onPage }: PaginationProps) {
+export function Pagination({
+  page,
+  pageCount,
+  onPage,
+}: Readonly<PaginationProps>) {
   const { t } = useI18n();
-  if (pageCount <= 1) return null;
+  if (pageCount <= 1) {
+    return null;
+  }
   const pages = windowedPages(page, pageCount);
+  // La ventana nunca está vacía con más de una página; el respaldo solo calma al tipo.
+  const ultima = pages.at(-1) ?? pageCount;
 
   const buttonClass = (active: boolean) =>
     `min-w-9 rounded-lg border px-3 py-1.5 font-mono text-xs transition-colors ${
@@ -64,11 +75,9 @@ export function Pagination({ page, pageCount, onPage }: PaginationProps) {
           {value}
         </button>
       ))}
-      {pages[pages.length - 1] < pageCount && (
+      {ultima < pageCount && (
         <>
-          {pages[pages.length - 1] < pageCount - 1 && (
-            <span className="text-dex-muted">…</span>
-          )}
+          {ultima < pageCount - 1 && <span className="text-dex-muted">…</span>}
           <button
             type="button"
             onClick={() => onPage(pageCount)}

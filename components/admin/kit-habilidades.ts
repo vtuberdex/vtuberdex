@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * El ASISTENTE DE KIT: de lo que el mantenedor elige en menús al HTML de las 5 habilidades.
  *
@@ -153,7 +154,7 @@ export function aTokens(html: string | null | undefined): string {
   return textoPlanoDe(
     String(html ?? "").replace(
       /<span\s+style\s*=\s*"[^"]*"\s*>([^<]*)<\/span>/gi,
-      (entero, nombre: string) => {
+      (_entero, nombre: string) => {
         const hallado = buscarEstado(nombre);
         return hallado ? `[[${hallado.canonico}]]` : nombre;
       },
@@ -169,8 +170,9 @@ export function kitDesdeHabilidades(skills: SkillForm[]): KitForm {
   const ultimate = skills.find((s) => s.category === "ultimate");
   activas.slice(0, 2).forEach((s, i) => {
     kit.activas[i].nombre = s.name;
-    if (s.type === "Defensivo" || s.type === "Soporte")
+    if (s.type === "Defensivo" || s.type === "Soporte") {
       kit.activas[i].tipo = s.type;
+    }
   });
   pasivas.slice(0, 2).forEach((s, i) => {
     kit.pasivas[i] = {
@@ -178,7 +180,9 @@ export function kitDesdeHabilidades(skills: SkillForm[]): KitForm {
       texto: aTokens(s.effectHtml ?? s.effect),
     };
   });
-  if (ultimate) kit.ultimate.nombre = ultimate.name;
+  if (ultimate) {
+    kit.ultimate.nombre = ultimate.name;
+  }
   return kit;
 }
 
@@ -194,7 +198,9 @@ export function mapaSubfacciones(
 ): Record<string, string> {
   const mapa: Record<string, string> = {};
   for (const faccion of facciones ?? []) {
-    if (faccion.slug && faccion.parentSlug) mapa[faccion.slug] = faccion.parentSlug;
+    if (faccion.slug && faccion.parentSlug) {
+      mapa[faccion.slug] = faccion.parentSlug;
+    }
   }
   return mapa;
 }
@@ -225,7 +231,9 @@ export function estadosDisponibles(
 /** El verbo que corresponde: el de la polaridad, o el elegido si el estado es `ambos`. */
 export function verboDe(elegido: EstadoElegido): Verbo {
   const hallado = buscarEstado(elegido.nombre);
-  if (!hallado || hallado.estado.polaridad === "ambos") return elegido.verbo;
+  if (!hallado || hallado.estado.polaridad === "ambos") {
+    return elegido.verbo;
+  }
   return hallado.estado.polaridad === "positivo" ? "obtienes" : "aplicas";
 }
 
@@ -246,29 +254,28 @@ function lineas(texto: string): string[] {
     .map((l) => `${expandirEstados(escaparHtml(l))}<br>`);
 }
 
-export function htmlDeActiva(a: ActivaForm): string {
-  const partes: string[] = [];
+/** La primera línea de una activa: daño (con su estado) o solo el estado; vacía si no tiene ninguno. */
+function primeraLineaDeActiva(a: ActivaForm): string[] {
   const estado = a.estado.nombre
     ? `${verboDe(a.estado)} ${spanDeEstado(a.estado.nombre)} durante ${turnos(a.turnos)}`
     : "";
   if (a.ataque !== "ninguno") {
-    partes.push(
-      `${formula(a.ataque, a.bono)}${estado ? ` y ${estado}` : ""}.<br>`,
-    );
-  } else if (estado) {
-    partes.push(`${mayuscula(estado)}.<br>`);
+    const conEstado = estado ? ` y ${estado}` : "";
+    return [`${formula(a.ataque, a.bono)}${conEstado}.<br>`];
   }
-  partes.push(...lineas(a.extra));
-  return partes.join("\n");
+  return estado ? [`${mayuscula(estado)}.<br>`] : [];
+}
+
+export function htmlDeActiva(a: ActivaForm): string {
+  return [...primeraLineaDeActiva(a), ...lineas(a.extra)].join("\n");
 }
 
 export function htmlDePasiva(p: PasivaForm): string {
   return lineas(p.texto).join("\n");
 }
 
-export function htmlDeUltimate(u: UltimateForm): string {
-  const partes: string[] = [];
-  const dano = formula(u.ataque, u.bono);
+/** La línea del daño de la Ultimate según su fórmula (dado, varios ataques o uno solo). */
+function lineasDeAtaqueDeUltimate(u: UltimateForm): string[] {
   if (u.formula === "dado") {
     const base = u.ataque === "magico" ? "Ataque Mágico Base" : "Ataque Base";
     const caras = FRACCION_DEL_DADO[u.caras] ? u.caras : "6";
@@ -276,57 +283,81 @@ export function htmlDeUltimate(u: UltimateForm): string {
       u.dados === "2"
         ? `Lanza 2d${caras}, donde X es la suma de los resultados.<br>`
         : `Lanza 1d${caras}, donde X es el resultado obtenido.<br>`;
-    partes.push(
+    return [
       tirada,
       `Realizas X ataques consecutivos equivalentes a ${FRACCION_DEL_DADO[caras]} del ${base}.<br>`,
-    );
-  } else if (u.formula === "consecutivos") {
-    partes.push(
+    ];
+  }
+  const dano = formula(u.ataque, u.bono);
+  if (u.formula === "consecutivos") {
+    return [
       `Realizas ${Math.max(2, Number(u.golpes) || 2)} ataques consecutivos equivalentes a ${dano}.<br>`,
-    );
-  } else {
-    partes.push(`${dano}.<br>`);
+    ];
   }
+  return [`${dano}.<br>`];
+}
 
-  // Los dos estados SIEMPRE en su evolución: la regla de la Ultimate no se deja a elección.
+/** Los estados de la Ultimate, SIEMPRE en su evolución: la regla no se deja a elección. */
+function lineasDeEstadosDeUltimate(u: UltimateForm): string[] {
   const elegidos = u.estados.filter((e) => e.nombre);
-  if (elegidos.length) {
-    const piezas = elegidos.map((e) => ({
-      verbo: verboDe(e),
-      span: spanDeEstado(buscarEstado(e.nombre)!.estado.evolucion.nombre),
-    }));
-    const frase =
-      piezas.length === 2 && piezas[0].verbo === piezas[1].verbo
-        ? `${mayuscula(piezas[0].verbo)} ${piezas[0].span} y ${piezas[1].span}`
-        : piezas
-            .map(
-              (p, i) => `${i === 0 ? mayuscula(p.verbo) : p.verbo} ${p.span}`,
-            )
-            .join(" y ");
-    partes.push(`\n<br>${frase} durante ${turnos(u.turnos)}.<br>`);
-    for (const e of elegidos) partes.push(`\n${bloqueDeEvolucion(e.nombre)}`);
+  if (!elegidos.length) {
+    return [];
   }
+  const piezas = elegidos.map((e) => ({
+    verbo: verboDe(e),
+    span: spanDeEstado(buscarEstado(e.nombre)!.estado.evolucion.nombre),
+  }));
+  // Con el mismo verbo se dice una vez («Aplicas A y B»); si no, cada uno lleva el suyo.
+  const frase =
+    piezas.length === 2 && piezas[0].verbo === piezas[1].verbo
+      ? `${mayuscula(piezas[0].verbo)} ${piezas[0].span} y ${piezas[1].span}`
+      : piezas
+          .map((p, i) => `${i === 0 ? mayuscula(p.verbo) : p.verbo} ${p.span}`)
+          .join(" y ");
+  return [
+    `\n<br>${frase} durante ${turnos(u.turnos)}.<br>`,
+    ...elegidos.map((e) => `\n${bloqueDeEvolucion(e.nombre)}`),
+  ];
+}
 
+/**
+ * Quita los puntos y comas del final. Con un bucle y no con `/[.,]+$/`: esa regex reintenta desde cada
+ * signo intermedio (coste cuadrático con un texto largo de puntuación) para el mismo resultado.
+ */
+export function sinPuntuacionFinal(texto: string): string {
+  let fin = texto.length;
+  while (fin > 0 && (texto[fin - 1] === "." || texto[fin - 1] === ",")) {
+    fin -= 1;
+  }
+  return texto.slice(0, fin);
+}
+
+/** La Habilidad Única: cómo se activa y qué hace mientras dura (nada si no está activa o no tiene nombre). */
+function lineasDeUnica(unica: UltimateForm["unica"]): string[] {
+  if (!unica.activa || !unica.nombre.trim()) {
+    return [];
+  }
+  const color = /^#[0-9a-fA-F]{6}$/.test(unica.color) ? unica.color : "#56bd45";
+  const span = `<span style="color:${color}; font-weight:bold;">${escaparHtml(unica.nombre.trim())}</span>`;
+  const condicion = sinPuntuacionFinal(unica.condicion.trim());
+  const activa = condicion
+    ? `${escaparHtml(condicion)}, se activa la habilidad única ${span} durante ${turnos(unica.turnos)}.<br>`
+    : `Se activa la habilidad única ${span} durante ${turnos(unica.turnos)}.<br>`;
+  return [
+    `\n<br>${expandirEstados(activa)}`,
+    `\n<br>Mientras ${span} esté activo:<br>`,
+    ...lineas(unica.efectos),
+  ];
+}
+
+export function htmlDeUltimate(u: UltimateForm): string {
   const extra = lineas(u.extra);
-  if (extra.length) partes.push(`\n<br>${extra.join("\n")}`);
-
-  const unica = u.unica;
-  if (unica.activa && unica.nombre.trim()) {
-    const color = /^#[0-9a-fA-F]{6}$/.test(unica.color)
-      ? unica.color
-      : "#56bd45";
-    const span = `<span style="color:${color}; font-weight:bold;">${escaparHtml(unica.nombre.trim())}</span>`;
-    const condicion = unica.condicion.trim().replace(/[.,]+$/, "");
-    const activa = condicion
-      ? `${escaparHtml(condicion)}, se activa la habilidad única ${span} durante ${turnos(unica.turnos)}.<br>`
-      : `Se activa la habilidad única ${span} durante ${turnos(unica.turnos)}.<br>`;
-    partes.push(
-      `\n<br>${expandirEstados(activa)}`,
-      `\n<br>Mientras ${span} esté activo:<br>`,
-      ...lineas(unica.efectos),
-    );
-  }
-  return partes.join("\n");
+  return [
+    ...lineasDeAtaqueDeUltimate(u),
+    ...lineasDeEstadosDeUltimate(u),
+    ...(extra.length ? [`\n<br>${extra.join("\n")}`] : []),
+    ...lineasDeUnica(u.unica),
+  ].join("\n");
 }
 
 /** El kit como las 5 filas del formulario, con su texto plano y su HTML. */
@@ -363,25 +394,47 @@ export function habilidadesDelKit(kit: KitForm): SkillForm[] {
   ];
 }
 
+/** La Ultimate necesita dos estados y que sean distintos. */
+function faltaDeEstadosDeUltimate(
+  estados: UltimateForm["estados"],
+): string | null {
+  if (estados.some((e) => !e.nombre)) {
+    return "Los dos estados de la Ultimate";
+  }
+  return estados[0].nombre === estados[1].nombre
+    ? "Dos estados DISTINTOS en la Ultimate"
+    : null;
+}
+
 /** Lo que falta por rellenar (antes de mirar las reglas del sistema). */
 export function faltantes(kit: KitForm): string[] {
   const faltan: string[] = [];
   kit.activas.forEach((a, i) => {
-    if (!a.nombre.trim()) faltan.push(`Nombre de la Activa ${i + 1}`);
-    if (a.ataque === "ninguno" && !a.estado.nombre && !a.extra.trim())
+    if (!a.nombre.trim()) {
+      faltan.push(`Nombre de la Activa ${i + 1}`);
+    }
+    if (a.ataque === "ninguno" && !a.estado.nombre && !a.extra.trim()) {
       faltan.push(`Efecto de la Activa ${i + 1}`);
+    }
   });
   kit.pasivas.forEach((p, i) => {
-    if (!p.nombre.trim()) faltan.push(`Nombre de la Pasiva ${i + 1}`);
-    if (!p.texto.trim()) faltan.push(`Efecto de la Pasiva ${i + 1}`);
+    if (!p.nombre.trim()) {
+      faltan.push(`Nombre de la Pasiva ${i + 1}`);
+    }
+    if (!p.texto.trim()) {
+      faltan.push(`Efecto de la Pasiva ${i + 1}`);
+    }
   });
-  if (!kit.ultimate.nombre.trim()) faltan.push("Nombre de la Ultimate");
-  if (kit.ultimate.estados.some((e) => !e.nombre))
-    faltan.push("Los dos estados de la Ultimate");
-  else if (kit.ultimate.estados[0].nombre === kit.ultimate.estados[1].nombre)
-    faltan.push("Dos estados DISTINTOS en la Ultimate");
-  if (kit.ultimate.unica.activa && !kit.ultimate.unica.nombre.trim())
+  if (!kit.ultimate.nombre.trim()) {
+    faltan.push("Nombre de la Ultimate");
+  }
+  const estados = faltaDeEstadosDeUltimate(kit.ultimate.estados);
+  if (estados) {
+    faltan.push(estados);
+  }
+  if (kit.ultimate.unica.activa && !kit.ultimate.unica.nombre.trim()) {
     faltan.push("Nombre de la Habilidad Única");
+  }
   return faltan;
 }
 

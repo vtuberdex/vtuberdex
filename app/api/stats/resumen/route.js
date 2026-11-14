@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `GET /api/stats/resumen` — agregados de visitantes para el panel de estado del servidor.
  *
@@ -15,8 +16,9 @@ export const dynamic = "force-dynamic";
 
 function tokenValido(recibido) {
   const esperado = process.env.VTUBERDEX_STATS_TOKEN;
-  if (!esperado || esperado.length < 16 || typeof recibido !== "string")
+  if (!esperado || esperado.length < 16 || typeof recibido !== "string") {
     return false;
+  }
   const a = Buffer.from(recibido);
   const b = Buffer.from(esperado);
   return a.length === b.length && crypto.timingSafeEqual(a, b);

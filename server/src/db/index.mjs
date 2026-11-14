@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Acceso a SQLite y utilidades de esquema.
  *
@@ -143,7 +144,9 @@ const MIGRATIONS = [
       const facciones = db
         .prepare("SELECT id, slug, label, parent_id AS parentId FROM faction")
         .all();
-      if (facciones.length < 2) return;
+      if (facciones.length < 2) {
+        return;
+      }
 
       const porEtiqueta = new Map(
         facciones.map((f) => [String(f.label).trim().toLowerCase(), f]),
@@ -153,44 +156,64 @@ const MIGRATIONS = [
       );
 
       for (const hija of facciones) {
-        if (hija.parentId) continue;
-        const etiqueta = String(hija.label).trim();
-        const entreParentesis = /^(.+?)\s*[([]/.exec(etiqueta);
-        let madre = entreParentesis
-          ? porEtiqueta.get(entreParentesis[1].trim().toLowerCase())
-          : undefined;
-        if (!madre) {
-          // Respaldo: el slug generado del nombre («glovecaller-elfs») empieza por el de la madre.
-          const prefijo = facciones
-            .filter(
-              (otra) =>
-                otra.id !== hija.id &&
-                hija.slug.startsWith(`${otra.slug}-`) &&
-                otra.parentId === null,
-            )
-            .sort((a, b) => b.slug.length - a.slug.length)[0];
-          madre = prefijo;
+        if (hija.parentId) {
+          continue;
         }
-        if (!madre || madre.id === hija.id) continue;
-        // Una madre que a su vez es hija de la candidata crearía un ciclo: se deja sin madre.
-        let subiendo = madre;
-        let saltos = 0;
-        let ciclo = false;
-        while (subiendo?.parentId && saltos < 16) {
-          if (subiendo.parentId === hija.id) {
-            ciclo = true;
-            break;
-          }
-          subiendo = facciones.find((f) => f.id === subiendo.parentId);
-          saltos += 1;
+        const madre = madreSembrada(hija, facciones, porEtiqueta);
+        if (
+          !madre ||
+          madre.id === hija.id ||
+          formariaCiclo(madre, hija, facciones)
+        ) {
+          continue;
         }
-        if (ciclo) continue;
         enlazar.run(madre.id, hija.id);
         hija.parentId = madre.id;
       }
     },
   },
 ];
+
+/**
+ * Madre que la migración `2026-11-faccion-madre` deduce del texto: lo que va antes del paréntesis
+ * en la etiqueta y, si no, el prefijo más largo del slug entre las facciones sin madre.
+ */
+function madreSembrada(hija, facciones, porEtiqueta) {
+  const etiqueta = String(hija.label).trim();
+  // `\S` al final del grupo hace que los blancos antes del paréntesis solo los pueda tomar `\s*`:
+  // con `(.+?)\s*` los dos competían por ellos y la regex era cuadrática con tiras de espacios.
+  // El grupo se recorta igual, así que la madre que sale es la misma.
+  const entreParentesis = /^(.*?\S)\s*[([]/.exec(etiqueta);
+  const madre = entreParentesis
+    ? porEtiqueta.get(entreParentesis[1].trim().toLowerCase())
+    : undefined;
+  if (madre) {
+    return madre;
+  }
+  // Respaldo: el slug generado del nombre («glovecaller-elfs») empieza por el de la madre.
+  return facciones
+    .filter(
+      (otra) =>
+        otra.id !== hija.id &&
+        hija.slug.startsWith(`${otra.slug}-`) &&
+        otra.parentId === null,
+    )
+    .sort((a, b) => b.slug.length - a.slug.length)[0];
+}
+
+/** Una madre que a su vez es hija de la candidata crearía un ciclo: se deja sin madre. */
+function formariaCiclo(madre, hija, facciones) {
+  let subiendo = madre;
+  let saltos = 0;
+  while (subiendo?.parentId && saltos < 16) {
+    if (subiendo.parentId === hija.id) {
+      return true;
+    }
+    subiendo = facciones.find((f) => f.id === subiendo.parentId);
+    saltos += 1;
+  }
+  return false;
+}
 
 /**
  * Vistas de apoyo. Se (re)crean en CADA apertura y SIEMPRE después de las
@@ -236,13 +259,20 @@ function applyMigrations(db) {
   for (const migration of MIGRATIONS) {
     const key = `migration:${migration.id}`;
     const already = db.prepare("SELECT value FROM meta WHERE key = ?").get(key);
-    if (already) continue;
+    if (already) {
+      continue;
+    }
     try {
-      if (migration.run) migration.run(db);
-      else db.exec(migration.sql);
+      if (migration.run) {
+        migration.run(db);
+      } else {
+        db.exec(migration.sql);
+      }
     } catch (error) {
       // Columna ya presente (base creada con el esquema nuevo): no es un fallo.
-      if (!/duplicate column name/i.test(String(error))) throw error;
+      if (!/duplicate column name/i.test(String(error))) {
+        throw error;
+      }
     }
     db.prepare(
       "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",

@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * ¿En qué idioma está un texto? Solo importa distinguir los tres idiomas de la interfaz, para
  * decidir si ofrecer «Traducir». No es un detector general: lo que no es claramente japonés,
@@ -22,27 +23,59 @@ const EN = new Set(
 const KANA = /[\p{Script=Hiragana}\p{Script=Katakana}]/gu;
 const LETRA = /\p{L}/gu;
 
+/** Cuántas coincidencias de un regex global hay en el texto. */
+const cuantas = (texto: string, patron: RegExp) =>
+  texto.match(patron)?.length ?? 0;
+
 export function idiomaDelTexto(texto: string): Locale | null {
   const t = texto.trim();
-  if (t.length < 12) return null;
-  const letras = t.match(LETRA)?.length ?? 0;
-  if (letras === 0) return null;
+  if (t.length < 12) {
+    return null;
+  }
+  const letras = cuantas(t, LETRA);
+  if (letras === 0) {
+    return null;
+  }
   // Kana: ningún otro idioma de la lista lo usa. Con pocos kana el resto es kanji de un texto japonés corto.
-  if ((t.match(KANA)?.length ?? 0) / letras > 0.1) return "ja";
+  if (cuantas(t, KANA) / letras > 0.1) {
+    return "ja";
+  }
 
   const palabras = t.toLowerCase().match(/[a-záéíóúüñ']+/g) ?? [];
-  if (palabras.length < 3) return null;
+  if (palabras.length < 3) {
+    return null;
+  }
+  const { es, en } = puntosPorIdioma(t, palabras);
+  return veredicto(es, en);
+}
+
+/** Palabras frecuentes de cada idioma, más medio punto por cada letra que solo usa el español. */
+function puntosPorIdioma(t: string, palabras: string[]) {
   let es = 0;
   let en = 0;
   for (const palabra of palabras) {
-    if (ES.has(palabra)) es += 1;
-    if (EN.has(palabra)) en += 1;
+    if (ES.has(palabra)) {
+      es += 1;
+    }
+    if (EN.has(palabra)) {
+      en += 1;
+    }
   }
-  const marcasEs = (t.match(/[ñ¿¡áéíóú]/gi)?.length ?? 0) / palabras.length;
+  const marcasEs = cuantas(t, /[ñ¿¡áéíóú]/gi) / palabras.length;
   es += marcasEs * palabras.length * 0.5;
-  if (es === 0 && en === 0) return null;
+  return { es, en };
+}
+
+function veredicto(es: number, en: number): Locale | null {
+  if (es === 0 && en === 0) {
+    return null;
+  }
   // Margen mínimo: un texto en portugués o francés comparte «de», «la»… con el español y no debe pasar por español.
-  if (es > en * 1.3) return "es";
-  if (en > es * 1.3) return "en";
+  if (es > en * 1.3) {
+    return "es";
+  }
+  if (en > es * 1.3) {
+    return "en";
+  }
   return null;
 }

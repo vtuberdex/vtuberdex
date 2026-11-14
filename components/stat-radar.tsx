@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Gráfico de telaraña de los atributos de combate.
  *
@@ -23,12 +24,14 @@ const ANILLOS = [0.25, 0.5, 0.75, 1];
 export function StatRadar({
   stats,
   palette,
-}: {
+}: Readonly<{
   stats: readonly StatRow[];
   palette: { accent: string; secondary: string };
-}) {
+}>) {
   const vertices = verticesDeRadar(stats);
-  if (vertices.length < MIN_EJES) return null;
+  if (vertices.length < MIN_EJES) {
+    return null;
+  }
   const n = vertices.length;
   const descripcion = vertices.map((v) => `${v.label} ${v.value}`).join(", ");
 
@@ -44,7 +47,7 @@ export function StatRadar({
         {ANILLOS.map((anillo) => (
           <polygon
             key={anillo}
-            points={poligono(Array(n).fill(anillo), RADIO, CX, CY)}
+            points={poligono(new Array(n).fill(anillo), RADIO, CX, CY)}
             fill="none"
             stroke="currentColor"
             strokeOpacity={anillo === 1 ? 0.35 : 0.15}
@@ -100,8 +103,7 @@ export function StatRadar({
         {/* Etiquetas: nombre corto y valor, fuera del anillo exterior. */}
         {vertices.map((v, i) => {
           const p = puntoDeEje(i, n, RADIO + 20, CX, CY);
-          const ancla =
-            Math.abs(p.x - CX) < 8 ? "middle" : p.x < CX ? "end" : "start";
+          const ancla = anclaDeEtiqueta(p.x);
           return (
             <text
               key={v.slug}
@@ -129,6 +131,14 @@ export function StatRadar({
       </svg>
     </figure>
   );
+}
+
+/** Alineación de una etiqueta según su lado: centrada cerca del eje vertical, si no hacia fuera. */
+function anclaDeEtiqueta(x: number): "middle" | "end" | "start" {
+  if (Math.abs(x - CX) < 8) {
+    return "middle";
+  }
+  return x < CX ? "end" : "start";
 }
 
 export default StatRadar;

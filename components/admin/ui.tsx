@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 'use client';
 /**
  * Piezas visuales compartidas por el mantenedor. Viven aparte para que cada
@@ -16,7 +17,7 @@ export const ghostButton =
 
 export const primaryButton = 'rounded-xl bg-dex-accent px-4 py-2 text-sm font-bold text-black disabled:opacity-50';
 
-export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+export function Field({ label, hint, children }: Readonly<{ label: string; hint?: ReactNode; children: ReactNode }>) {
   return (
     <label className={labelClass}>
       {label}
@@ -28,21 +29,31 @@ export function Field({ label, hint, children }: { label: string; hint?: ReactNo
 
 /** Ruta pública de un emblema (`images/faction/x.png` -> `/images/faction/x.png`). */
 export function emblemSrc(icon: string | null | undefined): string | null {
-  if (!icon) return null;
+  if (!icon) {
+    return null;
+  }
   return safeImageSrc(icon.startsWith('/') || /^https?:/i.test(icon) ? icon : `/${icon}`);
 }
 
 /** Solo deja pasar URLs de imagen inocuas (relativas, http(s), blob: o data:image/); el resto se descarta. */
 export function safeImageSrc(src: string | null | undefined): string | null {
-  if (!src) return null;
-  if (src.startsWith('//')) return null;
-  if (/^(https?:|blob:|data:image\/(png|jpe?g|webp|gif|avif);)/i.test(src) || src.startsWith('/')) return src;
+  if (!src) {
+    return null;
+  }
+  if (src.startsWith('//')) {
+    return null;
+  }
+  if (/^(https?:|blob:|data:image\/(png|jpe?g|webp|gif|avif);)/i.test(src) || src.startsWith('/')) {
+    return src;
+  }
   return /^[a-z][a-z0-9+.-]*:/i.test(src) ? null : src;
 }
 
-export function Emblem({ icon, className = 'h-5 w-5' }: { icon: string | null | undefined; className?: string }) {
+export function Emblem({ icon, className = 'h-5 w-5' }: Readonly<{ icon: string | null | undefined; className?: string }>) {
   const src = emblemSrc(icon);
-  if (!src) return <span className={`${className} inline-block rounded bg-white/5`} aria-hidden />;
+  if (!src) {
+    return <span className={`${className} inline-block rounded bg-white/5`} aria-hidden />;
+  }
   return <img src={src} alt="" className={`${className} object-contain`} />;
 }
 
@@ -52,7 +63,7 @@ export function Emblem({ icon, className = 'h-5 w-5' }: { icon: string | null | 
  * un fondo claro engañaría (un trazo oscuro desaparece en la carta). Verlo aquí sobre
  * el engarce es la prueba de que se leerá bien.
  */
-export function EmblemSocket({ icon, previewUrl, size = 96 }: { icon?: string | null; previewUrl?: string | null; size?: number }) {
+export function EmblemSocket({ icon, previewUrl, size = 96 }: Readonly<{ icon?: string | null; previewUrl?: string | null; size?: number }>) {
   const src = safeImageSrc(previewUrl) ?? emblemSrc(icon);
   return (
     <span
@@ -70,7 +81,7 @@ export function EmblemSocket({ icon, previewUrl, size = 96 }: { icon?: string | 
 }
 
 /** Ventana modal accesible: foco en el diálogo, Escape y clic fuera para cerrar. */
-export function Dialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Dialog({ title, onClose, children }: Readonly<{ title: string; onClose: () => void; children: ReactNode }>) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -89,7 +100,7 @@ export function Dialog({ title, onClose, children }: { title: string; onClose: (
 }
 
 /** Aviso con el motivo por el que una acción no está disponible (el botón deshabilitado nunca va mudo). */
-export function Reason({ children }: { children: ReactNode }) {
+export function Reason({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <p className="text-[11px] text-amber-200/90" data-testid="reason">
       {children}

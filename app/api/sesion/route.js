@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * `/api/sesion` (y `/renovar`) — sesión de visitante con prueba de trabajo (ver `lib/sesion-visitante.mjs`).
  *

@@ -119,14 +119,16 @@ describe("registrar / resumen", () => {
 
   it("con sesiones de más desaloja las más viejas y la memoria no crece sin tope", () => {
     // 100 ms entre sesiones = 600 por minuto: lo máximo que admite el guardia de sesiones nuevas.
-    for (let i = 0; i < MAX_SESIONES + 50; i += 1)
+    for (let i = 0; i < MAX_SESIONES + 50; i += 1) {
       expect(registrar(latido(i), T0 + i * 100)).toBe("ok");
+    }
     expect(__sesionesGuardadas()).toBe(MAX_SESIONES);
   });
 
   it("no admite más de MAX_NUEVAS_POR_MINUTO sesiones nuevas por minuto (sin IP, es el freno contra un script)", () => {
-    for (let i = 0; i < MAX_NUEVAS_POR_MINUTO; i += 1)
+    for (let i = 0; i < MAX_NUEVAS_POR_MINUTO; i += 1) {
       expect(registrar(latido(i), T0 + i)).toBe("ok");
+    }
     expect(registrar(latido(MAX_NUEVAS_POR_MINUTO), T0 + 5000)).toBe(
       "demasiado_rapido",
     );
@@ -266,8 +268,9 @@ describe("navegación y histórico mensual", () => {
   });
 
   it("el pico de conectados del mes se guarda", async () => {
-    for (let i = 1; i <= 4; i += 1)
+    for (let i = 1; i <= 4; i += 1) {
       registrar({ sid: sid(i), nav: true, ruta: "catalogo" }, T0 + i);
+    }
     expect((await mesActual(T0 + 100)).pico).toBe(4);
   });
 
@@ -309,11 +312,12 @@ describe("navegador, sistema operativo y ficha", () => {
       null,
       undefined,
       {},
-    ])
+    ]) {
       expect(
         limpiarLatido({ ...latido(1), fichaId: malo })!.fichaId,
         String(malo),
       ).toBeNull();
+    }
     expect(limpiarLatido({ ...latido(1), fichaId: 42 })!.fichaId).toBe(42);
     expect(
       limpiarLatido({ ...latido(1), ficha: "madkoding" }),

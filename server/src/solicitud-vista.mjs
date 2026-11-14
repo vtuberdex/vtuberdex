@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * VISTA PREVIA de una solicitud: lo que pasaría si el mantenedor la aprueba, sin escribir nada.
  *
@@ -103,13 +104,15 @@ function resumenDeFicha(f) {
 /** Qué fichas se parecen a lo que escribió la persona, para elegir a mano cuando no se resuelve sola. */
 export function candidatasParaReferencia(db, referencia, limite = 6) {
   const texto = String(referencia ?? "").trim();
-  const dex = texto.match(/#\s*(\d{1,4})\b/)?.[1];
+  const dex = /#\s*(\d{1,4})\b/.exec(texto)?.[1];
   const sinDex = texto
     .replace(/#\s*\d{1,4}\b/, " ")
     .replace(/\s+/g, " ")
     .trim();
   const q = sinDex || dex || "";
-  if (!q) return [];
+  if (!q) {
+    return [];
+  }
   try {
     return searchVtubers(db, {
       q,
@@ -125,36 +128,50 @@ export function candidatasParaReferencia(db, referencia, limite = 6) {
 export function cambiosDeModificacion(actual, patch) {
   const cambios = [];
   const agregar = (campo, antes, despues) => {
-    if (igual(antes, despues)) return;
+    if (igual(antes, despues)) {
+      return;
+    }
     cambios.push({ campo, antes, despues, nuevo: !String(antes).trim() });
   };
   for (const [clave, etiqueta] of Object.entries(ETIQUETAS)) {
-    if (patch[clave] === undefined) continue;
+    if (patch[clave] === undefined) {
+      continue;
+    }
     agregar(etiqueta, comoTexto(actual[clave]), comoTexto(patch[clave]));
   }
   if (patch.profile) {
-    const antes = new Map(
-      (actual.profile ?? []).map((f) => [normalizeText(f.label), f.value]),
-    );
-    for (const fila of patch.profile)
-      agregar(
-        `Gusto · ${fila.label}`,
-        antes.get(normalizeText(fila.label)) ?? "",
-        fila.value,
-      );
+    cambiosDeGustos(actual.profile, patch.profile, agregar);
   }
   if (patch.socials) {
-    const antes = new Map(
-      (actual.socials ?? []).map((r) => [normalizeText(r.platform), r.url]),
-    );
-    for (const red of patch.socials)
-      agregar(
-        `Red · ${red.label ?? red.platform}`,
-        antes.get(normalizeText(red.platform)) ?? "",
-        red.url,
-      );
+    cambiosDeRedes(actual.socials, patch.socials, agregar);
   }
   return cambios;
+}
+
+function cambiosDeGustos(perfilActual, perfilNuevo, agregar) {
+  const antes = new Map(
+    (perfilActual ?? []).map((f) => [normalizeText(f.label), f.value]),
+  );
+  for (const fila of perfilNuevo) {
+    agregar(
+      `Gusto · ${fila.label}`,
+      antes.get(normalizeText(fila.label)) ?? "",
+      fila.value,
+    );
+  }
+}
+
+function cambiosDeRedes(redesActuales, redesNuevas, agregar) {
+  const antes = new Map(
+    (redesActuales ?? []).map((r) => [normalizeText(r.platform), r.url]),
+  );
+  for (const red of redesNuevas) {
+    agregar(
+      `Red · ${red.label ?? red.platform}`,
+      antes.get(normalizeText(red.platform)) ?? "",
+      red.url,
+    );
+  }
 }
 
 function vistaInscripcion(db, solicitud, base) {
@@ -179,13 +196,14 @@ function vistaInscripcion(db, solicitud, base) {
       `Ya existe una ficha llamada «${g.name}» (/v/${g.slug}). Revisa que no sea un duplicado.`,
   );
   const corrida = simular(db, () => crearFicha(db, parsed.data));
-  if (!corrida.ok)
+  if (!corrida.ok) {
     return {
       ...base,
       avisos,
       puedeAprobar: false,
       problema: problemaDe(corrida.error),
     };
+  }
   return {
     ...base,
     avisos,
@@ -197,26 +215,67 @@ function vistaInscripcion(db, solicitud, base) {
   };
 }
 
+/**
+ * La ficha que tocaría la modificación: la elegida a mano (`fichaSlug`) o la que escribió la persona.
+ * Lanza `SolicitudError` si no se resuelve.
+ */
+function fichaDeModificacion(db, solicitud, fichaSlug) {
+  const ficha = fichaSlug
+    ? getVtuberBySlug(db, fichaSlug, { includeHidden: true })
+    : fichaDeLaSolicitud(db, solicitud.datos.ficha);
+  if (!ficha) {
+    throw new SolicitudError(
+      404,
+      "ficha_no_encontrada",
+      "no se encontró esa ficha",
+    );
+  }
+  return ficha;
+}
+
+/** Lo que conviene mirar antes de aprobar una modificación (no impide aprobarla). */
+function avisosDeModificacion(cambios, imagenes, ficha) {
+  const avisos = [];
+  if (cambios.length === 0) {
+    avisos.push(
+      "No cambia nada: los valores propuestos ya coinciden con la ficha.",
+    );
+  }
+  if (imagenes.imageId || imagenes.logoId) {
+    avisos.push(
+      "Trae imágenes nuevas (" +
+        [imagenes.imageId && "avatar", imagenes.logoId && "logo"]
+          .filter(Boolean)
+          .join(" y ") +
+        "): al aprobar REEMPLAZAN a las actuales de la ficha. Míralas antes en «Imágenes» de la solicitud.",
+    );
+  }
+  if (ficha.status !== "published") {
+    avisos.push(
+      "La ficha no está publicada: los cambios no se verán en el catálogo hasta que lo esté.",
+    );
+  }
+  return avisos;
+}
+
 function vistaModificacion(db, solicitud, base, { fichaSlug }) {
   let ficha = null;
   try {
-    ficha = fichaSlug
-      ? getVtuberBySlug(db, fichaSlug, { includeHidden: true })
-      : fichaDeLaSolicitud(db, solicitud.datos.ficha);
-    if (!ficha)
-      throw new SolicitudError(
-        404,
-        "ficha_no_encontrada",
-        "no se encontró esa ficha",
-      );
+    ficha = fichaDeModificacion(db, solicitud, fichaSlug);
   } catch (error) {
-    if (!(error instanceof SolicitudError)) throw error;
+    if (!(error instanceof SolicitudError)) {
+      throw error;
+    }
+    const pista =
+      error.detail === "no se encontró esa ficha"
+        ? "Elige cuál es"
+        : error.detail;
     return {
       ...base,
       puedeAprobar: false,
       problema: {
         codigo: error.code,
-        mensaje: `No se encontró la ficha «${solicitud.datos.ficha}». ${error.detail === "no se encontró esa ficha" ? "Elige cuál es" : error.detail}.`,
+        mensaje: `No se encontró la ficha «${solicitud.datos.ficha}». ${pista}.`,
       },
       candidatas: candidatasParaReferencia(db, solicitud.datos.ficha),
     };
@@ -237,26 +296,10 @@ function vistaModificacion(db, solicitud, base, { fichaSlug }) {
     };
   }
   const cambios = cambiosDeModificacion(ficha, parsed.data);
-  const avisos = [];
-  if (cambios.length === 0)
-    avisos.push(
-      "No cambia nada: los valores propuestos ya coinciden con la ficha.",
-    );
-  if (imagenes.imageId || imagenes.logoId)
-    avisos.push(
-      "Trae imágenes nuevas (" +
-        [imagenes.imageId && "avatar", imagenes.logoId && "logo"]
-          .filter(Boolean)
-          .join(" y ") +
-        "): al aprobar REEMPLAZAN a las actuales de la ficha. Míralas antes en «Imágenes» de la solicitud.",
-    );
-  if (ficha.status !== "published")
-    avisos.push(
-      "La ficha no está publicada: los cambios no se verán en el catálogo hasta que lo esté.",
-    );
+  const avisos = avisosDeModificacion(cambios, imagenes, ficha);
 
   const corrida = simular(db, () => aplicarParche(db, ficha.id, parsed.data));
-  if (!corrida.ok)
+  if (!corrida.ok) {
     return {
       ...salida,
       cambios,
@@ -264,6 +307,7 @@ function vistaModificacion(db, solicitud, base, { fichaSlug }) {
       puedeAprobar: false,
       problema: problemaDe(corrida.error),
     };
+  }
   return { ...salida, cambios, avisos };
 }
 
@@ -271,21 +315,28 @@ function vistaBaja(db, solicitud, base) {
   let ficha = null;
   const escrita = String(solicitud.datos.ficha ?? "").trim();
   try {
-    if (escrita) ficha = fichaDeLaSolicitud(db, escrita);
+    if (escrita) {
+      ficha = fichaDeLaSolicitud(db, escrita);
+    }
   } catch (error) {
-    if (!(error instanceof SolicitudError)) throw error;
+    if (!(error instanceof SolicitudError)) {
+      throw error;
+    }
   }
   const avisos = [
     "«Marcar procesada» solo cierra la solicitud: la degradación de la ficha (cláusula de salida) se aplica aparte, desde «Premium».",
   ];
-  if (!escrita)
+  if (!escrita) {
     avisos.unshift(
       "No indicó ficha y su correo no está asociado a ninguna inscripción: escríbele al correo de contacto para saber cuál es.",
     );
-  else if (!ficha)
+  } else if (!ficha) {
     avisos.unshift(
       `No se encontró la ficha «${escrita}»: ubícala a mano desde «Fichas».`,
     );
+  } else {
+    // Ficha escrita y encontrada: no hace falta avisar de nada más.
+  }
   return { ...base, ficha: ficha ? resumenDeFicha(ficha) : null, avisos };
 }
 
@@ -302,10 +353,14 @@ export function vistaPrevia(db, solicitud, { fichaSlug = null } = {}) {
     problema: null,
     avisos: [],
   };
-  if (solicitud.estado !== "pendiente") return { ...base, puedeAprobar: false };
-  if (solicitud.tipo === "inscripcion")
+  if (solicitud.estado !== "pendiente") {
+    return { ...base, puedeAprobar: false };
+  }
+  if (solicitud.tipo === "inscripcion") {
     return vistaInscripcion(db, solicitud, base);
-  if (solicitud.tipo === "modificacion")
+  }
+  if (solicitud.tipo === "modificacion") {
     return vistaModificacion(db, solicitud, base, { fichaSlug });
+  }
   return vistaBaja(db, solicitud, base);
 }

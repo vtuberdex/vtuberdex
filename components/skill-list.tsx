@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 /** Habilidades agrupadas por categoría (activas, pasivas, ultimate). */
 import { useState } from "react";
@@ -28,7 +29,7 @@ export interface SkillListProps {
   palette: { accent: string; secondary: string };
 }
 
-export function SkillList({ skills, palette }: SkillListProps) {
+export function SkillList({ skills, palette }: Readonly<SkillListProps>) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState<string | null>(skills[0]?.name ?? null);
 

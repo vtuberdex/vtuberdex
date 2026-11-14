@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Utilidades de terminal compartidas por los scripts: leer opciones `--nombre valor`, pedir la
  * contraseña sin mostrarla (`admin-hash`, `verificar-admin-prod`, `aplicar-ficha-prod`) y hablar
@@ -6,6 +7,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
+
+/** ¿Existe `ruta` y es un archivo? (no lanza si no existe). */
+function esArchivo(ruta) {
+  try {
+    return fs.statSync(ruta).isFile();
+  } catch {
+    return false; // no está en esta carpeta
+  }
+}
 
 /**
  * Ruta absoluta de un CLI (`git`, `vercel`) buscada en el PATH una sola vez, con las extensiones
@@ -18,13 +28,13 @@ export function ejecutable(nombre) {
       ? (process.env.PATHEXT ?? ".EXE;.CMD;.BAT").split(";")
       : [""];
   for (const carpeta of (process.env.PATH ?? "").split(path.delimiter)) {
-    if (!path.isAbsolute(carpeta)) continue;
+    if (!path.isAbsolute(carpeta)) {
+      continue;
+    }
     for (const extension of extensiones) {
       const candidato = path.join(carpeta, nombre + extension.toLowerCase());
-      try {
-        if (fs.statSync(candidato).isFile()) return candidato;
-      } catch {
-        // no está en esta carpeta
+      if (esArchivo(candidato)) {
+        return candidato;
       }
     }
   }
@@ -46,7 +56,9 @@ export function leerOpciones(
       const enLinea = conIgual
         ? args.find((a) => a.startsWith(`${bandera}=`))
         : undefined;
-      if (enLinea) return enLinea.slice(bandera.length + 1) || porDefecto;
+      if (enLinea) {
+        return enLinea.slice(bandera.length + 1) || porDefecto;
+      }
       const i = args.indexOf(bandera);
       return i >= 0 && args[i + 1] ? args[i + 1] : porDefecto;
     },
@@ -65,8 +77,9 @@ export function preguntarOculto(prompt) {
     // Se oculta el eco: sin esto la contraseña se ve mientras se escribe.
     const escribirOriginal = rl._writeToOutput?.bind(rl);
     rl._writeToOutput = function _oculto(texto) {
-      if (escribirOriginal && texto !== "\r\n" && texto !== "\n")
+      if (escribirOriginal && texto !== "\r\n" && texto !== "\n") {
         return escribirOriginal("");
+      }
       return escribirOriginal ? escribirOriginal(texto) : undefined;
     };
     rl.question("", (respuesta) => {
@@ -103,7 +116,7 @@ export function pedirCredencial(prompt = "Contraseña del mantenedor: ") {
  * `fetch` que devuelve `{ status, cuerpo }` sin lanzar por un status no-2xx: el status es el
  * dato. El cuerpo va como JSON; si no lo es, `siNoEsJson(texto)` decide qué guardar.
  */
-export async function pedirJson(url, init = {}, siNoEsJson = (texto) => texto) {
+export async function pedirJson(url, init = {}, siNoEsJson = (crudo) => crudo) {
   const respuesta = await fetch(url, init);
   const texto = await respuesta.text();
   let cuerpo;

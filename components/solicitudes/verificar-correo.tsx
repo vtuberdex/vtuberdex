@@ -1,3 +1,4 @@
+// Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 "use client";
 
 /**
@@ -22,36 +23,50 @@ const TIPOS = {
   modificacion: "verificar.tipo.modificacion",
 } as const;
 
+/** El texto del aviso: la baja ya aplicada, una baja sin ficha asociada o la solicitud en espera de revisión. */
+function TextoDelResultado({
+  resultado,
+}: Readonly<{ resultado: ResultadoDeVerificacion }>) {
+  const { t } = useI18n();
+  if (resultado.resultado === "baja_aplicada") {
+    return (
+      <>
+        <strong>{t("verificar.bajaAplicada")}</strong>{" "}
+        {t("verificar.bajaTexto", {
+          n: resultado.fichas?.length ?? 0,
+          fichas: resultado.fichas?.join(", ") ?? "",
+        })}
+      </>
+    );
+  }
+  if (resultado.resultado === "sin_ficha") {
+    return (
+      <>
+        <strong>{t("verificar.confirmado")}</strong>{" "}
+        {t("verificar.sinFicha")}
+      </>
+    );
+  }
+  return (
+    <>
+      <strong>{t("verificar.confirmado")}</strong>{" "}
+      {t("verificar.enEspera", { tipo: t(TIPOS[resultado.tipo]) })}
+      {resultado.tipo === "baja" && ` ${t("verificar.bajaRevision")}`}
+    </>
+  );
+}
+
 /** Qué pasó al confirmar el correo. Lo comparten esta página (enlace) y el paso 2 del formulario de baja (código). */
 export function ResultadoDeLaVerificacion({
   resultado,
-}: {
+}: Readonly<{
   resultado: ResultadoDeVerificacion;
-}) {
+}>) {
   const { t } = useI18n();
   return (
     <div className="space-y-4" data-testid="verificar-hecho">
       <Aviso tipo="ok">
-        {resultado.resultado === "baja_aplicada" ? (
-          <>
-            <strong>{t("verificar.bajaAplicada")}</strong>{" "}
-            {t("verificar.bajaTexto", {
-              n: resultado.fichas?.length ?? 0,
-              fichas: resultado.fichas?.join(", ") ?? "",
-            })}
-          </>
-        ) : resultado.resultado === "sin_ficha" ? (
-          <>
-            <strong>{t("verificar.confirmado")}</strong>{" "}
-            {t("verificar.sinFicha")}
-          </>
-        ) : (
-          <>
-            <strong>{t("verificar.confirmado")}</strong>{" "}
-            {t("verificar.enEspera", { tipo: t(TIPOS[resultado.tipo]) })}
-            {resultado.tipo === "baja" && ` ${t("verificar.bajaRevision")}`}
-          </>
-        )}
+        <TextoDelResultado resultado={resultado} />
       </Aviso>
       <Link
         href="/"
@@ -77,21 +92,24 @@ export function VerificarCorreo() {
     ).get("t");
     setToken(encontrado);
     setListo(true);
-    if (encontrado)
+    if (encontrado) {
       window.history.replaceState(null, "", window.location.pathname);
+    }
   }, []);
 
   const confirmar = async () => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     setEnviando(true);
     setError(null);
     try {
       const respuesta = await api.verificarSolicitud(token);
       setHecho(respuesta);
-    } catch (causa) {
+    } catch (error_) {
       setError(
-        causa instanceof ApiError
-          ? causa.message
+        error_ instanceof ApiError
+          ? error_.message
           : t("verificar.errorConfirmar"),
       );
     } finally {
@@ -99,7 +117,9 @@ export function VerificarCorreo() {
     }
   };
 
-  if (hecho) return <ResultadoDeLaVerificacion resultado={hecho} />;
+  if (hecho) {
+    return <ResultadoDeLaVerificacion resultado={hecho} />;
+  }
 
   if (listo && !token) {
     return (

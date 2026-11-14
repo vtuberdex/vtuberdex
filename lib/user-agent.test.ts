@@ -62,8 +62,9 @@ describe("clasificarUserAgent: navegador y sistema", () => {
 
   it("un iPhone NO es un Mac aunque su UA diga «like Mac OS X», y Edge/Opera/Samsung NO son «Chrome»", () => {
     expect(clasificarUserAgent(UA.safariIphone).so).toBe("ios");
-    for (const k of ["edgeWin", "operaWin", "samsung", "edgeAndroid"] as const)
+    for (const k of ["edgeWin", "operaWin", "samsung", "edgeAndroid"] as const) {
       expect(clasificarUserAgent(UA[k]).navegador).not.toBe("chrome");
+    }
   });
 
   it("los robots se reconocen y los navegadores reales no se confunden con robots", () => {
@@ -74,8 +75,9 @@ describe("clasificarUserAgent: navegador y sistema", () => {
       "firefoxLinux",
       "samsung",
       "headless",
-    ] as const)
+    ] as const) {
       expect(clasificarUserAgent(UA[k]).robot, k).toBe(false);
+    }
     for (const bot of [
       "curl/8.5.0",
       "Twitterbot/1.0",
