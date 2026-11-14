@@ -71,10 +71,13 @@ export function medianaDe(valores: number[]): number | null {
   return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
 }
 
+/** Qué clase de GPU dibuja la página (`desconocida` si el navegador no lo dice). */
+export type ClaseDeGpu = "hardware" | "software" | "desconocida";
+
 /** `software` si el renderizador es un rasterizador por CPU (SwiftShader, llvmpipe…): explica un 3D lento. */
 export function clasificarGpu(
   renderer: string | null | undefined,
-): "hardware" | "software" | "desconocida" {
+): ClaseDeGpu {
   if (!renderer) {
     return "desconocida";
   }
@@ -85,7 +88,7 @@ export function clasificarGpu(
     : "hardware";
 }
 
-function detectarGpu(): "hardware" | "software" | "desconocida" {
+function detectarGpu(): ClaseDeGpu {
   try {
     const canvas = document.createElement("canvas");
     const gl = canvas.getContext("webgl") as WebGLRenderingContext | null;
@@ -141,7 +144,7 @@ export function iniciarTelemetria(): Telemetria {
   const sid = idDeSesion();
   let largas = { n: 0, ms: 0 };
   let lcp: number | null = null;
-  let gpu: "hardware" | "software" | "desconocida" | null = null;
+  let gpu: ClaseDeGpu | null = null;
   let latidos = 0;
   let marcasVistas = 0;
   const observadores: PerformanceObserver[] = [];

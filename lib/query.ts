@@ -31,7 +31,12 @@ export const DEFAULT_SEARCH: SearchParams = {
   perPage: DEFAULT_PER_PAGE,
 };
 
-const SORTS: SortKey[] = ["dex", "dex-desc", "name", "power"];
+const SORTS: ReadonlySet<SortKey> = new Set<SortKey>([
+  "dex",
+  "dex-desc",
+  "name",
+  "power",
+]);
 
 const listOf = (values: string[] | undefined) =>
   (values ?? [])
@@ -87,8 +92,12 @@ const searchParamsSchema = z.object({
   perPage: z.coerce.number().int().min(1).max(100).optional(),
 });
 
-const asList = (value: string | string[] | undefined) =>
-  Array.isArray(value) ? value : value ? [value] : [];
+const asList = (value: string | string[] | undefined): string[] => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  return value ? [value] : [];
+};
 
 /** URL -> SearchParams (tolerante: valores inválidos caen al default). */
 export function searchParamsFromUrl(search: string): SearchParams {
@@ -106,7 +115,7 @@ export function searchParamsFromUrl(search: string): SearchParams {
     artists: listOf(asList(data.artists)),
     factions: listOf(asList(data.factions)),
     language: data.language ?? null,
-    sort: SORTS.includes(data.sort as SortKey) ? (data.sort as SortKey) : "dex",
+    sort: SORTS.has(data.sort as SortKey) ? (data.sort as SortKey) : "dex",
     premium: data.premium !== undefined,
     page: data.page ?? 1,
     perPage: data.perPage ?? DEFAULT_PER_PAGE,
