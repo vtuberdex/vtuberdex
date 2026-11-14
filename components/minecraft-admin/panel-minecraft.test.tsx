@@ -129,8 +129,14 @@ describe("dashboard en vivo", () => {
       return respuesta({ plugins: [], rol: "admin" });
     });
     render(<MinecraftAdminPage />);
+    // El panel monta, pide el panorama y pinta la lista: suelto tarda ~650 ms y con la suite completa
+    // en paralelo superaba el plazo por defecto de 1 s (falló así en varias pasadas). Se le da margen.
     fireEvent.click(
-      await screen.findByRole("button", { name: "Expulsar a Ana" }),
+      await screen.findByRole(
+        "button",
+        { name: "Expulsar a Ana" },
+        { timeout: 5000 },
+      ),
     );
     await waitFor(() =>
       expect(llamadas.some((l) => l.url.includes("/rcon"))).toBe(true),
