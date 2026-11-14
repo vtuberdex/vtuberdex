@@ -83,7 +83,8 @@ async function mascaraAsync(
 ): Promise<Uint8ClampedArray> {
   const w = obtenerWorker();
   if (w) {
-    const id = siguienteId++;
+    const id = siguienteId;
+    siguienteId += 1;
     const copia = new Uint8ClampedArray(src.data);
     const resultado = await new Promise<Uint8ClampedArray>((resolve) => {
       pendientes.set(id, resolve);
@@ -111,6 +112,18 @@ interface Preparada {
   y: number;
 }
 
+/** El origen como canvas si ya tiene el tamaño pedido (y si en este entorno existe el tipo). */
+function canvasDelMismoTamano(
+  art: CanvasImageSource,
+  width: number,
+  height: number,
+): HTMLCanvasElement | null {
+  if (typeof HTMLCanvasElement === "undefined" || !(art instanceof HTMLCanvasElement)) {
+    return null;
+  }
+  return art.width === width && art.height === height ? art : null;
+}
+
 function prepararTinta(
   art: CanvasImageSource,
   width: number,
@@ -129,13 +142,8 @@ function prepararTinta(
    * completo por carta y una pasada de pintado) solo para poder llamar a `getImageData`, y el
    * resultado era idéntico: el canvas intermedio no escalaba nada.
    */
-  const directo =
-    typeof HTMLCanvasElement !== "undefined" &&
-    art instanceof HTMLCanvasElement &&
-    art.width === width &&
-    art.height === height
-      ? art.getContext("2d")
-      : null;
+  const mismo = canvasDelMismoTamano(art, width, height);
+  const directo = mismo ? mismo.getContext("2d") : null;
   if (directo) {
     return {
       canvas,

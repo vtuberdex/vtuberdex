@@ -55,16 +55,22 @@ export function fitText(
  * consumen la placa del título, el badge del número y el wordmark.
  */
 
-/** Relleno metálico: gradiente de paradas + tinte de marca. */
+/**
+ * Relleno metálico: gradiente de paradas + tinte de marca. El rectángulo y el acabado van en dos
+ * objetos (antes eran ocho argumentos sueltos y era fácil cruzar el ancho con el alto).
+ */
 export function metalFill(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  stops: readonly { at: number; color: string }[],
-  brand: string,
-  brandTint: number,
+  { x, y, w, h }: { x: number; y: number; w: number; h: number },
+  {
+    stops,
+    brand,
+    brandTint,
+  }: {
+    stops: readonly { at: number; color: string }[];
+    brand: string;
+    brandTint: number;
+  },
 ): CanvasGradient {
   const g = ctx.createLinearGradient(x, y, x + w * 0.25, y + h);
   for (const s of stops) {
