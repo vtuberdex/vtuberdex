@@ -284,10 +284,21 @@ export function CabeceraDelAsistente({
   );
 }
 
+/** Solo al editar una ficha que aún no es pública: recuerda que no se ve y lleva a lo que falta. */
 export function AvisoDeBorrador({
+  mode,
+  detail,
   status,
   onContinue,
-}: Readonly<{ status: EditorForm["status"]; onContinue: () => void }>) {
+}: Readonly<{
+  mode: WizardMode;
+  detail: VtuberDetail | null;
+  status: EditorForm["status"];
+  onContinue: () => void;
+}>) {
+  if (mode !== "edit" || !detail || status === "published") {
+    return null;
+  }
   return (
     <p
       data-testid="admin-draft-notice"

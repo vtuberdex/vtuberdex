@@ -484,12 +484,12 @@ export function CardWizard({
           onSelect={setIndex}
         />
 
-        {mode === "edit" && detail && form.status !== "published" && (
-          <AvisoDeBorrador
-            status={form.status}
-            onContinue={jumpToFirstPending}
-          />
-        )}
+        <AvisoDeBorrador
+          mode={mode}
+          detail={detail}
+          status={form.status}
+          onContinue={jumpToFirstPending}
+        />
 
         <section aria-labelledby="wizard-step-title" className="space-y-4 p-5">
           <div>

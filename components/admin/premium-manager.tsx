@@ -352,6 +352,82 @@ function Paginacion({
   );
 }
 
+/** La lista filtrada (o por qué está vacía) y su paginación. */
+function ResultadosDePremium({
+  hay,
+  pag,
+  hayFiltros,
+  total,
+  onLimpiarFiltros,
+  onPagina,
+  abiertaId,
+  busyId,
+  confirmingId,
+  save,
+  onAlternar,
+  onConfirmar,
+}: Readonly<{
+  /** Algún resultado con los filtros actuales. */
+  hay: boolean;
+  pag: ReturnType<typeof paginar<VtuberCard>>;
+  hayFiltros: boolean;
+  total: number;
+  onLimpiarFiltros: () => void;
+  onPagina: (pagina: number) => void;
+  abiertaId: number | null;
+  busyId: number | null;
+  confirmingId: number | null;
+  save: Guardar;
+  onAlternar: (id: number) => void;
+  onConfirmar: (id: number, valor: boolean) => void;
+}>) {
+  return (
+    <>
+      {hay ? (
+        <ul className="space-y-2">
+          {pag.items.map((row) => (
+            <Fila
+              key={row.id}
+              row={row}
+              abierta={abiertaId === row.id}
+              onAlternar={onAlternar}
+              busy={busyId === row.id}
+              guardar={save}
+              confirmando={confirmingId === row.id}
+              onConfirmar={onConfirmar}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p
+          className="rounded-2xl border border-dashed border-dex-line px-6 py-8 text-center text-sm text-dex-muted"
+          data-testid="premium-sin-resultados"
+        >
+          Ninguna carta coincide con este filtro.{" "}
+          {hayFiltros && (
+            <button
+              type="button"
+              className="text-dex-accent hover:underline"
+              onClick={onLimpiarFiltros}
+            >
+              Quitar filtros
+            </button>
+          )}
+        </p>
+      )}
+
+      {hay && (
+        <Paginacion
+          pag={pag}
+          hayFiltros={hayFiltros}
+          total={total}
+          onPagina={onPagina}
+        />
+      )}
+    </>
+  );
+}
+
 export function PremiumManager({
   token,
   notify,
@@ -478,11 +554,11 @@ export function PremiumManager({
     setFiltro(valor);
     setPagina(1);
   }, []);
-  const limpiarFiltros = () => {
+  const limpiarFiltros = useCallback(() => {
     setFiltro("todas");
     setTexto("");
     setPagina(1);
-  };
+  }, []);
   const alternarAlta = useCallback(() => setAltaAbierta((v) => !v), []);
   // Abrir otra fila cierra la confirmación de «Quitar» que hubiera en la anterior.
   const alternarFila = useCallback((id: number) => {
@@ -570,47 +646,20 @@ export function PremiumManager({
             <span className="text-right">Acciones</span>
           </div>
 
-          {visibles.length === 0 ? (
-            <p
-              className="rounded-2xl border border-dashed border-dex-line px-6 py-8 text-center text-sm text-dex-muted"
-              data-testid="premium-sin-resultados"
-            >
-              Ninguna carta coincide con este filtro.{" "}
-              {hayFiltros && (
-                <button
-                  type="button"
-                  className="text-dex-accent hover:underline"
-                  onClick={limpiarFiltros}
-                >
-                  Quitar filtros
-                </button>
-              )}
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {pag.items.map((row) => (
-                <Fila
-                  key={row.id}
-                  row={row}
-                  abierta={abiertaId === row.id}
-                  onAlternar={alternarFila}
-                  busy={busyId === row.id}
-                  guardar={save}
-                  confirmando={confirmingId === row.id}
-                  onConfirmar={confirmarQuitar}
-                />
-              ))}
-            </ul>
-          )}
-
-          {visibles.length > 0 && (
-            <Paginacion
-              pag={pag}
-              hayFiltros={hayFiltros}
-              total={rows.length}
-              onPagina={setPagina}
-            />
-          )}
+          <ResultadosDePremium
+            hay={visibles.length > 0}
+            pag={pag}
+            hayFiltros={hayFiltros}
+            total={rows.length}
+            onLimpiarFiltros={limpiarFiltros}
+            onPagina={setPagina}
+            abiertaId={abiertaId}
+            busyId={busyId}
+            confirmingId={confirmingId}
+            save={save}
+            onAlternar={alternarFila}
+            onConfirmar={confirmarQuitar}
+          />
         </>
       )}
 

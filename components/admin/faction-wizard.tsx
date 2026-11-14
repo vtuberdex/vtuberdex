@@ -203,6 +203,74 @@ function FaccionCreada({
   );
 }
 
+/** Tras escribir algo: por qué no sirve el nombre, o que está disponible. */
+function EstadoDelNombre({
+  trimmed,
+  nameProblem,
+}: Readonly<{ trimmed: string; nameProblem: string | null }>) {
+  if (!trimmed) {
+    return null;
+  }
+  if (nameProblem) {
+    return (
+      <p
+        role="alert"
+        data-testid="faction-name-problem"
+        className="text-xs text-red-300"
+      >
+        {nameProblem}
+      </p>
+    );
+  }
+  return <p className="text-xs text-emerald-300">✓ Nombre disponible.</p>;
+}
+
+function PieDelAsistenteDeFaccion({
+  step,
+  busy,
+  motivo,
+  siguienteDeshabilitado,
+  onClose,
+  onAtras,
+}: Readonly<{
+  step: number;
+  busy: boolean;
+  motivo: string | null;
+  siguienteDeshabilitado: boolean;
+  onClose: () => void;
+  onAtras: () => void;
+}>) {
+  const primero = step === 0;
+  return (
+    <footer className="flex flex-wrap items-center justify-between gap-2">
+      <button
+        type="button"
+        className={ghostButton}
+        onClick={primero ? onClose : onAtras}
+        disabled={busy}
+      >
+        {primero ? "Cancelar" : "Atrás"}
+      </button>
+      <div className="flex flex-col items-end gap-1">
+        {motivo && <Reason>{motivo}</Reason>}
+        {step < 2 ? (
+          <button
+            type="submit"
+            className={primaryButton}
+            disabled={siguienteDeshabilitado}
+          >
+            Siguiente
+          </button>
+        ) : (
+          <button type="submit" className={primaryButton} disabled={busy}>
+            {busy ? "Creando…" : "Crear facción"}
+          </button>
+        )}
+      </div>
+    </footer>
+  );
+}
+
 function PasoNombre({
   name,
   onName,
@@ -246,18 +314,7 @@ function PasoNombre({
           aria-invalid={Boolean(duplicate)}
         />
       </Field>
-      {trimmed && nameProblem && (
-        <p
-          role="alert"
-          data-testid="faction-name-problem"
-          className="text-xs text-red-300"
-        >
-          {nameProblem}
-        </p>
-      )}
-      {trimmed && !nameProblem && (
-        <p className="text-xs text-emerald-300">✓ Nombre disponible.</p>
-      )}
+      <EstadoDelNombre trimmed={trimmed} nameProblem={nameProblem} />
       <fieldset className="space-y-1 rounded-xl border border-dex-line p-3">
         <legend className="px-1 text-xs uppercase tracking-[0.14em] text-dex-muted">
           ¿Pertenece a otra facción?
@@ -450,6 +507,19 @@ function motivoParaNoAvanzar(
   return null;
 }
 
+/** «Siguiente» deshabilitado: en el paso 1 por el nombre o la madre; en el 2, sin emblema ni omitirlo. */
+function pasoIncompleto(
+  step: number,
+  nameProblem: string | null,
+  sinMadre: boolean,
+  sinEmblema: boolean,
+): boolean {
+  if (step === 0) {
+    return Boolean(nameProblem) || sinMadre;
+  }
+  return sinEmblema;
+}
+
 export function FactionWizard({
   token,
   factions,
@@ -560,6 +630,7 @@ export function FactionWizard({
     setSkipped(false);
   }, []);
   const omitirEmblema = useCallback(() => setSkipped(true), []);
+  const atras = useCallback(() => setStep((actual) => actual - 1), []);
 
   if (created) {
     return (
@@ -593,10 +664,6 @@ export function FactionWizard({
       void create();
     }
   };
-
-  const motivo = motivoParaNoAvanzar(step, trimmed, sinMadre, sinEmblema);
-  const siguienteDeshabilitado =
-    step === 0 ? Boolean(nameProblem) || sinMadre : sinEmblema;
 
   return (
     <form
@@ -658,32 +725,19 @@ export function FactionWizard({
         />
       )}
 
-      <footer className="flex flex-wrap items-center justify-between gap-2">
-        <button
-          type="button"
-          className={ghostButton}
-          onClick={step === 0 ? onClose : () => setStep(step - 1)}
-          disabled={busy}
-        >
-          {step === 0 ? "Cancelar" : "Atrás"}
-        </button>
-        <div className="flex flex-col items-end gap-1">
-          {motivo && <Reason>{motivo}</Reason>}
-          {step < 2 ? (
-            <button
-              type="submit"
-              className={primaryButton}
-              disabled={siguienteDeshabilitado}
-            >
-              Siguiente
-            </button>
-          ) : (
-            <button type="submit" className={primaryButton} disabled={busy}>
-              {busy ? "Creando…" : "Crear facción"}
-            </button>
-          )}
-        </div>
-      </footer>
+      <PieDelAsistenteDeFaccion
+        step={step}
+        busy={busy}
+        motivo={motivoParaNoAvanzar(step, trimmed, sinMadre, sinEmblema)}
+        siguienteDeshabilitado={pasoIncompleto(
+          step,
+          nameProblem,
+          sinMadre,
+          sinEmblema,
+        )}
+        onClose={onClose}
+        onAtras={atras}
+      />
     </form>
   );
 }

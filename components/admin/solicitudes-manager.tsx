@@ -62,6 +62,32 @@ const TIPOS: Array<{ id: Tipo; label: string }> = [
   { id: "baja", label: "Bajas" },
 ];
 
+/** Solo al aprobar una modificación viaja la ficha elegida a mano (si se eligió). */
+function fichaParaResolver(
+  accion: Accion,
+  s: SolicitudAdmin,
+  fichaElegida: string | null,
+): string | undefined {
+  if (accion !== "aprobar" || s.tipo !== "modificacion") {
+    return undefined;
+  }
+  return fichaElegida ?? undefined;
+}
+
+/** Sin solicitudes: «al día» si se miran las pendientes de todos los tipos; si no, que esta vista está vacía. */
+function ColaVacia({ estado, tipo }: Readonly<{ estado: Estado; tipo: Tipo }>) {
+  return (
+    <p
+      className="rounded-2xl border border-dashed border-dex-line px-6 py-10 text-center text-sm text-dex-muted"
+      data-testid="solicitudes-vacio"
+    >
+      {estado === "pendiente" && tipo === "todos"
+        ? "No hay solicitudes pendientes. ¡Al día!"
+        : "No hay solicitudes en esta vista."}
+    </p>
+  );
+}
+
 /** El aviso de éxito de cada acción (aprobar dice qué pasó con la ficha según el tipo). */
 export function mensajeDeResolucion(
   accion: Accion,
@@ -448,9 +474,7 @@ export function SolicitudesManager({
           s.id,
           accion,
           nota,
-          accion === "aprobar" && s.tipo === "modificacion"
-            ? (fichaElegida ?? undefined)
-            : undefined,
+          fichaParaResolver(accion, s, fichaElegida),
         );
         const fallidas = imagenes?.fallidas ?? [];
         if (fallidas.length) {
@@ -499,16 +523,7 @@ export function SolicitudesManager({
           {error}
         </p>
       )}
-      {vacia && (
-        <p
-          className="rounded-2xl border border-dashed border-dex-line px-6 py-10 text-center text-sm text-dex-muted"
-          data-testid="solicitudes-vacio"
-        >
-          {estado === "pendiente" && tipo === "todos"
-            ? "No hay solicitudes pendientes. ¡Al día!"
-            : "No hay solicitudes en esta vista."}
-        </p>
-      )}
+      {vacia && <ColaVacia estado={estado} tipo={tipo} />}
 
       {items.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-[21rem_minmax(0,1fr)]">

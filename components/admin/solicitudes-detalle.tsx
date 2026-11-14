@@ -899,6 +899,35 @@ function ResumenDeResuelta({ s }: Readonly<{ s: SolicitudAdmin }>) {
   );
 }
 
+/** Una modificación cuya ficha no se resolvió sola: el mantenedor la elige antes de aprobar. */
+function hayQueElegirFicha(
+  s: SolicitudAdmin,
+  vista: VistaPreviaSolicitud | null,
+): boolean {
+  if (s.estado !== "pendiente" || s.tipo !== "modificacion") {
+    return false;
+  }
+  return vista?.problema?.codigo === "ficha_no_encontrada";
+}
+
+function ContenidoPorTipo({
+  token,
+  s,
+  vista,
+}: Readonly<{
+  token: string;
+  s: SolicitudAdmin;
+  vista: VistaPreviaSolicitud | null;
+}>) {
+  if (s.tipo === "inscripcion") {
+    return <ContenidoDeInscripcion token={token} s={s} />;
+  }
+  if (s.tipo === "modificacion") {
+    return <ContenidoDeModificacion token={token} s={s} vista={vista} />;
+  }
+  return <ContenidoDeBaja s={s} vista={vista} />;
+}
+
 /** El detalle de la solicitud elegida: veredicto, acciones (si está pendiente) y el contenido por tipo. */
 export function DetalleDeSolicitud({
   token,
@@ -928,10 +957,6 @@ export function DetalleDeSolicitud({
   onResolver: (s: SolicitudAdmin, accion: Accion) => void;
 }>) {
   const pendiente = s.estado === "pendiente";
-  const elegirFicha =
-    pendiente &&
-    s.tipo === "modificacion" &&
-    vista?.problema?.codigo === "ficha_no_encontrada";
   return (
     <article
       className="space-y-3 rounded-2xl border border-dex-line bg-dex-panel/60 p-4"
@@ -941,7 +966,7 @@ export function DetalleDeSolicitud({
 
       <Veredicto vista={vista} cargando={cargandoVista} solicitud={s} />
 
-      {elegirFicha && (
+      {hayQueElegirFicha(s, vista) && (
         <ElegirFicha
           token={token}
           candidatas={vista?.candidatas ?? []}
@@ -965,13 +990,7 @@ export function DetalleDeSolicitud({
       )}
 
       {/* ── contenido, según el tipo ───────────────────────────────────────── */}
-      {s.tipo === "inscripcion" && (
-        <ContenidoDeInscripcion token={token} s={s} />
-      )}
-      {s.tipo === "modificacion" && (
-        <ContenidoDeModificacion token={token} s={s} vista={vista} />
-      )}
-      {s.tipo === "baja" && <ContenidoDeBaja s={s} vista={vista} />}
+      <ContenidoPorTipo token={token} s={s} vista={vista} />
 
       {s.contacto && <ContactoConfidencial contacto={s.contacto} />}
 
