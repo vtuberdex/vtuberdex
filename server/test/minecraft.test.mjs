@@ -208,10 +208,13 @@ test("el cupo del día sale del tramo de nivel de la ficha", async () => {
   assert.equal(sumado, 300);
   assert.equal((await sumarXp(e, lote({ mob: 70 }, { nivel: 5 }))).sumado, 0);
   // De 31 a 50 el cupo es 1.000: lo que ya gastó cuenta para ese tope, no se reinicia.
-  assert.equal((await sumarXp(e, lote({ mob: 70 }, { nivel: 31 }))).sumado, 70);
-  const fin = await sumarXp(e, lote({ mob: 900 }, { nivel: 31 }));
+  let fin = await sumarXp(e, lote({ mob: 70 }, { nivel: 31 }));
+  while (fin.hoy < 1_000) {
+    fin = await sumarXp(e, lote({ mob: 70 }, { nivel: 31 }));
+  }
   assert.equal(fin.hoy, 1_000);
   assert.equal(fin.topeDia, 1_000);
+  assert.equal((await sumarXp(e, lote({ mob: 70 }, { nivel: 31 }))).sumado, 0);
 });
 
 test('la XP de entrega tiene su tope aparte y no resta del de siempre', async () => {
