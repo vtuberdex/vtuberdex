@@ -630,9 +630,9 @@ async function deHoy(e, vtuberId, dia, nivel = 1) {
   };
 }
 
-/** XP de juego que la ficha lleva HOY y el tope del día (el panel del juego muestra «hoy 120/300»). */
-export async function xpDeHoy(ejecutor, vtuberId, dia) {
-  return deHoy(await conTablas(ejecutor), Number(vtuberId), dia);
+/** XP de juego que la ficha lleva HOY y el tope del día (el panel del juego muestra «hoy 120/300»). `nivel` es el de la ficha hoy. */
+export async function xpDeHoy(ejecutor, vtuberId, dia, nivel = 1) {
+  return deHoy(await conTablas(ejecutor), Number(vtuberId), dia, nivel);
 }
 
 /** XP de juego de varias fichas en UNA consulta: `Map(id → xp)`. */
