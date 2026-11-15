@@ -57,7 +57,7 @@ import {
   XP_DIRECTO_MAX_DIA,
   xpDirectoDelTramo,
   XP_ENTREGA_MAX_DIA,
-  XP_JUEGO_MAX_DIA,
+  topeXpJuegoDia,
 } from "./experiencia.mjs";
 import { preparadorDeTablas } from "./db/tablas.mjs";
 
