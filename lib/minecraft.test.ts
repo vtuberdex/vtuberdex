@@ -321,7 +321,7 @@ describe("vínculo y XP de punta a punta", () => {
       sumado: 100,
       duplicado: false,
       hoy: 100,
-      topeDia: XP_JUEGO_MAX_DIA,
+      topeDia: topeXpJuegoDia(1),
       slug: "luna",
     });
     await vi.waitFor(() =>
