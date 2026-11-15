@@ -624,7 +624,7 @@ async function deHoy(e, vtuberId, dia, nivel = 1) {
   );
   return {
     hoy: Number(rows[0]?.n ?? 0),
-    topeDia: XP_JUEGO_MAX_DIA,
+    topeDia: topeXpJuegoDia(nivel),
     entregaHoy: Number(rows[0]?.entrega ?? 0),
     topeEntrega: XP_ENTREGA_MAX_DIA,
   };
