@@ -299,7 +299,7 @@ describe("vínculo y XP de punta a punta", () => {
       slug: "luna",
       progreso: {
         xpHoy: 0,
-        topeDia: XP_JUEGO_MAX_DIA,
+        topeDia: topeXpJuegoDia(1),
         puntosHabilidad: 0,
         puntosStats: 0,
         rango: "Novato",
