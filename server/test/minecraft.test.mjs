@@ -255,9 +255,10 @@ test("lotes concurrentes no pasan del tope", async () => {
   const resultados = await Promise.all(
     Array.from({ length: 10 }, () => sumarXp(e, lote({ jefe: 100 }))),
   );
+  // Sin nivel de la ficha se usa el tramo más corto (300), nunca el más generoso.
   assert.equal(
     resultados.reduce((s, r) => s + r.sumado, 0),
-    XP_JUEGO_MAX_DIA,
+    topeXpJuegoDia(1),
   );
 });
 
