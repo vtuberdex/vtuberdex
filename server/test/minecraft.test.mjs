@@ -234,9 +234,11 @@ test('la XP de entrega tiene su tope aparte y no resta del de siempre', async ()
 test('el tope de lo de siempre no se come la XP de entrega', async () => {
   const e = nuevo();
   await vinculado(e);
+  // Nivel 91: el tramo más alto, así el bucle de abajo termina en `XP_JUEGO_MAX_DIA`.
+  const alto = { nivel: 91 };
   let sumado = 0;
   while (sumado < XP_JUEGO_MAX_DIA) {
-    sumado += (await sumarXp(e, lote({ mob: 70 }))).sumado;
+    sumado += (await sumarXp(e, lote({ mob: 70 }, alto))).sumado;
   }
   assert.equal((await sumarXp(e, lote({ entrega: 80 }))).sumado, 80);
 });
