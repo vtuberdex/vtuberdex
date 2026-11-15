@@ -7,7 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import {
   DIRECTO_TRAMO_MIN, XP_DIRECTO_MAX_DIA, XP_DIRECTO_MINIMO, XP_DIRECTO_POR_TRAMO,
   xpDirectoDelTramo,
-  XP_ENTREGA_MAX_DIA, XP_JUEGO_MAX_DIA,
+  XP_ENTREGA_MAX_DIA, XP_JUEGO_MAX_DIA, topeXpJuegoDia,
   XP_POR_LIKE,
   experienciaConLikes,
 } from "../src/experiencia.mjs";
