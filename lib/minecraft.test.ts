@@ -38,7 +38,7 @@ vi.mock("@/lib/likes.mjs", async (original) => ({
 import * as correo from "@/lib/correo.mjs";
 import * as mc from "@/lib/minecraft.mjs";
 import * as miFicha from "@/lib/mi-ficha.mjs";
-import { XP_JUEGO_MAX_DIA } from "@/server/src/experiencia.mjs";
+import { XP_JUEGO_MAX_DIA, topeXpJuegoDia } from "@/server/src/experiencia.mjs";
 import { conTablas, ejecutorSqlite } from "@/server/src/solicitudes.mjs";
 import { crearToken } from "@/server/src/verificacion.mjs";
 
