@@ -7,7 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import {
   DIRECTO_TRAMO_MIN, XP_DIRECTO_MAX_DIA, XP_DIRECTO_MINIMO, XP_DIRECTO_POR_TRAMO,
   xpDirectoDelTramo,
-  XP_ENTREGA_MAX_DIA, XP_JUEGO_MAX_DIA,
+  XP_ENTREGA_MAX_DIA, XP_JUEGO_MAX_DIA, topeXpJuegoDia,
   XP_POR_LIKE,
   experienciaConLikes,
 } from "../src/experiencia.mjs";
@@ -180,19 +180,41 @@ test("un lote repetido no suma dos veces", async () => {
 test("el tope diario recorta el último lote y deja pasar al día siguiente", async () => {
   const e = nuevo();
   await vinculado(e);
+  // Nivel 91: el tramo más alto (7.000), que es `XP_JUEGO_MAX_DIA`.
+  const alto = { nivel: 91 };
   let sumado = 0;
   while (sumado < XP_JUEGO_MAX_DIA) {
-    sumado += (await sumarXp(e, lote({ mob: 70 }))).sumado;
+    sumado += (await sumarXp(e, lote({ mob: 70 }, alto))).sumado;
   }
   assert.equal(sumado, XP_JUEGO_MAX_DIA);
-  const topado = await sumarXp(e, lote({ mob: 70 }));
+  const topado = await sumarXp(e, lote({ mob: 70 }, alto));
   assert.equal(topado.sumado, 0);
   assert.equal(topado.hoy, XP_JUEGO_MAX_DIA);
   assert.equal(
-    (await sumarXp(e, lote({ mob: 70 }, { dia: "2026-10-08" }))).sumado,
+    (await sumarXp(e, lote({ mob: 70 }, { ...alto, dia: "2026-10-08" }))).sumado,
     70,
   );
   assert.equal(await xpDeJuego(e, 7), XP_JUEGO_MAX_DIA + 70);
+});
+
+test("el cupo del día sale del tramo de nivel de la ficha", async () => {
+  const e = nuevo();
+  await vinculado(e);
+  // Nivel 1-10: 300 al día, aunque el tramo más alto sea 7.000.
+  let sumado = 0;
+  while (sumado < 300) {
+    sumado += (await sumarXp(e, lote({ mob: 70 }, { nivel: 5 }))).sumado;
+  }
+  assert.equal(sumado, 300);
+  assert.equal((await sumarXp(e, lote({ mob: 70 }, { nivel: 5 }))).sumado, 0);
+  // De 31 a 50 el cupo es 1.000: lo que ya gastó cuenta para ese tope, no se reinicia.
+  let fin = await sumarXp(e, lote({ mob: 70 }, { nivel: 31 }));
+  while (fin.hoy < 1_000) {
+    fin = await sumarXp(e, lote({ mob: 70 }, { nivel: 31 }));
+  }
+  assert.equal(fin.hoy, 1_000);
+  assert.equal(fin.topeDia, 1_000);
+  assert.equal((await sumarXp(e, lote({ mob: 70 }, { nivel: 31 }))).sumado, 0);
 });
 
 test('la XP de entrega tiene su tope aparte y no resta del de siempre', async () => {
@@ -215,9 +237,11 @@ test('la XP de entrega tiene su tope aparte y no resta del de siempre', async ()
 test('el tope de lo de siempre no se come la XP de entrega', async () => {
   const e = nuevo();
   await vinculado(e);
+  // Nivel 91: el tramo más alto, así el bucle de abajo termina en `XP_JUEGO_MAX_DIA`.
+  const alto = { nivel: 91 };
   let sumado = 0;
   while (sumado < XP_JUEGO_MAX_DIA) {
-    sumado += (await sumarXp(e, lote({ mob: 70 }))).sumado;
+    sumado += (await sumarXp(e, lote({ mob: 70 }, alto))).sumado;
   }
   assert.equal((await sumarXp(e, lote({ entrega: 80 }))).sumado, 80);
 });
@@ -234,9 +258,10 @@ test("lotes concurrentes no pasan del tope", async () => {
   const resultados = await Promise.all(
     Array.from({ length: 10 }, () => sumarXp(e, lote({ jefe: 100 }))),
   );
+  // Sin nivel de la ficha se usa el tramo más corto (300), nunca el más generoso.
   assert.equal(
     resultados.reduce((s, r) => s + r.sumado, 0),
-    XP_JUEGO_MAX_DIA,
+    topeXpJuegoDia(1),
   );
 });
 

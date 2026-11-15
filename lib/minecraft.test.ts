@@ -38,7 +38,7 @@ vi.mock("@/lib/likes.mjs", async (original) => ({
 import * as correo from "@/lib/correo.mjs";
 import * as mc from "@/lib/minecraft.mjs";
 import * as miFicha from "@/lib/mi-ficha.mjs";
-import { XP_JUEGO_MAX_DIA } from "@/server/src/experiencia.mjs";
+import { XP_JUEGO_MAX_DIA, topeXpJuegoDia } from "@/server/src/experiencia.mjs";
 import { conTablas, ejecutorSqlite } from "@/server/src/solicitudes.mjs";
 import { crearToken } from "@/server/src/verificacion.mjs";
 
@@ -299,7 +299,7 @@ describe("vínculo y XP de punta a punta", () => {
       slug: "luna",
       progreso: {
         xpHoy: 0,
-        topeDia: XP_JUEGO_MAX_DIA,
+        topeDia: topeXpJuegoDia(1),
         puntosHabilidad: 0,
         puntosStats: 0,
         rango: "Novato",
@@ -321,7 +321,7 @@ describe("vínculo y XP de punta a punta", () => {
       sumado: 100,
       duplicado: false,
       hoy: 100,
-      topeDia: XP_JUEGO_MAX_DIA,
+      topeDia: topeXpJuegoDia(1),
       slug: "luna",
     });
     await vi.waitFor(() =>

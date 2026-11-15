@@ -42,8 +42,10 @@
  *
  * TOPE DIARIO EN UNA SOLA SENTENCIA
  * ---------------------------------
- * `XP_JUEGO_MAX_DIA` por ficha y día. El INSERT lee lo sumado hoy y recorta el lote a lo que cabe en la
- * MISMA sentencia: dos lotes simultáneos no pueden pasarse del tope (misma idea que `subirHabilidad`).
+ * `topeXpJuegoDia(nivel)` por ficha y día (`XP_ENTREGA_MAX_DIA` para los lotes de entrega). El INSERT lee lo sumado hoy y
+ * recorta el lote a lo que cabe en la MISMA sentencia: dos lotes simultáneos no pueden pasarse del tope (misma idea que
+ * `subirHabilidad`). El `nivel` lo manda quien llama porque este archivo no ve las fichas: es el nivel que la ficha tenía
+ * AL EMPEZAR el día (sin la XP de hoy), así que subir de tramo durante el día no amplía el cupo de ese día.
  * Las ENTREGAS (motivo `entrega`) tienen su tope aparte (`XP_ENTREGA_MAX_DIA`): un lote es de entrega o no lo es
  * (nunca mezcla), y cada tope suma solo los lotes de su clase.
  * El «día» lo decide quien llama (Chile, `diaDeChile` en `lib/likes.mjs`): este archivo es JS puro.
@@ -57,7 +59,7 @@ import {
   XP_DIRECTO_MAX_DIA,
   xpDirectoDelTramo,
   XP_ENTREGA_MAX_DIA,
-  XP_JUEGO_MAX_DIA,
+  topeXpJuegoDia,
 } from "./experiencia.mjs";
 import { preparadorDeTablas } from "./db/tablas.mjs";
 
@@ -533,11 +535,12 @@ function desgloseValido(detalle) {
 /**
  * Suma un lote de XP a la ficha vinculada al UUID. Idempotente por `idLote` y con el tope del día aplicado en
  * la misma sentencia. Devuelve lo que de verdad se sumó (puede ser menos que lo pedido, o 0 si ya se topó).
- * @param {{ uuid: string, idLote: string, detalle: Record<string, number>, dia: string, ahora?: number }} entrada
+ * `nivel` es el nivel que la ficha tenía al empezar el día (1 si no llega: el tramo más corto).
+ * @param {{ uuid: string, idLote: string, detalle: Record<string, number>, dia: string, nivel?: number, ahora?: number }} entrada
  */
 export async function sumarXp(
   ejecutor,
-  { uuid, idLote, detalle, dia, ahora = Date.now() },
+  { uuid, idLote, detalle, dia, nivel = 1, ahora = Date.now() },
 ) {
   if (!uuidValido(idLote)) {
     throw new MinecraftError(
@@ -550,7 +553,7 @@ export async function sumarXp(
     throw new Error(`día inválido: ${dia}`);
   }
   const { limpio, total, entrega } = desgloseValido(detalle);
-  const tope = entrega ? XP_ENTREGA_MAX_DIA : XP_JUEGO_MAX_DIA;
+  const tope = entrega ? XP_ENTREGA_MAX_DIA : topeXpJuegoDia(nivel);
   const e = await conTablas(ejecutor);
   const vinculo = await vinculoDeJugador(e, uuid);
   if (!vinculo) {
@@ -570,7 +573,7 @@ export async function sumarXp(
       vtuberId: vinculo.vtuberId,
       sumado: Number(previo.rows[0].cantidad),
       duplicado: true,
-      ...(await deHoy(e, vinculo.vtuberId, dia)),
+      ...(await deHoy(e, vinculo.vtuberId, dia, nivel)),
     };
   }
   // «Es de entrega» se lee del desglose guardado: un lote de entrega solo trae ese motivo (ver desgloseValido).
@@ -604,7 +607,7 @@ export async function sumarXp(
     vtuberId: vinculo.vtuberId,
     sumado: Number(escrito.rows[0]?.cantidad ?? 0),
     duplicado: false,
-    ...(await deHoy(e, vinculo.vtuberId, dia)),
+    ...(await deHoy(e, vinculo.vtuberId, dia, nivel)),
   };
 }
 
@@ -612,7 +615,7 @@ export async function sumarXp(
  * Lo de hoy, separado por clase de tope: `hoy`/`topeDia` es la XP de juego de siempre (el panel del plugin muestra
  * «hoy 120/300») y `entregaHoy`/`topeEntrega` la de entregas. Así llegar al tope de uno no apaga el aviso del otro.
  */
-async function deHoy(e, vtuberId, dia) {
+async function deHoy(e, vtuberId, dia, nivel = 1) {
   const { rows } = await e.execute(
     `SELECT COALESCE(SUM(CASE WHEN json_extract(detalle, '$.entrega') IS NULL THEN cantidad ELSE 0 END), 0) AS n,
             COALESCE(SUM(CASE WHEN json_extract(detalle, '$.entrega') IS NULL THEN 0 ELSE cantidad END), 0) AS entrega
@@ -621,15 +624,31 @@ async function deHoy(e, vtuberId, dia) {
   );
   return {
     hoy: Number(rows[0]?.n ?? 0),
-    topeDia: XP_JUEGO_MAX_DIA,
+    topeDia: topeXpJuegoDia(nivel),
     entregaHoy: Number(rows[0]?.entrega ?? 0),
     topeEntrega: XP_ENTREGA_MAX_DIA,
   };
 }
 
-/** XP de juego que la ficha lleva HOY y el tope del día (el panel del juego muestra «hoy 120/300»). */
-export async function xpDeHoy(ejecutor, vtuberId, dia) {
-  return deHoy(await conTablas(ejecutor), Number(vtuberId), dia);
+/** XP de juego que la ficha lleva HOY y el tope del día (el panel del juego muestra «hoy 120/300»). `nivel` es el de la ficha hoy. */
+export async function xpDeHoy(ejecutor, vtuberId, dia, nivel = 1) {
+  return deHoy(await conTablas(ejecutor), Number(vtuberId), dia, nivel);
+}
+
+/**
+ * XP que la ficha lleva HOY sumando TODAS sus fuentes (juego, entregas, directo y misiones). Sirve para una sola cosa:
+ * descontarla y saber qué nivel tenía la ficha AL EMPEZAR el día, que es de donde sale su tope diario (si el nivel de hoy
+ * lo subiera, ganar XP del propio día regalaría más cupo del aprobado).
+ */
+export async function xpDeHoyTodas(ejecutor, vtuberId, dia) {
+  const e = await conTablas(ejecutor);
+  const { rows } = await e.execute(
+    `SELECT (SELECT COALESCE(SUM(cantidad), 0) FROM xp_juego WHERE vtuber_id = ? AND dia = ?)
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_directo WHERE vtuber_id = ? AND dia = ?)
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_mision WHERE vtuber_id = ? AND dia = ?) AS n`,
+    [Number(vtuberId), dia, Number(vtuberId), dia, Number(vtuberId), dia],
+  );
+  return Number(rows[0]?.n ?? 0);
 }
 
 /** XP de juego de varias fichas en UNA consulta: `Map(id → xp)`. */

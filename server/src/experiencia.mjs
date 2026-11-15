@@ -61,16 +61,41 @@ export const RANGO_MAXIMO = 5;
  */
 export const PUNTOS_STATS_POR_NIVEL = 10;
 /**
- * XP de juego que puede sumar una ficha en un día (de Chile). Diez likes = 100 XP; el tope equivale a 60
- * likes al día: jugar mucho ayuda, pero no deja a los likes de adorno ni premia un bot con la sesión abierta.
+ * TOPE DIARIO DE XP DE JUEGO POR TRAMOS DE NIVEL
+ * ----------------------------------------------
+ * Cuánta XP de juego (de Chile) puede sumar una ficha en un día ya no es un número fijo: depende del nivel que la ficha
+ * tenía AL EMPEZAR el día. Al principio el cupo es corto (300) para que jugar no sustituya a la comunidad; a partir del
+ * nivel 11 se abre hasta 7.000, porque cada nivel pide `BASE_NIVEL + PASO_NIVEL x (nivel - 1)` y un cupo plano dejaba a las
+ * fichas altas subiendo a cuentagotas.
+ *
+ * El nivel se mide SIN la XP ganada hoy (`server/src/minecraft.mjs` resta lo de hoy al calcularlo): si el cupo subiera al
+ * cruzar un tramo a media tarde, subir de nivel con la XP del propio día regalaría más cupo del que se aprobó.
  */
-export const XP_JUEGO_MAX_DIA = 600;
+export const TRAMOS_XP_JUEGO = Object.freeze([
+  Object.freeze({ hasta: 10, tope: 300 }),
+  Object.freeze({ hasta: 30, tope: 600 }),
+  Object.freeze({ hasta: 50, tope: 1_000 }),
+  Object.freeze({ hasta: 60, tope: 2_000 }),
+  Object.freeze({ hasta: 70, tope: 3_000 }),
+  Object.freeze({ hasta: 80, tope: 4_500 }),
+  Object.freeze({ hasta: 90, tope: 6_000 }),
+  Object.freeze({ hasta: null, tope: 7_000 }),
+]);
+/** El tope del tramo MÁS ALTO (nivel 91 en adelante); el de cada ficha sale de `topeXpJuegoDia(nivel)`. */
+export const XP_JUEGO_MAX_DIA = 7_000;
+/** Cupo diario de XP de juego de una ficha de nivel `nivel` (1 si falta el dato: el tramo más corto, nunca el más generoso). */
+export function topeXpJuegoDia(nivel) {
+  const n = Math.max(1, entero(nivel, 1));
+  const tramo = TRAMOS_XP_JUEGO.find((t) => t.hasta === null || n <= t.hasta);
+  return tramo.tope;
+}
 /**
- * XP que una ficha puede sumar al día SOLO por entregas del plugin de Minecraft (motivo `entrega`), aparte y ADEMÁS de
- * `XP_JUEGO_MAX_DIA`. Es lo que hace rentable el trabajo de repartidor (llevar paquetes en la mochila, cruzar zonas de
- * varados) sin abrir la puerta a que matar mobs rinda más: cada tope cuenta solo lo suyo.
+ * XP que una ficha puede sumar al día SOLO por entregas del plugin de Minecraft (motivo `entrega`), aparte y ADEMÁS del
+ * tope de juego. Es lo que hace rentable el trabajo de repartidor (llevar paquetes en la mochila, cruzar zonas de
+ * varados) sin abrir la puerta a que matar mobs rinda más: cada tope cuenta solo lo suyo. Es plano (no depende del
+ * nivel) a propósito: repartir es trabajo, no una recompensa por subir.
  */
-export const XP_ENTREGA_MAX_DIA = 600;
+export const XP_ENTREGA_MAX_DIA = 1_500;
 /**
  * XP que gana una ficha por cada tramo (`DIRECTO_TRAMO_MIN`) en que se la ve EN DIRECTO (Twitch o Kick) y su tope diario,
  * aparte de `XP_JUEGO_MAX_DIA`: premiar transmitir no debe gastar el cupo de Minecraft ni al revés. 5 XP cada 30 min y
