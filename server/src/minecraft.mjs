@@ -607,7 +607,7 @@ export async function sumarXp(
     vtuberId: vinculo.vtuberId,
     sumado: Number(escrito.rows[0]?.cantidad ?? 0),
     duplicado: false,
-    ...(await deHoy(e, vinculo.vtuberId, dia)),
+    ...(await deHoy(e, vinculo.vtuberId, dia, nivel)),
   };
 }
 
