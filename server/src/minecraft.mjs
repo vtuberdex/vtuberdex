@@ -615,7 +615,7 @@ export async function sumarXp(
  * Lo de hoy, separado por clase de tope: `hoy`/`topeDia` es la XP de juego de siempre (el panel del plugin muestra
  * «hoy 120/300») y `entregaHoy`/`topeEntrega` la de entregas. Así llegar al tope de uno no apaga el aviso del otro.
  */
-async function deHoy(e, vtuberId, dia) {
+async function deHoy(e, vtuberId, dia, nivel = 1) {
   const { rows } = await e.execute(
     `SELECT COALESCE(SUM(CASE WHEN json_extract(detalle, '$.entrega') IS NULL THEN cantidad ELSE 0 END), 0) AS n,
             COALESCE(SUM(CASE WHEN json_extract(detalle, '$.entrega') IS NULL THEN 0 ELSE cantidad END), 0) AS entrega
