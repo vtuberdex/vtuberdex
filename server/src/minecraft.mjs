@@ -535,11 +535,12 @@ function desgloseValido(detalle) {
 /**
  * Suma un lote de XP a la ficha vinculada al UUID. Idempotente por `idLote` y con el tope del día aplicado en
  * la misma sentencia. Devuelve lo que de verdad se sumó (puede ser menos que lo pedido, o 0 si ya se topó).
- * @param {{ uuid: string, idLote: string, detalle: Record<string, number>, dia: string, ahora?: number }} entrada
+ * `nivel` es el nivel que la ficha tenía al empezar el día (1 si no llega: el tramo más corto).
+ * @param {{ uuid: string, idLote: string, detalle: Record<string, number>, dia: string, nivel?: number, ahora?: number }} entrada
  */
 export async function sumarXp(
   ejecutor,
-  { uuid, idLote, detalle, dia, ahora = Date.now() },
+  { uuid, idLote, detalle, dia, nivel = 1, ahora = Date.now() },
 ) {
   if (!uuidValido(idLote)) {
     throw new MinecraftError(
