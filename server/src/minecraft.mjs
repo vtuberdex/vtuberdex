@@ -635,6 +635,22 @@ export async function xpDeHoy(ejecutor, vtuberId, dia, nivel = 1) {
   return deHoy(await conTablas(ejecutor), Number(vtuberId), dia, nivel);
 }
 
+/**
+ * XP que la ficha lleva HOY sumando TODAS sus fuentes (juego, entregas, directo y misiones). Sirve para una sola cosa:
+ * descontarla y saber qué nivel tenía la ficha AL EMPEZAR el día, que es de donde sale su tope diario (si el nivel de hoy
+ * lo subiera, ganar XP del propio día regalaría más cupo del aprobado).
+ */
+export async function xpDeHoyTodas(ejecutor, vtuberId, dia) {
+  const e = await conTablas(ejecutor);
+  const { rows } = await e.execute(
+    `SELECT (SELECT COALESCE(SUM(cantidad), 0) FROM xp_juego WHERE vtuber_id = ? AND dia = ?)
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_directo WHERE vtuber_id = ? AND dia = ?)
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_mision WHERE vtuber_id = ? AND dia = ?) AS n`,
+    [Number(vtuberId), dia, Number(vtuberId), dia, Number(vtuberId), dia],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
 /** XP de juego de varias fichas en UNA consulta: `Map(id → xp)`. */
 export async function xpDeJuegoVarias(ejecutor, ids) {
   const lista = [...new Set(ids.map(Number).filter(Number.isInteger))];
