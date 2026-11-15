@@ -553,7 +553,7 @@ export async function sumarXp(
     throw new Error(`día inválido: ${dia}`);
   }
   const { limpio, total, entrega } = desgloseValido(detalle);
-  const tope = entrega ? XP_ENTREGA_MAX_DIA : XP_JUEGO_MAX_DIA;
+  const tope = entrega ? XP_ENTREGA_MAX_DIA : topeXpJuegoDia(nivel);
   const e = await conTablas(ejecutor);
   const vinculo = await vinculoDeJugador(e, uuid);
   if (!vinculo) {
