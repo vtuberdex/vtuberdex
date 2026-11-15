@@ -42,8 +42,10 @@
  *
  * TOPE DIARIO EN UNA SOLA SENTENCIA
  * ---------------------------------
- * `XP_JUEGO_MAX_DIA` por ficha y día. El INSERT lee lo sumado hoy y recorta el lote a lo que cabe en la
- * MISMA sentencia: dos lotes simultáneos no pueden pasarse del tope (misma idea que `subirHabilidad`).
+ * `topeXpJuegoDia(nivel)` por ficha y día (`XP_ENTREGA_MAX_DIA` para los lotes de entrega). El INSERT lee lo sumado hoy y
+ * recorta el lote a lo que cabe en la MISMA sentencia: dos lotes simultáneos no pueden pasarse del tope (misma idea que
+ * `subirHabilidad`). El `nivel` lo manda quien llama porque este archivo no ve las fichas: es el nivel que la ficha tenía
+ * AL EMPEZAR el día (sin la XP de hoy), así que subir de tramo durante el día no amplía el cupo de ese día.
  * Las ENTREGAS (motivo `entrega`) tienen su tope aparte (`XP_ENTREGA_MAX_DIA`): un lote es de entrega o no lo es
  * (nunca mezcla), y cada tope suma solo los lotes de su clase.
  * El «día» lo decide quien llama (Chile, `diaDeChile` en `lib/likes.mjs`): este archivo es JS puro.
