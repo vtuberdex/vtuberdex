@@ -573,8 +573,9 @@ export async function sumarXp(
       vtuberId: vinculo.vtuberId,
       sumado: Number(previo.rows[0].cantidad),
       duplicado: true,
-      ...(await deHoy(e, vinculo.vtuberId, dia)),
+      ...(await deHoy(e, vinculo.vtuberId, dia, nivel)),
     };
+    1;
   }
   // «Es de entrega» se lee del desglose guardado: un lote de entrega solo trae ese motivo (ver desgloseValido).
   await e.execute(
