@@ -565,7 +565,7 @@ describe("/minecraft-admin", () => {
       }),
     );
     render(<MinecraftAdminPage />);
-    await abrirPestana("Configuración");
+    await abrirPestana("Archivos");
     fireEvent.click(screen.getByRole("radio", { name: /server\.properties/ }));
     fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
     expect(await screen.findByText("no_existe")).toBeTruthy();
