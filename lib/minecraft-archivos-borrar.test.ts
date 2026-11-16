@@ -39,6 +39,8 @@ beforeEach(async () => {
   await fs.rm(plugins, { recursive: true, force: true });
   await fs.mkdir(path.join(plugins, "VTuberDex"), { recursive: true });
   await fs.writeFile(path.join(plugins, "VTuberDex", "config.yml"), "speed: 1\n");
+  await fs.mkdir(path.join(plugins, "MMOItems", "datos.yml"), { recursive: true });
+  await fs.writeFile(path.join(plugins, "MMOItems", "config.yml"), "a: 1\n");
   await fs.writeFile(path.join(plugins, "suelto.yml"), "a: 1\n");
 });
 
