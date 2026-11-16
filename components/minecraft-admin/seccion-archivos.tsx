@@ -678,11 +678,11 @@ export function SeccionArchivos() {
 
         <div className="space-y-3">
           {estaEnPlugins(contenido.ruta) ? (
-            <FormularioZip
-              zip={zip}
+            <FormularioSubida
+              archivo={archivo}
               deshabilitado={ocupado || carpetaSoloLectura}
-              alElegir={setZip}
-              alSubir={subirZip}
+              alElegir={setArchivo}
+              alSubir={subirArchivo}
             />
           ) : null}
           <EditorDeArchivo
