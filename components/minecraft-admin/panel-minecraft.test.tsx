@@ -313,12 +313,14 @@ describe("/minecraft-admin", () => {
     expect(screen.queryByText("Entrar con enlace mágico")).toBeNull();
   });
 
-  it("no hay consola libre: ningún campo acepta un comando", async () => {
+  it("la única entrada libre es la consola: las acciones mandan su nombre", async () => {
     montarFetch();
     render(<MinecraftAdminPage />);
     await screen.findByRole("button", { name: "Quién juega" });
+    // Desde la unificación la consola vive en «Servidor»: hay UN campo de texto y el servidor
+    // decide qué comando acepta (lista blanca para el mantenedor).
+    expect(screen.getByLabelText("Comando")).toBeTruthy();
     expect(screen.queryByLabelText("Comando RCON")).toBeNull();
-    expect(screen.queryByText(/consola rcon/i)).toBeNull();
   });
 
   it("un mantenedor que no es admin sube jars y edita la configuración, pero no veta", async () => {
