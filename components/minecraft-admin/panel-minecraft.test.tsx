@@ -325,7 +325,8 @@ describe("/minecraft-admin", () => {
     montarFetch({ plugins: ["Vault.jar"], rol: "mantenedor" });
     render(<MinecraftAdminPage />);
     await screen.findByRole("button", { name: "Quién juega" });
-    expect(screen.getByRole("tab", { name: "Configuración" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Archivos" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Experiencia" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Vetar" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Quitar veto" })).toBeNull();
     expect(screen.getByRole("button", { name: "Expulsar" })).toBeTruthy();
