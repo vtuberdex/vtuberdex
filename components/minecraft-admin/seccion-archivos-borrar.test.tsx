@@ -99,7 +99,11 @@ describe("crear una carpeta desde el explorador", () => {
           metodo: init?.method,
           cuerpo: String(init?.body ?? ""),
         });
-        return respuesta({ ok: true, ruta: "plugins/VTuberDex/assets" });
+        // El listado (GET) sigue devolviendo la carpeta abierta; solo el alta contesta otra cosa.
+        if (init?.method === "PATCH") {
+          return respuesta({ ok: true, ruta: "plugins/VTuberDex/assets" });
+        }
+        return respuesta(CARPETA);
       }),
     );
     render(<SeccionArchivos />);
