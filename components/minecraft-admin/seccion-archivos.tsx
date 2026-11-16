@@ -263,10 +263,11 @@ function Explorador({
             archivo={a}
             abierto={a.ruta === ruta}
             alAbrir={alAbrir}
+            alBorrar={alBorrar}
           />
         ))}
         {comprimidos.map((c) => (
-          <FilaDeComprimido key={c.ruta} comprimido={c} />
+          <FilaDeComprimido key={c.ruta} comprimido={c} alBorrar={alBorrar} />
         ))}
       </ul>
     </div>
