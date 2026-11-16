@@ -162,6 +162,6 @@ describe("borrar un archivo desde el explorador", () => {
     );
     render(<SeccionArchivos />);
 
-    expect(await screen.findByText(/Nada que mostrar/)).toBeTruthy();
+    expect(await screen.findByText("Carpeta vacía.")).toBeTruthy();
   });
 });
