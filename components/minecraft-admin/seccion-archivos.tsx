@@ -593,6 +593,7 @@ export function SeccionArchivos() {
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [archivo, setArchivo] = useState<File | null>(null);
+  const [carpetaNueva, setCarpetaNueva] = useState("");
 
   const cargar = useCallback(async (destino: string) => {
     setError(null);
