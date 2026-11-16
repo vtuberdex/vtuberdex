@@ -764,6 +764,7 @@ export function SeccionArchivos() {
           alFiltrar={setFiltro}
           alNavegar={navegarSinEsperar}
           alAbrir={abrirSinEsperar}
+          alBorrar={borrarSinEsperar}
         />
 
         <div className="space-y-3">
