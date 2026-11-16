@@ -800,23 +800,26 @@ export function PanelMinecraftAdmin() {
   // monta nada, solo se pinta el de la pestaña elegida.
   const vistas: Record<Pestana, React.ReactNode> = {
     servidor: (
-      <PestanaServidor
-        panorama={panorama}
-        historial={historial}
-        hace={hace}
-        ocupado={ocupado}
-        esAdmin={esAdmin}
-        jugador={jugador}
-        motivo={motivo}
-        anuncio={anuncio}
-        consola={consola}
-        alCambiarJugador={setJugador}
-        alCambiarMotivo={setMotivo}
-        alCambiarAnuncio={setAnuncio}
-        alAnunciar={anunciar}
-        alModerar={sobreJugador}
-        ejecutar={ejecutarSinEsperar}
-      />
+      <>
+        <PestanaServidor
+          panorama={panorama}
+          historial={historial}
+          hace={hace}
+          ocupado={ocupado}
+          esAdmin={esAdmin}
+          jugador={jugador}
+          motivo={motivo}
+          anuncio={anuncio}
+          consola={consola}
+          alCambiarJugador={setJugador}
+          alCambiarMotivo={setMotivo}
+          alCambiarAnuncio={setAnuncio}
+          alAnunciar={anunciar}
+          alModerar={sobreJugador}
+          ejecutar={ejecutarSinEsperar}
+        />
+        <SeccionConsola esAdmin={esAdmin} />
+      </>
     ),
     plugins: (
       <SeccionPlugins respaldo={estado.plugins ?? []}>
@@ -827,22 +830,23 @@ export function PanelMinecraftAdmin() {
         />
       </SeccionPlugins>
     ),
-    archivos: <SeccionArchivos />,
-    consola: <SeccionConsola esAdmin={esAdmin} />,
-    experiencia: esAdmin ? <SeccionExperiencia /> : null,
-    configuracion: (
-      <PestanaConfiguracion
-        destino={destino}
-        nombreConfig={nombreConfig}
-        texto={texto}
-        ocupado={ocupado}
-        alCambiarDestino={setDestino}
-        alCambiarNombre={setNombreConfig}
-        alCambiarTexto={setTexto}
-        alAbrir={abrirConfiguracionSinEsperar}
-        alGuardar={guardarConfiguracion}
-      />
+    archivos: (
+      <>
+        <SeccionArchivos />
+        <PestanaConfiguracion
+          destino={destino}
+          nombreConfig={nombreConfig}
+          texto={texto}
+          ocupado={ocupado}
+          alCambiarDestino={setDestino}
+          alCambiarNombre={setNombreConfig}
+          alCambiarTexto={setTexto}
+          alAbrir={abrirConfiguracionSinEsperar}
+          alGuardar={guardarConfiguracion}
+        />
+      </>
     ),
+    experiencia: esAdmin ? <SeccionExperiencia /> : null,
   };
 
   if (sesion === "comprobando") {
