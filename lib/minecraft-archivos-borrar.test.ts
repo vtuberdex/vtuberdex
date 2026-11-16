@@ -66,12 +66,12 @@ describe("borrarArchivo", () => {
 
   it("el mantenedor también borra (el equipo abrió la puerta a los mantenedores)", async () => {
     const r = await borrar({
-      ruta: "plugins/VTuberDex/config.yml",
+      ruta: "plugins/MMOItems/config.yml",
       dir: base,
       rol: "mantenedor",
     });
-    expect(r).toEqual({ ok: true, ruta: "plugins/VTuberDex/config.yml" });
-    expect(await existe("plugins/VTuberDex/config.yml")).toBe(false);
+    expect(r).toEqual({ ok: true, ruta: "plugins/MMOItems/config.yml" });
+    expect(await existe("plugins/MMOItems/config.yml")).toBe(false);
   });
 
   it("sin rol de admin ni mantenedor no borra nada", async () => {
