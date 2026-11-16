@@ -206,6 +206,7 @@ function Explorador({
   alFiltrar,
   alNavegar,
   alAbrir,
+  alBorrar,
 }: Readonly<{
   migas: Migaja[];
   carpetas: Carpeta[];
@@ -216,6 +217,7 @@ function Explorador({
   alFiltrar: (filtro: string) => void;
   alNavegar: (ruta: string) => void;
   alAbrir: (ruta: string) => void;
+  alBorrar: (ruta: string, nombre: string) => void;
 }>) {
   const filtrar = (e: React.ChangeEvent<HTMLInputElement>) =>
     alFiltrar(e.target.value);
