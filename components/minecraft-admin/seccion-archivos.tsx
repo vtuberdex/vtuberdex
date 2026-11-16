@@ -229,9 +229,13 @@ function Explorador({
 }
 
 /** Mismo tope que un jar de plugin (50 MB): el servidor lo vuelve a comprobar. */
-const LIMITE_ZIP_BYTES = 50 * 1024 * 1024;
+const LIMITE_SUBIDA_BYTES = 50 * 1024 * 1024;
 
-const ERROR_SUBIR_ZIP = "no se pudo subir el zip";
+const ERROR_SUBIR = "no se pudo subir el archivo";
+
+/** Lo que el servidor acepta subir: comprimidos y archivos sueltos (configuración y modelos). */
+const EXTENSIONES_SUBIBLES =
+  /\.(zip|ya?ml|json|txt|properties|toml|csv|bbmodel|nbt)$/i;
 
 /** Lo que se pinta mientras la primera carpeta no ha llegado: nada que filtrar, nada abierto. */
 const CONTENIDO_VACIO: Contenido = {
