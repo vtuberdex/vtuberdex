@@ -358,21 +358,21 @@ function FormularioSubida({
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="file"
-          accept=".zip,application/zip"
-          aria-label="Zip para subir"
+          accept=".zip,.yml,.yaml,.json,.txt,.properties,.toml,.csv,.bbmodel,.nbt"
+          aria-label="Archivo para subir"
           onChange={elegir}
           className="text-xs text-dex-ink"
         />
         <button
           type="submit"
-          disabled={deshabilitado || !zip}
+          disabled={deshabilitado || !archivo}
           className={CLASE_BOTON.primario}
         >
-          Subir zip
+          Subir archivo
         </button>
-        {zip ? (
+        {archivo ? (
           <span className={`text-[11px] text-dex-muted ${MONO}`}>
-            {tamano(zip.size)}
+            {tamano(archivo.size)}
           </span>
         ) : null}
       </div>
