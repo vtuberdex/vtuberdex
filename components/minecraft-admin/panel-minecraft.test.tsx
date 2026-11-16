@@ -461,7 +461,7 @@ describe("/minecraft-admin", () => {
   it("abre la configuración de un plugin por su nombre de archivo", async () => {
     montarFetch();
     render(<MinecraftAdminPage />);
-    await abrirPestana("Configuración");
+    await abrirPestana("Archivos");
     fireEvent.click(screen.getByRole("radio", { name: /Plugin/ }));
     fireEvent.change(screen.getByLabelText("Archivo del plugin"), {
       target: { value: "config.yml" },
