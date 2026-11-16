@@ -58,21 +58,18 @@ type Estado = {
 };
 
 type Sesion = "comprobando" | "dentro" | "fuera";
-type Pestana =
-  | "servidor"
-  | "plugins"
-  | "configuracion"
-  | "archivos"
-  | "consola"
-  | "experiencia";
+type Pestana = "servidor" | "plugins" | "archivos" | "experiencia";
 type Destino = "servidor" | "plugin";
 
+/**
+ * Cuatro pestañas y no seis: la consola se unió a «Servidor» (registro, comandos y moderación en
+ * el mismo sitio) y el editor de `server.properties` se unió a «Archivos», que ya edita lo mismo
+ * con el explorador. Antes había dos formas de tocar un `.yml` y ninguna decía cuál usar.
+ */
 const PESTANAS: { id: Pestana; titulo: string }[] = [
   { id: "servidor", titulo: "Servidor" },
   { id: "plugins", titulo: "Plugins" },
-  { id: "configuracion", titulo: "Configuración" },
   { id: "archivos", titulo: "Archivos" },
-  { id: "consola", titulo: "Consola" },
   { id: "experiencia", titulo: "Experiencia" },
 ];
 
