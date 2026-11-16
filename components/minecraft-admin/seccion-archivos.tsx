@@ -167,9 +167,15 @@ function FilaDeArchivo({
 }
 
 /** Un .zip de la carpeta: solo se muestra (no se abre ni se descomprime). */
-function FilaDeComprimido({ comprimido }: Readonly<{ comprimido: Archivo }>) {
+function FilaDeComprimido({
+  comprimido,
+  alBorrar,
+}: Readonly<{
+  comprimido: Archivo;
+  alBorrar: (ruta: string, nombre: string) => void;
+}>) {
   return (
-    <li>
+    <li className="flex items-center gap-1">
       <span
         className={`flex items-center gap-1.5 rounded-lg px-2 py-1 ${MONO} text-dex-muted`}
         title={`${comprimido.ruta} · ${tamano(comprimido.bytes)} · se reemplaza subiendo otro con el mismo nombre`}
@@ -180,6 +186,11 @@ function FilaDeComprimido({ comprimido }: Readonly<{ comprimido: Archivo }>) {
           {tamano(comprimido.bytes)}
         </span>
       </span>
+      <BotonBorrar
+        ruta={comprimido.ruta}
+        nombre={comprimido.nombre}
+        alBorrar={alBorrar}
+      />
     </li>
   );
 }
