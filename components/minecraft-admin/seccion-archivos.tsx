@@ -875,12 +875,20 @@ export function SeccionArchivos() {
 
         <div className="space-y-3">
           {estaEnPlugins(contenido.ruta) ? (
-            <FormularioSubida
-              archivo={archivo}
-              deshabilitado={ocupado || carpetaSoloLectura}
-              alElegir={setArchivo}
-              alSubir={subirArchivo}
-            />
+            <>
+              <FormularioCarpeta
+                nombre={carpetaNueva}
+                deshabilitado={ocupado || carpetaSoloLectura}
+                alEscribir={setCarpetaNueva}
+                alCrear={crearLaCarpeta}
+              />
+              <FormularioSubida
+                archivo={archivo}
+                deshabilitado={ocupado || carpetaSoloLectura}
+                alElegir={setArchivo}
+                alSubir={subirArchivo}
+              />
+            </>
           ) : null}
           <EditorDeArchivo
             ruta={ruta}
