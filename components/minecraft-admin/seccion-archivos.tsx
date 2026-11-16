@@ -746,6 +746,43 @@ export function SeccionArchivos() {
   );
 
   /**
+   * Crea una carpeta en la carpeta abierta (admin y mantenedor). El nombre puede traer varios
+   * tramos; si el servidor contesta `ya_existe`, no se toca nada y se cuenta en el aviso.
+   */
+  const crearLaCarpeta = useCallback(
+    async (evento: React.SubmitEvent) => {
+      evento.preventDefault();
+      const nombre = carpetaNueva.trim();
+      if (!nombre) {
+        setError("escribe el nombre de la carpeta");
+        return;
+      }
+      setError(null);
+      setAviso(null);
+      setOcupado(true);
+      try {
+        const r = await fetch("/api/minecraft-admin/archivos", {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ carpeta: contenido.ruta, nombre }),
+        });
+        if (!r.ok) {
+          throw new Error(await leerError(r, "no se pudo crear la carpeta"));
+        }
+        setCarpetaNueva("");
+        const donde = contenido.ruta ? `${contenido.ruta}/${nombre}` : nombre;
+        setAviso(`Creada la carpeta ${donde}.`);
+        await cargar(contenido.ruta);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "no se pudo crear la carpeta");
+      } finally {
+        setOcupado(false);
+      }
+    },
+    [carpetaNueva, contenido.ruta, cargar],
+  );
+
+  /**
    * Borra un archivo de la carpeta abierta (admin y mantenedor). Pregunta antes y, si era el que
    * estaba abierto, cierra el editor: el servidor deja una copia `.bak` al lado antes de borrar.
    */
