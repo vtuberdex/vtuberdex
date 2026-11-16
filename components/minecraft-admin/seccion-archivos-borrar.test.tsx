@@ -151,4 +151,17 @@ describe("borrar un archivo desde el explorador", () => {
       `ruta=${encodeURIComponent("plugins/VTuberDex/recursos.zip")}`,
     );
   });
+
+  it("un cuerpo sin listas no rompe el explorador", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (entrada: unknown) => {
+        llamadas.push({ url: String(entrada), metodo: undefined });
+        return respuesta({});
+      }),
+    );
+    render(<SeccionArchivos />);
+
+    expect(await screen.findByText(/Nada que mostrar/)).toBeTruthy();
+  });
 });
