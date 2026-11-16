@@ -478,7 +478,7 @@ export function SeccionArchivos() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
-  const [zip, setZip] = useState<File | null>(null);
+  const [archivo, setArchivo] = useState<File | null>(null);
 
   const cargar = useCallback(async (destino: string) => {
     setError(null);
