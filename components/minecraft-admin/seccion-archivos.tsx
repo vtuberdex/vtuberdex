@@ -37,9 +37,13 @@ type Contenido = {
 const MENSAJES: Record<string, string> = {
   sin_permiso_escritura:
     "El panel puede leer esta carpeta pero no guardar: al servicio web le falta permiso de escritura en ella.",
+  sin_permiso: "Borrar archivos del servidor es de admin y de mantenedor.",
   sin_espacio: "No queda espacio en disco.",
-  extension_no_permitida: "Solo se pueden subir archivos .zip.",
-  archivo_demasiado_grande: "El zip pasa de los 50 MB.",
+  extension_no_permitida:
+    "Esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel y .nbt.",
+  archivo_demasiado_grande: "El archivo pasa de los 50 MB.",
+  archivo_vacio: "El archivo llegó vacío.",
+  ya_existe: "Ya hay un archivo con ese nombre en la carpeta.",
 };
 const leerError = async (r: Response, porDefecto: string) => {
   const c = (await r.json().catch(() => null)) as {
@@ -100,19 +104,48 @@ function FilaDeCarpeta({
   );
 }
 
+/**
+ * El botón de borrar de una fila. El servidor deja una copia `.bak` al lado antes de borrar y aquí
+ * se pregunta antes, así que un clic de más se recupera.
+ */
+function BotonBorrar({
+  ruta,
+  nombre,
+  alBorrar,
+}: Readonly<{
+  ruta: string;
+  nombre: string;
+  alBorrar: (ruta: string, nombre: string) => void;
+}>) {
+  const borrar = () => alBorrar(ruta, nombre);
+  return (
+    <button
+      type="button"
+      onClick={borrar}
+      title={`Borrar ${nombre}`}
+      aria-label={`Borrar ${nombre}`}
+      className="shrink-0 rounded px-1 text-dex-muted hover:bg-red-400/20 hover:text-red-400"
+    >
+      🗑
+    </button>
+  );
+}
+
 function FilaDeArchivo({
   archivo,
   abierto,
   alAbrir,
+  alBorrar,
 }: Readonly<{
   archivo: Archivo;
   abierto: boolean;
   alAbrir: (ruta: string) => void;
+  alBorrar: (ruta: string, nombre: string) => void;
 }>) {
   const abrir = () => alAbrir(archivo.ruta);
   const tono = abierto ? "bg-dex-panel-soft text-dex-accent" : "text-dex-ink";
   return (
-    <li>
+    <li className="flex items-center gap-1">
       <button
         type="button"
         onClick={abrir}
@@ -126,14 +159,23 @@ function FilaDeArchivo({
           </span>
         ) : null}
       </button>
+      {archivo.escribible === false ? null : (
+        <BotonBorrar ruta={archivo.ruta} nombre={archivo.nombre} alBorrar={alBorrar} />
+      )}
     </li>
   );
 }
 
 /** Un .zip de la carpeta: solo se muestra (no se abre ni se descomprime). */
-function FilaDeComprimido({ comprimido }: Readonly<{ comprimido: Archivo }>) {
+function FilaDeComprimido({
+  comprimido,
+  alBorrar,
+}: Readonly<{
+  comprimido: Archivo;
+  alBorrar: (ruta: string, nombre: string) => void;
+}>) {
   return (
-    <li>
+    <li className="flex items-center gap-1">
       <span
         className={`flex items-center gap-1.5 rounded-lg px-2 py-1 ${MONO} text-dex-muted`}
         title={`${comprimido.ruta} · ${tamano(comprimido.bytes)} · se reemplaza subiendo otro con el mismo nombre`}
@@ -144,6 +186,11 @@ function FilaDeComprimido({ comprimido }: Readonly<{ comprimido: Archivo }>) {
           {tamano(comprimido.bytes)}
         </span>
       </span>
+      <BotonBorrar
+        ruta={comprimido.ruta}
+        nombre={comprimido.nombre}
+        alBorrar={alBorrar}
+      />
     </li>
   );
 }
@@ -159,6 +206,7 @@ function Explorador({
   alFiltrar,
   alNavegar,
   alAbrir,
+  alBorrar,
 }: Readonly<{
   migas: Migaja[];
   carpetas: Carpeta[];
@@ -169,6 +217,7 @@ function Explorador({
   alFiltrar: (filtro: string) => void;
   alNavegar: (ruta: string) => void;
   alAbrir: (ruta: string) => void;
+  alBorrar: (ruta: string, nombre: string) => void;
 }>) {
   const filtrar = (e: React.ChangeEvent<HTMLInputElement>) =>
     alFiltrar(e.target.value);
@@ -214,10 +263,11 @@ function Explorador({
             archivo={a}
             abierto={a.ruta === ruta}
             alAbrir={alAbrir}
+            alBorrar={alBorrar}
           />
         ))}
         {comprimidos.map((c) => (
-          <FilaDeComprimido key={c.ruta} comprimido={c} />
+          <FilaDeComprimido key={c.ruta} comprimido={c} alBorrar={alBorrar} />
         ))}
       </ul>
     </div>
@@ -225,9 +275,13 @@ function Explorador({
 }
 
 /** Mismo tope que un jar de plugin (50 MB): el servidor lo vuelve a comprobar. */
-const LIMITE_ZIP_BYTES = 50 * 1024 * 1024;
+const LIMITE_SUBIDA_BYTES = 50 * 1024 * 1024;
 
-const ERROR_SUBIR_ZIP = "no se pudo subir el zip";
+const ERROR_SUBIR = "no se pudo subir el archivo";
+
+/** Lo que el servidor acepta subir: comprimidos y archivos sueltos (configuración y modelos). */
+const EXTENSIONES_SUBIBLES =
+  /\.(zip|ya?ml|json|txt|properties|toml|csv|bbmodel|nbt)$/i;
 
 /** Lo que se pinta mientras la primera carpeta no ha llegado: nada que filtrar, nada abierto. */
 const CONTENIDO_VACIO: Contenido = {
@@ -257,41 +311,45 @@ const estaEnPlugins = (ruta: string) =>
 const esSoloLectura = (carpetaSoloLectura: boolean, abierto?: Archivo) =>
   carpetaSoloLectura || abierto?.escribible === false;
 
-/** Lo que impide subir el zip elegido (antes de gastar la subida), o null si se puede intentar. */
-function problemaDelZip(zip: File): string | null {
-  if (!/\.zip$/i.test(zip.name)) {
-    return "solo se pueden subir archivos .zip";
+/** Lo que impide subir el archivo elegido (antes de gastar la subida), o null si se puede intentar. */
+function problemaDelArchivo(archivo: File): string | null {
+  if (!EXTENSIONES_SUBIBLES.test(archivo.name)) {
+    return "esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel y .nbt";
   }
-  if (zip.size === 0) {
+  if (archivo.size === 0) {
     return "el archivo llegó vacío";
   }
-  if (zip.size > LIMITE_ZIP_BYTES) {
-    return "el zip pasa de los 50 MB";
+  if (archivo.size > LIMITE_SUBIDA_BYTES) {
+    return "el archivo pasa de los 50 MB";
   }
   return null;
 }
 
-function enviarZip(zip: File, carpeta: string, sobrescribir: boolean) {
-  const consulta = new URLSearchParams({ carpeta, nombre: zip.name });
+function enviarArchivo(
+  archivo: File,
+  carpeta: string,
+  sobrescribir: boolean,
+) {
+  const consulta = new URLSearchParams({ carpeta, nombre: archivo.name });
   if (sobrescribir) {
     consulta.set("sobrescribir", "1");
   }
   return fetch(`/api/minecraft-admin/archivos?${consulta}`, {
     method: "POST",
-    headers: { "content-type": "application/zip" },
-    body: zip,
+    headers: { "content-type": "application/octet-stream" },
+    body: archivo,
   });
 }
 
 /**
- * Sube el zip y, si el nombre ya está (409 `ya_existe`), pregunta antes de reemplazarlo de una
+ * Sube el archivo y, si el nombre ya está (409 `ya_existe`), pregunta antes de reemplazarlo de una
  * vez, sin copia del anterior (así lo pidió el equipo). Devuelve null si se canceló.
  */
-async function subirZipConfirmando(
-  zip: File,
+async function subirConfirmando(
+  archivo: File,
   carpeta: string,
 ): Promise<Response | null> {
-  const r = await enviarZip(zip, carpeta, false);
+  const r = await enviarArchivo(archivo, carpeta, false);
   if (r.status !== 409) {
     return r;
   }
@@ -299,56 +357,68 @@ async function subirZipConfirmando(
     error?: string;
   } | null;
   if (cuerpo?.error !== "ya_existe") {
-    throw new Error(ERROR_SUBIR_ZIP);
+    throw new Error(ERROR_SUBIR);
   }
   const reemplaza = window.confirm(
-    `Ya hay un «${zip.name}» en esta carpeta. ¿Reemplazarlo? No se guarda copia del anterior.`,
+    `Ya hay un «${archivo.name}» en esta carpeta. ¿Reemplazarlo? No se guarda copia del anterior.`,
   );
-  return reemplaza ? enviarZip(zip, carpeta, true) : null;
+  return reemplaza ? enviarArchivo(archivo, carpeta, true) : null;
 }
 
-/** Formulario para subir un `.zip` a la carpeta abierta (solo dentro de `plugins/`). */
-function FormularioZip({
-  zip,
+/** Formulario para subir un archivo (comprimido, modelo o texto) a la carpeta abierta. */
+function FormularioSubida({
+  archivo,
   deshabilitado,
   alElegir,
   alSubir,
 }: Readonly<{
-  zip: File | null;
+  archivo: File | null;
   deshabilitado: boolean;
-  alElegir: (zip: File | null) => void;
+  alElegir: (archivo: File | null) => void;
   alSubir: (evento: React.SubmitEvent) => void;
 }>) {
   const elegir = (e: React.ChangeEvent<HTMLInputElement>) =>
     alElegir(e.target.files?.[0] ?? null);
+  // Arrastrar y soltar: se queda con el primer archivo, igual que el selector.
+  const soltar = (e: React.DragEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const soltado = e.dataTransfer?.files?.[0] ?? null;
+    if (soltado) {
+      alElegir(soltado);
+    }
+  };
   return (
     <form
       onSubmit={alSubir}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={soltar}
       className="space-y-2 rounded-xl border border-dex-line bg-dex-void/60 p-3"
     >
       <p className="text-xs text-dex-muted">
-        Subir un <strong>.zip</strong> a esta carpeta (máximo 50 MB, igual que
-        un jar). Solo se aceptan comprimidos y no se descomprimen solos: si
+        Sube un archivo a esta carpeta (máximo 50 MB, igual que un jar):
+        comprimidos <strong>.zip</strong> y archivos sueltos de configuración o
+        modelo (.yml, .json, .txt, .properties, .toml, .csv, .bbmodel, .nbt).
+        También vale arrastrarlo aquí. Los zips no se descomprimen solos y, si
         ya hay uno con ese nombre, se pregunta antes de reemplazarlo.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="file"
-          accept=".zip,application/zip"
-          aria-label="Zip para subir"
+          accept=".zip,.yml,.yaml,.json,.txt,.properties,.toml,.csv,.bbmodel,.nbt"
+          aria-label="Archivo para subir"
           onChange={elegir}
           className="text-xs text-dex-ink"
         />
         <button
           type="submit"
-          disabled={deshabilitado || !zip}
+          disabled={deshabilitado || !archivo}
           className={CLASE_BOTON.primario}
         >
-          Subir zip
+          Subir archivo
         </button>
-        {zip ? (
+        {archivo ? (
           <span className={`text-[11px] text-dex-muted ${MONO}`}>
-            {tamano(zip.size)}
+            {tamano(archivo.size)}
           </span>
         ) : null}
       </div>
@@ -454,7 +524,7 @@ export function SeccionArchivos() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
-  const [zip, setZip] = useState<File | null>(null);
+  const [archivo, setArchivo] = useState<File | null>(null);
 
   const cargar = useCallback(async (destino: string) => {
     setError(null);
@@ -563,20 +633,20 @@ export function SeccionArchivos() {
   );
 
   /**
-   * Sube el `.zip` elegido a la carpeta abierta. Si el nombre ya está, el servidor responde
-   * «ya existe» y se pregunta antes de reemplazarlo (`subirZipConfirmando`). Nunca se
-   * descomprime: el zip se queda como archivo.
+   * Sube el archivo elegido a la carpeta abierta (zip, modelo o texto). Si el nombre ya está, el
+   * servidor responde «ya existe» y se pregunta antes de reemplazarlo (`subirConfirmando`). Un zip
+   * no se descomprime: se queda como archivo.
    */
-  const subirZip = useCallback(
+  const subirArchivo = useCallback(
     async (evento: React.SubmitEvent) => {
       evento.preventDefault();
       setError(null);
       setAviso(null);
-      if (!zip) {
-        setError("elige un archivo .zip");
+      if (!archivo) {
+        setError("elige un archivo para subir");
         return;
       }
-      const problema = problemaDelZip(zip);
+      const problema = problemaDelArchivo(archivo);
       if (problema) {
         setError(problema);
         return;
@@ -584,26 +654,70 @@ export function SeccionArchivos() {
       const carpeta = contenido.ruta;
       setOcupado(true);
       try {
-        const r = await subirZipConfirmando(zip, carpeta);
+        const r = await subirConfirmando(archivo, carpeta);
         if (r === null) {
           return;
         }
         if (!r.ok) {
-          throw new Error(await leerError(r, ERROR_SUBIR_ZIP));
+          throw new Error(await leerError(r, ERROR_SUBIR));
         }
         const guardado = (await r.json()) as { nombre?: string };
         setAviso(
-          `Zip guardado: ${guardado.nombre ?? zip.name}. Se queda en la carpeta tal cual; no se descomprime solo.`,
+          `Guardado ${guardado.nombre ?? archivo.name}. Si es configuración o un modelo, recarga el plugin o reinicia para que lo lea; si es un zip, no se descomprime solo.`,
         );
-        setZip(null);
+        setArchivo(null);
         await cargar(carpeta);
       } catch (e) {
-        setError(e instanceof Error ? e.message : ERROR_SUBIR_ZIP);
+        setError(e instanceof Error ? e.message : ERROR_SUBIR);
       } finally {
         setOcupado(false);
       }
     },
-    [zip, contenido.ruta, cargar],
+    [archivo, contenido.ruta, cargar],
+  );
+
+  /**
+   * Borra un archivo de la carpeta abierta (admin y mantenedor). Pregunta antes y, si era el que
+   * estaba abierto, cierra el editor: el servidor deja una copia `.bak` al lado antes de borrar.
+   */
+  const borrar = useCallback(
+    async (destino: string, nombre: string) => {
+      const seguro = window.confirm(
+        `¿Borrar «${nombre}»? En el servidor queda una copia .bak al lado, así que se puede recuperar.`,
+      );
+      if (!seguro) {
+        return;
+      }
+      setError(null);
+      setAviso(null);
+      setOcupado(true);
+      try {
+        const r = await fetch(
+          `/api/minecraft-admin/archivos?${new URLSearchParams({ ruta: destino })}`,
+          { method: "DELETE" },
+        );
+        if (!r.ok) {
+          throw new Error(await leerError(r, "no se pudo borrar"));
+        }
+        if (destino === ruta) {
+          setRuta(null);
+          setTexto("");
+          setOriginal("");
+        }
+        setAviso(`Borrado ${destino} (queda ${destino}.bak).`);
+        await cargar(contenido.ruta);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "no se pudo borrar");
+      } finally {
+        setOcupado(false);
+      }
+    },
+    [ruta, contenido.ruta, cargar],
+  );
+
+  const borrarSinEsperar = useCallback(
+    (destino: string, nombre: string) => void borrar(destino, nombre),
+    [borrar],
   );
 
   const f = filtro.trim().toLowerCase();
@@ -650,15 +764,16 @@ export function SeccionArchivos() {
           alFiltrar={setFiltro}
           alNavegar={navegarSinEsperar}
           alAbrir={abrirSinEsperar}
+          alBorrar={borrarSinEsperar}
         />
 
         <div className="space-y-3">
           {estaEnPlugins(contenido.ruta) ? (
-            <FormularioZip
-              zip={zip}
+            <FormularioSubida
+              archivo={archivo}
               deshabilitado={ocupado || carpetaSoloLectura}
-              alElegir={setZip}
-              alSubir={subirZip}
+              alElegir={setArchivo}
+              alSubir={subirArchivo}
             />
           ) : null}
           <EditorDeArchivo
