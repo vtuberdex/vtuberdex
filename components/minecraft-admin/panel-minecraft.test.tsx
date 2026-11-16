@@ -438,7 +438,7 @@ describe("/minecraft-admin", () => {
   it("abre la configuración del servidor y la guarda", async () => {
     montarFetch();
     render(<MinecraftAdminPage />);
-    await abrirPestana("Configuración");
+    await abrirPestana("Archivos");
     fireEvent.click(screen.getByRole("radio", { name: /server\.properties/ }));
     fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
     const area = screen.getByLabelText(
