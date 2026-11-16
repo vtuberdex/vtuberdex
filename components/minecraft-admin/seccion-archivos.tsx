@@ -587,20 +587,20 @@ export function SeccionArchivos() {
   );
 
   /**
-   * Sube el `.zip` elegido a la carpeta abierta. Si el nombre ya está, el servidor responde
-   * «ya existe» y se pregunta antes de reemplazarlo (`subirZipConfirmando`). Nunca se
-   * descomprime: el zip se queda como archivo.
+   * Sube el archivo elegido a la carpeta abierta (zip, modelo o texto). Si el nombre ya está, el
+   * servidor responde «ya existe» y se pregunta antes de reemplazarlo (`subirConfirmando`). Un zip
+   * no se descomprime: se queda como archivo.
    */
-  const subirZip = useCallback(
+  const subirArchivo = useCallback(
     async (evento: React.SubmitEvent) => {
       evento.preventDefault();
       setError(null);
       setAviso(null);
-      if (!zip) {
-        setError("elige un archivo .zip");
+      if (!archivo) {
+        setError("elige un archivo para subir");
         return;
       }
-      const problema = problemaDelZip(zip);
+      const problema = problemaDelArchivo(archivo);
       if (problema) {
         setError(problema);
         return;
@@ -608,26 +608,26 @@ export function SeccionArchivos() {
       const carpeta = contenido.ruta;
       setOcupado(true);
       try {
-        const r = await subirZipConfirmando(zip, carpeta);
+        const r = await subirConfirmando(archivo, carpeta);
         if (r === null) {
           return;
         }
         if (!r.ok) {
-          throw new Error(await leerError(r, ERROR_SUBIR_ZIP));
+          throw new Error(await leerError(r, ERROR_SUBIR));
         }
         const guardado = (await r.json()) as { nombre?: string };
         setAviso(
-          `Zip guardado: ${guardado.nombre ?? zip.name}. Se queda en la carpeta tal cual; no se descomprime solo.`,
+          `Guardado ${guardado.nombre ?? archivo.name}. Si es configuración o un modelo, recarga el plugin o reinicia para que lo lea; si es un zip, no se descomprime solo.`,
         );
-        setZip(null);
+        setArchivo(null);
         await cargar(carpeta);
       } catch (e) {
-        setError(e instanceof Error ? e.message : ERROR_SUBIR_ZIP);
+        setError(e instanceof Error ? e.message : ERROR_SUBIR);
       } finally {
         setOcupado(false);
       }
     },
-    [zip, contenido.ruta, cargar],
+    [archivo, contenido.ruta, cargar],
   );
 
   const f = filtro.trim().toLowerCase();
