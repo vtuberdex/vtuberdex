@@ -265,41 +265,45 @@ const estaEnPlugins = (ruta: string) =>
 const esSoloLectura = (carpetaSoloLectura: boolean, abierto?: Archivo) =>
   carpetaSoloLectura || abierto?.escribible === false;
 
-/** Lo que impide subir el zip elegido (antes de gastar la subida), o null si se puede intentar. */
-function problemaDelZip(zip: File): string | null {
-  if (!/\.zip$/i.test(zip.name)) {
-    return "solo se pueden subir archivos .zip";
+/** Lo que impide subir el archivo elegido (antes de gastar la subida), o null si se puede intentar. */
+function problemaDelArchivo(archivo: File): string | null {
+  if (!EXTENSIONES_SUBIBLES.test(archivo.name)) {
+    return "esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel y .nbt";
   }
-  if (zip.size === 0) {
+  if (archivo.size === 0) {
     return "el archivo llegó vacío";
   }
-  if (zip.size > LIMITE_ZIP_BYTES) {
-    return "el zip pasa de los 50 MB";
+  if (archivo.size > LIMITE_SUBIDA_BYTES) {
+    return "el archivo pasa de los 50 MB";
   }
   return null;
 }
 
-function enviarZip(zip: File, carpeta: string, sobrescribir: boolean) {
-  const consulta = new URLSearchParams({ carpeta, nombre: zip.name });
+function enviarArchivo(
+  archivo: File,
+  carpeta: string,
+  sobrescribir: boolean,
+) {
+  const consulta = new URLSearchParams({ carpeta, nombre: archivo.name });
   if (sobrescribir) {
     consulta.set("sobrescribir", "1");
   }
   return fetch(`/api/minecraft-admin/archivos?${consulta}`, {
     method: "POST",
-    headers: { "content-type": "application/zip" },
-    body: zip,
+    headers: { "content-type": "application/octet-stream" },
+    body: archivo,
   });
 }
 
 /**
- * Sube el zip y, si el nombre ya está (409 `ya_existe`), pregunta antes de reemplazarlo de una
+ * Sube el archivo y, si el nombre ya está (409 `ya_existe`), pregunta antes de reemplazarlo de una
  * vez, sin copia del anterior (así lo pidió el equipo). Devuelve null si se canceló.
  */
-async function subirZipConfirmando(
-  zip: File,
+async function subirConfirmando(
+  archivo: File,
   carpeta: string,
 ): Promise<Response | null> {
-  const r = await enviarZip(zip, carpeta, false);
+  const r = await enviarArchivo(archivo, carpeta, false);
   if (r.status !== 409) {
     return r;
   }
@@ -307,12 +311,12 @@ async function subirZipConfirmando(
     error?: string;
   } | null;
   if (cuerpo?.error !== "ya_existe") {
-    throw new Error(ERROR_SUBIR_ZIP);
+    throw new Error(ERROR_SUBIR);
   }
   const reemplaza = window.confirm(
-    `Ya hay un «${zip.name}» en esta carpeta. ¿Reemplazarlo? No se guarda copia del anterior.`,
+    `Ya hay un «${archivo.name}» en esta carpeta. ¿Reemplazarlo? No se guarda copia del anterior.`,
   );
-  return reemplaza ? enviarZip(zip, carpeta, true) : null;
+  return reemplaza ? enviarArchivo(archivo, carpeta, true) : null;
 }
 
 /** Formulario para subir un `.zip` a la carpeta abierta (solo dentro de `plugins/`). */
