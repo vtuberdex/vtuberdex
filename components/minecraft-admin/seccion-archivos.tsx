@@ -298,6 +298,23 @@ const CONTENIDO_VACIO: Contenido = {
 const puedeDescartar = (sinGuardar: boolean) =>
   !sinGuardar || window.confirm("Hay cambios sin guardar. ¿Descartarlos?");
 
+/**
+ * Un cuerpo sin las listas (una versión vieja del servidor o una respuesta parcial) no debe tumbar
+ * la pestaña: se completa con la carpeta vacía.
+ */
+function normalizarContenido(cuerpo: unknown): Contenido {
+  const c = (cuerpo ?? {}) as Partial<Contenido>;
+  return {
+    ...CONTENIDO_VACIO,
+    ...c,
+    ruta: c.ruta ?? "",
+    migas: c.migas ?? [],
+    carpetas: c.carpetas ?? [],
+    archivos: c.archivos ?? [],
+    comprimidos: c.comprimidos ?? [],
+  };
+}
+
 const filtrarPorNombre = <T extends { nombre: string }>(
   lista: T[] | undefined,
   f: string,
