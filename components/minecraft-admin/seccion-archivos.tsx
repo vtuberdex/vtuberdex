@@ -676,6 +676,50 @@ export function SeccionArchivos() {
     [archivo, contenido.ruta, cargar],
   );
 
+  /**
+   * Borra un archivo de la carpeta abierta (admin y mantenedor). Pregunta antes y, si era el que
+   * estaba abierto, cierra el editor: el servidor deja una copia `.bak` al lado antes de borrar.
+   */
+  const borrar = useCallback(
+    async (destino: string, nombre: string) => {
+      const seguro = window.confirm(
+        `¿Borrar «${nombre}»? En el servidor queda una copia .bak al lado, así que se puede recuperar.`,
+      );
+      if (!seguro) {
+        return;
+      }
+      setError(null);
+      setAviso(null);
+      setOcupado(true);
+      try {
+        const r = await fetch(
+          `/api/minecraft-admin/archivos?${new URLSearchParams({ ruta: destino })}`,
+          { method: "DELETE" },
+        );
+        if (!r.ok) {
+          throw new Error(await leerError(r, "no se pudo borrar"));
+        }
+        if (destino === ruta) {
+          setRuta(null);
+          setTexto("");
+          setOriginal("");
+        }
+        setAviso(`Borrado ${destino} (queda ${destino}.bak).`);
+        await cargar(contenido.ruta);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "no se pudo borrar");
+      } finally {
+        setOcupado(false);
+      }
+    },
+    [ruta, contenido.ruta, cargar],
+  );
+
+  const borrarSinEsperar = useCallback(
+    (destino: string, nombre: string) => void borrar(destino, nombre),
+    [borrar],
+  );
+
   const f = filtro.trim().toLowerCase();
   const carpetas = useMemo(
     () => filtrarPorNombre(contenido.carpetas, f),
