@@ -15,7 +15,9 @@ import {
   respuestaJson,
 } from "../../../../lib/minecraft-admin.mjs";
 import {
+  borrarArchivo,
   guardarArchivo,
+  guardarArchivoSuelto,
   guardarComprimido,
   leerArchivo,
   listarCarpeta,
