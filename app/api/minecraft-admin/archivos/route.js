@@ -15,7 +15,9 @@ import {
   respuestaJson,
 } from "../../../../lib/minecraft-admin.mjs";
 import {
+  borrarArchivo,
   guardarArchivo,
+  guardarArchivoSuelto,
   guardarComprimido,
   leerArchivo,
   listarCarpeta,
@@ -78,12 +80,14 @@ export async function PUT(request) {
 }
 
 /**
- * Sube un `.zip` a una carpeta de `plugins/`. Los bytes van en el cuerpo (el navegador manda el
- * `File` tal cual) y el nombre en `?nombre=`; `?carpeta=` dice el destino y `?sobrescribir=1`
- * confirma que se reemplaza el que ya estaba (el panel pregunta antes).
+ * Sube un archivo a una carpeta de `plugins/`: un `.zip` o uno SUELTO (configuración, modelo de
+ * Blockbench, texto). Los bytes van en el cuerpo (el navegador manda el `File` tal cual) y el
+ * nombre en `?nombre=`; `?carpeta=` dice el destino y `?sobrescribir=1` confirma que se reemplaza
+ * el que ya estaba (el panel pregunta antes).
  *
- * Un zip no se ejecuta, pero ocupa disco y puede pisar el paquete de recursos de un plugin: mismo
- * tope que un jar y solo la extensión `.zip`.
+ * Nada de lo que se sube se ejecuta ni se descomprime: un zip ocupa disco y puede pisar el
+ * paquete de recursos de un plugin, y un suelto solo cuenta si su extensión está en la lista
+ * cerrada. Mismo tope para los dos (el de un jar).
  */
 export async function POST(request) {
   return conMantenedor(request, async (acceso) => {
@@ -108,7 +112,11 @@ export async function POST(request) {
     }
 
     const datos = new Uint8Array(await request.arrayBuffer());
-    const resultado = await guardarComprimido({
+    // La extensión decide qué se valida; los ejecutables y los scripts los corta la lista cerrada
+    // de `lib/minecraft-archivos.mjs`, no el navegador.
+    const esZip = /\.zip$/i.test(String(nombre ?? ""));
+    const guardar = esZip ? guardarComprimido : guardarArchivoSuelto;
+    const resultado = await guardar({
       carpeta,
       nombre,
       contenido: datos,
@@ -118,7 +126,7 @@ export async function POST(request) {
     await anotarAuditoria({
       quien: acceso.sesion.email,
       rol: acceso.sesion.role,
-      tipo: "comprimido-subido",
+      tipo: esZip ? "comprimido-subido" : "archivo-subido",
       detalle: `${carpeta ?? ""}/${nombre ?? ""}`,
       ok: resultado.ok,
     });
@@ -126,5 +134,28 @@ export async function POST(request) {
       return respuestaJson(resultado.cuerpo, resultado.status);
     }
     return respuestaJson(resultado, 201);
+  });
+}
+
+/**
+ * Borra un archivo editable del servidor (`?ruta=`). Admin y mantenedor; el servidor deja una
+ * copia `.bak` al lado antes de borrar, así un clic de más se recupera. La ruta se valida igual
+ * que al guardar: solo se borra lo que el explorador deja escribir.
+ */
+export async function DELETE(request) {
+  return conMantenedor(request, async (acceso) => {
+    const ruta = new URL(request.url).searchParams.get("ruta");
+    const resultado = await borrarArchivo({ ruta, rol: acceso.sesion.role });
+    await anotarAuditoria({
+      quien: acceso.sesion.email,
+      rol: acceso.sesion.role,
+      tipo: "archivo-borrado",
+      detalle: String(ruta ?? ""),
+      ok: resultado.ok,
+    });
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
+    return respuestaJson(resultado);
   });
 }
