@@ -555,7 +555,7 @@ export function SeccionArchivos() {
       setError(await leerError(r, "no se pudo listar la carpeta"));
       return;
     }
-    setDatos((await r.json()) as Contenido);
+    setDatos(normalizarContenido(await r.json()));
   }, []);
 
   useEffect(() => {
