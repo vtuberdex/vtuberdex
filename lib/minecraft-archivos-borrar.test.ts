@@ -119,14 +119,14 @@ describe("borrarArchivo", () => {
 
   it("una carpeta no se borra como si fuera un archivo", async () => {
     const r = (await borrar({
-      ruta: "plugins/VTuberDex",
+      ruta: "plugins/MMOItems/datos.yml",
       dir: base,
       rol: "admin",
     })) as Rechazo;
     expect(r.ok).toBe(false);
     expect(r.status).toBe(400);
     expect(r.cuerpo.error).toBe("no_es_archivo");
-    expect(await existe("plugins/VTuberDex/config.yml")).toBe(true);
+    expect(await existe("plugins/MMOItems/config.yml")).toBe(true);
   });
 
   it("un archivo que ya no está responde «no existe»", async () => {
