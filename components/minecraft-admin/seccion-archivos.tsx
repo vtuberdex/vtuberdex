@@ -104,19 +104,48 @@ function FilaDeCarpeta({
   );
 }
 
+/**
+ * El botón de borrar de una fila. El servidor deja una copia `.bak` al lado antes de borrar y aquí
+ * se pregunta antes, así que un clic de más se recupera.
+ */
+function BotonBorrar({
+  ruta,
+  nombre,
+  alBorrar,
+}: Readonly<{
+  ruta: string;
+  nombre: string;
+  alBorrar: (ruta: string, nombre: string) => void;
+}>) {
+  const borrar = () => alBorrar(ruta, nombre);
+  return (
+    <button
+      type="button"
+      onClick={borrar}
+      title={`Borrar ${nombre}`}
+      aria-label={`Borrar ${nombre}`}
+      className="shrink-0 rounded px-1 text-dex-muted hover:bg-red-400/20 hover:text-red-400"
+    >
+      🗑
+    </button>
+  );
+}
+
 function FilaDeArchivo({
   archivo,
   abierto,
   alAbrir,
+  alBorrar,
 }: Readonly<{
   archivo: Archivo;
   abierto: boolean;
   alAbrir: (ruta: string) => void;
+  alBorrar: (ruta: string, nombre: string) => void;
 }>) {
   const abrir = () => alAbrir(archivo.ruta);
   const tono = abierto ? "bg-dex-panel-soft text-dex-accent" : "text-dex-ink";
   return (
-    <li>
+    <li className="flex items-center gap-1">
       <button
         type="button"
         onClick={abrir}
@@ -130,6 +159,9 @@ function FilaDeArchivo({
           </span>
         ) : null}
       </button>
+      {archivo.escribible === false ? null : (
+        <BotonBorrar ruta={archivo.ruta} nombre={archivo.nombre} alBorrar={alBorrar} />
+      )}
     </li>
   );
 }
