@@ -37,9 +37,13 @@ type Contenido = {
 const MENSAJES: Record<string, string> = {
   sin_permiso_escritura:
     "El panel puede leer esta carpeta pero no guardar: al servicio web le falta permiso de escritura en ella.",
+  sin_permiso: "Borrar archivos del servidor es de admin y de mantenedor.",
   sin_espacio: "No queda espacio en disco.",
-  extension_no_permitida: "Solo se pueden subir archivos .zip.",
-  archivo_demasiado_grande: "El zip pasa de los 50 MB.",
+  extension_no_permitida:
+    "Esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel y .nbt.",
+  archivo_demasiado_grande: "El archivo pasa de los 50 MB.",
+  archivo_vacio: "El archivo llegó vacío.",
+  ya_existe: "Ya hay un archivo con ese nombre en la carpeta.",
 };
 const leerError = async (r: Response, porDefecto: string) => {
   const c = (await r.json().catch(() => null)) as {
