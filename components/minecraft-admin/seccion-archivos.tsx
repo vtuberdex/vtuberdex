@@ -43,7 +43,10 @@ const MENSAJES: Record<string, string> = {
     "Esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel y .nbt.",
   archivo_demasiado_grande: "El archivo pasa de los 50 MB.",
   archivo_vacio: "El archivo llegó vacío.",
-  ya_existe: "Ya hay un archivo con ese nombre en la carpeta.",
+  ya_existe: "Ya hay algo con ese nombre en la carpeta.",
+  nombre_invalido:
+    "Ese nombre no vale: van letras, números, espacio, punto, guion, guion bajo y / para separar carpetas.",
+  ruta_no_permitida: "Las carpetas se crean dentro de plugins/.",
 };
 const leerError = async (r: Response, porDefecto: string) => {
   const c = (await r.json().catch(() => null)) as {
