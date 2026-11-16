@@ -446,6 +446,54 @@ function FormularioSubida({
   );
 }
 
+/**
+ * Formulario para crear una carpeta dentro de la abierta. El nombre admite varios tramos
+ * (`assets/minecraft/shaders/core`) y se crean todos de una vez: montar así la ruta de un resource
+ * pack son decenas de carpetas y de una en una no acaba nunca.
+ */
+function FormularioCarpeta({
+  nombre,
+  deshabilitado,
+  alEscribir,
+  alCrear,
+}: Readonly<{
+  nombre: string;
+  deshabilitado: boolean;
+  alEscribir: (nombre: string) => void;
+  alCrear: (evento: React.SubmitEvent) => void;
+}>) {
+  const escribir = (e: React.ChangeEvent<HTMLInputElement>) =>
+    alEscribir(e.target.value);
+  return (
+    <form
+      onSubmit={alCrear}
+      className="space-y-2 rounded-xl border border-dex-line bg-dex-void/60 p-3"
+    >
+      <p className="text-xs text-dex-muted">
+        Crea una carpeta aquí dentro. Puedes pegar la ruta completa
+        («assets/minecraft/shaders/core») y se crean todas de una vez.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="text"
+          value={nombre}
+          onChange={escribir}
+          placeholder="nombre de la carpeta"
+          aria-label="Nombre de la carpeta nueva"
+          className={CLASE_CAMPO}
+        />
+        <button
+          type="submit"
+          disabled={deshabilitado || !nombre.trim()}
+          className={CLASE_BOTON.primario}
+        >
+          Crear carpeta
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function MensajesDeArchivo({
   aviso,
   error,
