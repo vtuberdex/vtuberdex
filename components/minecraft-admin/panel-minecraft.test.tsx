@@ -286,8 +286,9 @@ describe("/minecraft-admin", () => {
     expect(await screen.findByText("Vault.jar")).toBeTruthy();
     expect(screen.getByText(/Plugins instalados/)).toBeTruthy();
     expect(screen.getByText("Subir plugin")).toBeTruthy();
-    await abrirPestana("Configuración");
-    expect(screen.getByLabelText("Contenido de la configuración")).toBeTruthy();
+    // «Configuración» ya no es una pestaña propia: el editor vive dentro de «Archivos».
+    expect(screen.queryByRole("tab", { name: "Configuración" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Consola" })).toBeNull();
   });
 
   it("sin sesión solo muestra el formulario del enlace: nada del mantenedor", async () => {
