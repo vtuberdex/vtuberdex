@@ -126,7 +126,7 @@ export async function POST(request) {
     await anotarAuditoria({
       quien: acceso.sesion.email,
       rol: acceso.sesion.role,
-      tipo: "comprimido-subido",
+      tipo: esZip ? "comprimido-subido" : "archivo-subido",
       detalle: `${carpeta ?? ""}/${nombre ?? ""}`,
       ok: resultado.ok,
     });
@@ -134,5 +134,28 @@ export async function POST(request) {
       return respuestaJson(resultado.cuerpo, resultado.status);
     }
     return respuestaJson(resultado, 201);
+  });
+}
+
+/**
+ * Borra un archivo editable del servidor (`?ruta=`). Admin y mantenedor; el servidor deja una
+ * copia `.bak` al lado antes de borrar, así un clic de más se recupera. La ruta se valida igual
+ * que al guardar: solo se borra lo que el explorador deja escribir.
+ */
+export async function DELETE(request) {
+  return conMantenedor(request, async (acceso) => {
+    const ruta = new URL(request.url).searchParams.get("ruta");
+    const resultado = await borrarArchivo({ ruta, rol: acceso.sesion.role });
+    await anotarAuditoria({
+      quien: acceso.sesion.email,
+      rol: acceso.sesion.role,
+      tipo: "archivo-borrado",
+      detalle: String(ruta ?? ""),
+      ok: resultado.ok,
+    });
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
+    return respuestaJson(resultado);
   });
 }
