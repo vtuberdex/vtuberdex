@@ -88,6 +88,69 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("crear una carpeta desde el explorador", () => {
+  it("manda la carpeta abierta y el nombre, y avisa de lo creado", async () => {
+    const enviados: { url: string; metodo?: string; cuerpo: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (entrada: unknown, init?: RequestInit) => {
+        enviados.push({
+          url: String(entrada),
+          metodo: init?.method,
+          cuerpo: String(init?.body ?? ""),
+        });
+        return respuesta({ ok: true, ruta: "plugins/VTuberDex/assets" });
+      }),
+    );
+    render(<SeccionArchivos />);
+
+    fireEvent.change(
+      await screen.findByLabelText("Nombre de la carpeta nueva"),
+      { target: { value: "assets/minecraft/shaders/core" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Crear carpeta" }));
+
+    await waitFor(() =>
+      expect(enviados.some((e) => e.metodo === "PATCH")).toBe(true),
+    );
+    const patch = enviados.find((e) => e.metodo === "PATCH");
+    expect(patch?.url).toBe("/api/minecraft-admin/archivos");
+    expect(JSON.parse(patch?.cuerpo ?? "{}")).toEqual({
+      carpeta: "plugins/VTuberDex",
+      nombre: "assets/minecraft/shaders/core",
+    });
+    expect(
+      await screen.findByText(
+        "Creada la carpeta plugins/VTuberDex/assets/minecraft/shaders/core.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("si ya existe, lo cuenta en el aviso y no dice que la creó", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_entrada: unknown, init?: RequestInit) => {
+        if (init?.method === "PATCH") {
+          return respuesta({ error: "ya_existe" }, false, 409);
+        }
+        return respuesta(CARPETA);
+      }),
+    );
+    render(<SeccionArchivos />);
+
+    fireEvent.change(
+      await screen.findByLabelText("Nombre de la carpeta nueva"),
+      { target: { value: "assets" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Crear carpeta" }));
+
+    expect(
+      await screen.findByText("Ya hay algo con ese nombre en la carpeta."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Creada la carpeta/)).toBeNull();
+  });
+});
+
 describe("borrar un archivo desde el explorador", () => {
   it("pregunta antes, borra y avisa de la copia .bak", async () => {
     montarFetch();
