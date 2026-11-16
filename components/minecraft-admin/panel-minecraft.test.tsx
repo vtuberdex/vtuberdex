@@ -286,8 +286,9 @@ describe("/minecraft-admin", () => {
     expect(await screen.findByText("Vault.jar")).toBeTruthy();
     expect(screen.getByText(/Plugins instalados/)).toBeTruthy();
     expect(screen.getByText("Subir plugin")).toBeTruthy();
-    await abrirPestana("Configuración");
-    expect(screen.getByLabelText("Contenido de la configuración")).toBeTruthy();
+    // «Configuración» ya no es una pestaña propia: el editor vive dentro de «Archivos».
+    expect(screen.queryByRole("tab", { name: "Configuración" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Consola" })).toBeNull();
   });
 
   it("sin sesión solo muestra el formulario del enlace: nada del mantenedor", async () => {
@@ -312,19 +313,22 @@ describe("/minecraft-admin", () => {
     expect(screen.queryByText("Entrar con enlace mágico")).toBeNull();
   });
 
-  it("no hay consola libre: ningún campo acepta un comando", async () => {
+  it("la única entrada libre es la consola: las acciones mandan su nombre", async () => {
     montarFetch();
     render(<MinecraftAdminPage />);
     await screen.findByRole("button", { name: "Quién juega" });
+    // Desde la unificación la consola vive en «Servidor»: hay UN campo de texto y el servidor
+    // decide qué comando acepta (lista blanca para el mantenedor).
+    expect(screen.getByLabelText("Comando")).toBeTruthy();
     expect(screen.queryByLabelText("Comando RCON")).toBeNull();
-    expect(screen.queryByText(/consola rcon/i)).toBeNull();
   });
 
   it("un mantenedor que no es admin sube jars y edita la configuración, pero no veta", async () => {
     montarFetch({ plugins: ["Vault.jar"], rol: "mantenedor" });
     render(<MinecraftAdminPage />);
     await screen.findByRole("button", { name: "Quién juega" });
-    expect(screen.getByRole("tab", { name: "Configuración" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Archivos" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Experiencia" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Vetar" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Quitar veto" })).toBeNull();
     expect(screen.getByRole("button", { name: "Expulsar" })).toBeTruthy();
@@ -434,7 +438,7 @@ describe("/minecraft-admin", () => {
   it("abre la configuración del servidor y la guarda", async () => {
     montarFetch();
     render(<MinecraftAdminPage />);
-    await abrirPestana("Configuración");
+    await abrirPestana("Archivos");
     fireEvent.click(screen.getByRole("radio", { name: /server\.properties/ }));
     fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
     const area = screen.getByLabelText(
@@ -457,7 +461,7 @@ describe("/minecraft-admin", () => {
   it("abre la configuración de un plugin por su nombre de archivo", async () => {
     montarFetch();
     render(<MinecraftAdminPage />);
-    await abrirPestana("Configuración");
+    await abrirPestana("Archivos");
     fireEvent.click(screen.getByRole("radio", { name: /Plugin/ }));
     fireEvent.change(screen.getByLabelText("Archivo del plugin"), {
       target: { value: "config.yml" },
@@ -561,7 +565,7 @@ describe("/minecraft-admin", () => {
       }),
     );
     render(<MinecraftAdminPage />);
-    await abrirPestana("Configuración");
+    await abrirPestana("Archivos");
     fireEvent.click(screen.getByRole("radio", { name: /server\.properties/ }));
     fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
     expect(await screen.findByText("no_existe")).toBeTruthy();
@@ -583,7 +587,7 @@ describe("/minecraft-admin", () => {
       }),
     );
     render(<MinecraftAdminPage />);
-    await abrirPestana("Configuración");
+    await abrirPestana("Archivos");
     fireEvent.click(screen.getByRole("radio", { name: /server\.properties/ }));
     fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
     const area = screen.getByLabelText(

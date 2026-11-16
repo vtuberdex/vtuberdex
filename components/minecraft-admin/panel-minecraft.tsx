@@ -58,21 +58,18 @@ type Estado = {
 };
 
 type Sesion = "comprobando" | "dentro" | "fuera";
-type Pestana =
-  | "servidor"
-  | "plugins"
-  | "configuracion"
-  | "archivos"
-  | "consola"
-  | "experiencia";
+type Pestana = "servidor" | "plugins" | "archivos" | "experiencia";
 type Destino = "servidor" | "plugin";
 
+/**
+ * Cuatro pestañas y no seis: la consola se unió a «Servidor» (registro, comandos y moderación en
+ * el mismo sitio) y el editor de `server.properties` se unió a «Archivos», que ya edita lo mismo
+ * con el explorador. Antes había dos formas de tocar un `.yml` y ninguna decía cuál usar.
+ */
 const PESTANAS: { id: Pestana; titulo: string }[] = [
   { id: "servidor", titulo: "Servidor" },
   { id: "plugins", titulo: "Plugins" },
-  { id: "configuracion", titulo: "Configuración" },
   { id: "archivos", titulo: "Archivos" },
-  { id: "consola", titulo: "Consola" },
   { id: "experiencia", titulo: "Experiencia" },
 ];
 
@@ -803,23 +800,26 @@ export function PanelMinecraftAdmin() {
   // monta nada, solo se pinta el de la pestaña elegida.
   const vistas: Record<Pestana, React.ReactNode> = {
     servidor: (
-      <PestanaServidor
-        panorama={panorama}
-        historial={historial}
-        hace={hace}
-        ocupado={ocupado}
-        esAdmin={esAdmin}
-        jugador={jugador}
-        motivo={motivo}
-        anuncio={anuncio}
-        consola={consola}
-        alCambiarJugador={setJugador}
-        alCambiarMotivo={setMotivo}
-        alCambiarAnuncio={setAnuncio}
-        alAnunciar={anunciar}
-        alModerar={sobreJugador}
-        ejecutar={ejecutarSinEsperar}
-      />
+      <>
+        <PestanaServidor
+          panorama={panorama}
+          historial={historial}
+          hace={hace}
+          ocupado={ocupado}
+          esAdmin={esAdmin}
+          jugador={jugador}
+          motivo={motivo}
+          anuncio={anuncio}
+          consola={consola}
+          alCambiarJugador={setJugador}
+          alCambiarMotivo={setMotivo}
+          alCambiarAnuncio={setAnuncio}
+          alAnunciar={anunciar}
+          alModerar={sobreJugador}
+          ejecutar={ejecutarSinEsperar}
+        />
+        <SeccionConsola esAdmin={esAdmin} />
+      </>
     ),
     plugins: (
       <SeccionPlugins respaldo={estado.plugins ?? []}>
@@ -830,22 +830,23 @@ export function PanelMinecraftAdmin() {
         />
       </SeccionPlugins>
     ),
-    archivos: <SeccionArchivos />,
-    consola: <SeccionConsola esAdmin={esAdmin} />,
-    experiencia: esAdmin ? <SeccionExperiencia /> : null,
-    configuracion: (
-      <PestanaConfiguracion
-        destino={destino}
-        nombreConfig={nombreConfig}
-        texto={texto}
-        ocupado={ocupado}
-        alCambiarDestino={setDestino}
-        alCambiarNombre={setNombreConfig}
-        alCambiarTexto={setTexto}
-        alAbrir={abrirConfiguracionSinEsperar}
-        alGuardar={guardarConfiguracion}
-      />
+    archivos: (
+      <>
+        <SeccionArchivos />
+        <PestanaConfiguracion
+          destino={destino}
+          nombreConfig={nombreConfig}
+          texto={texto}
+          ocupado={ocupado}
+          alCambiarDestino={setDestino}
+          alCambiarNombre={setNombreConfig}
+          alCambiarTexto={setTexto}
+          alAbrir={abrirConfiguracionSinEsperar}
+          alGuardar={guardarConfiguracion}
+        />
+      </>
     ),
+    experiencia: esAdmin ? <SeccionExperiencia /> : null,
   };
 
   if (sesion === "comprobando") {

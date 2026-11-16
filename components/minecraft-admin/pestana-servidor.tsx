@@ -112,7 +112,8 @@ const MODERACION = [
 
 /**
  * Acciones de un clic. El navegador manda el NOMBRE de la acción, nunca un comando: el servidor
- * arma el comando (`lib/minecraft-rcon.mjs`). La consola con comandos va aparte (pestaña «Consola»), con lista blanca para mantenedores.
+ * arma el comando (`lib/minecraft-rcon.mjs`). La consola con comandos se pinta debajo, en la misma
+ * pestaña (`seccion-consola.tsx`), con lista blanca para mantenedores.
  */
 const ACCIONES_RAPIDAS: { titulo: string; accion: string; ayuda: string }[] = [
   { titulo: "Quién juega", accion: "jugadores", ayuda: "Jugadores conectados" },
