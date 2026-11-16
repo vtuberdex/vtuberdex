@@ -319,28 +319,40 @@ async function subirConfirmando(
   return reemplaza ? enviarArchivo(archivo, carpeta, true) : null;
 }
 
-/** Formulario para subir un `.zip` a la carpeta abierta (solo dentro de `plugins/`). */
-function FormularioZip({
-  zip,
+/** Formulario para subir un archivo (comprimido, modelo o texto) a la carpeta abierta. */
+function FormularioSubida({
+  archivo,
   deshabilitado,
   alElegir,
   alSubir,
 }: Readonly<{
-  zip: File | null;
+  archivo: File | null;
   deshabilitado: boolean;
-  alElegir: (zip: File | null) => void;
+  alElegir: (archivo: File | null) => void;
   alSubir: (evento: React.SubmitEvent) => void;
 }>) {
   const elegir = (e: React.ChangeEvent<HTMLInputElement>) =>
     alElegir(e.target.files?.[0] ?? null);
+  // Arrastrar y soltar: se queda con el primer archivo, igual que el selector.
+  const soltar = (e: React.DragEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const soltado = e.dataTransfer?.files?.[0] ?? null;
+    if (soltado) {
+      alElegir(soltado);
+    }
+  };
   return (
     <form
       onSubmit={alSubir}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={soltar}
       className="space-y-2 rounded-xl border border-dex-line bg-dex-void/60 p-3"
     >
       <p className="text-xs text-dex-muted">
-        Subir un <strong>.zip</strong> a esta carpeta (máximo 50 MB, igual que
-        un jar). Solo se aceptan comprimidos y no se descomprimen solos: si
+        Sube un archivo a esta carpeta (máximo 50 MB, igual que un jar):
+        comprimidos <strong>.zip</strong> y archivos sueltos de configuración o
+        modelo (.yml, .json, .txt, .properties, .toml, .csv, .bbmodel, .nbt).
+        También vale arrastrarlo aquí. Los zips no se descomprimen solos y, si
         ya hay uno con ese nombre, se pregunta antes de reemplazarlo.
       </p>
       <div className="flex flex-wrap items-center gap-2">
