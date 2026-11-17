@@ -334,7 +334,7 @@ const esSoloLectura = (carpetaSoloLectura: boolean, abierto?: Archivo) =>
 /** Lo que impide subir el archivo elegido (antes de gastar la subida), o null si se puede intentar. */
 function problemaDelArchivo(archivo: File): string | null {
   if (!EXTENSIONES_SUBIBLES.test(archivo.name)) {
-    return "esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel y .nbt";
+    return "esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel, .nbt, .mcmeta, .fsh, .vsh, .glsl, .frag, .vert, .geom y .png";
   }
   if (archivo.size === 0) {
     return "el archivo llegó vacío";
