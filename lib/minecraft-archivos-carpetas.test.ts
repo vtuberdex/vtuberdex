@@ -52,6 +52,8 @@ beforeAll(async () => {
   await w("config/otro.yml", "o: 1\n");
   await w("plugins/MythicMobs/config.yml", "x: 1\n");
   await w("plugins/MythicMobs/Skills/a.yml", "s: 1\n");
+  await w("plugins/MythicMobs/Models/mob.bbmodel", "{}\n");
+  await w("plugins/MythicMobs/Models/piel.png", "png");
   await w("plugins/VTuberDex/config.yml", "token: secreto\n");
   await w("plugins/VTuberDex/extra.yml", "token: secreto\n");
   await w("plugins/dynmap/config.yml", "d: 1\n");
