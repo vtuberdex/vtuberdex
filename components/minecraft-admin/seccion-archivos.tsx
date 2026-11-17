@@ -282,9 +282,9 @@ const LIMITE_SUBIDA_BYTES = 50 * 1024 * 1024;
 
 const ERROR_SUBIR = "no se pudo subir el archivo";
 
-/** Lo que el servidor acepta subir: comprimidos y archivos sueltos (configuración y modelos). */
+/** Lo que el servidor acepta subir: comprimidos y archivos sueltos (configuración, modelos, pack). */
 const EXTENSIONES_SUBIBLES =
-  /\.(zip|ya?ml|json|txt|properties|toml|csv|bbmodel|nbt)$/i;
+  /\.(zip|ya?ml|json|txt|properties|toml|csv|bbmodel|nbt|mcmeta|fsh|vsh|glsl|frag|vert|geom|png)$/i;
 
 /** Lo que se pinta mientras la primera carpeta no ha llegado: nada que filtrar, nada abierto. */
 const CONTENIDO_VACIO: Contenido = {
