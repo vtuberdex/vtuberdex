@@ -19,7 +19,13 @@ type Listado = {
   ruta: string;
   migas: { nombre: string; ruta: string }[];
   carpetas: { nombre: string; ruta: string }[];
-  archivos: { nombre: string; ruta: string; escribible: boolean; legible: boolean }[];
+  archivos: {
+    nombre: string;
+    ruta: string;
+    escribible: boolean;
+    editable?: boolean;
+    legible: boolean;
+  }[];
   escribible: boolean;
   legible: boolean;
 };
