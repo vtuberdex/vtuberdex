@@ -107,8 +107,25 @@ describe("explorador por carpetas", () => {
       rol: "mantenedor",
     });
     expect(rutas(r.archivos)).toEqual(["plugins/MythicMobs/config.yml"]);
-    expect(rutas(r.carpetas)).toEqual(["plugins/MythicMobs/Skills"]);
+    expect(rutas(r.carpetas)).toEqual([
+      "plugins/MythicMobs/Models",
+      "plugins/MythicMobs/Skills",
+    ]);
     expect(r.archivos[0].escribible).toBe(true);
+    expect(r.archivos[0].editable).toBe(true);
+  });
+
+  it("una carpeta de texturas y modelos no sale vacía: se ven, marcados como no editables", async () => {
+    const r = await listar({
+      dir: base,
+      ruta: "plugins/MythicMobs/Models",
+      rol: "mantenedor",
+    });
+    expect(rutas(r.archivos)).toEqual([
+      "plugins/MythicMobs/Models/mob.bbmodel",
+      "plugins/MythicMobs/Models/piel.png",
+    ]);
+    expect(r.archivos.every((a) => a.editable === false)).toBe(true);
   });
 
   it("config/ solo muestra los yml de Paper de la lista cerrada", async () => {
