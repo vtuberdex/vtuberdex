@@ -20,6 +20,8 @@ type Archivo = {
   bytes: number;
   modificado: string;
   escribible?: boolean;
+  /** Falso en lo que se ve pero no se abre desde el panel (texturas, shaders, modelos, jars). */
+  editable?: boolean;
 };
 type Carpeta = { nombre: string; ruta: string };
 type Migaja = { nombre: string; ruta: string };
