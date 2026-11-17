@@ -6,6 +6,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  crearCarpeta,
   falloDeEscritura,
   guardarArchivo,
   listarCarpeta,
@@ -138,6 +139,81 @@ describe("barras al principio y al final de la carpeta", () => {
     });
     // Una barra doble en medio deja un segmento vacío: sigue siendo inválida.
     expect(validarCarpetaRelativa("plugins//x", "admin").ok).toBe(false);
+  });
+});
+
+/** Igual que los anteriores, para `crearCarpeta`. */
+const crear = (opciones: Record<string, unknown>) =>
+  crearCarpeta(opciones as never) as unknown as Promise<{
+    ok: boolean;
+    status?: number;
+    ruta?: string;
+    cuerpo?: { error: string; detail?: string };
+  }>;
+
+describe("crear carpetas", () => {
+  it("crea varios tramos de una vez y después se puede navegar dentro", async () => {
+    // 9 segmentos a propósito: con el tope viejo de 8 el explorador ni abría la carpeta.
+    const nueva =
+      "resourcepack/armor3d_shader_overlay_1_21_6/assets/minecraft/shaders/core";
+    const r = await crear({
+      dir: base,
+      carpeta: "plugins/Solo",
+      nombre: nueva,
+      rol: "mantenedor",
+    });
+    expect(r.ok).toBe(true);
+    expect(r.ruta).toBe(`plugins/Solo/${nueva}`);
+    const dentro = await listar({
+      dir: base,
+      ruta: `plugins/Solo/${nueva}`,
+      rol: "mantenedor",
+    });
+    expect(dentro.legible).toBe(true);
+    expect(dentro.carpetas).toEqual([]);
+  });
+
+  it("no crea nada fuera de plugins/ ni acepta nombres con trampas", async () => {
+    const fuera = await crear({
+      dir: base,
+      carpeta: "config",
+      nombre: "otra",
+      rol: "mantenedor",
+    });
+    expect(fuera.ok).toBe(false);
+    expect(fuera.status).toBe(403);
+    for (const nombre of ["", "   ", "../fuera", "a//b", "a/../../fuera"]) {
+      const r = await crear({
+        dir: base,
+        carpeta: "plugins/Solo",
+        nombre,
+        rol: "mantenedor",
+      });
+      expect(r.ok).toBe(false);
+    }
+  });
+
+  it("si la carpeta ya está, no pisa nada", async () => {
+    const r = await crear({
+      dir: base,
+      carpeta: "plugins/MythicMobs",
+      nombre: "Skills",
+      rol: "mantenedor",
+    });
+    expect(r.ok).toBe(false);
+    expect(r.status).toBe(409);
+    expect(r.cuerpo?.error).toBe("ya_existe");
+  });
+
+  it("el mantenedor no crea dentro de la carpeta del plugin con el token", async () => {
+    const r = await crear({
+      dir: base,
+      carpeta: "plugins/VTuberDex",
+      nombre: "recursos",
+      rol: "mantenedor",
+    });
+    expect(r.ok).toBe(false);
+    expect(r.status).toBe(403);
   });
 });
 

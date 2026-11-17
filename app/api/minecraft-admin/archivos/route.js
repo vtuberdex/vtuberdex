@@ -16,6 +16,7 @@ import {
 } from "../../../../lib/minecraft-admin.mjs";
 import {
   borrarArchivo,
+  crearCarpeta,
   guardarArchivo,
   guardarArchivoSuelto,
   guardarComprimido,
@@ -128,6 +129,36 @@ export async function POST(request) {
       rol: acceso.sesion.role,
       tipo: esZip ? "comprimido-subido" : "archivo-subido",
       detalle: `${carpeta ?? ""}/${nombre ?? ""}`,
+      ok: resultado.ok,
+    });
+    if (!resultado.ok) {
+      return respuestaJson(resultado.cuerpo, resultado.status);
+    }
+    return respuestaJson(resultado, 201);
+  });
+}
+
+/**
+ * Crea una CARPETA dentro de `plugins/` (`{ carpeta, nombre }`, en el cuerpo). El nombre puede
+ * traer varios tramos y se crean todos de una vez: es como se monta la ruta de un resource pack.
+ * Solo admin y mantenedor, igual que borrar; si ya existe contesta `ya_existe` sin tocar nada.
+ */
+export async function PATCH(request) {
+  return conMantenedor(request, async (acceso) => {
+    const cuerpo = await request.json().catch(() => null);
+    if (!cuerpo || typeof cuerpo !== "object") {
+      return respuestaJson({ error: "cuerpo_invalido" }, 400);
+    }
+    const resultado = await crearCarpeta({
+      carpeta: cuerpo.carpeta,
+      nombre: cuerpo.nombre,
+      rol: acceso.sesion.role,
+    });
+    await anotarAuditoria({
+      quien: acceso.sesion.email,
+      rol: acceso.sesion.role,
+      tipo: "carpeta-creada",
+      detalle: `${cuerpo.carpeta ?? ""}/${cuerpo.nombre ?? ""}`,
       ok: resultado.ok,
     });
     if (!resultado.ok) {

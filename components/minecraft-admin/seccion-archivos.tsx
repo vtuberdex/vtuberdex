@@ -43,7 +43,10 @@ const MENSAJES: Record<string, string> = {
     "Esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel y .nbt.",
   archivo_demasiado_grande: "El archivo pasa de los 50 MB.",
   archivo_vacio: "El archivo llegó vacío.",
-  ya_existe: "Ya hay un archivo con ese nombre en la carpeta.",
+  ya_existe: "Ya hay algo con ese nombre en la carpeta.",
+  nombre_invalido:
+    "Ese nombre no vale: van letras, números, espacio, punto, guion, guion bajo y / para separar carpetas.",
+  ruta_no_permitida: "Las carpetas se crean dentro de plugins/.",
 };
 const leerError = async (r: Response, porDefecto: string) => {
   const c = (await r.json().catch(() => null)) as {
@@ -443,6 +446,54 @@ function FormularioSubida({
   );
 }
 
+/**
+ * Formulario para crear una carpeta dentro de la abierta. El nombre admite varios tramos
+ * (`assets/minecraft/shaders/core`) y se crean todos de una vez: montar así la ruta de un resource
+ * pack son decenas de carpetas y de una en una no acaba nunca.
+ */
+function FormularioCarpeta({
+  nombre,
+  deshabilitado,
+  alEscribir,
+  alCrear,
+}: Readonly<{
+  nombre: string;
+  deshabilitado: boolean;
+  alEscribir: (nombre: string) => void;
+  alCrear: (evento: React.SubmitEvent) => void;
+}>) {
+  const escribir = (e: React.ChangeEvent<HTMLInputElement>) =>
+    alEscribir(e.target.value);
+  return (
+    <form
+      onSubmit={alCrear}
+      className="space-y-2 rounded-xl border border-dex-line bg-dex-void/60 p-3"
+    >
+      <p className="text-xs text-dex-muted">
+        Crea una carpeta aquí dentro. Puedes pegar la ruta completa
+        («assets/minecraft/shaders/core») y se crean todas de una vez.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="text"
+          value={nombre}
+          onChange={escribir}
+          placeholder="nombre de la carpeta"
+          aria-label="Nombre de la carpeta nueva"
+          className={CLASE_CAMPO}
+        />
+        <button
+          type="submit"
+          disabled={deshabilitado || !nombre.trim()}
+          className={CLASE_BOTON.primario}
+        >
+          Crear carpeta
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function MensajesDeArchivo({
   aviso,
   error,
@@ -542,6 +593,7 @@ export function SeccionArchivos() {
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [archivo, setArchivo] = useState<File | null>(null);
+  const [carpetaNueva, setCarpetaNueva] = useState("");
 
   const cargar = useCallback(async (destino: string) => {
     setError(null);
@@ -694,6 +746,43 @@ export function SeccionArchivos() {
   );
 
   /**
+   * Crea una carpeta en la carpeta abierta (admin y mantenedor). El nombre puede traer varios
+   * tramos; si el servidor contesta `ya_existe`, no se toca nada y se cuenta en el aviso.
+   */
+  const crearLaCarpeta = useCallback(
+    async (evento: React.SubmitEvent) => {
+      evento.preventDefault();
+      const nombre = carpetaNueva.trim();
+      if (!nombre) {
+        setError("escribe el nombre de la carpeta");
+        return;
+      }
+      setError(null);
+      setAviso(null);
+      setOcupado(true);
+      try {
+        const r = await fetch("/api/minecraft-admin/archivos", {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ carpeta: contenido.ruta, nombre }),
+        });
+        if (!r.ok) {
+          throw new Error(await leerError(r, "no se pudo crear la carpeta"));
+        }
+        setCarpetaNueva("");
+        const donde = contenido.ruta ? `${contenido.ruta}/${nombre}` : nombre;
+        setAviso(`Creada la carpeta ${donde}.`);
+        await cargar(contenido.ruta);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "no se pudo crear la carpeta");
+      } finally {
+        setOcupado(false);
+      }
+    },
+    [carpetaNueva, contenido.ruta, cargar],
+  );
+
+  /**
    * Borra un archivo de la carpeta abierta (admin y mantenedor). Pregunta antes y, si era el que
    * estaba abierto, cierra el editor: el servidor deja una copia `.bak` al lado antes de borrar.
    */
@@ -786,12 +875,20 @@ export function SeccionArchivos() {
 
         <div className="space-y-3">
           {estaEnPlugins(contenido.ruta) ? (
-            <FormularioSubida
-              archivo={archivo}
-              deshabilitado={ocupado || carpetaSoloLectura}
-              alElegir={setArchivo}
-              alSubir={subirArchivo}
-            />
+            <>
+              <FormularioCarpeta
+                nombre={carpetaNueva}
+                deshabilitado={ocupado || carpetaSoloLectura}
+                alEscribir={setCarpetaNueva}
+                alCrear={crearLaCarpeta}
+              />
+              <FormularioSubida
+                archivo={archivo}
+                deshabilitado={ocupado || carpetaSoloLectura}
+                alElegir={setArchivo}
+                alSubir={subirArchivo}
+              />
+            </>
           ) : null}
           <EditorDeArchivo
             ruta={ruta}
