@@ -416,15 +416,16 @@ function FormularioSubida({
     >
       <p className="text-xs text-dex-muted">
         Sube un archivo a esta carpeta (máximo 50 MB, igual que un jar):
-        comprimidos <strong>.zip</strong> y archivos sueltos de configuración o
-        modelo (.yml, .json, .txt, .properties, .toml, .csv, .bbmodel, .nbt).
+        comprimidos <strong>.zip</strong> y archivos sueltos de configuración,
+        modelo o resource pack (.yml, .json, .txt, .properties, .toml, .csv,
+        .bbmodel, .nbt, .mcmeta, shaders .fsh/.vsh/.glsl y texturas .png).
         También vale arrastrarlo aquí. Los zips no se descomprimen solos y, si
         ya hay uno con ese nombre, se pregunta antes de reemplazarlo.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="file"
-          accept=".zip,.yml,.yaml,.json,.txt,.properties,.toml,.csv,.bbmodel,.nbt"
+          accept=".zip,.yml,.yaml,.json,.txt,.properties,.toml,.csv,.bbmodel,.nbt,.mcmeta,.fsh,.vsh,.glsl,.frag,.vert,.geom,.png"
           aria-label="Archivo para subir"
           onChange={elegir}
           className="text-xs text-dex-ink"
