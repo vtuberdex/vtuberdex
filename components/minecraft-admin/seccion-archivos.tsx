@@ -40,7 +40,7 @@ const MENSAJES: Record<string, string> = {
   sin_permiso: "Borrar archivos del servidor es de admin y de mantenedor.",
   sin_espacio: "No queda espacio en disco.",
   extension_no_permitida:
-    "Esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel y .nbt.",
+    "Esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel, .nbt, .mcmeta, shaders (.fsh, .vsh, .glsl, .frag, .vert, .geom) y texturas .png.",
   archivo_demasiado_grande: "El archivo pasa de los 50 MB.",
   archivo_vacio: "El archivo llegó vacío.",
   ya_existe: "Ya hay algo con ese nombre en la carpeta.",
