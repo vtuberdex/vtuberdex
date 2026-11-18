@@ -42,7 +42,7 @@ const MENSAJES: Record<string, string> = {
   sin_permiso: "Borrar archivos del servidor es de admin y de mantenedor.",
   sin_espacio: "No queda espacio en disco.",
   extension_no_permitida:
-    "Esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel y .nbt.",
+    "Esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel, .nbt, .mcmeta, shaders (.fsh, .vsh, .glsl, .frag, .vert, .geom) y texturas .png.",
   archivo_demasiado_grande: "El archivo pasa de los 50 MB.",
   archivo_vacio: "El archivo llegó vacío.",
   ya_existe: "Ya hay algo con ese nombre en la carpeta.",
@@ -300,9 +300,9 @@ const LIMITE_SUBIDA_BYTES = 50 * 1024 * 1024;
 
 const ERROR_SUBIR = "no se pudo subir el archivo";
 
-/** Lo que el servidor acepta subir: comprimidos y archivos sueltos (configuración y modelos). */
+/** Lo que el servidor acepta subir: comprimidos y archivos sueltos (configuración, modelos, pack). */
 const EXTENSIONES_SUBIBLES =
-  /\.(zip|ya?ml|json|txt|properties|toml|csv|bbmodel|nbt)$/i;
+  /\.(zip|ya?ml|json|txt|properties|toml|csv|bbmodel|nbt|mcmeta|fsh|vsh|glsl|frag|vert|geom|png)$/i;
 
 /** Lo que se pinta mientras la primera carpeta no ha llegado: nada que filtrar, nada abierto. */
 const CONTENIDO_VACIO: Contenido = {
@@ -352,7 +352,7 @@ const esSoloLectura = (carpetaSoloLectura: boolean, abierto?: Archivo) =>
 /** Lo que impide subir el archivo elegido (antes de gastar la subida), o null si se puede intentar. */
 function problemaDelArchivo(archivo: File): string | null {
   if (!EXTENSIONES_SUBIBLES.test(archivo.name)) {
-    return "esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel y .nbt";
+    return "esa extensión no se sube: van .zip, .yml, .json, .txt, .properties, .toml, .csv, .bbmodel, .nbt, .mcmeta, .fsh, .vsh, .glsl, .frag, .vert, .geom y .png";
   }
   if (archivo.size === 0) {
     return "el archivo llegó vacío";
@@ -434,15 +434,16 @@ function FormularioSubida({
     >
       <p className="text-xs text-dex-muted">
         Sube un archivo a esta carpeta (máximo 50 MB, igual que un jar):
-        comprimidos <strong>.zip</strong> y archivos sueltos de configuración o
-        modelo (.yml, .json, .txt, .properties, .toml, .csv, .bbmodel, .nbt).
+        comprimidos <strong>.zip</strong> y archivos sueltos de configuración,
+        modelo o resource pack (.yml, .json, .txt, .properties, .toml, .csv,
+        .bbmodel, .nbt, .mcmeta, shaders .fsh/.vsh/.glsl y texturas .png).
         También vale arrastrarlo aquí. Los zips no se descomprimen solos y, si
         ya hay uno con ese nombre, se pregunta antes de reemplazarlo.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="file"
-          accept=".zip,.yml,.yaml,.json,.txt,.properties,.toml,.csv,.bbmodel,.nbt"
+          accept=".zip,.yml,.yaml,.json,.txt,.properties,.toml,.csv,.bbmodel,.nbt,.mcmeta,.fsh,.vsh,.glsl,.frag,.vert,.geom,.png"
           aria-label="Archivo para subir"
           onChange={elegir}
           className="text-xs text-dex-ink"
