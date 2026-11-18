@@ -19,7 +19,13 @@ type Listado = {
   ruta: string;
   migas: { nombre: string; ruta: string }[];
   carpetas: { nombre: string; ruta: string }[];
-  archivos: { nombre: string; ruta: string; escribible: boolean; legible: boolean }[];
+  archivos: {
+    nombre: string;
+    ruta: string;
+    escribible: boolean;
+    editable?: boolean;
+    legible: boolean;
+  }[];
   escribible: boolean;
   legible: boolean;
 };
@@ -52,6 +58,8 @@ beforeAll(async () => {
   await w("config/otro.yml", "o: 1\n");
   await w("plugins/MythicMobs/config.yml", "x: 1\n");
   await w("plugins/MythicMobs/Skills/a.yml", "s: 1\n");
+  await w("plugins/MythicMobs/Models/mob.bbmodel", "{}\n");
+  await w("plugins/MythicMobs/Models/piel.png", "png");
   await w("plugins/VTuberDex/config.yml", "token: secreto\n");
   await w("plugins/VTuberDex/extra.yml", "token: secreto\n");
   await w("plugins/dynmap/config.yml", "d: 1\n");
@@ -99,8 +107,25 @@ describe("explorador por carpetas", () => {
       rol: "mantenedor",
     });
     expect(rutas(r.archivos)).toEqual(["plugins/MythicMobs/config.yml"]);
-    expect(rutas(r.carpetas)).toEqual(["plugins/MythicMobs/Skills"]);
+    expect(rutas(r.carpetas)).toEqual([
+      "plugins/MythicMobs/Models",
+      "plugins/MythicMobs/Skills",
+    ]);
     expect(r.archivos[0].escribible).toBe(true);
+    expect(r.archivos[0].editable).toBe(true);
+  });
+
+  it("una carpeta de texturas y modelos no sale vacía: se ven, marcados como no editables", async () => {
+    const r = await listar({
+      dir: base,
+      ruta: "plugins/MythicMobs/Models",
+      rol: "mantenedor",
+    });
+    expect(rutas(r.archivos)).toEqual([
+      "plugins/MythicMobs/Models/mob.bbmodel",
+      "plugins/MythicMobs/Models/piel.png",
+    ]);
+    expect(r.archivos.every((a) => a.editable === false)).toBe(true);
   });
 
   it("config/ solo muestra los yml de Paper de la lista cerrada", async () => {

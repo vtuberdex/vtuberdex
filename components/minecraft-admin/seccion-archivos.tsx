@@ -20,6 +20,8 @@ type Archivo = {
   bytes: number;
   modificado: string;
   escribible?: boolean;
+  /** Falso en lo que se ve pero no se abre desde el panel (texturas, shaders, modelos, jars). */
+  editable?: boolean;
 };
 type Carpeta = { nombre: string; ruta: string };
 type Migaja = { nombre: string; ruta: string };
@@ -145,6 +147,22 @@ function FilaDeArchivo({
   alAbrir: (ruta: string) => void;
   alBorrar: (ruta: string, nombre: string) => void;
 }>) {
+  // Lo que no es texto se ve, para saber que está, pero no se abre ni se edita aquí.
+  if (archivo.editable === false) {
+    return (
+      <li className="flex items-center gap-1">
+        <span
+          className={`flex w-full items-center gap-1.5 rounded-lg px-2 py-1 ${MONO} text-dex-muted`}
+          title={`${archivo.ruta} · ${tamano(archivo.bytes)} · se ve, no se edita desde el panel`}
+        >
+          <span aria-hidden>📄</span>
+          <span className="truncate">{archivo.nombre}</span>
+          <span className="ml-auto shrink-0 text-[10px]">{tamano(archivo.bytes)}</span>
+          <span className="shrink-0 text-[10px] uppercase">se ve</span>
+        </span>
+      </li>
+    );
+  }
   const abrir = () => alAbrir(archivo.ruta);
   const tono = abierto ? "bg-dex-panel-soft text-dex-accent" : "text-dex-ink";
   return (

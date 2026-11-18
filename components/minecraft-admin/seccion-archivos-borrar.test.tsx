@@ -231,4 +231,32 @@ describe("borrar un archivo desde el explorador", () => {
 
     expect(await screen.findByText("Carpeta vacía.")).toBeTruthy();
   });
+
+  it("lo que no se edita se ve en la lista y no se ofrece para abrir", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        respuesta({
+          ...CARPETA,
+          archivos: [
+            {
+              ruta: "plugins/VTuberDex/resourcepack/piel.png",
+              nombre: "piel.png",
+              bytes: 2048,
+              modificado: "2026-11-16T09:00:00.000Z",
+              escribible: true,
+              editable: false,
+            },
+          ],
+          comprimidos: [],
+        }),
+      ),
+    );
+    render(<SeccionArchivos />);
+
+    expect(await screen.findByText("piel.png")).toBeTruthy();
+    // No hay botón con ese nombre: se ve, pero no se abre ni se borra desde aquí.
+    expect(screen.queryByRole("button", { name: /piel\.png/ })).toBeNull();
+    expect(screen.queryByLabelText("Borrar piel.png")).toBeNull();
+  });
 });
