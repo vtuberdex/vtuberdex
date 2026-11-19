@@ -1334,6 +1334,15 @@ SPA), y el "leak" de la base hay que comprobarlo por contenido, no por status.
 
 ## Imágenes: qué se publica y qué no
 
+**Peso, no solo carpetas (2026-11-19)**: el libro bajaba 9,9 MB por página (5,8 de emblemas y logos). Límites al
+subir (`lib/imagen-cliente.ts`): emblema `EMBLEMA_MAX_LADO` 256 (se dibuja a 88 px de 1008), logo `LOGO_MAX_LADO` 1008
+(llegaron logos de 10.799 px) y WebP `CALIDAD_WEBP` 0,84 (era 0,92; no se distingue ampliado al doble). Lo ya guardado se
+redujo con `scripts/reducir-imagenes.mjs` (emblemas a PNG con paleta, logos topados, personaje/fondo del mantenedor solo
+recodificados: la resolución no se toca). Originales y base previa en `~/backups/vtuberdex-antes-reducir-imagenes-20261119/`.
+Ojo: `publish:images` compara TAMAÑOS con `data/images/`, así que volvería a subir los emblemas y logos del catálogo en grande:
+corre `reducir-imagenes` otra vez después. Las imágenes de las páginas vecinas del libro esperan a las de la página visible
+y no se precargan con ahorro de datos o 2G (`use-vtuber-search.ts`).
+
 Publican **cuatro carpetas**: las tres primeras las produce el scraper y viajan
 siempre; `background` es nueva y viaja **vacía** por defecto. La decisión es por
 uso real verificado en el front, no por lo que exista en disco:
@@ -1429,8 +1438,14 @@ se retiró: ya no hay nada con ese nombre en nginx, systemd ni `/var/www`.)
   el código compilado. Y `www-data` no atraviesa `/home/madkoding`: el desafío ACME daba 404 (el primer intento de
   certificado falló por eso). Comprobado: `app/` y la base responden 404 por HTTP y HTTPS.
 - **nginx**: `/etc/nginx/conf.d/00-a-vtuberdex.com.conf` (HTTP; `server_name` exacto gana al regex del multidominio) +
-  `snippets/vtuberdex-{locations,proxy}.conf`. Cachea `/images/` (clave con `?v=`) y `/_next/static/`. **No** servir el
-  release con `alias`/`root` salvo `/.well-known/acme-challenge/`. `www` comparte carpeta (mapa `$dominio_web`).
+  `snippets/vtuberdex-{locations,proxy}.conf`. Cachea `/images/` (clave con `?v=`). **No** servir el
+  release con `alias`/`root` salvo `/.well-known/acme-challenge/` y `publico/_next/static` (ver abajo). `www` comparte carpeta (mapa `$dominio_web`).
+- **Compresión (2026-11-19)**: Brotli (`libnginx-mod-http-brotli-{filter,static}`) + gzip, los dos a nivel 5 al vuelo. Node
+  responde SIN comprimir (`Accept-Encoding ""` hacia el upstream): si Next comprime, nginx no recomprime y Brotli no llega. Los
+  chunks de `/_next/static` se precomprimen en el release (`scripts/precomprimir.mjs`: Brotli 11 + gzip 9, medido 2,66 MB ->
+  662 KB br / 778 KB gz) en `publico/_next/static`, la ÚNICA carpeta del release que nginx lee del disco (`root` +
+  `brotli_static`/`gzip_static`, y `try_files` vuelve a Node si falta el archivo). Son los mismos chunks públicos con hash;
+  `app/` sigue cerrada. Brotli 11 al vuelo tardaría 2,8 s por chunk: por eso se precomprime.
 - **HTTPS**: lo emite `ssl-dominios` (Let's Encrypt, cada 5 min, cuando el DNS apunta aquí); su 443 es estático y no sirve,
   así que `/usr/local/sbin/vtuberdex-https` (drop-in `ExecStartPost` de `ssl-dominios.service`) escribe el 443 PROPIO
   `conf.d/00-b-vtuberdex.com-https.conf` (carga antes y gana) y **amplía el certificado a `www`** si este resuelve a la VPS

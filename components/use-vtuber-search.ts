@@ -37,6 +37,31 @@ export interface UseVtuberSearchOptions {
   perPage?: number;
 }
 
+/** Pide las imágenes de estas cartas (memoizado por URL en `loadImage`) y avisa cuando acabaron todas. */
+const cargarImagenes = (items: VtuberCard[]): Promise<unknown> => {
+  if (typeof Image === "undefined") {
+    return Promise.resolve();
+  }
+  return Promise.allSettled(
+    imagenesDeCartas(items).map((src) => loadImage(src)),
+  );
+};
+
+/**
+ * ¿La conexión pide no gastar? Con «ahorro de datos» o en 2G no se precargan las imágenes de las
+ * páginas vecinas (los datos de la página, unos KB, sí): son la mayor parte de lo que baja el libro.
+ */
+function conexionQueAhorra(): boolean {
+  const c = (
+    globalThis.navigator as
+      | (Navigator & {
+          connection?: { saveData?: boolean; effectiveType?: string };
+        })
+      | undefined
+  )?.connection;
+  return c?.saveData === true || /(^|-)2g$/.test(c?.effectiveType ?? "");
+}
+
 /**
  * Deja las imágenes de unas cartas en la memoria de `loadImage` y, en tiempo ocioso, sus
  * TEXTURAS ya generadas en la caché de la fábrica (`pregenerar`, prioridad baja): al pasar
@@ -47,9 +72,7 @@ const calentarImagenes = (items: VtuberCard[]) => {
   if (typeof Image === "undefined") {
     return;
   }
-  for (const src of imagenesDeCartas(items)) {
-    void loadImage(src);
-  }
+  void cargarImagenes(items);
   if (
     typeof document === "undefined" ||
     typeof HTMLCanvasElement === "undefined"
@@ -104,13 +127,30 @@ export function useVtuberSearch({
      * memoria cuando el usuario pasa de hoja, así que el giro no espera a la red.
      */
     let precarga: ReturnType<typeof setTimeout> | undefined;
+    let vigente = true;
+    /**
+     * Las imágenes de las vecinas esperan a que terminen las de la página VISIBLE. Antes salían a la
+     * vez (medido 2026-11-19: 16 juegos de imágenes en paralelo a los 1,3 s, la mitad de otra página) y
+     * le quitaban ancho de banda justo a las cartas que se están mirando; en celular duplicaba lo
+     * descargado. Los datos de las vecinas (JSON pequeño) se siguen pidiendo enseguida.
+     */
     const programarPrecarga = (response: ApiListResponse) => {
+      const visibles = cargarImagenes(response.items);
       precarga = setTimeout(() => {
         void precargarVecinas(
           params,
           response.pageCount,
           (vecina) => pedirPagina(vecina),
-          calentarImagenes,
+          (items) => {
+            if (conexionQueAhorra()) {
+              return;
+            }
+            void visibles.then(() => {
+              if (vigente) {
+                calentarImagenes(items);
+              }
+            });
+          },
         );
       }, RETRASO_PRECARGA_MS);
     };
@@ -122,7 +162,10 @@ export function useVtuberSearch({
       setLoading(false);
       calentarImagenes(enCache.items);
       programarPrecarga(enCache);
-      return () => clearTimeout(precarga);
+      return () => {
+        vigente = false;
+        clearTimeout(precarga);
+      };
     }
 
     setLoading(true);
@@ -148,6 +191,7 @@ export function useVtuberSearch({
       });
 
     return () => {
+      vigente = false;
       controller.abort();
       clearTimeout(precarga);
     };
