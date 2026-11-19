@@ -21,6 +21,33 @@ const nextConfig = {
   // El front habla con su propia API por rutas relativas; no hay dominio externo.
   images: { unoptimized: true },
   /**
+   * Sin `X-Powered-By: Next.js`: no aporta nada y le dice a un atacante qué buscar (auditoría 2026-11-19).
+   */
+  poweredByHeader: false,
+  /**
+   * Content-Security-Policy MÍNIMA (auditoría 2026-11-19): lo que no rompe nada y cierra vías reales.
+   *   · `object-src 'none'`: ni Flash ni `<embed>`.
+   *   · `base-uri 'self'`: un `<base>` inyectado no puede redirigir las rutas relativas a otro dominio.
+   *   · `frame-ancestors 'self'`: nadie enmarca el sitio (clickjacking), igual que `X-Frame-Options`.
+   *   · `form-action 'self'`: ningún formulario puede enviar a otro dominio (PayPal es un enlace, no un form).
+   * NO se restringen scripts: Next mete scripts en línea (la carga del RSC) y hacerlo bien exige nonces y
+   * renderizado dinámico en TODAS las páginas. Si algún día se hace, este es el sitio.
+   */
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value:
+              "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'",
+          },
+        ],
+      },
+    ];
+  },
+  /**
    * Orígenes autorizados a pedir los assets SOLO-DEV (`/_next/hmr`, los chunks
    * sin compilar, el websocket de recarga).
    *

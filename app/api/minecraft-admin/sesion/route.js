@@ -13,7 +13,9 @@ import {
   cookieDeSesion,
   crearSesionMantenedor,
   respuestaJson,
+  revocarSesionesDe,
   rolDe,
+  sesionDeLaPeticion,
 } from "../../../../lib/minecraft-admin.mjs";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +48,12 @@ export async function POST(request) {
   );
 }
 
-export function DELETE() {
+export function DELETE(request) {
+  // Salir cierra la sesión EN EL SERVIDOR (todas las de ese correo), no solo la cookie del navegador.
+  const sesion = request ? sesionDeLaPeticion(request) : null;
+  if (sesion) {
+    revocarSesionesDe(sesion.email);
+  }
   return new Response(null, {
     status: 204,
     headers: {

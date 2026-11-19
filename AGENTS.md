@@ -372,7 +372,7 @@ WHERE usado = 0 AND expira > ahora` es el cerrojo), 24 h para solicitudes y 15 m
 - **Acceso del mantenedor** (`lib/admin-enlace.mjs`, `POST /api/admin/enlace` y `/enlace/entrar`): pedir el enlace responde SIEMPRE
   lo mismo y el envío va en segundo plano (ni la respuesta ni el tiempo delatan quién es admin). La sesión es la de siempre
   (`emitirSesion`) con el correo como usuario, así que el diario dice quién editó. **La UI de `/admin` ya no tiene login por
-  contraseña** (solo correo) y, desde 2026-11-19, **la ruta de Next tampoco**: `POST /api/admin/login` es un 404 (no tenía tope
+  contraseña** (solo correo) y, desde 2026-11-19, **la ruta de Next tampoco**: `POST /api/admin/login` responde 401 `no_autenticado` como cualquier ruta sin sesión (no tenía tope
   de intentos y su 401 decía si fallaba el usuario o la clave), `VTUBERDEX_ADMIN_PASSWORD_HASH` ya no está en `/etc/vtuberdex.env` y
   `/api/admin/session` valida siempre el token. El Express local conserva su login por contraseña, pero ya no hay pantalla que lo use.
 - **No desplegar sin DNS**: sin SPF/DKIM/DMARC publicados el correo sale pero Gmail lo descarta o lo manda a spam, y las
@@ -484,9 +484,9 @@ calcula ni «procesar» una baja los aplica solo**.
   simuladas**: falta una pasada con credenciales reales por plataforma.
 - **XP por transmitir**: `scripts/premiar-directos.mjs` (`npm run premiar:directos`, `--vigilar` para servicio, `--seco` para ver quién está en
   directo sin pagar). Cada 10 min revisa Twitch y Kick de todas las fichas y `premiarDirecto` (`server/src/minecraft.mjs`) paga 5 XP por tramo
-  de 30 min, tope 50 al día, **idempotente por `directo:<ficha>:<tramo>`** y con el tope aplicado en la misma sentencia. Tabla `xp_directo`, aparte de
+  de 30 min con retorno decreciente y SIN tope diario (`XP_DIRECTO_MAX_DIA = -1`, decisión del #53), **idempotente por `directo:<ficha>:<tramo>`**. Tabla `xp_directo`, aparte de
   `xp_juego`: **no gasta el tope de Minecraft**; la suma `xpDeJuego`/`xpDeJuegoVarias` incluye las dos, así que nivel y puntos salen solos.
-  Una ficha con varios canales cobra una vez por tramo. **YouTube NO paga**: revisar ~800 fichas gastaría las 10.000 unidades diarias en horas.
+  Una ficha con varios canales cobra una vez por tramo, y **un canal paga a una sola ficha** (la de id más bajo que lo declara: `sinCanalesRepetidos`). **YouTube NO paga**: revisar ~800 fichas gastaría las 10.000 unidades diarias en horas.
   Falta instalar el servicio en la VPS (como `vtuberdex-voces`) y definir las credenciales en `/etc/vtuberdex.env`. Perillas: `XP_DIRECTO_*` en
   `server/src/experiencia.mjs`.
 
@@ -641,7 +641,7 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
   responder («HTTP/1.1 header parser received no bytes»; `curl --http2` reproduce: exit 52). `ApiClient` fuerza HTTP/1.1. Ningún
   gate lo vio: salió en la primera entrada real (Bedrock) y dejaba a todos en la sala de espera.
 - **Producción (VPS)**: servicio `vtuberdex-minecraft` (usuario `minecraft`, `/srv/minecraft`, Java 25 de apt, `-Xmx1536M`
-  `-XX:ActiveProcessorCount=2`, `ProtectSystem=strict`), puertos **25565/tcp** (Java) y **19132/udp** (Bedrock) públicos, `online-mode=true` (solo premium, ver arriba). **RCON activado el 2026-10-12** a petición del mantenedor (puerto 25575, contraseña en `server.properties` y en `~/.local/share/vtuberdex-auto/rcon-pass`; cliente `~/.local/bin/mc-rcon "<comando>"`): no hay cortafuegos, así que el drop-in `rcon-local.conf` del servicio añade una regla iptables que descarta 25575 salvo desde `lo`. Si cambias de máquina o quitas el drop-in, RCON queda abierto a internet. **No hagas
+  `-XX:ActiveProcessorCount=2`, `ProtectSystem=strict`), puertos **25565/tcp** (Java) y **19132/udp** (Bedrock) públicos, `online-mode=true` (solo premium, ver arriba). **RCON activado el 2026-10-12** a petición del mantenedor (puerto 25575, contraseña en `server.properties` y en `~/.local/share/vtuberdex-auto/rcon-pass`; cliente `~/.local/bin/mc-rcon "<comando>"`): hay cortafuegos (nftables, política `drop`: solo 80/443, Minecraft 25565 y 19132, 19133/24454 udp, el SSH de Gitea 2222 y WireGuard; SSH solo por VPN) y además el drop-in `rcon-local.conf` del servicio descarta 25575 salvo desde `lo`.conf` del servicio añade una regla iptables que descarta 25575 salvo desde `lo`. Si cambias de máquina o quitas el drop-in, RCON queda abierto a internet. **No hagas
   op por nombre a cuentas Java**: el permiso lo hereda quien use ese nombre (el plugin no lo deja saltarse el lobby, pero el op sigue
   siendo op en el resto del servidor). Se entra con `vtuberdex.com`
   (el registro A no pasa por el proxy de Cloudflare). El plugin habla con la app LOCAL (`api-url: http://127.0.0.1:3100`; `sitio-url`
@@ -862,6 +862,18 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
 
 ## Trampas conocidas (ya nos costaron tiempo)
 
+- **Auditoría de seguridad (2026-11-19), tanda baja.** (14) Pedir un enlace de «Mi ficha» anula los anteriores del mismo correo
+  (`crearToken`, propósito `ficha`: dura 7 días y no se gasta). (15) `sesion_admin` guarda el sha256 del token, no el token. (16) CSP
+  mínima (`object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'`, en `next.config.mjs`) y sin
+  `X-Powered-By`; los scripts NO se restringen (Next mete scripts en línea: haría falta nonce en todas las páginas). (18) Pedir un
+  código de vínculo solo anula los anteriores del MISMO pedido (cuenta o «Mi ficha»). (19) Un canal paga XP de directo a una sola
+  ficha. (20) El `style` de un `<span>` de habilidad es lista blanca de propiedades y valores (`estiloDeHabilidadSeguro`): pasan las
+  1.055 del scrape y las del diario; si una ficha nueva da 400 al guardar, mira qué propiedad usa antes de ampliar la lista. (21) El
+  enlace del panel de Minecraft tiene tope por red (5/15 min) y por correo (1/min, 5/día) y no delata la lista con un 502; salir
+  cierra la sesión EN EL SERVIDOR (`revocarSesionesDe`: todas las de ese correo emitidas antes). (22) `/api/stats` corta por
+  `content-length`. **La auditoría del panel estaba ROTA desde el 13-nov** (escribía en `data/` del release, que no existe: 360
+  errores en el log): hoy va a `/var/lib/vtuberdex/` en producción (`lib/estado-servicio.mjs`), con las sesiones revocadas.
+  (17) BlueMap (`/mapa/`) sigue en el mismo origen que la web: moverlo a un subdominio necesita un registro DNS nuevo.
 - **Auditoría de seguridad (2026-11-19), tanda media.** (6) Panel de Minecraft: el mantenedor PUEDE subir jars (decisión del
   dueño), pero cada subida, cada guardado de configuración y cada plugin habilitado/deshabilitado van a la auditoría; un jar
   existente no se pisa sin `?reemplazar=1` (el panel lo confirma); en `server.properties` se ocultan y conservan también

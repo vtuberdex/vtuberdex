@@ -123,6 +123,18 @@ export async function crearToken(
     throw new Error(`propósito de token desconocido: ${proposito}`);
   }
   const e = await conTablas(ejecutor);
+  /**
+   * El enlace de «Mi ficha» dura 7 días y NO se gasta al usarlo: pedir uno nuevo anula los anteriores del
+   * mismo correo (auditoría 2026-11-19). Si uno se filtró (una captura en directo de la barra, un
+   * historial compartido), pedir otro lo deja sin valor; antes seguía sirviendo, también para vincular una
+   * cuenta de Minecraft a la ficha.
+   */
+  if (proposito === "ficha") {
+    await e.execute(
+      "UPDATE token_correo SET usado = 1 WHERE email = ? AND proposito = 'ficha' AND usado = 0",
+      [email],
+    );
+  }
   const token = crypto.randomBytes(32).toString("base64url");
   await e.execute(
     "INSERT INTO token_correo (hash, proposito, email, solicitud_id, creado, expira) VALUES (?, ?, ?, ?, ?, ?)",

@@ -36,6 +36,7 @@ import {
   LIMITE_JAR_BYTES,
   __reiniciarEnlaces,
   crearSesionMantenedor,
+  usarArchivoDeRevocadas,
 } from "./minecraft-admin.mjs";
 
 // Lista cerrada de accesos: el rol sale del correo, no de la cookie (ver `rolDeCorreo`).
@@ -79,6 +80,7 @@ const cookieDeRespuesta = (r: Response) =>
 beforeAll(async () => {
   base = await fs.mkdtemp(path.join(os.tmpdir(), "minecraft-admin-"));
   process.env.VTUBERDEX_MINECRAFT_DIR = base;
+  usarArchivoDeRevocadas(path.join(base, "revocadas.json"));
 });
 
 beforeEach(() => {
@@ -459,6 +461,33 @@ describe("sesión", () => {
     const r = sesionDELETE();
     expect(r.status).toBe(204);
     expect(r.headers.get("set-cookie")).toContain("Max-Age=0");
+  });
+
+  it("salir cierra la sesión EN EL SERVIDOR: una copia de la cookie deja de valer (auditoría 2026-11-19)", async () => {
+    const copia = cookieDe("mantenedor");
+    const antes = await estadoGET(
+      pedir("http://x/api/minecraft-admin/estado", { cookie: copia }),
+    );
+    expect(antes.status).not.toBe(401);
+    // Se espera 1 ms: una sesión emitida en el MISMO instante del cierre también cae.
+    await new Promise((r) => setTimeout(r, 2));
+    expect(
+      sesionDELETE(
+        pedir("http://x/api/minecraft-admin/sesion", { cookie: copia }),
+      ).status,
+    ).toBe(204);
+    const despues = await estadoGET(
+      pedir("http://x/api/minecraft-admin/estado", { cookie: copia }),
+    );
+    expect(despues.status).toBe(401);
+    // Una sesión NUEVA (emitida después del cierre) sí entra.
+    await new Promise((r) => setTimeout(r, 2));
+    const nueva = await estadoGET(
+      pedir("http://x/api/minecraft-admin/estado", {
+        cookie: cookieDe("mantenedor"),
+      }),
+    );
+    expect(nueva.status).not.toBe(401);
   });
 });
 
