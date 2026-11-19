@@ -33,6 +33,12 @@ mkdir -p "$destino/app" "$destino/.well-known/acme-challenge"
 cp -a .next/standalone/. "$destino/app/"
 mkdir -p "$destino/app/.next"
 cp -a .next/static "$destino/app/.next/static"
+# Copia PÚBLICA de los assets estáticos, ya comprimidos (.br/.gz): nginx los sirve sin pasar por Node
+# (`brotli_static`/`gzip_static`, ver infra/nginx/vtuberdex-locations.conf). Solo `_next/static`: son los
+# chunks con hash que cualquiera ya puede bajar; `app/` sigue cerrada a nginx.
+mkdir -p "$destino/publico/_next"
+cp -a .next/static "$destino/publico/_next/static"
+node scripts/precomprimir.mjs "$destino/publico/_next/static"
 # La base empaquetada la lee `fs` con una ruta construida: el trazado no la copia sola.
 mkdir -p "$destino/app/deploy"
 cp -a deploy/data "$destino/app/deploy/data"
@@ -44,6 +50,7 @@ cat > "$destino/index.html" <<'H'
 H
 chmod 755 "$destino" "$destino/.well-known" "$destino/.well-known/acme-challenge"
 chmod 644 "$destino/index.html"
+chmod -R u+rwX,go+rX,go-w "$destino/publico"
 # nginx (www-data) no puede leer la app: solo el servicio, que corre como `vtuberdex`.
 # Grupo `vtuberdex` = lectura; madkoding (dueño, miembro del grupo) sigue siendo quien despliega.
 chgrp -R vtuberdex "$destino/app"

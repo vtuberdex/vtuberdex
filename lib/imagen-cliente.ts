@@ -32,11 +32,22 @@ export function canvasABlob(
 
 /** Tope de peso que acepta el servidor de producción para un emblema. */
 export const EMBLEMA_MAX_BYTES = 2 * 1024 * 1024;
-/** Lado máximo del emblema: se dibuja a ~74 px en la carta, 512 sobra incluso en pantallas densas. */
-export const EMBLEMA_MAX_LADO = 512;
+/**
+ * Lado máximo del emblema. Se dibuja a 88 px de una textura de 1008 (~120 px en la ficha con pantalla densa):
+ * con 512 cada emblema pesaba ~180 KB y una página del libro bajaba 3,6 MB solo de emblemas (medido
+ * 2026-11-19). 256 sobra; los ya guardados se redujeron con `scripts/reducir-imagenes.mjs`.
+ */
+export const EMBLEMA_MAX_LADO = 256;
+/** Lado máximo del logo: el ancho de la textura de la carta (se subían logos de hasta 10.799 px). */
+export const LOGO_MAX_LADO = 1008;
+/**
+ * Calidad WebP del arte (personaje, fondo, logo). Era 0,92: a 0,84 el personaje pesa ~36 % menos y,
+ * comparado ampliado al doble, no se distingue (ver `scripts/reducir-imagenes.mjs`).
+ */
+export const CALIDAD_WEBP = 0.84;
 
 /**
- * Convierte lo elegido a un PNG CUADRADO de hasta 512 px, con transparencia.
+ * Convierte lo elegido a un PNG CUADRADO de hasta `EMBLEMA_MAX_LADO` px, con transparencia.
  *
  * Cuadrado porque el engarce de la carta lo es: un emblema apaisado se vería
  * descentrado. Se CENTRA sobre un lienzo transparente (no se recorta) para no
@@ -103,7 +114,8 @@ export const IMAGEN_SOLICITUD = {
 } as const;
 
 /** Código del error: la interfaz lo traduce a un texto (`img.error.*`). */
-export type CodigoDeErrorDeImagen = "tipo" | "peso" | "chica" | "grande" | "navegador";
+export type CodigoDeErrorDeImagen =
+  "tipo" | "peso" | "chica" | "grande" | "navegador";
 
 export class ErrorDeImagen extends Error {
   constructor(readonly codigo: CodigoDeErrorDeImagen) {
@@ -128,7 +140,10 @@ function encuadrar(
     const dh = bitmap.height * escala;
     ctx.drawImage(bitmap, (ancho - dw) / 2, 0, dw, dh);
   } else {
-    const escala = Math.min(1, IMAGEN_SOLICITUD.logo.maxLado / Math.max(bitmap.width, bitmap.height));
+    const escala = Math.min(
+      1,
+      IMAGEN_SOLICITUD.logo.maxLado / Math.max(bitmap.width, bitmap.height),
+    );
     canvas.width = Math.max(1, Math.round(bitmap.width * escala));
     canvas.height = Math.max(1, Math.round(bitmap.height * escala));
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
@@ -154,7 +169,10 @@ export async function normalizarImagenDeSolicitud(
   if (!bitmap) {
     throw new ErrorDeImagen("tipo");
   }
-  const minimo = tipo === "character" ? IMAGEN_SOLICITUD.character.minLado : IMAGEN_SOLICITUD.logo.minLado;
+  const minimo =
+    tipo === "character"
+      ? IMAGEN_SOLICITUD.character.minLado
+      : IMAGEN_SOLICITUD.logo.minLado;
   if (Math.min(bitmap.width, bitmap.height) < minimo) {
     bitmap.close?.();
     throw new ErrorDeImagen("chica");
@@ -169,7 +187,7 @@ export async function normalizarImagenDeSolicitud(
   encuadrar(canvas, ctx, bitmap, tipo);
   bitmap.close?.();
 
-  for (const calidad of [0.92, 0.85, 0.75, 0.65, 0.5]) {
+  for (const calidad of [CALIDAD_WEBP, 0.75, 0.65, 0.5]) {
     const webp = await canvasABlob(canvas, "image/webp", calidad);
     if (webp?.type !== "image/webp") {
       throw new ErrorDeImagen("navegador");

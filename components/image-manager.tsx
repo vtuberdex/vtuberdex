@@ -28,7 +28,12 @@
 import { useRef, useState, type ChangeEvent } from "react";
 
 import { api } from "@/lib/api";
-import { canvasABlob, cargarBitmap } from "@/lib/imagen-cliente";
+import {
+  CALIDAD_WEBP,
+  LOGO_MAX_LADO,
+  canvasABlob,
+  cargarBitmap,
+} from "@/lib/imagen-cliente";
 import type { UploadKind, VtuberDetail } from "@/lib/types";
 import { ToastContainer, useToasts } from "@/components/toast";
 
@@ -151,13 +156,21 @@ async function preparar(file: File, kind: ManagedKind): Promise<Blob> {
     const dh = bitmap.height * escala;
     ctx.drawImage(bitmap, (target.w - dw) / 2, 0, dw, dh);
   } else {
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    ctx.drawImage(bitmap, 0, 0);
+    /**
+     * Sin encuadre (logo, emblema), pero con TOPE de lado: se subían logos de 2.000-10.000 px que se
+     * dibujan en una textura de 1008 de ancho. Se conserva la proporción y nunca se agranda.
+     */
+    const escala = Math.min(
+      1,
+      LOGO_MAX_LADO / Math.max(bitmap.width, bitmap.height),
+    );
+    canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+    canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   }
   bitmap.close?.();
 
-  return (await canvasABlob(canvas, "image/webp", 0.92)) ?? file;
+  return (await canvasABlob(canvas, "image/webp", CALIDAD_WEBP)) ?? file;
 }
 
 interface Props {

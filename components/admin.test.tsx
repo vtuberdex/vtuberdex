@@ -804,7 +804,7 @@ describe("aPngCuadrado", () => {
     return drawImage;
   }
 
-  test("reduce a ≤512 px, centra en un lienzo cuadrado y exporta PNG", async () => {
+  test("reduce a ≤EMBLEMA_MAX_LADO (256) px, centra en un lienzo cuadrado y exporta PNG", async () => {
     const drawImage = mockCanvas(1000);
     (globalThis as { createImageBitmap?: unknown }).createImageBitmap = vi
       .fn()
@@ -813,8 +813,8 @@ describe("aPngCuadrado", () => {
       new File(["x"], "big.jpg", { type: "image/jpeg" }),
     );
     expect(out.type).toBe("image/png");
-    // 2000x1000 -> 512x256 centrado verticalmente en un lienzo de 512x512.
-    expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 128, 512, 256);
+    // 2000x1000 -> 256x128 centrado verticalmente en un lienzo de 256x256.
+    expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 64, 256, 128);
   });
 
   test("no agranda lo pequeño", async () => {

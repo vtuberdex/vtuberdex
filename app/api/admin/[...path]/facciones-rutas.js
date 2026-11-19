@@ -81,7 +81,7 @@ function leerMedidasPng(bytes) {
 /**
  * `POST /api/admin/factions/:id/image` — sube el emblema de una facción (PNG).
  *
- * El cliente lo normaliza a PNG de hasta 512 px antes de enviarlo (en producción no hay `sharp`),
+ * El cliente lo normaliza a PNG de hasta 256 px (`EMBLEMA_MAX_LADO`) antes de enviarlo (en producción no hay `sharp`),
  * y aquí se valida la FIRMA, no la extensión. Se guarda como asset del mantenedor (`kind =
  * 'faction'`, por slug de la facción) y la facción pasa a apuntar a él con `?v=<ms>`: la ruta es
  * canónica y sin versión el navegador seguiría mostrando el emblema anterior.
