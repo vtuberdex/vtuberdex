@@ -3,45 +3,44 @@
  * Cliente de la sesión de visitante (ver `lib/sesion-visitante.mjs`): pide un reto, lo resuelve y
  * deja la cookie. Una sola resolución a la vez aunque varias peticiones la pidan a la vez.
  */
+import { resolverReto } from "./reto-pow";
+
+export { resolverReto } from "./reto-pow";
+
 let enCurso: Promise<void> | null = null;
 
-async function sha256(texto: string): Promise<Uint8Array> {
-  return new Uint8Array(
-    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto)),
-  );
-}
-
-function cerosIniciales(d: Uint8Array): number {
-  let bits = 0;
-  for (const byte of d) {
-    if (byte === 0) {
-      bits += 8;
-      continue;
-    }
-    bits += Math.clz32(byte) - 24;
-    break;
+/**
+ * La prueba de trabajo se resuelve en un WEB WORKER (`reto.worker.ts`). En el hilo principal costaba
+ * ~370 ms de CPU en un equipo rápido (perfil de CDP, 2026-11-19) en cada carga, justo mientras la página
+ * hidrata; en un celular modesto, varias veces eso. Sin `Worker` (o si el worker falla) se resuelve aquí.
+ */
+function resolverEnSegundoPlano(reto: string, bits: number): Promise<string> {
+  if (typeof Worker === "undefined") {
+    return resolverReto(reto, bits);
   }
-  return bits;
-}
-
-/** Busca `n` con sha256(reto:n) de `bits` ceros. Por lotes, para no congelar la página. */
-export async function resolverReto(
-  reto: string,
-  bits: number,
-): Promise<string> {
-  const LOTE = 512;
-  for (let desde = 0; ; desde += LOTE) {
-    const lote = await Promise.all(
-      Array.from({ length: LOTE }, async (_, i) => {
-        const n = desde + i;
-        return cerosIniciales(await sha256(`${reto}:${n}`)) >= bits ? n : -1;
-      }),
-    );
-    const hallado = lote.find((n) => n >= 0);
-    if (hallado !== undefined) {
-      return String(hallado);
+  return new Promise((resolver) => {
+    let trabajador: Worker;
+    try {
+      trabajador = new Worker(new URL("./reto.worker.ts", import.meta.url));
+    } catch {
+      resolver(resolverReto(reto, bits));
+      return;
     }
-  }
+    const enHilo = () => {
+      trabajador.terminate();
+      resolver(resolverReto(reto, bits));
+    };
+    trabajador.onmessage = (evento: MessageEvent<{ solucion?: string }>) => {
+      trabajador.terminate();
+      if (evento.data.solucion === undefined) {
+        resolver(resolverReto(reto, bits));
+      } else {
+        resolver(evento.data.solucion);
+      }
+    };
+    trabajador.onerror = enHilo;
+    trabajador.postMessage({ reto, bits });
+  });
 }
 
 async function abrir(): Promise<void> {
@@ -50,7 +49,7 @@ async function abrir(): Promise<void> {
     throw new Error(`HTTP ${r.status}`);
   }
   const { reto, bits } = (await r.json()) as { reto: string; bits: number };
-  const solucion = await resolverReto(reto, bits);
+  const solucion = await resolverEnSegundoPlano(reto, bits);
   const p = await fetch("/api/sesion", {
     method: "POST",
     headers: { "content-type": "application/json" },

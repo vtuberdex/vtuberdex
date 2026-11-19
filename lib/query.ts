@@ -104,58 +104,53 @@ function entero(valor: string, min: number, max: number): number | null {
   return Number.isInteger(n) && n >= min && n <= max ? n : null;
 }
 
-const ORDENES = new Set(["dex", "dex-desc", "name", "power"]);
+const INVALIDO = Symbol("invalido");
+/** Valida un campo presente: devuelve su valor ya leído o `INVALIDO`. */
+type Regla = (valor: string) => string | number | typeof INVALIDO;
+
+const libre: Regla = (valor) => valor;
+const hasta =
+  (max: number): Regla =>
+  (valor) =>
+    valor.length <= max ? valor : INVALIDO;
+const unoDe =
+  (opciones: ReadonlySet<string>): Regla =>
+  (valor) =>
+    opciones.has(valor) ? valor : INVALIDO;
+const enteroHasta =
+  (max: number): Regla =>
+  (valor) =>
+    entero(valor, 1, max) ?? INVALIDO;
+
+/** Una regla por campo: lo mismo que pedía el esquema zod que reemplaza. */
+const REGLAS: Record<keyof Validado, Regla> = {
+  q: hasta(120),
+  countries: libre,
+  languages: libre,
+  groups: libre,
+  artists: libre,
+  factions: libre,
+  language: hasta(10),
+  sort: unoDe(new Set(["dex", "dex-desc", "name", "power"])),
+  premium: unoDe(new Set(["1", "true"])),
+  page: enteroHasta(10_000),
+  perPage: enteroHasta(100),
+};
 
 function validarBusqueda(raw: Crudo): Validado | null {
-  const salida: Validado = {};
-  for (const campo of [
-    "countries",
-    "languages",
-    "groups",
-    "artists",
-    "factions",
-  ] as const) {
-    if (raw[campo] !== undefined) {
-      salida[campo] = raw[campo];
+  const salida: Record<string, string | number> = {};
+  for (const [campo, regla] of Object.entries(REGLAS)) {
+    const valor = raw[campo];
+    if (valor === undefined) {
+      continue;
     }
-  }
-  if (raw.q !== undefined) {
-    if (raw.q.length > 120) {
+    const leido = regla(valor);
+    if (leido === INVALIDO) {
       return null;
     }
-    salida.q = raw.q;
+    salida[campo] = leido;
   }
-  if (raw.language !== undefined) {
-    if (raw.language.length > 10) {
-      return null;
-    }
-    salida.language = raw.language;
-  }
-  if (raw.sort !== undefined) {
-    if (!ORDENES.has(raw.sort)) {
-      return null;
-    }
-    salida.sort = raw.sort;
-  }
-  if (raw.premium !== undefined) {
-    if (raw.premium !== "1" && raw.premium !== "true") {
-      return null;
-    }
-    salida.premium = raw.premium;
-  }
-  for (const [campo, max] of [
-    ["page", 10_000],
-    ["perPage", 100],
-  ] as const) {
-    if (raw[campo] !== undefined) {
-      const n = entero(raw[campo], 1, max);
-      if (n === null) {
-        return null;
-      }
-      salida[campo] = n;
-    }
-  }
-  return salida;
+  return salida as Validado;
 }
 
 const asList = (value: string | string[] | undefined): string[] => {

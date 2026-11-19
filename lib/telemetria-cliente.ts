@@ -99,7 +99,8 @@ export function rendererDeContexto(gl: {
   getParameter: (p: number) => unknown;
   getExtension: (nombre: string) => unknown;
 }): string | null {
-  const basico = String(gl.getParameter(gl.RENDERER) ?? "").trim();
+  const valor = gl.getParameter(gl.RENDERER);
+  const basico = typeof valor === "string" ? valor.trim() : "";
   if (basico && !/^webkit webgl$/i.test(basico)) {
     return basico;
   }

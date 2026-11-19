@@ -20,12 +20,7 @@
  *      · `KHR_parallel_shader_compile extension not supported`: es un dato del navegador (Firefox no la
  *        tiene; SwiftShader tampoco), three cae solo a la compilación normal y no hay nada que cambiar.
  */
-import {
-  getConsoleFunction,
-  setConsoleFunction,
-  Timer,
-  type Clock,
-} from "three";
+import { getConsoleFunction, setConsoleFunction, Timer } from "three";
 import type { RootState } from "@react-three/fiber";
 import { anotarContextoWebGL } from "@/lib/telemetria-cliente";
 // Todo canvas importa este módulo: de paso, fuera los getters `moz*` que R3F lee (ver el módulo).
@@ -58,9 +53,10 @@ export function callarAvisosSinAccion(): void {
       return;
     }
     if (previa) {
-      return previa(tipo, mensaje, ...params);
+      previa(tipo, mensaje, ...params);
+    } else {
+      console[tipo](mensaje, ...params);
     }
-    console[tipo](mensaje, ...params);
   });
 }
 callarAvisosSinAccion();
@@ -134,7 +130,7 @@ export function usarTimer(state: RootState): void {
   if (state.clock.running) {
     reloj.start();
   }
-  state.set({ clock: reloj as unknown as Clock });
+  state.set({ clock: reloj as unknown as RootState["clock"] });
   // La telemetría lee la GPU de ESTE contexto en vez de abrir uno propio (ver `anotarContextoWebGL`).
   anotarContextoWebGL(state.gl.getContext());
   state.gl.domElement.addEventListener(
