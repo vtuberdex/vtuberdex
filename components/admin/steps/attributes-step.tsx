@@ -2,7 +2,7 @@
 "use client";
 /**
  * Paso 5: atributos. UNA línea por atributo (nombre · valor / máximo · barra) en vez de una tarjeta
- * alta por cada uno: con los 7 estándar la versión anterior ocupaba varias pantallas y no se veía de
+ * alta por cada uno: con los 11 estándar la versión anterior ocupaba varias pantallas y no se veía de
  * un vistazo cómo quedaba la ficha. La barra es la misma proporción que dibuja `StatBars`.
  * El «texto del valor» (p. ej. «S+») es raro: va escondido tras «Texto» de cada fila.
  */
