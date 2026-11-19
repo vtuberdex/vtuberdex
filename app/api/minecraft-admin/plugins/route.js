@@ -26,6 +26,7 @@ import {
   analizarPluginsCargados,
 } from "../../../../lib/minecraft-plugins.mjs";
 import { ejecutarAccion } from "../../../../lib/minecraft-rcon.mjs";
+import { anotarAuditoria } from "../../../../lib/minecraft-consola.mjs";
 
 /** GET: plugins instalados con sus datos y si están cargados (lo que dice `/plugins` por RCON). */
 export async function GET(request) {
@@ -70,7 +71,17 @@ export async function POST(request) {
     return respuestaJson(comprobacion.cuerpo, comprobacion.status);
   }
 
-  const resultado = await guardarJar({ nombre, contenido: datos });
+  // Un jar que ya existe solo se reemplaza con `?reemplazar=1` (el panel lo pide confirmando).
+  const reemplazar = url.searchParams.get("reemplazar") === "1";
+  const resultado = await guardarJar({ nombre, contenido: datos, reemplazar });
+  // Subir un jar es instalar código en el servidor: siempre queda en la auditoría (antes no).
+  await anotarAuditoria({
+    quien: acceso.sesion.email,
+    rol: acceso.sesion.role,
+    tipo: reemplazar ? "plugin-reemplazado" : "plugin-subido",
+    detalle: `${nombre} (${datos.byteLength} bytes)`,
+    ok: resultado.ok,
+  });
   if (!resultado.ok) {
     return respuestaJson(resultado.cuerpo, resultado.status);
   }

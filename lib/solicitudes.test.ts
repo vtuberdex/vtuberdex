@@ -358,22 +358,24 @@ describe("POST público", () => {
     expect((await respuesta.json()).detail).toMatch(/términos/);
   });
 
-  test("una baja con un correo sin ficha se rechaza (404) y manda a hablar con un administrador", async () => {
+  test("una baja con un correo sin ficha responde IGUAL que con ficha (sin delatarlo) y no guarda nada", async () => {
     const respuesta = await recibirSolicitud(
       peticion(baja({ email: "nadie@example.com" })),
       "baja",
       ejecutor,
     );
-    expect(respuesta.status).toBe(404);
-    const cuerpo = await respuesta.json();
-    expect(cuerpo.error).toBe("correo_no_registrado");
-    expect(cuerpo.detail).toMatch(/administradores/);
+    // La misma respuesta que una baja real: lo que cambia es el correo que llega (un aviso, no el código).
+    expect(respuesta.status).toBe(201);
+    expect(await respuesta.json()).toEqual({
+      ok: true,
+      estado: "sin_verificar",
+    });
     expect(
       await listarSolicitudes(ejecutor, { estado: "todas" }),
     ).toMatchObject({ items: [] });
   });
 
-  test("pedir el código de una modificación con un correo sin ficha se rechaza; con ficha, se manda", async () => {
+  test("pedir el código de una modificación: sin ficha responde igual (aviso al buzón); con ficha, se manda el código", async () => {
     const codigo = (email: string) =>
       pedirCodigo(
         new Request("http://localhost/api/modificaciones/codigo", {
@@ -384,9 +386,11 @@ describe("POST público", () => {
         "modificacion",
         ejecutor,
       );
+    // Sin ficha, la web responde lo mismo que con ficha (no se puede averiguar qué correos son de VTubers):
+    // al buzón le llega un aviso en vez del código.
     const sin = await codigo("nadie@example.com");
-    expect(sin.status).toBe(404);
-    expect((await sin.json()).error).toBe("correo_no_registrado");
+    expect(sin.status).toBe(200);
+    expect(await sin.json()).toEqual({ ok: true });
     await fijarCorreoDeFicha(ejecutor, 1, "luna@example.com");
     expect((await codigo("luna@example.com")).status).toBe(200);
   });

@@ -182,8 +182,7 @@ function FormularioDeEntrada({
         <h1 className="text-3xl text-dex-ink">Mantenedor de Minecraft</h1>
         <p className="text-sm text-dex-muted">
           Estado del servidor en vivo, plugins y configuración. El acceso se
-          abre con un enlace de un solo uso enviado al correo del
-          mantenedor.
+          abre con un enlace de un solo uso enviado al correo del mantenedor.
         </p>
       </header>
       <section className={`${CLASE_TARJETA} space-y-4`}>
@@ -362,7 +361,11 @@ function SubirPlugin({
           onChange={elegir}
           className="text-sm text-dex-muted file:mr-3 file:rounded-xl file:border file:border-dex-line file:bg-dex-panel-soft file:px-3 file:py-1.5 file:text-dex-ink"
         />
-        <button type="submit" disabled={ocupado} className={CLASE_BOTON.primario}>
+        <button
+          type="submit"
+          disabled={ocupado}
+          className={CLASE_BOTON.primario}
+        >
           Subir .jar
         </button>
       </form>
@@ -450,7 +453,11 @@ function PestanaConfiguracion({
           aria-label="Contenido de la configuración"
           className={`${CLASE_CAMPO} ${FUENTE_MONO} text-xs leading-relaxed`}
         />
-        <button type="submit" disabled={ocupado} className={CLASE_BOTON.primario}>
+        <button
+          type="submit"
+          disabled={ocupado}
+          className={CLASE_BOTON.primario}
+        >
           Guardar configuración
         </button>
       </form>
@@ -466,9 +473,9 @@ function AvisoCarpeta({ directorio }: Readonly<{ directorio?: string }>) {
       className="rounded-2xl border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-400"
     >
       El panel no puede leer la carpeta del servidor
-      {directorio ? ` (${directorio})` : ""}. Falta
-      darle permiso al servicio web o definir VTUBERDEX_MINECRAFT_DIR;
-      por eso no aparecen plugins ni archivos de configuración.
+      {directorio ? ` (${directorio})` : ""}. Falta darle permiso al servicio
+      web o definir VTUBERDEX_MINECRAFT_DIR; por eso no aparecen plugins ni
+      archivos de configuración.
     </p>
   );
 }
@@ -734,14 +741,26 @@ export function PanelMinecraftAdmin() {
       }
       return operar(async () => {
         const nombre = encodeURIComponent(archivo.name);
-        const r = await exigirOk(
-          await fetch(`/api/minecraft-admin/plugins?nombre=${nombre}`, {
-            method: "POST",
-            headers: { "content-type": "application/java-archive" },
-            body: archivo,
-          }),
-          "no se pudo subir el plugin",
-        );
+        const enviar = (reemplazar: boolean) =>
+          fetch(
+            `/api/minecraft-admin/plugins?nombre=${nombre}${reemplazar ? "&reemplazar=1" : ""}`,
+            {
+              method: "POST",
+              headers: { "content-type": "application/java-archive" },
+              body: archivo,
+            },
+          );
+        let respuesta = await enviar(false);
+        // Ya hay un plugin con ese nombre: se reemplaza solo si se confirma (antes se pisaba sin avisar).
+        if (
+          respuesta.status === 409 &&
+          window.confirm(
+            `Ya hay un plugin llamado ${archivo.name}. ¿Reemplazarlo? El servidor usará el nuevo al reiniciar.`,
+          )
+        ) {
+          respuesta = await enviar(true);
+        }
+        const r = await exigirOk(respuesta, "no se pudo subir el plugin");
         const meta = (await r.json()) as { plugin?: string };
         setAviso(`Plugin guardado: ${meta.plugin ?? archivo.name}`);
         setArchivo(null);

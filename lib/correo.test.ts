@@ -4,6 +4,7 @@ import {
   correoDeAcceso,
   correoDeBienvenida,
   correoDeSolicitud,
+  correoSinFicha,
   urlDelSitio,
 } from "@/lib/correo.mjs";
 
@@ -14,10 +15,7 @@ describe("correos de solicitud", () => {
   test.each(["inscripcion", "modificacion", "baja"] as const)(
     "%s: enlace con el token en el fragmento, en HTML y en texto plano",
     (tipo) => {
-      const { asunto, texto, html } = correoDeSolicitud(
-        { tipo, token, nombre: "Luna" },
-        env,
-      );
+      const { asunto, texto, html } = correoDeSolicitud({ tipo, token }, env);
       // La inscripción y los cambios abren el formulario en el paso del código; la baja confirma en `/verificar`.
       const enlace = `https://vtuberdex.com/${tipo === "baja" ? "verificar" : tipo}#t=${token}`;
       expect(texto).toContain(enlace);
@@ -27,23 +25,23 @@ describe("correos de solicitud", () => {
     },
   );
 
-  test("lo que escribe la persona se escapa en el HTML y no llega al asunto", () => {
-    const { asunto, html } = correoDeSolicitud(
-      { tipo: "baja", token, nombre: '<script>alert(1)</script> "x"' },
+  test("el correo de baja NO repite lo que escribió quien la pidió (podía ser otra persona)", () => {
+    const { asunto, html, texto } = correoDeSolicitud(
+      { tipo: "baja", token, nombre: '<script>alert(1)</script> "x"' } as never,
       env,
     );
-    expect(html).not.toContain("<script>");
-    expect(html).toContain("&lt;script&gt;");
+    expect(html).not.toContain("script");
+    expect(texto).not.toContain("Ficha:");
     expect(asunto).not.toMatch(/script/);
   });
 
-  test("un nombre larguísimo o con saltos de línea se recorta y se aplana", () => {
-    const { texto } = correoDeSolicitud(
-      { tipo: "baja", token, nombre: `A\nB${"x".repeat(500)}` },
-      env,
-    );
-    expect(texto).toContain("Ficha: A B");
-    expect(texto.split("\n").every((linea) => linea.length < 400)).toBe(true);
+  test("el aviso «sin ficha» no lleva código ni enlace de confirmación, solo el de inscribirse", () => {
+    for (const tipo of ["baja", "modificacion"] as const) {
+      const { asunto, texto } = correoSinFicha({ tipo }, env);
+      expect(asunto).toMatch(/No encontramos tu ficha/);
+      expect(texto).toContain("/inscripcion");
+      expect(texto).not.toMatch(/#t=/);
+    }
   });
 
   test("la inscripción y los cambios llevan el código en claro para pegarlo en el formulario; la baja también", () => {

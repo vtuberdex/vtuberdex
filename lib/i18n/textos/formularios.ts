@@ -20,7 +20,7 @@ export const formulariosEs = {
   "baja.revisaCorreo": "Revisa tu correo.",
   "baja.codigoEnviadoA": "Te enviamos un código a",
   "baja.codigoInstrucciones":
-    "Pégalo aquí para confirmar la baja, o pulsa el botón del correo. Vale 24 horas; si no llega, mira en spam.",
+    "Pégalo aquí para confirmar la baja, o pulsa el botón del correo. Vale 24 horas; si no llega, mira en spam. Si ese correo no tiene ficha, te llegará un aviso en vez del código.",
   "baja.paso2": "Paso 2 de 2 · Confirmar la baja",
   "baja.codigo": "Código del correo",
   "baja.confirmando": "Confirmando…",
