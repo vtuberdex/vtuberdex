@@ -44,13 +44,8 @@ import {
 } from "../../../../lib/carpetas.mjs";
 import {
   cerrarSesion,
-  credencialesConfiguradas,
-  diagnosticarCredenciales,
-  emitirSesion,
-  formatoDeHash,
   leerSesion,
   tokenDeCabecera,
-  usuarioEsperado,
 } from "../../../../lib/admin-auth.mjs";
 import {
   entrarConEnlace,
@@ -191,68 +186,11 @@ async function reenviar(request, context, method) {
 }
 
 /**
- * `POST /api/admin/login` — entra al mantenedor en producción.
- *
- * La UI del mantenedor EXIGE esto antes de cualquier otra llamada (pide `/api/admin/login`
- * y guarda el token en `localStorage`). Sin esta ruta la página cargaba y se quedaba muerta:
- * medido en producción, `/admin` respondía 200 y no hacía ni una llamada a la API.
+ * `POST /api/admin/login` (contraseña) SE RETIRÓ (auditoría 2026-11-19): la UI ya solo entra por enlace
+ * mágico (`/enlace`), y esta ruta seguía viva mientras existiera `VTUBERDEX_ADMIN_PASSWORD_HASH`, sin
+ * tope de intentos y con un 401 que decía si fallaba el usuario o la clave. Ahora responde 404 como
+ * cualquier ruta desconocida. El Express local conserva su propio login.
  */
-async function login(request) {
-  if (!credencialesConfiguradas()) {
-    return NextResponse.json(
-      {
-        error: "sin_credenciales",
-        detail:
-          "falta VTUBERDEX_ADMIN_PASSWORD_HASH: genera el hash con `node scripts/admin-hash.mjs`",
-      },
-      { status: 500 },
-    );
-  }
-  const body = await request.json().catch(() => null);
-  const { ok, usuarioOk, claveOk } = diagnosticarCredenciales(
-    body?.username,
-    body?.password,
-  );
-  if (!ok) {
-    /**
-     * 401 CON DIAGNÓSTICO, no un 401 mudo.
-     *
-     * Antes esta respuesta era siempre `{error:'credenciales_invalidas'}`, así que tres causas
-     * totalmente distintas quedaban indistinguibles desde fuera: (a) el usuario no es el
-     * esperado, (b) la contraseña no es la del hash guardado y (c) el hash guardado se pegó
-     * mal. Medido en producción: la (a) —el campo de usuario— se veía EXACTAMENTE igual que
-     * las otras dos, y no había forma de averiguar cuál era sin volver a tocar la variable a
-     * ciegas. La contraseña nunca viaja en la respuesta; el usuario esperado sí puede, porque
-     * no es el secreto (vive en `admin-hash.mjs`, aquí y en la documentación).
-     *
-     * `formatoDeHash` devuelve solo la ESTRUCTURA del valor (segmentos, hexadecimal, tamaño),
-     * nunca su contenido ni sus longitudes exactas, así que se puede adjuntar a la respuesta
-     * de una ruta sin sesión sin filtrar nada de la credencial.
-     */
-    const hash = !credencialesConfiguradas()
-      ? { valido: false, problemas: ["falta VTUBERDEX_ADMIN_PASSWORD_HASH"] }
-      : formatoDeHash();
-    return NextResponse.json(
-      {
-        error: "credenciales_invalidas",
-        usuarioOk,
-        claveOk,
-        usuarioEsperado: usuarioEsperado(),
-        hash,
-      },
-      { status: 401 },
-    );
-  }
-  const user = { id: 0, username: usuarioEsperado(), role: "admin" };
-  const token = await emitirSesion(user);
-  if (!token) {
-    return noDisponible("no se pudo emitir la sesión (¿Turso configurado?)");
-  }
-  return NextResponse.json({
-    token,
-    user: { username: user.username, role: user.role },
-  });
-}
 
 /**
  * `POST /api/admin/enlace` (pide el enlace por correo) y `POST /api/admin/enlace/entrar` (lo gasta).
@@ -294,19 +232,10 @@ async function enlaceDeAcceso(request, accion) {
 /**
  * `GET /api/admin/session` — valida el token que la UI guardó en `localStorage`.
  *
- * Con login configurado, un token inválido es un 401 y la UI borra el token y pide entrar de
- * nuevo. Sin login configurado se responde el modo SIN autenticar, para que la página pueda
- * decir qué falta en vez de mostrar un formulario que nunca va a funcionar por más que se
- * escriba la contraseña correcta.
+ * Un token inválido es un 401 y la UI lo borra y pide entrar de nuevo (por enlace mágico).
  */
 async function sesionTurso(request) {
-  if (!credencialesConfiguradas()) {
-    return NextResponse.json({
-      mode: "turso",
-      login: false,
-      note: "falta VTUBERDEX_ADMIN_PASSWORD_HASH: define la contraseña con `node scripts/admin-hash.mjs`",
-    });
-  }
+  // Siempre se valida el token: la sesión la crea el enlace mágico, haya o no contraseña configurada.
   const user = await leerSesion(tokenDeCabecera(request));
   if (!user) {
     return noAutenticado();
@@ -625,13 +554,7 @@ async function subirImagen(request, id, kind) {
    * una imagen que sí está guardada: el síntoma que confundía al mantenedor.
    */
   const medidas = readWebpSize(bytes);
-  await guardarAssetDelMantenedor(
-    actual.slug,
-    kind,
-    bytes,
-    MIME_WEBP,
-    medidas,
-  );
+  await guardarAssetDelMantenedor(actual.slug, kind, bytes, MIME_WEBP, medidas);
 
   /**
    * Se devuelve el MISMO contrato que el Express: `{ok, kind, asset, vtuber}`.
@@ -720,7 +643,6 @@ async function estadoMasivo(request, usuario) {
     return responderError(error);
   }
 }
-
 
 /** Respuesta común cuando no hay ningún backend de escritura. */
 function sinBackend() {
@@ -855,10 +777,6 @@ export async function PUT(request, context) {
 
 /** Rutas POST que crean la sesión o la cierran: no la exigen. `null` si no es ninguna. */
 function postSinSesion(request, partes) {
-  // El login es la ÚNICA ruta sin sesión que entra con contraseña: es la que la crea.
-  if (partes[0] === "login") {
-    return login(request);
-  }
   if (partes[0] === "enlace") {
     return enlaceDeAcceso(request, partes[1]);
   }

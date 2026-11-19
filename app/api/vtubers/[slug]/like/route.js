@@ -10,6 +10,7 @@
  */
 import { randomUUID } from "node:crypto";
 
+import { exigirSesion } from "../../../../../lib/sesion-visitante.mjs";
 import { dbConDiario } from "../../../../../lib/diario.mjs";
 import {
   COOKIE_VISITANTE,
@@ -90,6 +91,16 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   if (!origenPermitido(request.headers)) {
     return responder({ error: "origen_no_permitido" }, 403);
+  }
+  /**
+   * Dar like exige la sesión de visitante (prueba de trabajo, `lib/sesion-visitante.mjs`), como el
+   * catálogo. El botón vive en la ficha, que ya la abrió al cargar, así que quien navega no nota nada;
+   * un script, en cambio, tiene que resolver un reto por sesión (y hay 30 sesiones nuevas por red y
+   * hora). Antes el POST era gratis: con el tope por red falsificable, eran likes y XP sin límite.
+   */
+  const sinSesion = exigirSesion(request);
+  if (sinSesion) {
+    return sinSesion;
   }
   const { slug } = await params;
   const card = await fichaPublica(slug);
