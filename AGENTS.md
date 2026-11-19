@@ -372,9 +372,9 @@ WHERE usado = 0 AND expira > ahora` es el cerrojo), 24 h para solicitudes y 15 m
 - **Acceso del mantenedor** (`lib/admin-enlace.mjs`, `POST /api/admin/enlace` y `/enlace/entrar`): pedir el enlace responde SIEMPRE
   lo mismo y el envío va en segundo plano (ni la respuesta ni el tiempo delatan quién es admin). La sesión es la de siempre
   (`emitirSesion`) con el correo como usuario, así que el diario dice quién editó. **La UI de `/admin` ya no tiene login por
-  contraseña** (solo correo). El endpoint `POST /api/admin/login` sigue en la ruta de Next y funciona mientras exista
-  `VTUBERDEX_ADMIN_PASSWORD_HASH`: **en producción se cierra quitando esa variable de `/etc/vtuberdex.env`**. El Express local
-  conserva su login por contraseña, pero ya no hay pantalla que lo use.
+  contraseña** (solo correo) y, desde 2026-11-19, **la ruta de Next tampoco**: `POST /api/admin/login` es un 404 (no tenía tope
+  de intentos y su 401 decía si fallaba el usuario o la clave), `VTUBERDEX_ADMIN_PASSWORD_HASH` ya no está en `/etc/vtuberdex.env` y
+  `/api/admin/session` valida siempre el token. El Express local conserva su login por contraseña, pero ya no hay pantalla que lo use.
 - **No desplegar sin DNS**: sin SPF/DKIM/DMARC publicados el correo sale pero Gmail lo descarta o lo manda a spam, y las
   inscripciones parecerían enviadas sin que nadie pueda confirmarlas.
 
