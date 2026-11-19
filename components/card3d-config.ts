@@ -1634,29 +1634,29 @@ export const DESGASTE_LEVE = {
  */
 export const RENDER = {
   /**
-   * Tope de fps con interacción (0 = SIN tope: un frame por rAF). 60 por decisión del dueño (se
-   * probó 24: en un monitor de 60 Hz alterna 33/50 ms y se ve menos suave). La agenda de frames es
-   * FIJA (`nextSchedule`) y no «desde el último frame»: comparar contra el último real, con rAF
-   * desalineado del tope, rinde menos fps que los pedidos. En 144 Hz, 60 sale en pasos de 3,3,2
-   * ticks (20,8/20,8/13,9 ms): promedio exacto, aunque no perfectamente parejo; los umbrales del
-   * DPR de abajo lo toleran a propósito.
+   * Tope de fps con interacción. 0 = SIN tope: un frame por rAF, la cadencia NATIVA del monitor
+   * (60, 120, 144, 165 Hz…). Antes era 60: en pantallas de 120/144 Hz el giro y el brillo se
+   * sentían frenados frente al resto de la interfaz (queja del dueño, 2026-11-19: «demasiado
+   * limitante»). Con la agenda fija de `nextSchedule` un número > 0 sigue funcionando si hace falta
+   * volver a topar (se probó 24: en 60 Hz alterna 33/50 ms y se ve a tirones).
    */
-  activeFps: 60,
+  activeFps: 0,
   /**
    * Un `delta` mayor se recorta a esto (ms) al integrar el giro de página: el primer frame del
    * giro llega tras uno de reposo (50 ms a 20 fps) y un hipo del hilo (generar texturas) pesa
    * cientos; sin el recorte la hoja se adelanta de golpe. Se prefiere ir un poco más lento
-   * en un hipo que saltar. Tiene que quedar POR ENCIMA del paso normal del tope de fps
-   * (50 ms a 20 fps en reposo): con 40 recortaría cada frame de reposo.
+   * en un hipo que saltar. Tiene que quedar POR ENCIMA del paso normal del reposo
+   * (33 ms a 30 fps): por debajo recortaría cada frame de reposo.
    */
   maxDeltaMs: 70,
   /**
    * fps en reposo (nunca por encima de `activeFps`). Se mantiene un pulso bajo (y no cero) porque el holograma tiene una
    * componente de tiempo (`uTime`): a 0 fps la lámina quedaría congelada y se leería como imagen.
+   * Era 20: el brillo del holograma se veía a saltos con el libro quieto. 30 es el mínimo que se lee fluido.
    */
-  idleFps: 20,
-  /** La carta suelta del detalle FLOTA sola (movimiento ambiente): a 20 fps se vería a tirones, y es una sola carta. */
-  idleFpsDetail: 30,
+  idleFps: 30,
+  /** La carta suelta del detalle FLOTA sola (movimiento ambiente) y es una sola carta: a 30 fps el vaivén se veía a tirones. */
+  idleFpsDetail: 60,
   /** Cuánto tiempo, tras la última señal de actividad, se sigue a `activeFps` (la amortiguación necesita asentarse). */
   activeMs: 1500,
   /**

@@ -41,6 +41,7 @@ import {
   type TipoDeDado,
 } from "@/components/dados/dados-geometria";
 import { colorDelHumo, crearMaterialDeHumo } from "@/components/dados/humo";
+import { usarTimer } from "@/components/reloj-timer";
 
 /** Perillas de la escena. Calibradas mirando la bandeja renderizada. */
 export const ESCENA = {
@@ -142,7 +143,11 @@ function sombraCompartida(): CanvasTexture {
   return texturaSombra;
 }
 
-function Dado({ dado, x, z }: Readonly<{ dado: DadoEnMesa; x: number; z: number }>) {
+function Dado({
+  dado,
+  x,
+  z,
+}: Readonly<{ dado: DadoEnMesa; x: number; z: number }>) {
   const grupo = useRef<Group>(null);
   const sombra = useRef<Mesh>(null);
   const humo = useRef<Mesh>(null);
@@ -358,8 +363,11 @@ function CamaraAjustada({ n }: Readonly<{ n: number }>) {
   return null;
 }
 
-/** Al crear el canvas la cámara ya mira al centro de la mesa (luego la sigue `CamaraAjustada`). */
-const mirarAlCentro = ({ camera }: RootState) => camera.lookAt(0, 0, 0.4);
+/** Al crear el canvas: reloj sobre `THREE.Timer` y la cámara ya mira al centro de la mesa (luego la sigue `CamaraAjustada`). */
+const mirarAlCentro = (state: RootState) => {
+  usarTimer(state);
+  state.camera.lookAt(0, 0, 0.4);
+};
 
 export function EscenaDados({
   dados,
