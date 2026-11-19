@@ -862,6 +862,13 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
 
 ## Trampas conocidas (ya nos costaron tiempo)
 
+- **Auditoría de seguridad (2026-11-19), tanda alta.** (1) **La IP del visitante es `X-Real-IP`** (`ipDelCliente`, `redDeLaPeticion`):
+  nginx AÑADE a `X-Forwarded-For` lo que manda el cliente, así que su PRIMER valor es inventable; con él se saltaban todos los topes
+  por red (likes → XP sin límite, solicitudes, subidas, enlaces). Nunca uses el primer valor de `X-Forwarded-For`. Dar like exige
+  además la sesión de visitante. (2) **Una ficha de baja no puede delatar su nombre por una URL de imagen**: su personaje va por
+  `/images/character/deteriorada-<dex>.webp` y `/images/*` da 404 por su slug real o sus alias (`server/src/imagenes-de-baja.mjs`).
+  Al dar una ficha de baja, conviene vaciar la caché de nginx (`/var/cache/nginx/vtuberdex`): lo ya cacheado por el slug real
+  sigue ahí hasta que caduca. (3) `server/` está en Dependabot: lo empaqueta la app de producción (validaciones con zod).
 - **Fuentes sin `preload` (`app/layout.tsx`) y cómo probar con FIREFOX.** En páginas dinámicas Next precarga las fuentes dos veces
   (cabecera `Link` + `<link rel="preload">` que inserta el cliente después) y Firefox avisa «precargado … no se usó en unos pocos
   segundos»; Chromium no dice nada. Con `preload: false` cada `.woff2` se pide una vez y la primera pintura no cambia (medido: fuentes a

@@ -19,6 +19,14 @@
  */
 import { GRADO_DE_BAJA } from "./premium.mjs";
 
+/** Prefijo de la ruta NEUTRA del personaje de una ficha de baja (ver `imagenes-de-baja.mjs`). */
+export const PREFIJO_NEUTRO = "deteriorada-";
+
+/** La ruta neutra del personaje de una ficha de baja: la que ve el público en vez del slug real. */
+export function rutaNeutraDelPersonaje(dexNumber) {
+  return `/images/character/${PREFIJO_NEUTRO}${dexNumber}.webp`;
+}
+
 /** Símbolos con los que se sustituyen las letras: ASCII, para que cualquier fuente los tenga. */
 const SIMBOLOS = String.raw`#%&@*?/\~=+<>`;
 
@@ -76,8 +84,21 @@ export function ocultarFichaDeteriorada(card) {
     languages: [],
     statsPreview: [],
     socialCount: 0,
-    // Sin logo: la marca del VTuber deja de aparecer en su carta.
-    images: { ...card.images, logo: null, background: null },
+    /**
+     * Sin logo ni fondo, y el personaje por una ruta NEUTRA: la ruta de siempre lleva el slug, que es el
+     * nombre (ver `imagenes-de-baja.mjs`, que la traduce y bloquea la real). La carta 3D lo estropea igual.
+     */
+    images: {
+      character:
+        card.images?.character || card.images?.card
+          ? rutaNeutraDelPersonaje(card.dexNumber)
+          : null,
+      background: null,
+      card: null,
+      thumb: null,
+      logo: null,
+      radar: null,
+    },
   };
   return oculta;
 }

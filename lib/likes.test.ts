@@ -268,13 +268,17 @@ describe("pegamento HTTP", () => {
     expect(cookieDeVisitante(A, false)).toContain("Max-Age=31536000");
   });
 
-  test("IP: el primer valor de x-forwarded-for", () => {
+  test("IP: manda X-Real-IP (la escribe nginx); el cliente no puede elegirla con X-Forwarded-For", () => {
+    // Lo que llega por nginx: el cliente inventa el primer valor, nginx añade el real al final y fija X-Real-IP.
+    const falsificada = new Headers({
+      "x-forwarded-for": "6.6.6.6, 203.0.113.7",
+      "x-real-ip": "203.0.113.7",
+    });
+    expect(ipDelCliente(falsificada)).toBe("203.0.113.7");
+    // Sin X-Real-IP, el ÚLTIMO de la cadena (el que añadió el proxy), nunca el primero.
     expect(
-      ipDelCliente(new Headers({ "x-forwarded-for": "203.0.113.7, 10.0.0.1" })),
-    ).toBe("203.0.113.7");
-    expect(ipDelCliente(new Headers({ "x-real-ip": "198.51.100.2" }))).toBe(
-      "198.51.100.2",
-    );
+      ipDelCliente(new Headers({ "x-forwarded-for": "6.6.6.6, 198.51.100.2" })),
+    ).toBe("198.51.100.2");
     expect(ipDelCliente(new Headers())).toBe("desconocida");
   });
 

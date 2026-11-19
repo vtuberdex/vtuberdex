@@ -11,6 +11,7 @@ import path from "node:path";
 import { createApp } from "../src/index.mjs";
 import { seedDatabase } from "../src/seed.mjs";
 import { openDatabase } from "../src/db/index.mjs";
+import { claveSegunBajas } from "../src/imagenes-de-baja.mjs";
 import { hashPassword } from "../src/auth.mjs";
 import {
   MutationError,
@@ -380,6 +381,37 @@ test("una ficha en grado 1 no tiene página pública: ni nombre, ni URL, ni veci
     );
     assert.equal(lista.phrase, null);
     assert.equal(lista.images.logo, null);
+    // Ninguna URL de imagen lleva el slug real (es el nombre): el personaje va por la ruta neutra.
+    assert.doesNotMatch(JSON.stringify(lista.images), /otra/);
+    if (lista.images.character) {
+      assert.equal(
+        lista.images.character,
+        "/images/character/deteriorada-31.webp",
+      );
+    }
+    // Y la ruta de imágenes: la neutra se traduce a la real, la real (y su alias) dan 404.
+    assert.deepEqual(
+      claveSegunBajas(db, "images/character/deteriorada-31.webp"),
+      {
+        key: "images/character/otra.webp",
+      },
+    );
+    assert.deepEqual(claveSegunBajas(db, "images/character/otra.webp"), {
+      bloqueada: true,
+    });
+    assert.deepEqual(claveSegunBajas(db, "images/logo/otra-vieja.webp"), {
+      bloqueada: true,
+    });
+    assert.deepEqual(claveSegunBajas(db, "images/logo/deteriorada-31.webp"), {
+      bloqueada: true,
+    });
+    assert.deepEqual(
+      claveSegunBajas(db, "images/character/deteriorada-30.webp"),
+      { bloqueada: true },
+    );
+    assert.deepEqual(claveSegunBajas(db, "images/character/alguien.webp"), {
+      key: "images/character/alguien.webp",
+    });
     assert.equal(lista.dexNumber, 31, "el número de dex se conserva");
     assert.equal(lista.premium.grade, "1");
     assert.equal(

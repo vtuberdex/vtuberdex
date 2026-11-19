@@ -25,6 +25,11 @@ import path from "node:path";
 import { resolveImageUrl, usesLocalImages } from "../../../lib/db.mjs";
 import { leerAssetRemoto, tursoConfigurado } from "../../../lib/ediciones.mjs";
 import { CARPETAS_PUBLICADAS } from "../../../lib/carpetas.mjs";
+import { dbConDiario } from "../../../lib/diario.mjs";
+import { claveSegunBajas } from "../../../server/src/imagenes-de-baja.mjs";
+
+/** TTL de la clave del diario (como en las rutas públicas): saber qué fichas son de baja. */
+const TTL_DIARIO_MS = 2000;
 import {
   ANCHO_LIBRO,
   CARPETAS_CON_VARIANTE,
@@ -267,7 +272,25 @@ function servirDeDisco(key, etagPedido) {
 /** El original de `key`. `etagPedido` es el `If-None-Match` ya traducido al ETag del original. */
 async function servirOriginal(request, { params }, etagPedido) {
   const { path: segments } = await params;
-  const key = `images/${Array.isArray(segments) ? segments.join("/") : segments}`;
+  const pedida = `images/${Array.isArray(segments) ? segments.join("/") : segments}`;
+  /**
+   * Fichas de BAJA (grado 1): su imagen se pide por una ruta neutra y la del slug real da 404, para que
+   * la URL no delate el nombre (ver `server/src/imagenes-de-baja.mjs`). Si la base no responde, se sirve
+   * como siempre: una caída no puede dejar el catálogo sin imágenes.
+   */
+  let key = pedida;
+  try {
+    const decision = claveSegunBajas(
+      await dbConDiario({ ttlMs: TTL_DIARIO_MS }),
+      pedida,
+    );
+    if (decision.bloqueada) {
+      return noPublicada(pedida);
+    }
+    key = decision.key;
+  } catch (error) {
+    console.error(`[images] sin comprobar las bajas: ${error.message}`);
+  }
 
   /**
    * El manifiesto decide qué se sirve, pero solo para las carpetas PUBLICADAS.

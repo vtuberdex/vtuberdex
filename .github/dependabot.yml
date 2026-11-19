@@ -16,6 +16,19 @@ updates:
       npm-root:
         patterns:
           - "*"
+  # server/ faltaba (auditoría 2026-11-19): sus módulos (`server/src/validation.mjs`…) los empaqueta la app de
+  # PRODUCCIÓN, con el zod de server/node_modules, y quedó en una versión vulnerable sin que nadie avisara.
+  - package-ecosystem: npm
+    directory: /server
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      npm-server:
+        patterns:
+          - "*"
   - package-ecosystem: npm
     directory: /scraper
     schedule:
