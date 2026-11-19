@@ -2,6 +2,14 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 import { createElement } from "react";
+import { en } from "@/lib/i18n/en";
+import { ja } from "@/lib/i18n/ja";
+import { registrarDiccionario } from "@/lib/i18n/mensajes";
+
+// En la app, inglés y japonés se cargan bajo demanda (`lib/i18n/mensajes.ts`); en las pruebas van
+// precargados para que cambiar de idioma siga siendo síncrono.
+registrarDiccionario("en", en);
+registrarDiccionario("ja", ja);
 
 // jsdom no tiene WebGL y el producto ya no tiene vista 2D de respaldo: el libro y la ficha
 // montan SIEMPRE un `<Canvas>`. Aquí es una caja inerte (los hijos son mallas de three, no

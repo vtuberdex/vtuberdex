@@ -19,14 +19,7 @@
  * suelta: su cámara, su inclinación hacia el puntero y su flotación. Los efectos se
  * activan desde `card3d-config.ts` y `card-texture.ts` sin ensuciar el shader.
  */
-import {
-  Component,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { Group } from "three";
 
@@ -35,6 +28,7 @@ import { cardPalette } from "@/lib/color";
 import * as CFG from "@/components/card3d-config";
 import { RenderGovernor } from "@/components/render-governor";
 import { useWebGLRecovery } from "@/components/webgl-recovery";
+import { WebGLBoundary } from "@/components/webgl-boundary";
 import { usarTimer } from "@/components/reloj-timer";
 import type { RootState } from "@react-three/fiber";
 import { CANVAS_FUERA_DE_FLUJO } from "@/components/canvas-fuera-de-flujo";
@@ -294,22 +288,6 @@ export interface HoloCardProps extends HoloCardSceneProps {
   className?: string;
 }
 
-export class WebGLBoundary extends Component<
-  { fallback: ReactNode; children: ReactNode },
-  { failed: boolean }
-> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  componentDidCatch(error: unknown) {
-    console.warn("[holo-card] fallo al dibujar la escena 3D", error);
-  }
-  render() {
-    return this.state.failed ? this.props.fallback : this.props.children;
-  }
-}
-
 export function HoloCard({
   card,
   holo = CFG.INTENSITY.holo.default,
@@ -408,3 +386,6 @@ export function HoloCard({
 }
 
 export default HoloCard;
+
+// Se reexporta por compatibilidad; vive en su archivo para que el libro no arrastre three al importarlo.
+export { WebGLBoundary } from "@/components/webgl-boundary";

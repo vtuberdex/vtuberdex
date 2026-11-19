@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { LOCALES, elegirLocale, localeDeEtiqueta } from "./locales";
-import { DICCIONARIOS, traducir } from "./mensajes";
+import { en } from "./en";
+import { es } from "./es";
+import { ja } from "./ja";
+import { traducir } from "./mensajes";
+
+/** Los tres completos (en la app, en/ja se cargan bajo demanda: ver `mensajes.ts`). */
+const DICCIONARIOS = { es, en, ja } as const;
 import {
   etiquetaDePerfil,
   etiquetaDeStat,

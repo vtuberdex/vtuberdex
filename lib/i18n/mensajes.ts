@@ -1,11 +1,47 @@
 // Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** Resolución de textos: pura (sin React ni DOM), para poder probarla y usarla desde cualquier lado. */
-import { en } from "./en";
 import { es, type Mensajes } from "./es";
-import { ja } from "./ja";
 import { LOCALE_POR_DEFECTO, type Locale } from "./locales";
 
-export const DICCIONARIOS: Record<Locale, Mensajes> = { es, en, ja };
+/**
+ * Diccionarios YA cargados. El español va siempre (es el HTML del servidor y el idioma por defecto);
+ * inglés y japonés se piden la primera vez que se eligen (`cargarDiccionario`).
+ *
+ * POR QUÉ: los tres idiomas viajaban en el JS de TODAS las páginas (~41 KB comprimidos, medido con
+ * `next analyze` el 2026-11-19) y la gran mayoría de las visitas no cambia nunca del español. Mientras
+ * llega el elegido se sigue viendo el idioma anterior (ver `I18nProvider`), nunca una mezcla.
+ */
+const DICCIONARIOS: Partial<Record<Locale, Mensajes>> = { es };
+
+const CARGADORES: Record<Exclude<Locale, "es">, () => Promise<Mensajes>> = {
+  en: () => import("./en").then((m) => m.en),
+  ja: () => import("./ja").then((m) => m.ja),
+};
+const enVuelo = new Map<Locale, Promise<void>>();
+
+export function diccionarioCargado(locale: Locale): boolean {
+  return DICCIONARIOS[locale] !== undefined;
+}
+
+/** Deja un diccionario disponible sin pedirlo (las pruebas precargan los tres en `test/setup.ts`). */
+export function registrarDiccionario(locale: Locale, mensajes: Mensajes): void {
+  DICCIONARIOS[locale] = mensajes;
+}
+
+/** Trae el diccionario de `locale` si falta. Las peticiones en vuelo se comparten; un fallo se puede reintentar. */
+export function cargarDiccionario(locale: Locale): Promise<void> {
+  if (diccionarioCargado(locale) || locale === "es") {
+    return Promise.resolve();
+  }
+  let pendiente = enVuelo.get(locale);
+  if (!pendiente) {
+    pendiente = CARGADORES[locale]()
+      .then((mensajes) => registrarDiccionario(locale, mensajes))
+      .finally(() => enVuelo.delete(locale));
+    enVuelo.set(locale, pendiente);
+  }
+  return pendiente;
+}
 
 type Sufijo = "_one" | "_other";
 /** Las claves tal como se PIDEN: `x_one` / `x_other` se piden como `x`. */
@@ -36,7 +72,10 @@ export function traducir(
 ): string {
   const n = variables && typeof variables.n === "number" ? variables.n : null;
   const buscar = (idioma: Locale): string | undefined => {
-    const dic = DICCIONARIOS[idioma] as Record<string, string>;
+    const dic = DICCIONARIOS[idioma] as Record<string, string> | undefined;
+    if (!dic) {
+      return undefined;
+    }
     if (n !== null) {
       const plural = dic[`${clave}_${categoriaPlural(idioma, n)}`];
       if (plural !== undefined) {

@@ -26,7 +26,13 @@ import {
   esLocale,
   type Locale,
 } from "./locales";
-import { traducir, type Clave, type Variables } from "./mensajes";
+import {
+  cargarDiccionario,
+  diccionarioCargado,
+  traducir,
+  type Clave,
+  type Variables,
+} from "./mensajes";
 
 export interface ContextoI18n {
   locale: Locale;
@@ -57,9 +63,31 @@ export function I18nProvider({
   children: ReactNode;
   inicial?: Locale;
 }>) {
+  // El PEDIDO (lo que eligió la persona) y el que se VE: el segundo solo cambia cuando su diccionario
+  // ya está cargado (`cargarDiccionario`), así la interfaz nunca mezcla dos idiomas.
   const [localeEstado, setLocaleEstado] = useState<Locale>(
     inicial ?? LOCALE_POR_DEFECTO,
   );
+  const [localeVisible, setLocaleVisible] = useState<Locale>(() =>
+    diccionarioCargado(localeEstado) ? localeEstado : LOCALE_POR_DEFECTO,
+  );
+  useEffect(() => {
+    if (diccionarioCargado(localeEstado)) {
+      setLocaleVisible(localeEstado);
+      return;
+    }
+    let vigente = true;
+    cargarDiccionario(localeEstado)
+      .then(() => {
+        if (vigente) {
+          setLocaleVisible(localeEstado);
+        }
+      })
+      .catch(() => undefined /* sin red: se queda el idioma que se ve */);
+    return () => {
+      vigente = false;
+    };
+  }, [localeEstado]);
 
   useEffect(() => {
     if (inicial) {
@@ -76,8 +104,8 @@ export function I18nProvider({
   }, [inicial]);
 
   useEffect(() => {
-    document.documentElement.lang = BCP47[localeEstado];
-  }, [localeEstado]);
+    document.documentElement.lang = BCP47[localeVisible];
+  }, [localeVisible]);
 
   const setLocale = useCallback((nuevo: Locale) => {
     if (!esLocale(nuevo)) {
@@ -93,11 +121,11 @@ export function I18nProvider({
 
   const valor = useMemo<ContextoI18n>(
     () => ({
-      locale: localeEstado,
+      locale: localeVisible,
       setLocale,
-      t: (clave, variables) => traducir(localeEstado, clave, variables),
+      t: (clave, variables) => traducir(localeVisible, clave, variables),
     }),
-    [localeEstado, setLocale],
+    [localeVisible, setLocale],
   );
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }

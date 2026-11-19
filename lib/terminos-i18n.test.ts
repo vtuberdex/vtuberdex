@@ -1,8 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { LOCALES } from "./i18n/locales";
 import { CLAUSULAS } from "./terminos";
-import { terminosDe } from "./terminos-i18n";
+import { cargarTerminos, terminosCargados, terminosDe } from "./terminos-i18n";
+
+// En la app la traducción se carga al elegir el idioma; aquí se cargan todas antes de comparar.
+beforeAll(async () => {
+  for (const locale of LOCALES) {
+    await cargarTerminos(locale);
+  }
+});
 
 describe("terminos traducidos", () => {
   for (const locale of LOCALES) {
@@ -35,5 +42,13 @@ describe("terminos traducidos", () => {
     expect(terminosDe("es").textosPagina.notaTraduccion).toBe("");
     expect(terminosDe("en").textosPagina.notaTraduccion).not.toBe("");
     expect(terminosDe("ja").textosPagina.notaTraduccion).not.toBe("");
+  });
+});
+
+describe("carga bajo demanda", () => {
+  it("el español va siempre; en/ja quedan cargados tras pedirlos", () => {
+    expect(terminosCargados("es")).toBe(true);
+    expect(terminosCargados("en")).toBe(true);
+    expect(terminosCargados("ja")).toBe(true);
   });
 });

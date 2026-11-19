@@ -9,6 +9,7 @@
  * conocida (`DADOS`), así que el panel no depende de que la escena le avise (y se prueba sin WebGL).
  * La escena se monta tras hidratar y solo con la pestaña abierta: un canvas por pantalla.
  */
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -19,12 +20,18 @@ import {
   tirar,
   type TipoDeDado,
 } from "@/components/dados/dados-geometria";
-import { EscenaDados, type DadoEnMesa } from "@/components/dados/escena-dados";
+import type { DadoEnMesa } from "@/components/dados/escena-dados";
 import {
   FRACCION_DEL_DADO,
   type CarasDelDado,
 } from "@/components/admin/kit-habilidades";
 import { ghostButton, primaryButton } from "@/components/admin/ui";
+
+/** La mesa 3D (three + R3F) en un chunk propio: solo la baja quien abre la pestaña «Dados». */
+const EscenaDados = dynamic(
+  () => import("@/components/dados/escena-dados").then((m) => m.EscenaDados),
+  { ssr: false },
+);
 
 interface Tirada {
   id: number;

@@ -23,8 +23,12 @@ describe("DadosPanel", () => {
     vi.restoreAllMocks();
   });
 
-  it("arma la bandeja, tira y muestra el resultado cuando los dados terminan de rodar", () => {
+  it("arma la bandeja, tira y muestra el resultado cuando los dados terminan de rodar", async () => {
     render(<DadosPanel />);
+    // La mesa 3D llega en su propio chunk (`next/dynamic`): se espera a que resuelva el import.
+    await act(async () => {
+      await vi.dynamicImportSettled();
+    });
     expect(screen.getByTestId("r3f-canvas")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "+ d20" }));
     const tirarBoton = screen.getByRole("button", { name: "Tirar 2d6 + 1d20" });
