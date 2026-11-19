@@ -44,7 +44,6 @@ import {
   CanvasTexture,
   Color,
   FrontSide,
-  PMREMGenerator,
   SRGBColorSpace,
   ShaderMaterial,
   Texture,
@@ -80,6 +79,7 @@ import {
 import { iconosDeFaccion } from "@/components/card-texture/facciones";
 import type { ColorPredominante } from "@/components/card-texture/predominante";
 import { refuerzoDeGrado } from "@/components/premium-boost";
+import { prefiltrarEquirectangular } from "@/components/pmrem-sin-mipmaps-vacios";
 import {
   anclar,
   generarTexturas,
@@ -134,10 +134,8 @@ export function useSharedCardEnv(): SharedCardEnv {
     if (!envMap) {
       return null;
     }
-    const pmrem = new PMREMGenerator(gl);
-    const prefiltrada = pmrem.fromEquirectangular(envMap).texture;
-    pmrem.dispose();
-    return prefiltrada;
+    // Sin generar mipmaps sobre un cube map vacío (aviso de Firefox): ver `pmrem-sin-mipmaps-vacios.ts`.
+    return prefiltrarEquirectangular(gl, envMap);
   }, [envMap, gl]);
 
   useEffect(

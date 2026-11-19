@@ -288,22 +288,22 @@ pestaña «Solicitudes» en el mantenedor. **Nada se publica solo**: cada envío
   `POST/GET /api/{inscripciones,modificaciones}/imagen`). Antes el avatar y el logo eran ENLACES porque un formulario público que recibe
   archivos es una puerta a subir basura; se cambió a subida con estas defensas, TODAS en el servidor:
   · **Solo WebP y solo bytes que el servidor pueda verificar**: en producción no hay `sharp`, así que el navegador decodifica y reexporta la
-    imagen a un lienzo (`normalizarImagenDeSolicitud` en `lib/imagen-cliente.ts`: personaje 720x1008 `cover` anclado arriba, logo ≤ 900 px con
-    alfa) y el servidor recorre el contenedor RIFF (`validarWebp`): tamaño declarado = real (nada pegado al final), solo trozos
-    `VP8 `/`VP8L`/`VP8X`/`ALPH`/`ICCP`, una sola imagen, sin animación, EXIF ni XMP. Medidas EXACTAS (personaje) o 64-900 px (logo), ≤ 900 KB
-    (nginx corta en 1 MB). Validado también contra un WebP real de `sharp` (`server/test/api.test.mjs`).
+  imagen a un lienzo (`normalizarImagenDeSolicitud` en `lib/imagen-cliente.ts`: personaje 720x1008 `cover` anclado arriba, logo ≤ 900 px con
+  alfa) y el servidor recorre el contenedor RIFF (`validarWebp`): tamaño declarado = real (nada pegado al final), solo trozos
+  `VP8 `/`VP8L`/`VP8X`/`ALPH`/`ICCP`, una sola imagen, sin animación, EXIF ni XMP. Medidas EXACTAS (personaje) o 64-900 px (logo), ≤ 900 KB
+  (nginx corta en 1 MB). Validado también contra un WebP real de `sharp` (`server/test/api.test.mjs`).
   · **Se exige la credencial del formulario** (`x-credencial`: la `sesion` o el `permiso`, MIRADA sin gastarla): sin correo verificado no se
-    sube. El correo sale de la credencial y en la tabla solo queda una huella (`huellaDeCorreo`). Una imagen por tipo y correo (subir otra
-    reemplaza), 12 subidas por correo y 30 por red al día. La vista previa solo la ve quien la subió (404 igual si es de otra persona).
+  sube. El correo sale de la credencial y en la tabla solo queda una huella (`huellaDeCorreo`). Una imagen por tipo y correo (subir otra
+  reemplaza), 12 subidas por correo y 30 por red al día. La vista previa solo la ve quien la subió (404 igual si es de otra persona).
   · **El formulario lleva IDs** (`imageId`/`logoId`), no bytes; `crearSolicitud` comprueba que son de ese correo, del tipo y sin usar.
-    Inscripción: obligatorias; modificación: opcionales. El borrador guarda solo el id (`sanearBorrador`); si la imagen caducó, el
-    componente lo detecta y pide subirla de nuevo.
+  Inscripción: obligatorias; modificación: opcionales. El borrador guarda solo el id (`sanearBorrador`); si la imagen caducó, el
+  componente lo detecta y pide subirla de nuevo.
   · **Nada se queda si no se aprueba** (`LIMITES`, `purgarCaducadas`, sin trabajo programado: se llama al subir y al listar la cola): 24 h
-    sin enviar, 30 días en una solicitud pendiente, 7 días en una ya resuelta, y se borran de inmediato al RECHAZAR.
+  sin enviar, 30 días en una solicitud pendiente, 7 días en una ya resuelta, y se borran de inmediato al RECHAZAR.
   · **Aprobar las aplica**: `aplicarImagenesDeSolicitud` las copia a la ficha (producción: `guardarAssetDelMantenedor`, origen
-    `mantenedor`; Express local: `saveUploadedImage` con `sharp` + `registrarAsset`) y borra las copiadas. Si una falla NO se rompe la
-    aprobación: `imagenes.fallidas` en la respuesta, el mantenedor la sube a mano desde «Imágenes». En una MODIFICACIÓN reemplazan a las
-    actuales (la vista previa lo avisa). El mantenedor las ve antes (`ImagenesSubidas`, `GET /api/admin/solicitudes/:id/imagenes[|imagen/:tipo]`).
+  `mantenedor`; Express local: `saveUploadedImage` con `sharp` + `registrarAsset`) y borra las copiadas. Si una falla NO se rompe la
+  aprobación: `imagenes.fallidas` en la respuesta, el mantenedor la sube a mano desde «Imágenes». En una MODIFICACIÓN reemplazan a las
+  actuales (la vista previa lo avisa). El mantenedor las ve antes (`ImagenesSubidas`, `GET /api/admin/solicitudes/:id/imagenes[|imagen/:tipo]`).
   · Las solicitudes antiguas con enlaces (`imageUrl`/`logoUrl`) siguen mostrándose en la cola; el esquema nuevo ya no los acepta.
   · Términos 4.12, 19.4 y 20.5 (`TERMINOS_VERSION` 2026-10-20b).
 - `/api/admin/solicitudes*` sale 404 sin Turso ni proxy local, como el resto del mantenedor.
@@ -676,6 +676,7 @@ JAVA_HOME=…/jdk25 ./gradlew build`.
 Un TERCER plugin, aparte del principal y de las mochilas (`~/.motita/workspace/vtuberdex-entregas`, paquete `com.vtuberdex.entregas`), que
 depende de los dos y solo usa su API pública. Se compila DESPUÉS de ellos (`build.gradle.kts` lee sus jars de `build/libs/`):
 mochilas y principal → entregas. Todo es del mundo principal; los de la sala de espera no llegan.
+
 - **API que se añadió a los otros dos**: `MochilasPlugin` (`llevaMochila`, `capacidadLibre`, `fraccionDeCarga`, `guardar`, `contar`,
   `sacar`; cierran la ventana de la mochila antes de escribir, porque al cerrarse reescribe la página y pisaría el cambio) y
   `VtuberDexPlugin` (`darXp(jugador, motivo, cantidad)`, `tieneFicha`).
@@ -706,13 +707,13 @@ mochilas y principal → entregas. Todo es del mundo principal; los de la sala d
   los displays). Se GANA (3 entregas; libre para las fichas de `moto.libre-para-fichas`, reconocidas por la ficha VINCULADA vía
   `slugDe`, nunca por el nombre de cuenta) y se entrega como **Llave de moto** (ítem ligado). Trampas que ya costaron:
   · **Clicar la moto con la llave en la mano la reemplazaba**: el cliente manda «usar sobre la entidad» Y «usar el ítem»; el segundo
-    retiraba la moto recién montada y tiraba al conductor. Hoy la llave MONTA tu moto si está a ≤ 8 bloques y no hace nada montado.
+  retiraba la moto recién montada y tiraba al conductor. Hoy la llave MONTA tu moto si está a ≤ 8 bloques y no hace nada montado.
   · **Medidas reales, no estimadas** (servidor de prueba + cliente): un pasajero se ancla a **1,444 × escala** sobre los pies del caballo
-    (lineal: 1 → 1,444, 0,8 → 1,155) y 0 en X/Z. Con escala 1 el conductor quedaba ~25 cm alto: el caballo va a **escala 0,82**.
+  (lineal: 1 → 1,444, 0,8 → 1,155) y 0 en X/Z. Con escala 1 el conductor quedaba ~25 cm alto: el caballo va a **escala 0,82**.
   · Un caballo invisible SIGUE dibujando silla y riendas: la silla lleva un modelo de equipo inexistente (`vtuberdex:vacio`).
   · Los displays nacen con guiñada 0 (si heredan la de quien llama, la moto sale «ladeada» ese ángulo).
   · La caja del caballo es menor que el modelo: hay una `Interaction` de 1,8×1,1 que sigue al caballo (no como pasajera: se anclaría
-    a 1,18 de alto) y se encoge a 0 montado (si no, se tragaría los clics del conductor).
+  a 1,18 de alto) y se encoge a 0 montado (si no, se tragaría los clics del conductor).
   · Aparece en el primer hueco libre con suelo firme por delante (antes, a ciegas, podía quedar dentro de un bloque).
 - **Probar con un cliente REAL (lo que de verdad funcionó)**: Paper de prueba (la versión del encabezado) + `portablemc` (cliente 26.2 offline, instalado en
   `~/.local/share/vtuberdex-build/mc-cliente`, NO en /tmp que es RAM) en `Xvfb` con `LIBGL_ALWAYS_SOFTWARE=1`, control por XTest
@@ -861,6 +862,16 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
 
 ## Trampas conocidas (ya nos costaron tiempo)
 
+- **Consola limpia en Firefox (2026-11-19)**: cada aviso tenía causa propia. `THREE.Clock` obsoleto (r183) → el reloj de R3F
+  se cambia por `RelojTimer` sobre `THREE.Timer` en el `onCreated` de cada `<Canvas>` (`components/reloj-timer.ts`, que también
+  calla SOLO dos avisos sin acción posible: la construcción de `Clock` que hace R3F por dentro y `KHR_parallel_shader_compile`).
+  `generateMipmap ... TEXTURE_CUBE_MAP ... lazy initialization` → PMREM r187 genera mipmaps al RESERVAR su cube map de origen
+  (`pmrem-sin-mipmaps-vacios.ts` le da uno ya reservado sin ellos). `mozPressure`/`mozInputSource` → R3F copia el evento con
+  `for…in` (`eventos-sin-moz.ts` borra esos dos getters del prototipo). `longtask` no existe en Firefox → `supportedEntryTypes`.
+  `WEBGL_debug_renderer_info` obsoleta y «WebGL context was lost» → la telemetría abría un contexto propio para leer la GPU;
+  ahora la lee del canvas de la página (`anotarContextoWebGL`) y solo pide la extensión si `RENDERER` es genérico (Chrome).
+  Para cazar el origen de un aviso de WebGL: CDP + `Page.addScriptToEvaluateOnNewDocument` que envuelva la llamada y haga
+  `console.log(new Error().stack)`.
 - **El canvas de la carta NO puede medir su propio contenedor (responsive roto al
   redimensionar en vivo).** three.js escribe el tamaño medido en el estilo INLINE del
   canvas (`width: 414px`), y un canvas en el flujo aporta ese ancho a la cadena de

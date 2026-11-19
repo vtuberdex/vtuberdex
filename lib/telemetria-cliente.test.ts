@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   categoriaDeRuta,
   clasificarGpu,
+  rendererDeContexto,
   fichaDeRuta,
   idDeSesion,
   iniciarTelemetria,
@@ -183,5 +184,44 @@ describe("iniciarTelemetria", () => {
     const limpiar = vi.spyOn(window, "clearInterval");
     iniciarTelemetria().detener();
     expect(limpiar).toHaveBeenCalled();
+  });
+});
+
+describe("rendererDeContexto (sin abrir un contexto propio)", () => {
+  const contexto = (renderer: string, desenmascarado: string | null) => {
+    const pedidas: string[] = [];
+    return {
+      pedidas,
+      gl: {
+        RENDERER: 1,
+        getParameter: (p: number) => (p === 1 ? renderer : desenmascarado),
+        getExtension: (nombre: string) => {
+          pedidas.push(nombre);
+          return desenmascarado === null
+            ? null
+            : { UNMASKED_RENDERER_WEBGL: 2 };
+        },
+      },
+    };
+  };
+
+  it("Firefox: RENDERER ya trae el renderizador y NO se pide la extensión obsoleta", () => {
+    const { gl, pedidas } = contexto("llvmpipe, or similar", "nunca");
+    expect(rendererDeContexto(gl)).toBe("llvmpipe, or similar");
+    expect(pedidas).toEqual([]);
+  });
+
+  it("Chrome: RENDERER es genérico y el real sale de la extensión", () => {
+    const { gl, pedidas } = contexto(
+      "WebKit WebGL",
+      "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device))",
+    );
+    expect(rendererDeContexto(gl)).toContain("SwiftShader");
+    expect(pedidas).toEqual(["WEBGL_debug_renderer_info"]);
+  });
+
+  it("sin extensión se queda con lo que diga RENDERER", () => {
+    const { gl } = contexto("WebKit WebGL", null);
+    expect(rendererDeContexto(gl)).toBe("WebKit WebGL");
   });
 });

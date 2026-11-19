@@ -42,6 +42,7 @@ import {
 } from "@/components/dados/dados-geometria";
 import { colorDelHumo, crearMaterialDeHumo } from "@/components/dados/humo";
 import { usarTimer } from "@/components/reloj-timer";
+import { prepararOrigenDePmrem } from "@/components/pmrem-sin-mipmaps-vacios";
 
 /** Perillas de la escena. Calibradas mirando la bandeja renderizada. */
 export const ESCENA = {
@@ -325,6 +326,8 @@ function Entorno() {
   const { gl, scene } = useThree();
   useEffect(() => {
     const pmrem = new PMREMGenerator(gl);
+    // Origen ya reservado sin mipmaps: sin esto Firefox avisa de mipmaps sobre caras vacías (ver el módulo).
+    prepararOrigenDePmrem(pmrem, gl, 256, true);
     const sala = new RoomEnvironment();
     const mapa = pmrem.fromScene(sala, 0.04).texture;
     scene.environment = mapa;
