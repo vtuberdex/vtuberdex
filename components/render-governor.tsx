@@ -11,11 +11,11 @@
  *
  * (Hubo un tercero, el DPR ADAPTATIVO, que medía la cadencia y bajaba la resolución. Se retiró: la
  * resolución del canvas es FIJA y no hay medición por frame.)
- * POR QUÉ NO `PerformanceMonitor` de drei: cuenta TODOS los frames, y en reposo (20 fps a
+ * POR QUÉ NO `PerformanceMonitor` de drei: cuenta TODOS los frames, y en reposo (30 fps a
  * propósito) leería «rendimiento pobre» y bajaría la resolución sin motivo. Aquí solo se miden
  * los intervalos entre frames activos (ver `render-pacing.ts`).
  *
- * TRAMPA DEL RELOJ: en `demand` el reloj de three sigue corriendo durante la pausa, así que el
+ * TRAMPA DEL RELOJ: en `demand` el reloj (`THREE.Timer`, ver `reloj-timer.ts`) sigue corriendo durante la pausa fuera de pantalla, así que el
  * primer frame al volver traería un `delta` de minutos y `advanceFlip` (que integra por delta)
  * saltaría el giro entero. Al reanudar se descarta con `clock.getDelta()`.
  */

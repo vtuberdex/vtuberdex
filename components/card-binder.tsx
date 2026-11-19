@@ -70,6 +70,8 @@ import {
 import { RenderGovernor } from "@/components/render-governor";
 import { esFichaDeteriorada } from "@/lib/premium";
 import { useWebGLRecovery } from "@/components/webgl-recovery";
+import { usarTimer } from "@/components/reloj-timer";
+import { CANVAS_FUERA_DE_FLUJO } from "@/components/canvas-fuera-de-flujo";
 import {
   CardEnvContext,
   useCardMaterials,
@@ -348,7 +350,8 @@ function BinderScene({
         if (nuevo.token >= 0 && !nuevo.done) {
           nuevo.progress = advanceFlip(nuevo.progress, delta, nuevo.ready);
         }
-        nuevo.theta = nuevo.token >= 0 ? sheetAngle(nuevo.dir, nuevo.progress) : 0;
+        nuevo.theta =
+          nuevo.token >= 0 ? sheetAngle(nuevo.dir, nuevo.progress) : 0;
         sheetMatrix(nuevo.theta, nuevo.sheet);
         const b = book.current;
         nuevo.book.x = b?.rotation.x ?? 0;
@@ -598,7 +601,10 @@ export function CardBinder({
     }
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-    if (Math.abs(dx) < BINDER.swipeMinPx || Math.abs(dx) <= Math.abs(dy) * 1.2) {
+    if (
+      Math.abs(dx) < BINDER.swipeMinPx ||
+      Math.abs(dx) <= Math.abs(dy) * 1.2
+    ) {
       return;
     }
     go(dx < 0 ? 1 : -1);
@@ -631,7 +637,10 @@ export function CardBinder({
   );
   const { attach } = recovery;
   const onCanvasCreated = useCallback(
-    ({ gl }: { gl: { domElement: HTMLCanvasElement } }) => attach(gl.domElement),
+    (state: RootState) => {
+      usarTimer(state);
+      attach(state.gl.domElement);
+    },
     [attach],
   );
   const { spreadW, pageW, pageH } = bookDimensions();
@@ -669,34 +678,33 @@ export function CardBinder({
         ) : (
           <WebGLBoundary fallback={<BinderUnavailable />}>
             {threeD && (
-              /* Caja posicionada: el canvas no puede participar del layout (ver `holo-card.tsx`). */
-              <div className="absolute inset-0">
-                <Canvas
-                  key={recovery.canvasKey}
-                  frameloop="demand"
-                  dpr={[1, CFG.RENDER.dprMax]}
-                  gl={{
-                    antialias: true,
-                    alpha: true,
-                    powerPreference: "high-performance",
-                  }}
-                  camera={{
-                    fov: CFG.GEOMETRY.cameraFov,
-                    position: [0, 0, fitCameraZ(frameW / pageH)],
-                  }}
-                  onCreated={onCanvasCreated}
-                >
-                  <BinderScene
-                    placements={placements}
-                    flip={flip}
-                    ready={arrived}
-                    focus={focus}
-                    textureWidth={textureWidth}
-                    onFlipEnd={onFlipEnd}
-                    onOpen={onOpen}
-                  />
-                </Canvas>
-              </div>
+              /* La caja de R3F va posicionada (`CANVAS_FUERA_DE_FLUJO`): el canvas no puede participar del layout (ver `holo-card.tsx`). */
+              <Canvas
+                style={CANVAS_FUERA_DE_FLUJO}
+                key={recovery.canvasKey}
+                frameloop="demand"
+                dpr={[1, CFG.RENDER.dprMax]}
+                gl={{
+                  antialias: true,
+                  alpha: true,
+                  powerPreference: "high-performance",
+                }}
+                camera={{
+                  fov: CFG.GEOMETRY.cameraFov,
+                  position: [0, 0, fitCameraZ(frameW / pageH)],
+                }}
+                onCreated={onCanvasCreated}
+              >
+                <BinderScene
+                  placements={placements}
+                  flip={flip}
+                  ready={arrived}
+                  focus={focus}
+                  textureWidth={textureWidth}
+                  onFlipEnd={onFlipEnd}
+                  onOpen={onOpen}
+                />
+              </Canvas>
             )}
           </WebGLBoundary>
         )}

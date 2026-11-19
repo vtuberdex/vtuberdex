@@ -31,6 +31,25 @@ const fuente = readFileSync(
   "utf8",
 );
 
+/** Props del `<Canvas>` (hasta el `>` que abre sus hijos, tras `onCreated`). */
+function bloqueCanvas(texto: string): string {
+  const inicio = texto.indexOf("<Canvas");
+  const props = texto.indexOf(
+    "\n            >",
+    texto.indexOf("onCreated", inicio),
+  );
+  const fin = props > -1 ? props : texto.indexOf("</Canvas>", inicio);
+  return texto.slice(inicio, fin);
+}
+
+describe("estilo de la caja del canvas", () => {
+  it("es absoluta, ocupa el contenedor y no declara tamaño", async () => {
+    const { CANVAS_FUERA_DE_FLUJO } =
+      await import("@/components/canvas-fuera-de-flujo");
+    expect(CANVAS_FUERA_DE_FLUJO).toEqual({ position: "absolute", inset: 0 });
+  });
+});
+
 /** Bloque JSX devuelto por `HoloCard`. */
 const render = fuente.slice(fuente.indexOf("return (\n    <div"));
 
@@ -43,12 +62,11 @@ describe("layout del canvas", () => {
   });
 
   it("el canvas vive en una caja posicionada, fuera del flujo", () => {
-    const caja = render.indexOf('<div className="absolute inset-0">');
-    const canvas = render.indexOf("<Canvas");
-    expect(caja).toBeGreaterThan(-1);
-    // Entre la caja y el canvas no puede cerrarse la caja: el canvas va DENTRO.
-    expect(canvas).toBeGreaterThan(caja);
-    expect(render.slice(caja, canvas)).not.toContain("</div>");
+    expect(bloqueCanvas(render)).toContain("style={CANVAS_FUERA_DE_FLUJO}");
+  });
+
+  it("sin caja propia repetida alrededor del Canvas (la de R3F ya ocupa el rectángulo)", () => {
+    expect(render).not.toContain('<div className="absolute inset-0">');
   });
 
   it("no hay vista 2D de respaldo: el producto asume GPU", () => {
@@ -59,9 +77,7 @@ describe("layout del canvas", () => {
   it("el canvas no se declara con tamaño propio (la medida la fija el contenedor)", () => {
     // Un `style` o una clase de tamaño en el Canvas devolvería el lazo: el contenedor
     // pasaría a depender de la medida que el canvas escribe.
-    const canvas = render.indexOf("<Canvas");
-    const cierre = render.indexOf("</Canvas>");
-    const bloque = render.slice(canvas, cierre);
+    const bloque = bloqueCanvas(render);
     expect(bloque).not.toMatch(/style=\{\{/);
     expect(bloque).not.toMatch(/\bwidth:|\bheight:/);
   });
@@ -79,22 +95,16 @@ const fuenteLibro = readFileSync(
 
 describe("layout del canvas del libro", () => {
   it("el canvas del libro vive en una caja posicionada dentro de una raíz `relative`", () => {
-    const caja = fuenteLibro.indexOf('<div className="absolute inset-0">');
-    const canvas = fuenteLibro.indexOf("<Canvas");
-    expect(caja).toBeGreaterThan(-1);
-    expect(canvas).toBeGreaterThan(caja);
-    expect(fuenteLibro.slice(caja, canvas)).not.toContain("</div>");
+    expect(bloqueCanvas(fuenteLibro)).toContain(
+      "style={CANVAS_FUERA_DE_FLUJO}",
+    );
+    expect(fuenteLibro).not.toContain('<div className="absolute inset-0">\n');
     // La raíz que lo contiene es la superficie de gestos, posicionada.
     expect(fuenteLibro).toMatch(/className="relative mx-auto select-none"/);
   });
 
   it("el canvas del libro no se declara con tamaño propio", () => {
-    const canvas = fuenteLibro.indexOf("<Canvas");
-    const cierre = fuenteLibro.indexOf(
-      ">",
-      fuenteLibro.indexOf("onCreated", canvas),
-    );
-    const bloque = fuenteLibro.slice(canvas, cierre);
+    const bloque = bloqueCanvas(fuenteLibro);
     expect(bloque).not.toMatch(/style=\{\{/);
     expect(bloque).not.toMatch(/\bwidth:|\bheight:/);
   });

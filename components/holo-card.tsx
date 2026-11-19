@@ -35,6 +35,9 @@ import { cardPalette } from "@/lib/color";
 import * as CFG from "@/components/card3d-config";
 import { RenderGovernor } from "@/components/render-governor";
 import { useWebGLRecovery } from "@/components/webgl-recovery";
+import { usarTimer } from "@/components/reloj-timer";
+import type { RootState } from "@react-three/fiber";
+import { CANVAS_FUERA_DE_FLUJO } from "@/components/canvas-fuera-de-flujo";
 import {
   CARD_TEXTURE_HEIGHT,
   CARD_TEXTURE_WIDTH,
@@ -327,8 +330,10 @@ export function HoloCard({
   };
   const { attach } = recovery;
   const onCanvasCreated = useCallback(
-    ({ gl }: { gl: { domElement: HTMLCanvasElement } }) =>
-      attach(gl.domElement),
+    (state: RootState) => {
+      usarTimer(state);
+      attach(state.gl.domElement);
+    },
     [attach],
   );
 
@@ -356,6 +361,10 @@ export function HoloCard({
    * medida la fija siempre el contenedor, en cualquier orden de redimensión
    * (rotar el móvil, abrir el inspector, girar la tablet).
    *
+   * La caja posicionada es la PROPIA de R3F (`style={CANVAS_FUERA_DE_FLUJO}`), no
+   * un div nuestro alrededor: ese div duplicaba la caja de R3F y dejaba cuatro capas
+   * apiladas sobre el mismo rectángulo (ver `canvas-fuera-de-flujo.ts`).
+   *
    * Ningún gate ve este fallo: jsdom no mide, y el componente compila y renderiza
    * bien. Lo que lo fija es `holo-card-layout.test.ts`, que comprueba que esta
    * caja siga existiendo.
@@ -367,32 +376,31 @@ export function HoloCard({
     >
       <WebGLBoundary fallback={null}>
         {recovery.canRender && (
-          <div className="absolute inset-0">
-            <Canvas
-              key={recovery.canvasKey}
-              frameloop="demand"
-              dpr={plan.dpr}
-              gl={{
-                antialias: true,
-                alpha: true,
-                powerPreference: "high-performance",
-              }}
-              camera={{
-                fov: CFG.GEOMETRY.cameraFov,
-                position: [0, 0, cameraZFor(card)],
-              }}
-              onCreated={onCanvasCreated}
-            >
-              <RenderGovernor wake={card} idleFps={CFG.RENDER.idleFpsDetail} />
-              <Rig accent={palette.accent} cameraZ={cameraZFor(card)} />
-              <CardMesh
-                card={card}
-                holo={holo}
-                gloss={gloss}
-                textureWidth={plan.textureWidth}
-              />
-            </Canvas>
-          </div>
+          <Canvas
+            style={CANVAS_FUERA_DE_FLUJO}
+            key={recovery.canvasKey}
+            frameloop="demand"
+            dpr={plan.dpr}
+            gl={{
+              antialias: true,
+              alpha: true,
+              powerPreference: "high-performance",
+            }}
+            camera={{
+              fov: CFG.GEOMETRY.cameraFov,
+              position: [0, 0, cameraZFor(card)],
+            }}
+            onCreated={onCanvasCreated}
+          >
+            <RenderGovernor wake={card} idleFps={CFG.RENDER.idleFpsDetail} />
+            <Rig accent={palette.accent} cameraZ={cameraZFor(card)} />
+            <CardMesh
+              card={card}
+              holo={holo}
+              gloss={gloss}
+              textureWidth={plan.textureWidth}
+            />
+          </Canvas>
         )}
       </WebGLBoundary>
     </div>

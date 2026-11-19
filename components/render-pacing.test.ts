@@ -93,8 +93,8 @@ describe("tope de 24 fps con agenda fija (nextSchedule)", () => {
   };
   const fps = (ts: number[], segundos = 5) => ts.length / segundos;
 
-  it("el tope por defecto es 60", () => {
-    expect(RENDER.activeFps).toBe(60);
+  it("por defecto no hay tope activo: cadencia nativa del monitor", () => {
+    expect(RENDER.activeFps).toBe(0);
   });
 
   it.each([60, 75, 120, 144, 165])(
