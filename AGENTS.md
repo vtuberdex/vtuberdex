@@ -862,6 +862,12 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
 
 ## Trampas conocidas (ya nos costaron tiempo)
 
+- **BlueMap pasa a `mapa.vtuberdex.com` en cuanto exista su DNS (registro A a la VPS, sin proxy de Cloudflare).** Ya está todo
+  preparado y no hay que tocar nada más: `vtuberdex-https` (corre tras cada pasada de `ssl-dominios`, cada 5 min; copia en
+  `infra/sbin/`) amplía el certificado de vtuberdex.com con ese nombre, escribe `conf.d/00-d-mapa.vtuberdex.com-https.conf`, pone el
+  HTTP del subdominio a redirigir a HTTPS y cambia `snippets/vtuberdex-mapa.conf` para que `/mapa/` de la web sea un 301 al
+  subdominio. Si `nginx -t` falla, revierte. Mientras no haya DNS, el mapa sigue en `/mapa/`. Por qué: BlueMap es de terceros y en
+  el mismo origen un XSS suyo alcanzaría la sesión del mantenedor. Si cambias la ampliación de `www` en ese script, conserva `mapa`.
 - **Auditoría de seguridad (2026-11-19), tanda baja.** (14) Pedir un enlace de «Mi ficha» anula los anteriores del mismo correo
   (`crearToken`, propósito `ficha`: dura 7 días y no se gasta). (15) `sesion_admin` guarda el sha256 del token, no el token. (16) CSP
   mínima (`object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'`, en `next.config.mjs`) y sin
