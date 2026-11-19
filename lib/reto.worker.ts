@@ -10,6 +10,10 @@ import { resolverReto } from "./reto-pow";
 self.onmessage = async (
   evento: MessageEvent<{ reto: string; bits: number }>,
 ) => {
+  // Un worker dedicado solo recibe de quien lo creó (origen vacío o el propio); cualquier otro se ignora.
+  if (evento.origin && evento.origin !== self.location.origin) {
+    return;
+  }
   try {
     const solucion = await resolverReto(evento.data.reto, evento.data.bits);
     self.postMessage({ solucion });

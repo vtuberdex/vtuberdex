@@ -103,6 +103,25 @@ export async function reducir(kind, bytes) {
   };
 }
 
+/** La versión reducida si vale la pena (cumple `AHORRO_MINIMO`); `null` si no hay que tocarla. */
+async function reduccionQueConviene(f, bytes) {
+  try {
+    const r = await reducir(f.kind, bytes);
+    return r && r.bytes.length <= f.peso * (1 - AHORRO_MINIMO) ? r : null;
+  } catch (e) {
+    console.warn(`omitida ${f.kind}/${f.slug} (${f.origen}): ${e.message}`);
+    return null;
+  }
+}
+
+/** Guarda el original ANTES de reescribir la fila: es la única copia de lo que subió el mantenedor. */
+function respaldarOriginal(carpeta, f, bytes) {
+  const ext = f.mime === "image/png" ? "png" : "webp";
+  const destino = path.join(carpeta, f.origen, f.kind);
+  mkdirSync(destino, { recursive: true });
+  writeFileSync(path.join(destino, `${f.slug}.${ext}`), Buffer.from(bytes));
+}
+
 async function main() {
   const { values } = parseArgs({
     options: {
@@ -143,19 +162,8 @@ async function main() {
     total.filas += 1;
     total.antes += f.peso;
     const { bytes } = leer.get(f.slug, f.kind, f.origen);
-    let r;
-    try {
-      r = await reducir(f.kind, bytes);
-    } catch (e) {
-      console.warn(`omitida ${f.kind}/${f.slug} (${f.origen}): ${e.message}`);
-      total.despues += f.peso;
-      continue;
-    }
-    if (r === null) {
-      total.despues += f.peso;
-      continue;
-    }
-    if (r.bytes.length > f.peso * (1 - AHORRO_MINIMO)) {
+    const r = await reduccionQueConviene(f, bytes);
+    if (!r) {
       total.despues += f.peso;
       continue;
     }
@@ -164,30 +172,18 @@ async function main() {
     console.log(
       `${f.kind}/${f.slug} (${f.origen}) ${r.antes.w}x${r.antes.h} ${Math.round(f.peso / 1024)} KB -> ${r.w}x${r.h} ${Math.round(r.bytes.length / 1024)} KB`,
     );
-    if (values.seco) {
-      continue;
-    }
-    const ext = f.mime === "image/png" ? "png" : "webp";
-    const destino = path.join(values.respaldo, f.origen, f.kind);
-    mkdirSync(destino, { recursive: true });
-    writeFileSync(path.join(destino, `${f.slug}.${ext}`), Buffer.from(bytes));
-    if (f.kind !== "faction") {
-      actualizarLogo.run(
+    if (!values.seco) {
+      respaldarOriginal(values.respaldo, f, bytes);
+      // Logo, personaje y fondo: nueva versión en la URL (`actualizado`); emblema: no (ver la cabecera).
+      const sentencia =
+        f.kind === "faction" ? actualizarEmblema : actualizarLogo;
+      const version = f.kind === "faction" ? [] : [new Date().toISOString()];
+      sentencia.run(
         r.bytes,
         r.bytes.length,
         r.w,
         r.h,
-        new Date().toISOString(),
-        f.slug,
-        f.kind,
-        f.origen,
-      );
-    } else {
-      actualizarEmblema.run(
-        r.bytes,
-        r.bytes.length,
-        r.w,
-        r.h,
+        ...version,
         f.slug,
         f.kind,
         f.origen,

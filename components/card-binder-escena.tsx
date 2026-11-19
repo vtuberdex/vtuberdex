@@ -18,8 +18,12 @@ import {
 import { Group, Matrix4 } from "three";
 
 import type { VtuberCard } from "@/lib/types";
-import * as CFG from "@/components/card3d-config";
-import { BINDER } from "@/components/card3d-config";
+import {
+  BINDER,
+  GEOMETRY,
+  INTENSITY,
+  RENDER,
+} from "@/components/card3d-config";
 import { CardMeshes, Rig, usePointerTilt } from "@/components/holo-card";
 import { RenderGovernor } from "@/components/render-governor";
 import { usarTimer } from "@/components/reloj-timer";
@@ -101,8 +105,8 @@ function BinderCard({
     [placement.slot],
   );
   const mats = useCardMaterials(placement.card, {
-    holo: CFG.INTENSITY.holo.tile,
-    gloss: CFG.INTENSITY.gloss.tile,
+    holo: INTENSITY.holo.tile,
+    gloss: INTENSITY.gloss.tile,
     textureWidth,
   });
 
@@ -201,7 +205,7 @@ function cameraTarget(focus: Focus, aspect: number) {
     return { x: 0, z: fitCameraZ(aspect) };
   }
   // Una hoja: mismo cálculo «contain» que el libro entero, con el ancho de la hoja.
-  const halfFov = (CFG.GEOMETRY.cameraFov * Math.PI) / 180 / 2;
+  const halfFov = (GEOMETRY.cameraFov * Math.PI) / 180 / 2;
   const tan = Math.tan(halfFov);
   const byHeight = pageH / 2 / tan;
   const byWidth = pageW / 2 / (tan * Math.max(0.2, aspect));
@@ -361,14 +365,14 @@ export default function BinderLienzo({
     <Canvas
       style={CANVAS_FUERA_DE_FLUJO}
       frameloop="demand"
-      dpr={[1, CFG.RENDER.dprMax]}
+      dpr={[1, RENDER.dprMax]}
       gl={{
         antialias: true,
         alpha: true,
         powerPreference: "high-performance",
       }}
       camera={{
-        fov: CFG.GEOMETRY.cameraFov,
+        fov: GEOMETRY.cameraFov,
         position: [0, 0, fitCameraZ(aspecto)],
       }}
       onCreated={onCreated}

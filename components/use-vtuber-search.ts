@@ -82,6 +82,25 @@ const calentarImagenes = (items: VtuberCard[]) => {
   pregenerar(items, TEXTURAS.ancho);
 };
 
+/**
+ * Calienta las cartas de una página VECINA cuando acabaron las imágenes de la visible (`visibles`), y
+ * nunca con ahorro de datos o 2G. `vigente` dice si la página que la pidió sigue en pantalla.
+ */
+function calentarTrasLaVisible(
+  items: VtuberCard[],
+  visibles: Promise<unknown>,
+  vigente: () => boolean,
+): void {
+  if (conexionQueAhorra()) {
+    return;
+  }
+  void visibles.then(() => {
+    if (vigente()) {
+      calentarImagenes(items);
+    }
+  });
+}
+
 export interface UseVtuberSearchResult {
   params: SearchParams;
   data: ApiListResponse | null;
@@ -141,16 +160,7 @@ export function useVtuberSearch({
           params,
           response.pageCount,
           (vecina) => pedirPagina(vecina),
-          (items) => {
-            if (conexionQueAhorra()) {
-              return;
-            }
-            void visibles.then(() => {
-              if (vigente) {
-                calentarImagenes(items);
-              }
-            });
-          },
+          (items) => calentarTrasLaVisible(items, visibles, () => vigente),
         );
       }, RETRASO_PRECARGA_MS);
     };

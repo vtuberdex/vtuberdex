@@ -39,6 +39,8 @@ async function* archivos(carpeta) {
       yield* archivos(ruta);
     } else if (EXTENSIONES.has(path.extname(entrada.name))) {
       yield ruta;
+    } else {
+      // Imágenes, fuentes y demás ya van comprimidos: no se tocan.
     }
   }
 }
