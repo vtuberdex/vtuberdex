@@ -168,6 +168,20 @@ const urlsDeCarta = (card: VtuberCard) => [
   card.images.background ?? "",
 ];
 
+/**
+ * ¿Llegaron todas las imágenes que la carta TIENE? Si una con URL falló (tras sus reintentos), la textura
+ * se dibuja igual (con «SIN IMAGEN») pero NO se guarda en la caché: si no, la carta seguía rota al volver
+ * a su página aunque la imagen ya respondiera.
+ */
+export function fuentesCompletas(card: VtuberCard, fuentes: Fuentes): boolean {
+  const [art, logo, background] = urlsDeCarta(card);
+  return (
+    (!art || fuentes.art !== null) &&
+    (!logo || fuentes.logo !== null) &&
+    (!background || fuentes.background !== null)
+  );
+}
+
 async function cargarFuentes(card: VtuberCard): Promise<Fuentes> {
   const [art, logo, background] = await Promise.all(
     urlsDeCarta(card).map((src) => loadImage(src)),
@@ -502,7 +516,9 @@ export async function generarTexturas(
     completa = resultado.texturas;
     medir(`textura-completa:${width}:${prioridad}`, performance.now() - t0);
     medir(`textura-completa-cpu:${width}`, resultado.msCpu);
-    guardarEnCache(card, completa);
+    if (fuentesCompletas(card, fuentes)) {
+      guardarEnCache(card, completa);
+    }
   }, prioridad);
 
   return completa;

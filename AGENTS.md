@@ -1562,7 +1562,7 @@ Copias versionadas en `infra/` (la fuente viva está en `/etc/nginx` y `/etc/fai
 
 - `conf.d/00-seguridad.conf`: 403 a UAs vacíos, librerías de scraping (curl, python-requests, Scrapy, headless…) y bots de
   SEO/IA (Ahrefs, Semrush, GPTBot, ClaudeBot…). Buscadores y previsualizadores de enlaces (Googlebot, Bing, Facebook, Discord…) pasan.
-  `/api/vtubers` e `/images/` exigen `Sec-Fetch-Site` o `Referer` (un navegador siempre manda uno). Techo de 10 r/s por IP en imágenes.
+  `/api/vtubers` e `/images/` exigen `Sec-Fetch-Site` o `Referer` (un navegador siempre manda uno). Techo de 40 r/s por IP en imágenes (ráfaga 400; con 10/60 pasar páginas rápido daba 429 y cartas «SIN IMAGEN»: `loadImage` además reintenta y la fábrica no cachea una carta con una imagen fallida).
   Loopback y VPN están exentos (`$vtd_limitar`; en fail2ban, `ignoreip` incluye la IP pública de la propia VPS: probar la trampa desde aquí contra la IP pública SIN esa excepción baneó al servidor): **probar desde 127.0.0.1 no ejercita nada**; usa `curl --resolve vtuberdex.com:443:<IP pública>`.
 - fail2ban `vtuberdex-scraping`: 40 respuestas 403/429 sobre esas rutas en 10 min → ban 1 h (creciente). El filtro NO lleva fecha
   ni `\[`: fail2ban la recorta antes de aplicar la regex.
