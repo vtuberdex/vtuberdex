@@ -14,9 +14,11 @@
  *      correr sobre `Timer` sin tocar cada escena.
  *   2. `Timer.connect(document)` usa la Page Visibility API: con la pestaña oculta el delta es 0 y al
  *      volver se reinicia, así que el primer frame tras volver no trae minutos de golpe.
- *   3. Se calla SOLO el aviso de construcción de `Clock` (el que provoca R3F por dentro), con
- *      `setConsoleFunction`, encadenando cualquier función previa. El resto de avisos de three sale igual.
- * Cuando R3F deje de construir `Clock` (v10), se borra el punto 3.
+ *   3. Se callan SOLO dos avisos de three que no podemos corregir desde aquí (`AVISOS_SIN_ACCION`), con
+ *      `setConsoleFunction`, encadenando cualquier función previa. El resto de avisos de three sale igual:
+ *      · la construcción de `Clock`, que hace R3F por dentro (se borra cuando R3F v10 deje de crearlo);
+ *      · `KHR_parallel_shader_compile extension not supported`: es un dato del navegador (Firefox no la
+ *        tiene; SwiftShader tampoco), three cae solo a la compilación normal y no hay nada que cambiar.
  */
 import {
   getConsoleFunction,
@@ -25,12 +27,18 @@ import {
   type Clock,
 } from "three";
 import type { RootState } from "@react-three/fiber";
+import { anotarContextoWebGL } from "@/lib/telemetria-cliente";
+// Todo canvas importa este módulo: de paso, fuera los getters `moz*` que R3F lee (ver el módulo).
+import "@/components/eventos-sin-moz";
 
-const AVISO_CLOCK = "Clock: This module has been deprecated";
+const AVISOS_SIN_ACCION = [
+  "Clock: This module has been deprecated",
+  "KHR_parallel_shader_compile extension not supported",
+];
 
 let filtroInstalado = false;
 /** Idempotente. Se llama al cargar el módulo: tiene que ir ANTES de que R3F cree su store. */
-export function callarAvisoDeClockDeR3F(): void {
+export function callarAvisosSinAccion(): void {
   if (filtroInstalado) {
     return;
   }
@@ -44,9 +52,8 @@ export function callarAvisoDeClockDeR3F(): void {
     | null;
   setConsoleFunction((tipo, mensaje, ...params) => {
     if (
-      tipo === "warn" &&
       typeof mensaje === "string" &&
-      mensaje.includes(AVISO_CLOCK)
+      AVISOS_SIN_ACCION.some((aviso) => mensaje.includes(aviso))
     ) {
       return;
     }
@@ -56,7 +63,7 @@ export function callarAvisoDeClockDeR3F(): void {
     console[tipo](mensaje, ...params);
   });
 }
-callarAvisoDeClockDeR3F();
+callarAvisosSinAccion();
 
 /**
  * La forma de `THREE.Clock` que usan R3F (`getDelta`, `elapsedTime`, `oldTime`, `start`, `stop`) y
@@ -118,7 +125,8 @@ export class RelojTimer {
 }
 
 /**
- * Para el `onCreated` de cada `<Canvas>`: cambia el reloj de la escena por uno sobre `Timer`. El
+ * Para el `onCreated` de cada `<Canvas>`: cambia el reloj de la escena por uno sobre `Timer` (y anota
+ * la GPU para la telemetría). El
  * `Clock` que R3F creó queda sin uso. El `Timer` se suelta al perder el contexto (desmontar).
  */
 export function usarTimer(state: RootState): void {
@@ -127,6 +135,8 @@ export function usarTimer(state: RootState): void {
     reloj.start();
   }
   state.set({ clock: reloj as unknown as Clock });
+  // La telemetría lee la GPU de ESTE contexto en vez de abrir uno propio (ver `anotarContextoWebGL`).
+  anotarContextoWebGL(state.gl.getContext());
   state.gl.domElement.addEventListener(
     "webglcontextlost",
     () => reloj.dispose(),

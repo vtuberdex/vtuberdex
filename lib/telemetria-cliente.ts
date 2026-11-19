@@ -75,9 +75,7 @@ export function medianaDe(valores: number[]): number | null {
 export type ClaseDeGpu = "hardware" | "software" | "desconocida";
 
 /** `software` si el renderizador es un rasterizador por CPU (SwiftShader, llvmpipe…): explica un 3D lento. */
-export function clasificarGpu(
-  renderer: string | null | undefined,
-): ClaseDeGpu {
+export function clasificarGpu(renderer: string | null | undefined): ClaseDeGpu {
   if (!renderer) {
     return "desconocida";
   }
@@ -88,22 +86,60 @@ export function clasificarGpu(
     : "hardware";
 }
 
-function detectarGpu(): ClaseDeGpu {
-  try {
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl") as WebGLRenderingContext | null;
-    if (!gl) {
-      return "desconocida";
-    }
-    const info = gl.getExtension("WEBGL_debug_renderer_info");
-    const renderer = info
-      ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))
-      : null;
-    gl.getExtension("WEBGL_lose_context")?.loseContext(); // no ocupa uno de los ~16 contextos del navegador
-    return clasificarGpu(renderer);
-  } catch {
-    return "desconocida";
+/**
+ * El renderizador que el navegador declara para un contexto WebGL YA EXISTENTE.
+ *
+ * Firefox avisa de que `WEBGL_debug_renderer_info` está obsoleta y que se use `RENDERER`, que allí ya
+ * trae el renderizador (saneado). Chrome, en cambio, sigue devolviendo «WebKit WebGL» en `RENDERER` y
+ * solo da el real por la extensión, que en Chrome no avisa. Así que la extensión solo se pide cuando
+ * `RENDERER` no dice nada útil.
+ */
+export function rendererDeContexto(gl: {
+  RENDERER: number;
+  getParameter: (p: number) => unknown;
+  getExtension: (nombre: string) => unknown;
+}): string | null {
+  const basico = String(gl.getParameter(gl.RENDERER) ?? "").trim();
+  if (basico && !/^webkit webgl$/i.test(basico)) {
+    return basico;
   }
+  const info = gl.getExtension("WEBGL_debug_renderer_info") as {
+    UNMASKED_RENDERER_WEBGL: number;
+  } | null;
+  return info
+    ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))
+    : basico || null;
+}
+
+let rendererDeLaEscena: string | null = null;
+
+/**
+ * Lo llama cada `<Canvas>` al crearse (ver `reloj-timer.ts`, `usarTimer`): la GPU se lee del contexto
+ * que la página YA tiene. Antes la telemetría abría un contexto WebGL propio para preguntarlo y lo
+ * soltaba con `loseContext()`: era un contexto más contra el tope del navegador y Firefox escribía
+ * «WebGL context was lost» en la consola de cada visita.
+ */
+export function anotarContextoWebGL(
+  gl: Parameters<typeof rendererDeContexto>[0],
+): void {
+  if (rendererDeLaEscena !== null) {
+    return;
+  }
+  try {
+    rendererDeLaEscena = rendererDeContexto(gl);
+  } catch {
+    /* sin dato: la telemetría manda «desconocida» */
+  }
+}
+
+/** Para los tests. */
+export function __olvidarRenderer(): void {
+  rendererDeLaEscena = null;
+}
+
+/** `null` mientras ninguna escena 3D se haya montado (páginas sin canvas): se vuelve a mirar en cada latido. */
+function detectarGpu(): ClaseDeGpu | null {
+  return rendererDeLaEscena === null ? null : clasificarGpu(rendererDeLaEscena);
 }
 
 function medirFps(): Promise<number | null> {
@@ -150,6 +186,11 @@ export function iniciarTelemetria(): Telemetria {
   const observadores: PerformanceObserver[] = [];
 
   const observar = (tipo: string, alEntrada: (e: PerformanceEntry) => void) => {
+    // Solo lo que el navegador soporta: Firefox no tiene `longtask` y, en vez de lanzar, escribe
+    // «Ignorando entryTypes no compatibles» en la consola.
+    if (!PerformanceObserver.supportedEntryTypes?.includes(tipo)) {
+      return;
+    }
     try {
       const o = new PerformanceObserver((lista) =>
         lista.getEntries().forEach(alEntrada),
@@ -172,6 +213,7 @@ export function iniciarTelemetria(): Telemetria {
       PerformanceNavigationTiming | undefined;
 
   const construir = async (extra: Record<string, unknown> = {}) => {
+    gpu ??= detectarGpu(); // sin canvas aún: se reintenta en el latido siguiente
     const visible = document.visibilityState === "visible";
     latidos += 1;
     const fps =
@@ -277,9 +319,8 @@ export function iniciarTelemetria(): Telemetria {
   };
   const alSalir = () => enviar({ sid, bye: true });
 
-  // Primer latido a los 3 s (ya hay TTFB y casi siempre LCP); la GPU se mira una vez, en reposo.
+  // Primer latido a los 3 s (ya hay TTFB y casi siempre LCP). La GPU la anota el canvas de la página.
   const inicial = window.setTimeout(() => {
-    gpu = detectarGpu();
     void latir();
   }, 3000);
   const reloj = window.setInterval(() => {

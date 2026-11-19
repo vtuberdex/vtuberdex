@@ -1,6 +1,6 @@
 // Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Clock } from "three";
+import { Clock, warn } from "three";
 import { RelojTimer } from "@/components/reloj-timer";
 
 afterEach(() => vi.restoreAllMocks());
@@ -41,6 +41,18 @@ describe("RelojTimer (Clock sobre THREE.Timer)", () => {
     ahora += 60_000;
     expect(reloj.getDelta()).toBe(0);
     reloj.dispose();
+  });
+});
+
+describe("avisos de three sin acción posible", () => {
+  it("se calla el de KHR_parallel_shader_compile y los demás siguen saliendo", () => {
+    const aviso = vi.spyOn(console, "warn").mockImplementation(() => {});
+    warn("WebGLRenderer: KHR_parallel_shader_compile extension not supported.");
+    expect(aviso).not.toHaveBeenCalled();
+    warn("WebGLRenderer: otra cosa que sí importa.");
+    expect(aviso).toHaveBeenCalledWith(
+      "THREE.WebGLRenderer: otra cosa que sí importa.",
+    );
   });
 });
 
