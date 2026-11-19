@@ -14,18 +14,16 @@
  * descontaba lo despublicado. Sin Turso, `dbConDiario()` es la base de siempre.
  */
 import {
-  PER_PAGE_PUBLICO_MAX,
   gastarFichas,
   redDeLaPeticion,
   respuestaAgotada,
 } from "../../../lib/anti-scraping.mjs";
 import { dbConDiario } from "../../../lib/diario.mjs";
+import {
+  buscarPagina,
+  completarPagina,
+} from "../../../lib/fichas-publicas.mjs";
 import { exigirSesion } from "../../../lib/sesion-visitante.mjs";
-import { aplicarReemplazosALista } from "../../../lib/ediciones.mjs";
-import { conExperiencia, contarLikesVarios } from "../../../lib/likes.mjs";
-import { xpJuegoDeVarias } from "../../../lib/minecraft.mjs";
-import { marcarSinCorreo } from "../../../lib/sin-correo.mjs";
-import { facetCounts, searchVtubers } from "../../../server/src/search.mjs";
 import {
   formatIssues,
   listQuerySchema,
@@ -45,14 +43,6 @@ const CACHE_PUBLICA =
 /** TTL de la clave del diario en lecturas públicas (ver `dbConDiario`). */
 const TTL_DIARIO_MS = 2000;
 
-/** El servidor Express acepta `?countries=a,b` además de `?countries=a&countries=b`. */
-function splitCsv(value) {
-  return String(value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 export async function GET(request) {
   const sinSesion = exigirSesion(request);
   if (sinSesion) {
@@ -70,63 +60,16 @@ export async function GET(request) {
     );
   }
 
-  const {
-    q,
-    countries,
-    languages,
-    groups,
-    artists,
-    factions,
-    sort,
-    page,
-    language,
-    premium,
-    facet,
-  } = parsed.data;
-  // El público nunca necesita más que una página del libro: 100 por petición volcaba el catálogo en 8.
-  const perPage = Math.min(parsed.data.perPage, PER_PAGE_PUBLICO_MAX);
-  const result = searchVtubers(db, {
-    q,
-    countries: splitCsv(countries),
-    languages: splitCsv(languages),
-    groups: splitCsv(groups),
-    artists: splitCsv(artists),
-    factions: splitCsv(factions),
-    premium: Boolean(premium),
-    sort,
-    page,
-    perPage,
-  });
+  const pagina = buscarPagina(db, parsed.data);
   // Fichas DISTINTAS por red y hora/día (ver lib/anti-scraping.mjs): frena al scraper paciente.
   const cupo = gastarFichas(
     redDeLaPeticion(request.headers),
-    result.items.map((c) => c.id),
+    pagina.result.items.map((c) => c.id),
   );
   if (!cupo.permitido) {
     return respuestaAgotada(cupo);
   }
-  const facets = facet ? facetCounts(db, { language, q }) : null;
-  /**
-   * Las imágenes del mantenedor, al final: viven en Turso por slug y no en la base del catálogo.
-   * Una sola consulta para toda la página (ver `reemplazosDePagina`).
-   */
-  const conImagenes = await aplicarReemplazosALista(result.items);
-  /**
-   * El nivel de cada carta sale de la fórmula de experiencia (likes, juego, antigüedad, premium), no de la
-   * columna guardada. Dos consultas para toda la página; si el almacén falla se queda el nivel de fórmula con
-   * 0 likes, nunca el manual.
-   */
-  const ids = conImagenes.map((c) => c.id);
-  const [likes, juego] = await Promise.all([
-    contarLikesVarios(ids).catch(() => new Map()),
-    xpJuegoDeVarias(ids),
-  ]);
-  const conNivel = conImagenes.map((c) =>
-    conExperiencia(c, likes.get(c.id) ?? 0, juego.get(c.id) ?? 0),
-  );
-  const items = await marcarSinCorreo(db, conNivel);
-  return Response.json(
-    { ...result, items, facets },
-    { headers: { "cache-control": CACHE_PUBLICA } },
-  );
+  return Response.json(await completarPagina(db, pagina), {
+    headers: { "cache-control": CACHE_PUBLICA },
+  });
 }

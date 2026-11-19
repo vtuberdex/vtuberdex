@@ -12,7 +12,10 @@
 import dynamic from "next/dynamic";
 import { VrtonBanners } from "@/components/vrton-banners";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { loadImage } from "@/components/card-texture/imagen";
+import { imagenesDeCartas } from "@/lib/cache-paginas";
 
 import { VoiceButton } from "@/components/voice-button";
 import { limpiarAbriendo } from "@/lib/abriendo-detalle";
@@ -47,11 +50,21 @@ const HoloCard = dynamic(
   },
 );
 
-type Payload = (VtuberDetail & { neighbors: Neighbors }) | null;
+/** La ficha como la devuelve `/api/vtubers/[slug]`, con sus vecinas de dex. */
+export type FichaInicial = VtuberDetail & { neighbors: Neighbors };
+type Payload = FichaInicial | null;
 
-export function DetailPage({ slug }: Readonly<{ slug: string }>) {
+export function DetailPage({
+  slug,
+  inicial = null,
+}: Readonly<{ slug: string; inicial?: FichaInicial | null }>) {
   const { t } = useI18n();
-  const [data, setData] = useState<Payload>(null);
+  /**
+   * La ficha que el servidor ya resolvió para este slug (ver `app/(dex)/v/[slug]/page.tsx`) se pinta
+   * desde el primer render y NO se vuelve a pedir; navegar a otra ficha sí la pide a la API.
+   */
+  const [data, setData] = useState<Payload>(inicial);
+  const inicialDe = useRef<string | null>(inicial ? slug : null);
   /**
    * Panel de ajuste en vivo, SOLO si la URL trae `?tune=1`. Se importa de forma
    * dinámica para que no entre en el bundle de quien solo quiere ver la ficha: es un
@@ -61,7 +74,7 @@ export function DetailPage({ slug }: Readonly<{ slug: string }>) {
     null | typeof import("@/components/card3d-tuner").Card3dTuner
   >(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(inicial === null);
   /** Dónde estaba el visitante en el catálogo (página y filtros); se lee tras hidratar: el servidor no tiene `sessionStorage`. */
   const [volverA, setVolverA] = useState("/");
   useEffect(() => {
@@ -69,6 +82,10 @@ export function DetailPage({ slug }: Readonly<{ slug: string }>) {
   }, []);
 
   useEffect(() => {
+    if (inicialDe.current === slug) {
+      inicialDe.current = null;
+      return () => undefined;
+    }
     const controller = new AbortController();
     setLoading(true);
     setError(null);
@@ -89,6 +106,19 @@ export function DetailPage({ slug }: Readonly<{ slug: string }>) {
       });
     return () => controller.abort();
   }, [slug]);
+
+  /**
+   * Las imágenes de la carta se piden en cuanto hay datos, sin esperar al chunk de three: la carta 3D
+   * llega en diferido (`next/dynamic`) y, con los datos ya en el HTML, la ficha esperaba ~3 s a que
+   * three cargara para EMPEZAR a bajarlas. `loadImage` las memoiza: la carta las encuentra listas.
+   */
+  useEffect(() => {
+    if (data) {
+      for (const src of imagenesDeCartas([data])) {
+        void loadImage(src);
+      }
+    }
+  }, [data]);
 
   useEffect(() => {
     // `window` solo en un efecto: leerlo durante el render rompe el render del servidor.

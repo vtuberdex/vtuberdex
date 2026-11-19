@@ -24,31 +24,9 @@ import {
   respuestaAgotada,
 } from "../../../../lib/anti-scraping.mjs";
 import { dbConDiario } from "../../../../lib/diario.mjs";
+import { completarFicha } from "../../../../lib/fichas-publicas.mjs";
 import { exigirSesion } from "../../../../lib/sesion-visitante.mjs";
-import { conExperiencia, contarLikes } from "../../../../lib/likes.mjs";
-import {
-  aplicarImagenesDelMantenedor,
-  reemplazosDelMantenedor,
-} from "../../../../lib/ediciones.mjs";
-import { KINDS_GESTIONABLES } from "../../../../lib/carpetas.mjs";
-import { xpJuegoDe } from "../../../../lib/minecraft.mjs";
-import { ejecutorDeSolicitudes } from "../../../../lib/solicitudes.mjs";
-import { marcarSinCorreo } from "../../../../lib/sin-correo.mjs";
-import { equilibrarStats } from "../../../../server/src/equilibrio.mjs";
-import {
-  aplicarAtributosAStats,
-  statsDeAtributosDe,
-} from "../../../../server/src/atributos.mjs";
-import {
-  aplicarPuntosAStats,
-  claveDeHabilidad,
-  leerPuntosDeStats,
-  leerRangos,
-} from "../../../../server/src/mi-ficha.mjs";
-import {
-  getNeighbors,
-  getVtuberBySlug,
-} from "../../../../server/src/search.mjs";
+import { getVtuberBySlug } from "../../../../server/src/search.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -74,99 +52,7 @@ export async function GET(request, { params }) {
     return respuestaAgotada(cupo);
   }
 
-  /**
-   * Las IMÁGENES del mantenedor también ganan al catálogo, no solo los campos de texto.
-   *
-   * Sin esto, subir una imagen desde el mantenedor no se veía en el sitio público: el campo que
-   * decide qué dibuja la carta 3D es `images[kind]`, y para `background` viene `null` en 784 de
-   * las 785 fichas. El fondo se servía por HTTP con un 200 y la carta no lo pintaba, porque
-   * `holo-card.tsx` solo entra en esa capa `if (card.images.background)`. Los `assets` sí traían
-   * la ruta nueva, así que mirando la API parecía correcto.
-   */
-  const reemplazos = await reemplazosDelMantenedor(
-    card.slug,
-    KINDS_GESTIONABLES,
-  );
-  const conImagenes = aplicarImagenesDelMantenedor(card, reemplazos);
-  /**
-   * Likes y experiencia. La experiencia es función de los likes (`experienciaConLikes`), así que
-   * se calcula aquí al leer. Si el almacén de likes falla NO se tumba la ficha: sale sin likes,
-   * que es lo que había antes de que existieran.
-   */
-  let conLikes = { ...conImagenes, likes: 0 };
-  try {
-    // La XP de Minecraft (`lib/minecraft.mjs`) se suma como la de los likes; si su almacén falla, vale 0.
-    const [likes, xpJuego] = await Promise.all([
-      contarLikes(card.id),
-      xpJuegoDe(card.id),
-    ]);
-    conLikes = conExperiencia(conImagenes, likes, xpJuego);
-  } catch (error) {
-    console.error(`[likes] la ficha ${slug} sale sin likes: ${error.message}`);
-  }
-  // Rango de cada habilidad (los puntos que su titular repartió al subir de nivel). Si el almacén falla, la
-  // ficha sale sin rangos: es un adorno, no puede tumbarla.
-  try {
-    const rangos = await leerRangos(await ejecutorDeSolicitudes(), card.id);
-    if (rangos.size) {
-      conLikes = {
-        ...conLikes,
-        skills: conLikes.skills.map((s) => ({
-          ...s,
-          rank: rangos.get(claveDeHabilidad(s)) ?? 0,
-        })),
-      };
-    }
-  } catch (error) {
-    console.error(
-      `[mi-ficha] la ficha ${slug} sale sin rangos: ${error.message}`,
-    );
-  }
-  // Los stats que la persona subió con sus puntos y el bono automático por niveles (velocidad, evasión…) se ven
-  // en la ficha pública. Si el almacén falla, la ficha sale con sus valores base.
-  conLikes = { ...conLikes, stats: equilibrarStats(conLikes.stats) };
-  try {
-    const puestos = await leerPuntosDeStats(
-      await ejecutorDeSolicitudes(),
-      card.id,
-    );
-    conLikes = {
-      ...conLikes,
-      stats: aplicarPuntosAStats(
-        conLikes.stats,
-        puestos,
-        conLikes.levelsGained ?? 0,
-      ),
-    };
-  } catch (error) {
-    console.error(
-      `[mi-ficha] la ficha ${slug} sale sin puntos de stats: ${error.message}`,
-    );
-  }
-  // Si la ficha repartió sus seis atributos (STR, DEX, CON…), los stats que ve el juego salen de
-  // ahí: se calculan, no se guardan. Si el almacén falla, la ficha sale con lo que tenía.
-  try {
-    const derivados = await statsDeAtributosDe(await ejecutorDeSolicitudes(), {
-      vtuberId: card.id,
-      facciones: card.factions ?? [],
-      stats: card.stats,
-    });
-    if (derivados.length) {
-      conLikes = {
-        ...conLikes,
-        stats: aplicarAtributosAStats(conLikes.stats, derivados),
-      };
-    }
-  } catch (error) {
-    console.error(
-      `[mi-ficha] la ficha ${slug} sale sin atributos: ${error.message}`,
-    );
-  }
-  return Response.json(
-    {
-      ...(await marcarSinCorreo(db, [conLikes]))[0],
-      neighbors: getNeighbors(db, card.dexNumber),
-    },
-    { headers: { "cache-control": CACHE_PUBLICA } },
-  );
+  return Response.json(await completarFicha(db, card), {
+    headers: { "cache-control": CACHE_PUBLICA },
+  });
 }

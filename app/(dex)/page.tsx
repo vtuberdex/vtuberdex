@@ -15,7 +15,19 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
+import { headers } from "next/headers";
+
 import { CatalogPage } from "@/components/catalog-page";
+import type { DatosIniciales } from "@/components/use-vtuber-search";
+import { gastarFichas, redDeLaPeticion } from "@/lib/anti-scraping.mjs";
+import { dbConDiario } from "@/lib/diario.mjs";
+import {
+  buscarPagina,
+  comoJson,
+  completarPagina,
+} from "@/lib/fichas-publicas.mjs";
+import { searchParamsFromUrl, searchParamsToQuery } from "@/lib/query";
+import { listQuerySchema } from "@/server/src/validation.mjs";
 import { fichasPublicadas } from "@/lib/seo-datos.mjs";
 import {
   DESCRIPCION_SITIO,
@@ -48,7 +60,55 @@ function Fallback() {
   );
 }
 
-export default async function CatalogRoute() {
+type Busqueda = Record<string, string | string[] | undefined>;
+
+/**
+ * La página que pide la URL, resuelta en el servidor y mandada en el HTML (ver `lib/fichas-publicas.mjs`):
+ * las cartas empiezan a bajar en cuanto hidrata, sin esperar la sesión ni la API. Gasta el MISMO cupo de
+ * fichas por red que la API; si se agotó, o si algo falla, no se manda nada y el cliente la pide como antes.
+ * Siempre con 8 cartas: el servidor no sabe si es un celular (`use-vtuber-search` saca de ahí la hoja de 4).
+ */
+async function primeraVista(
+  busqueda: Busqueda,
+): Promise<DatosIniciales | null> {
+  try {
+    const url = new URLSearchParams();
+    for (const [clave, valor] of Object.entries(busqueda)) {
+      for (const v of Array.isArray(valor) ? valor : [valor]) {
+        if (v !== undefined) {
+          url.append(clave, v);
+        }
+      }
+    }
+    const params = searchParamsFromUrl(url.toString());
+    const parsed = listQuerySchema.safeParse(
+      Object.fromEntries(new URLSearchParams(searchParamsToQuery(params))),
+    );
+    if (!parsed.success) {
+      return null;
+    }
+    const db = await dbConDiario({ ttlMs: 2000 });
+    const pagina = buscarPagina(db, parsed.data);
+    const cupo = gastarFichas(
+      redDeLaPeticion(await headers()),
+      pagina.result.items.map((c: { id: number }) => c.id),
+    );
+    if (!cupo.permitido) {
+      return null;
+    }
+    return { params, respuesta: comoJson(await completarPagina(db, pagina)) };
+  } catch (error) {
+    console.error(
+      `[catalogo] sin primera vista del servidor: ${(error as Error).message}`,
+    );
+    return null;
+  }
+}
+
+export default async function CatalogRoute({
+  searchParams,
+}: Readonly<{ searchParams: Promise<Busqueda> }>) {
+  const inicial = await primeraVista(await searchParams);
   // Si la base falla el catálogo sigue funcionando: solo se pierde el JSON-LD de la lista.
   const fichas = await fichasPublicadas({ limit: FICHAS_EN_JSON_LD }).catch(
     () => [],
@@ -62,7 +122,7 @@ export default async function CatalogRoute() {
         }}
       />
       <Suspense fallback={<Fallback />}>
-        <CatalogPage />
+        <CatalogPage inicial={inicial} />
       </Suspense>
     </>
   );

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import {
   RETRASO_PRECARGA_MS,
+  clavePagina,
   guardarPagina,
   imagenesDeCartas,
   leerPagina,
@@ -21,7 +22,7 @@ import {
 import type { ApiListResponse, SearchParams, VtuberCard } from "@/lib/types";
 import { loadImage } from "@/components/card-texture/imagen";
 import { pregenerar } from "@/components/card-texture/fabrica";
-import { TEXTURAS } from "@/components/card3d-config";
+import { BINDER, TEXTURAS } from "@/components/card3d-config";
 
 /**
  * El tamaño de página lo decide el LIBRO, no la URL: 8 cartas (dos hojas de 4) en
@@ -35,6 +36,35 @@ const pedirPagina = (params: SearchParams, signal?: AbortSignal) =>
 export interface UseVtuberSearchOptions {
   /** Cartas por página que el libro puede mostrar (8 o 4). */
   perPage?: number;
+  /** La página que el servidor ya resolvió para esta URL (ver `app/(dex)/page.tsx`). */
+  inicial?: DatosIniciales | null;
+}
+
+/** Lo que manda el servidor dentro del HTML: la búsqueda que resolvió y su respuesta. */
+export interface DatosIniciales {
+  params: SearchParams;
+  respuesta: ApiListResponse;
+}
+
+/**
+ * La primera página en hojas de 4 (celular) sale de la de 8 que mandó el servidor, que no sabe el
+ * viewport: las primeras 4 cartas de la página 1 son la página 1 de 4. Otras páginas no coinciden
+ * (la URL cuenta hojas distintas), así que esas se piden como siempre.
+ */
+function sembrarDatosIniciales({ params, respuesta }: DatosIniciales): void {
+  guardarPagina(params, respuesta);
+  const porHoja = BINDER.cardsPerPage;
+  if (params.page === 1 && params.perPage === porHoja * 2) {
+    guardarPagina(
+      { ...params, perPage: porHoja },
+      {
+        ...respuesta,
+        items: respuesta.items.slice(0, porHoja),
+        perPage: porHoja,
+        pageCount: Math.max(1, Math.ceil(respuesta.total / porHoja)),
+      },
+    );
+  }
 }
 
 /** Pide las imágenes de estas cartas (memoizado por URL en `loadImage`) y avisa cuando acabaron todas. */
@@ -117,6 +147,7 @@ export interface UseVtuberSearchResult {
  */
 export function useVtuberSearch({
   perPage = DEFAULT_PER_PAGE,
+  inicial = null,
 }: UseVtuberSearchOptions = {}): UseVtuberSearchResult {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -129,8 +160,18 @@ export function useVtuberSearch({
   useEffect(() => {
     guardarCatalogo(queryString);
   }, [queryString]);
-  const [data, setData] = useState<ApiListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  /**
+   * Si el servidor ya resolvió ESTA búsqueda, se pinta desde el primer render (también en el HTML: los
+   * enlaces accesibles del libro salen sin JS) y no se pide a la API. Se copia a la caché de páginas en
+   * un efecto, solo en el navegador: en el servidor esa caché de módulo la compartirían todas las visitas.
+   */
+  const [data, setData] = useState<ApiListResponse | null>(() =>
+    inicial && clavePagina(inicial.params) === clavePagina(params)
+      ? inicial.respuesta
+      : null,
+  );
+  const [loading, setLoading] = useState(data === null);
+  const sembrado = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
 
@@ -165,7 +206,11 @@ export function useVtuberSearch({
       }, RETRASO_PRECARGA_MS);
     };
 
-    // Página ya en caché (visitada o precargada): se muestra sin tocar la red.
+    if (inicial && !sembrado.current) {
+      sembrado.current = true;
+      sembrarDatosIniciales(inicial);
+    }
+    // Página ya en caché (visitada, precargada o mandada por el servidor): se muestra sin tocar la red.
     const enCache = leerPagina(params);
     if (enCache) {
       setData(enCache);
@@ -205,6 +250,8 @@ export function useVtuberSearch({
       controller.abort();
       clearTimeout(precarga);
     };
+    // `inicial` solo se usa en la primera pasada (`sembrado`): no debe volver a lanzar la búsqueda.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
 
   /**
