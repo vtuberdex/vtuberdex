@@ -862,6 +862,17 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
 
 ## Trampas conocidas (ya nos costaron tiempo)
 
+- **Auditoría de seguridad (2026-11-19), tanda media.** (6) Panel de Minecraft: el mantenedor PUEDE subir jars (decisión del
+  dueño), pero cada subida, cada guardado de configuración y cada plugin habilitado/deshabilitado van a la auditoría; un jar
+  existente no se pisa sin `?reemplazar=1` (el panel lo confirma); en `server.properties` se ocultan y conservan también
+  `management-server-*` y cualquier `*secret*`/`*password*`/`*token*`, y las líneas fijas van AL PRINCIPIO (un `\` final del
+  mantenedor se tragaba `enable-rcon`). (7) Modificación y baja responden IGUAL tenga o no ficha el correo; al buzón sin ficha le
+  llega `correoSinFicha` en vez del código (antes un 404 delataba qué correos son de VTubers). (8) Los correos de los formularios
+  tienen tope por red y global por día (`lib/cupo-correos.mjs`). (9) `?w=512` solo admite `w` y `v` (con otro parámetro se saltaba
+  la caché de nginx y obligaba a recodificar). (10) `/var/lib/vtuberdex` sin permisos para «otros» y el servicio con `UMask=0007`
+  (drop-in `umask.conf`): la base tiene correos y nombres civiles, y `minecraft` ejecuta plugins de terceros. (11) Las copias del
+  diario en `/tmp` nacen 600 y con `COPYFILE_EXCL`. (12) Reclamar un grado relee el grado vigente: si ya es igual o mayor, suelta el
+  reclamo (409) en vez de bajar la carta. (13) El Express del mantenedor escucha en 127.0.0.1 por defecto (Next le habla por ahí).
 - **Auditoría de seguridad (2026-11-19), tanda alta.** (1) **La IP del visitante es `X-Real-IP`** (`ipDelCliente`, `redDeLaPeticion`):
   nginx AÑADE a `X-Forwarded-For` lo que manda el cliente, así que su PRIMER valor es inventable; con él se saltaban todos los topes
   por red (likes → XP sin límite, solicitudes, subidas, enlaces). Nunca uses el primer valor de `X-Forwarded-For`. Dar like exige

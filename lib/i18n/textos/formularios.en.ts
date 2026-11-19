@@ -21,7 +21,7 @@ export const formulariosEn: { [K in keyof typeof formulariosEs]: string } = {
   "baja.revisaCorreo": "Check your email.",
   "baja.codigoEnviadoA": "We sent a code to",
   "baja.codigoInstrucciones":
-    "Paste it here to confirm the removal, or press the button in the email. It is valid for 24 hours; if it does not arrive, check your spam folder.",
+    "Paste it here to confirm the removal, or press the button in the email. It is valid for 24 hours; if it does not arrive, check your spam folder. If that address has no card, you will get a notice instead of the code.",
   "baja.paso2": "Step 2 of 2 · Confirm the removal",
   "baja.codigo": "Code from the email",
   "baja.confirmando": "Confirming…",

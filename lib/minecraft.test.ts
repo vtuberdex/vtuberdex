@@ -638,9 +638,16 @@ describe("misiones", () => {
     );
     return enlace;
   }
-  const reportar = (avances: unknown, idLote = randomUUID(), token: string | null = TOKEN) =>
+  const reportar = (
+    avances: unknown,
+    idLote = randomUUID(),
+    token: string | null = TOKEN,
+  ) =>
     mc.registrarMisiones(
-      pedir("/api/minecraft/misiones", { cuerpo: { uuid: JUGADOR, idLote, avances }, token }),
+      pedir("/api/minecraft/misiones", {
+        cuerpo: { uuid: JUGADOR, idLote, avances },
+        token,
+      }),
       { ejecutor: e, db: DB, env: ENV, avisar: async () => true },
     );
 
@@ -655,7 +662,11 @@ describe("misiones", () => {
     await vinculada();
     const r = await reportar({ jefes: 1 });
     expect(r.status).toBe(200);
-    expect(await r.json()).toMatchObject({ ok: true, duplicado: false, completadas: [{ id: "primer-jefe", xp: 100 }] });
+    expect(await r.json()).toMatchObject({
+      ok: true,
+      duplicado: false,
+      completadas: [{ id: "primer-jefe", xp: 100 }],
+    });
     const lista = await mc.misionesDelJugador(
       pedir(`/api/minecraft/misiones/${JUGADOR}`, { metodo: "GET" }),
       JUGADOR,
@@ -663,8 +674,19 @@ describe("misiones", () => {
     );
     const cuerpo = await lista.json();
     expect(cuerpo.vinculado).toBe(true);
-    expect(cuerpo.secundarias.find((m: { id: string }) => m.id === "primer-jefe").completada).toBe(true);
-    expect((await mc.misionesDelJugador(pedir("/x", { metodo: "GET", token: null }), JUGADOR, { ejecutor: e, db: DB, env: ENV })).status).toBe(404);
+    expect(
+      cuerpo.secundarias.find((m: { id: string }) => m.id === "primer-jefe")
+        .completada,
+    ).toBe(true);
+    expect(
+      (
+        await mc.misionesDelJugador(
+          pedir("/x", { metodo: "GET", token: null }),
+          JUGADOR,
+          { ejecutor: e, db: DB, env: ENV },
+        )
+      ).status,
+    ).toBe(404);
   });
 
   test("datos inválidos dan 400", async () => {
@@ -678,7 +700,12 @@ describe("misiones", () => {
     const reclamar = () =>
       miFicha.misionesDeMiFicha(
         pedir("/api/mi-ficha/misiones", {
-          cuerpo: { token: enlace, slug: "luna", accion: "reclamar-grado", mision: "grado-6" },
+          cuerpo: {
+            token: enlace,
+            slug: "luna",
+            accion: "reclamar-grado",
+            mision: "grado-6",
+          },
           token: null,
         }),
         { ejecutor: e, db: DB },
@@ -688,7 +715,12 @@ describe("misiones", () => {
     expect((await antes.json()).error).toBe("mision_incompleta");
     expect(APLICAR).not.toHaveBeenCalled();
 
-    for (const [contador, meta] of [["mobs", 1000], ["mineria", 1000], ["mineria", 500], ["entregas", 10]] as const) {
+    for (const [contador, meta] of [
+      ["mobs", 1000],
+      ["mineria", 1000],
+      ["mineria", 500],
+      ["entregas", 10],
+    ] as const) {
       expect((await reportar({ [contador]: meta })).status).toBe(200);
     }
     const ok = await reclamar();
@@ -699,18 +731,74 @@ describe("misiones", () => {
       { tipo: "vtuber.editar", id: 7, patch: { premium: { grade: "6" } } },
       "mision",
     );
-    expect(cuerpo.ficha.misiones.grado.find((m: { id: string }) => m.id === "grado-6").reclamada).toBe(true);
+    expect(
+      cuerpo.ficha.misiones.grado.find(
+        (m: { id: string }) => m.id === "grado-6",
+      ).reclamada,
+    ).toBe(true);
     expect((await reclamar()).status).toBe(409);
+  });
+
+  test("si la carta ya subió por su cuenta entre medias, NO se baja: el reclamo se suelta (409)", async () => {
+    const enlace = await vinculada();
+    for (const [contador, meta] of [
+      ["mobs", 1000],
+      ["mineria", 1000],
+      ["mineria", 500],
+      ["entregas", 10],
+    ] as const) {
+      await reportar({ [contador]: meta });
+    }
+    // La sesión de «Mi ficha» leyó la carta sin grado; justo antes de aplicar, una donación la deja en 8.
+    const leer = (DB.prepare as unknown as (sql: string) => unknown).bind(DB);
+    const espia = vi
+      .spyOn(DB, "prepare")
+      .mockImplementation(((sql: string) =>
+        sql.includes("SELECT grade FROM premium WHERE vtuber_id")
+          ? { get: () => ({ grade: "8" }) }
+          : leer(sql)) as never);
+    try {
+      const r = await miFicha.misionesDeMiFicha(
+        pedir("/api/mi-ficha/misiones", {
+          cuerpo: {
+            token: enlace,
+            slug: "luna",
+            accion: "reclamar-grado",
+            mision: "grado-6",
+          },
+          token: null,
+        }),
+        { ejecutor: e, db: DB },
+      );
+      expect(r.status).toBe(409);
+      expect((await r.json()).error).toBe("grado_no_aplicable");
+      expect(APLICAR).not.toHaveBeenCalled();
+    } finally {
+      espia.mockRestore();
+    }
   });
 
   test("si el diario falla, el reclamo se suelta y se puede reintentar", async () => {
     const enlace = await vinculada();
-    for (const [contador, meta] of [["mobs", 1000], ["mineria", 1000], ["mineria", 500], ["entregas", 10]] as const) {
+    for (const [contador, meta] of [
+      ["mobs", 1000],
+      ["mineria", 1000],
+      ["mineria", 500],
+      ["entregas", 10],
+    ] as const) {
       await reportar({ [contador]: meta });
     }
     const reclamar = () =>
       miFicha.misionesDeMiFicha(
-        pedir("/api/mi-ficha/misiones", { cuerpo: { token: enlace, slug: "luna", accion: "reclamar-grado", mision: "grado-6" }, token: null }),
+        pedir("/api/mi-ficha/misiones", {
+          cuerpo: {
+            token: enlace,
+            slug: "luna",
+            accion: "reclamar-grado",
+            mision: "grado-6",
+          },
+          token: null,
+        }),
         { ejecutor: e, db: DB },
       );
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -722,9 +810,26 @@ describe("misiones", () => {
   test("acciones o fichas ajenas se rechazan", async () => {
     const enlace = await vinculada();
     const hacer = (cuerpo: object) =>
-      miFicha.misionesDeMiFicha(pedir("/api/mi-ficha/misiones", { cuerpo: { token: enlace, ...cuerpo }, token: null }), { ejecutor: e, db: DB });
-    expect((await hacer({ slug: "otra", accion: "reclamar-grado", mision: "grado-6" })).status).toBe(404);
-    expect((await hacer({ slug: "luna", accion: "borrar", mision: "grado-6" })).status).toBe(400);
+      miFicha.misionesDeMiFicha(
+        pedir("/api/mi-ficha/misiones", {
+          cuerpo: { token: enlace, ...cuerpo },
+          token: null,
+        }),
+        { ejecutor: e, db: DB },
+      );
+    expect(
+      (
+        await hacer({
+          slug: "otra",
+          accion: "reclamar-grado",
+          mision: "grado-6",
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (await hacer({ slug: "luna", accion: "borrar", mision: "grado-6" }))
+        .status,
+    ).toBe(400);
   });
 });
 

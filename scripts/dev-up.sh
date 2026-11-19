@@ -40,8 +40,10 @@ if [[ "$MODE" != "web" ]]; then
     echo "✖ falta server/node_modules. Corre: cd server && npm install"
     exit 1
   fi
-  echo "▶ mantenedor (Express) en http://0.0.0.0:${ADMIN_PORT}"
-  (cd "$ROOT/server" && PORT="$ADMIN_PORT" HOST=0.0.0.0 npm start) &
+  # El Express SOLO en local: Next le reenvía /api/admin/* por 127.0.0.1, así que no hace falta abrirlo a la
+  # LAN (y escribe el catálogo). La web sí va en 0.0.0.0, abajo, para verla desde otro equipo.
+  echo "▶ mantenedor (Express) en http://127.0.0.1:${ADMIN_PORT}"
+  (cd "$ROOT/server" && PORT="$ADMIN_PORT" HOST=127.0.0.1 npm start) &
   pids+=($!)
 fi
 

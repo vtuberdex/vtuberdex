@@ -220,6 +220,28 @@ describe("subida de plugins", () => {
     expect(escrito.byteLength).toBe(bytes.byteLength);
   });
 
+  it("no pisa un jar existente sin confirmar (409) y lo reemplaza con ?reemplazar=1", async () => {
+    const otro = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x01, 0x02]);
+    const sinConfirmar = await subir("mi-plugin.jar", otro, cookieDe("admin"));
+    expect(sinConfirmar.status).toBe(409);
+    expect((await sinConfirmar.json()).error).toBe("jar_existe");
+    const confirmado = await pluginsPOST(
+      pedir(
+        "http://x/api/minecraft-admin/plugins?nombre=mi-plugin.jar&reemplazar=1",
+        {
+          method: "POST",
+          body: otro.slice().buffer as ArrayBuffer,
+          cookie: cookieDe("admin"),
+        },
+      ),
+    );
+    expect(confirmado.status).toBe(201);
+    const escrito = await fs.readFile(
+      path.join(base, "plugins", "mi-plugin.jar"),
+    );
+    expect(escrito.byteLength).toBe(otro.byteLength);
+  });
+
   it("rechaza con 415 una extensión que no es .jar", async () => {
     const r = await subir(
       "notas.txt",
@@ -395,7 +417,7 @@ describe("plugins", () => {
 
   it("un mantenedor autorizado también puede subir plugins", async () => {
     const r = await subir(
-      "mi-plugin.jar",
+      "plugin-del-mantenedor.jar",
       new Uint8Array([1, 2, 3]),
       cookieDe("mantenedor"),
     );
@@ -495,5 +517,34 @@ describe("roles: admin y mantenedor", () => {
     const texto = (await leido.json()).contenido as string;
     expect(texto).toContain("motd=x");
     expect(texto).not.toContain("hackeada");
+  });
+
+  it("el mantenedor no ve los secretos de gestión ni puede apagar RCON con un «\\» al final", async () => {
+    await fs.writeFile(
+      path.join(base, "server.properties"),
+      "enable-rcon=true\nrcon.password=secretisima\nmanagement-server-secret=otro-secreto\nmotd=antes\n",
+    );
+    const leido = await configGET(
+      pedir("http://x/api/minecraft-admin/configuracion?tipo=servidor", {
+        cookie: cookieDe("mantenedor"),
+      }),
+    );
+    const texto = (await leido.json()).contenido as string;
+    expect(texto).not.toContain("otro-secreto");
+    expect(texto).not.toContain("secretisima");
+    // Una línea que acaba en «\» continúa en la siguiente: antes se tragaba `enable-rcon`.
+    const guardado = await guardarComo(
+      { tipo: "servidor", contenido: "motd=despues\\" },
+      cookieDe("mantenedor"),
+    );
+    expect(guardado.status).toBe(200);
+    const archivo = await fs.readFile(
+      path.join(base, "server.properties"),
+      "utf8",
+    );
+    const lineas = archivo.split("\n");
+    expect(lineas[0]).toBe("enable-rcon=true");
+    expect(archivo).toContain("management-server-secret=otro-secreto");
+    expect(archivo).toContain("rcon.password=secretisima");
   });
 });

@@ -9,11 +9,12 @@ import {
   respuestaJson,
 } from "../../../../../lib/minecraft-admin.mjs";
 import { cambiarEstadoPlugin } from "../../../../../lib/minecraft-plugins.mjs";
+import { anotarAuditoria } from "../../../../../lib/minecraft-consola.mjs";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
-  return conMantenedor(request, async () => {
+  return conMantenedor(request, async (acceso) => {
     const cuerpo = await request.json().catch(() => null);
     if (!cuerpo || typeof cuerpo !== "object") {
       return respuestaJson({ error: "cuerpo_invalido" }, 400);
@@ -21,6 +22,14 @@ export async function POST(request) {
     const r = await cambiarEstadoPlugin({
       archivo: cuerpo.archivo,
       habilitado: cuerpo.habilitado,
+    });
+    // Habilitar un jar es instalar código: queda en la auditoría como la subida.
+    await anotarAuditoria({
+      quien: acceso.sesion.email,
+      rol: acceso.sesion.role,
+      tipo: cuerpo.habilitado ? "plugin-habilitado" : "plugin-deshabilitado",
+      detalle: String(cuerpo.archivo ?? ""),
+      ok: r.ok,
     });
     if (!r.ok) {
       return respuestaJson(r.cuerpo, r.status);
