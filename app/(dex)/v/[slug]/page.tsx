@@ -16,7 +16,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { DetailPage } from "@/components/detail-page";
+import { headers } from "next/headers";
+
+import { DetailPage, type FichaInicial } from "@/components/detail-page";
+import { gastarFichas, redDeLaPeticion } from "@/lib/anti-scraping.mjs";
+import { dbConDiario } from "@/lib/diario.mjs";
+import { comoJson, completarFicha } from "@/lib/fichas-publicas.mjs";
+import { getVtuberBySlug } from "@/server/src/search.mjs";
 import { fichaPublica } from "@/lib/seo-datos.mjs";
 import {
   descripcionDeFicha,
@@ -74,6 +80,31 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+/**
+ * La ficha completa resuelta en el servidor y mandada en el HTML (ver `lib/fichas-publicas.mjs`): la
+ * carta empieza a bajar sus imágenes en cuanto hidrata. Gasta el MISMO cupo de fichas por red que la API;
+ * si se agotó o algo falla, no se manda y el cliente la pide como antes.
+ */
+async function fichaInicial(slug: string): Promise<FichaInicial | null> {
+  try {
+    const db = await dbConDiario({ ttlMs: 2000 });
+    const card = getVtuberBySlug(db, slug);
+    if (!card) {
+      return null;
+    }
+    const cupo = gastarFichas(redDeLaPeticion(await headers()), [card.id]);
+    if (!cupo.permitido) {
+      return null;
+    }
+    return comoJson(await completarFicha(db, card)) as FichaInicial;
+  } catch (error) {
+    console.error(
+      `[ficha] ${slug} sin primera vista del servidor: ${(error as Error).message}`,
+    );
+    return null;
+  }
+}
+
 export default async function DetailRoute({ params }: Readonly<Props>) {
   const { slug } = await params;
   const card = await fichaPublica(slug).catch(() => undefined);
@@ -82,6 +113,7 @@ export default async function DetailRoute({ params }: Readonly<Props>) {
   if (card === null) {
     notFound();
   }
+  const inicial = card ? await fichaInicial(slug) : null;
   return (
     <>
       {card ? (
@@ -92,7 +124,7 @@ export default async function DetailRoute({ params }: Readonly<Props>) {
           }}
         />
       ) : null}
-      <DetailPage slug={slug} />
+      <DetailPage slug={slug} inicial={inicial} />
     </>
   );
 }

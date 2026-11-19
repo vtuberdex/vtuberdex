@@ -29,14 +29,20 @@ import { SearchBar } from "@/components/search-bar";
 import { SortSelect } from "@/components/sort-select";
 import { VrtonBanners } from "@/components/vrton-banners";
 import { useSingleSheet } from "@/components/use-single-sheet";
-import { useVtuberSearch } from "@/components/use-vtuber-search";
+import {
+  useVtuberSearch,
+  type DatosIniciales,
+} from "@/components/use-vtuber-search";
 
-export function CatalogPage() {
+export function CatalogPage({
+  inicial = null,
+}: Readonly<{ inicial?: DatosIniciales | null }> = {}) {
   // En celular el libro es UNA hoja de 4 fundas: cada página son 4 cartas (ver `useSingleSheet`).
   const single = useSingleSheet();
   const { params, data, loading, error, setParams, reset, goToPage } =
     useVtuberSearch({
       perPage: single ? BINDER.cardsPerPage : BINDER.cardsPerPage * 2,
+      inicial,
     });
   const [sheetOpen, setSheetOpen] = useState(false);
   // Premium tiene su propio botón (que también lo apaga): ni cuenta en «Filtros» ni lleva chip.

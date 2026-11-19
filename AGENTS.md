@@ -824,7 +824,7 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
   esqueleto y el `notFound()` ya no cambia el código (soft 404; medido: 200 con él, 404 sin él). Cada página
   que usa `useSearchParams` lleva su propio `Suspense`.
 - **`/`**: canonical siempre `/` (filtros y páginas son querystring: no se indexan como páginas aparte) + JSON-LD
-  `WebSite`/`ItemList` (las primeras 24 fichas; la home es estática, se congela en el build).
+  `WebSite`/`ItemList` (las primeras 24 fichas). La home ya NO es estática (2026-11-19): lee `searchParams` para mandar la primera página en el HTML (ver «Primera vista desde el servidor»).
 - **`/sitemap.xml`** (dinámico, todas las fichas publicadas) y **`/robots.txt`** (bloquea `/api/` y `/admin`).
 - **Dominio**: `SITE_URL` → `VERCEL_PROJECT_PRODUCTION_URL` → localhost. Defínela en Vercel si hay dominio propio;
   no hay dominio fijado en el código a propósito (un canonical ajeno saca la página del índice).
@@ -862,6 +862,19 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
 
 ## Trampas conocidas (ya nos costaron tiempo)
 
+- **Primera vista desde el servidor (2026-11-19).** `/` y `/v/[slug]` resuelven en el servidor la página o ficha que pide la
+  URL y la pasan como prop (`inicial`) a `CatalogPage`/`DetailPage`: las cartas ya no esperan sesión → API para empezar a bajar
+  imágenes, y el HTML lleva los enlaces y la ficha (bueno también para buscadores). La lógica es UNA (`lib/fichas-publicas.mjs`:
+  `buscarPagina`/`completarPagina`/`completarFicha`) para la API y las páginas. **La página gasta el mismo cupo de fichas por red**
+  (`gastarFichas` con la IP de `headers()`); si se agotó, no manda datos y el cliente pide la API como antes. Es una decisión del
+  dueño: los datos de la primera vista ya no pasan por la sesión con prueba de trabajo. Trampas: (1) **las filas de `node:sqlite`
+  no tienen prototipo** y React se niega a pasarlas a un componente cliente: el render del servidor fallaba y caía al cliente con un
+  `<template data-dgst>`, sin error visible salvo en el log; se pasa `comoJson(...)` (lo mismo que daría la API). (2) La caché de
+  páginas es de módulo: se siembra en un EFECTO (solo navegador), nunca durante el render, o el servidor la compartiría entre visitas.
+  (3) El servidor manda siempre 8 cartas; el celular saca de ahí la página 1 de 4 (`sembrarDatosIniciales`).
+- **Para probar con `next start`, `kill` al PID de `npx` NO mata el servidor**: queda el `next-server` hijo escuchando y el siguiente
+  `next start` en ese puerto falla con `EADDRINUSE` mientras el VIEJO sigue respondiendo (con el build anterior). Mátalo por puerto:
+  `ss -ltnp | grep :PUERTO`. Y nunca `pgrep -f`/`pkill -f` con un patrón que aparezca en tu propio comando.
 - **three y R3F van en chunks propios (`next/dynamic`), no en el JS de la ruta (2026-11-19).** Medido con
   `next analyze`: el catálogo cargaba 578 KB comprimidos de entrada (three 180 + R3F 51) y CUALQUIER página con un enlace
   al catálogo los bajaba al precargarlo (`/terminos` bajaba 572 KB de JS). Hoy `card-binder.tsx` es solo DOM y carga la
@@ -1675,7 +1688,7 @@ Cuatro trampas concretas de trabajar en local:
 5. **Next 16 mantiene un bloque gestionado en `AGENTS.md`** (entre
    `<!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 

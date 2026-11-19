@@ -26,6 +26,7 @@ import {
 } from "@/components/card-texture";
 import { api } from "@/lib/api";
 import { __limpiarCachePaginas } from "@/lib/cache-paginas";
+import { searchParamsFromUrl } from "@/lib/query";
 import { makeCard, makeDetail, makeList } from "@/test/fixtures";
 
 vi.mock("next/navigation", async () => {
@@ -113,6 +114,24 @@ const renderCatalog = (initial = "/") => {
 };
 
 describe("CatalogPage", () => {
+  it("con la primera página ya resuelta por el servidor, la pinta sin pedirla a la API", () => {
+    const respuesta = makeList({ items: [makeCard()], total: 1 });
+    render(
+      <CatalogPage
+        inicial={{
+          params: { ...searchParamsFromUrl(""), perPage: 8 },
+          respuesta,
+        }}
+      />,
+    );
+    // Desde el PRIMER render (es lo que sale en el HTML del servidor): sin esperar a nada.
+    expect(screen.getAllByTestId("binder-link")).toHaveLength(1);
+    expect(mockedApi.list).not.toHaveBeenCalledWith(
+      expect.objectContaining({ page: 1 }),
+      expect.anything(),
+    );
+  });
+
   it("muestra las cartas devueltas por la API con su contador", async () => {
     mockedApi.list.mockResolvedValue(
       makeList({
@@ -352,6 +371,18 @@ describe("DetailPage", () => {
   // El slug entra por props (lo lee la página de ruta del App Router).
   const renderDetail = (slug = "gkuro-monochrome") =>
     render(<DetailPage slug={slug} />);
+
+  it("con la ficha ya resuelta por el servidor, la pinta sin pedirla a la API", () => {
+    const ficha = {
+      ...makeDetail(),
+      neighbors: { prev: null, next: null },
+    };
+    render(<DetailPage slug="gkuro-monochrome" inicial={ficha} />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "GKuro Monochrome",
+    );
+    expect(mockedApi.detail).not.toHaveBeenCalled();
+  });
 
   it("renderiza la ficha, atributos, habilidades y redes", async () => {
     mockedApi.detail.mockResolvedValue({
