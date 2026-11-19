@@ -72,18 +72,18 @@ export function I18nProvider({
     diccionarioCargado(localeEstado) ? localeEstado : LOCALE_POR_DEFECTO,
   );
   useEffect(() => {
+    let vigente = true;
     if (diccionarioCargado(localeEstado)) {
       setLocaleVisible(localeEstado);
-      return;
+    } else {
+      cargarDiccionario(localeEstado)
+        .then(() => {
+          if (vigente) {
+            setLocaleVisible(localeEstado);
+          }
+        })
+        .catch(() => undefined /* sin red: se queda el idioma que se ve */);
     }
-    let vigente = true;
-    cargarDiccionario(localeEstado)
-      .then(() => {
-        if (vigente) {
-          setLocaleVisible(localeEstado);
-        }
-      })
-      .catch(() => undefined /* sin red: se queda el idioma que se ve */);
     return () => {
       vigente = false;
     };

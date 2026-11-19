@@ -19,25 +19,25 @@ import {
 export function TerminosContenido() {
   const { locale } = useI18n();
   // La traducción de cortesía se pide al elegir el idioma; mientras llega se ve el texto vinculante.
-  const [, alCargar] = useState(0);
+  const [terminos, setTerminos] = useState(() => terminosDe(locale));
   useEffect(() => {
-    if (terminosCargados(locale)) {
-      return;
-    }
     let vigente = true;
-    cargarTerminos(locale)
-      .then(() => vigente && alCargar((n) => n + 1))
-      .catch(() => undefined);
+    if (terminosCargados(locale)) {
+      setTerminos(terminosDe(locale));
+    } else {
+      cargarTerminos(locale)
+        .then(() => {
+          if (vigente) {
+            setTerminos(terminosDe(locale));
+          }
+        })
+        .catch(() => undefined);
+    }
     return () => {
       vigente = false;
     };
   }, [locale]);
-  const {
-    fechaVigencia,
-    preambulo,
-    clausulas,
-    textosPagina: tx,
-  } = terminosDe(locale);
+  const { fechaVigencia, preambulo, clausulas, textosPagina: tx } = terminos;
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">

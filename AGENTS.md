@@ -1573,7 +1573,9 @@ Copias versionadas en `infra/` (la fuente viva está en `/etc/nginx` y `/etc/fai
 - **Sesión de visitante con prueba de trabajo** (`lib/sesion-visitante.mjs`, `app/api/sesion`, cliente en `lib/sesion-cliente.ts`):
   `/api/vtubers*` responde 401 `sesion_requerida` sin la cookie `vtd_s`. Se obtiene resolviendo un reto (sha256 con 16 bits de ceros,
   ~1 s en el navegador), dura 5 min y el navegador la RENUEVA sola cada 3 min mientras la pestaña está visible (`POST /api/sesion/renovar`, sin repetir la prueba; tope de 2 h desde el reto) y va atada al hash de la red y del User-Agent (copiarla a otra máquina no sirve). Tope de 30 sesiones
-  nuevas por red y hora. `ClienteStats` la abre al cargar y `request()` de `lib/api.ts` la abre y repite UNA vez ante la primera 401.
+  nuevas por red y hora. `ClienteStats` la abre SOLO al entrar al catálogo o a una ficha (las únicas que llaman a `/api/vtubers*`; antes
+  se resolvía en todas las cargas) y la prueba corre en un Web Worker (`lib/reto.worker.ts`; costaba ~370 ms de hilo principal).
+  `request()` de `lib/api.ts` la abre y repite UNA vez ante la primera 401.
   Secreto por proceso (un reinicio invalida las sesiones; el cliente re-resuelve). Loopback/VPN y desarrollo sin `X-Real-IP` no la exigen.
   Un navegador real la pasa: lo que frena a ese es el presupuesto de fichas. Probado con `next start` + `X-Real-IP` simulada.
 - **Términos**: la cláusula 18 (`/terminos#seguridad`) prohíbe el scraping, los usos derivados (incluido entrenar IA), la elusión de
