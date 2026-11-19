@@ -1,0 +1,155 @@
+#!/bin/bash
+# HTTPS de VTuberDex (vtuberdex.com + www.vtuberdex.com): bloque 443 PROPIO y certificado con AMBOS nombres.
+#
+# 1) Por qué un bloque 443 propio: ssl-dominios emite el certificado pero genera un 443 que sirve
+#    /var/www/<dominio> como ESTÁTICO (una página vacía). Aquí se quiere el proxy a la app. Este archivo
+#    se llama 00-b-… para cargar antes que 00-multidominio.conf (que incluye ssl-dominios.d): con
+#    server_name repetido nginx usa el PRIMERO.
+# 2) Por qué amplía el certificado: ssl-dominios incluye www solo si `dig A www` devuelve EXACTAMENTE la IP
+#    de esta VPS; con www como CNAME la respuesta trae también el nombre destino y www queda fuera del
+#    certificado (el navegador avisaría en www). Si www resuelve aquí pero el certificado no lo lleva,
+#    se reemite con `--expand` (reintento como mucho cada 6 h tras un fallo).
+# Se ejecuta tras cada pasada de ssl-dominios (drop-in ExecStartPost). Nunca falla: es un complemento.
+DOMS="vtuberdex.com"
+CONF=/etc/nginx/conf.d; MARK=/etc/nginx/vtuberdex-https; STATE=/var/lib/vtuberdex-https; WWW=/var/www
+mkdir -p "$MARK" "$STATE"
+IP4=$(ip -4 -o addr show scope global | awk '{split($4,a,"/"); print a[1]; exit}')
+IP6=$(ip -6 -o addr show scope global | awk '{split($4,a,"/"); print a[1]; exit}')
+
+resuelve_aqui() {  # 0 si el nombre llega a esta VPS (siguiendo CNAME) y no hay un AAAA ajeno
+  local a aaaa
+  a=$(getent ahostsv4 "$1" | awk '{print $1}' | sort -u); [ "$a" = "$IP4" ] || return 1
+  aaaa=$(dig +short AAAA "$1" | grep -E '^[0-9a-f:]+$' | sort -u); [ -z "$aaaa" ] || [ "$aaaa" = "$IP6" ] || return 1
+}
+
+cambio=0
+for d in $DOMS; do
+  LIVE=/etc/letsencrypt/live/$d
+  [ -f "$LIVE/fullchain.pem" ] || continue
+  sans=$(openssl x509 -in "$LIVE/fullchain.pem" -noout -ext subjectAltName 2>/dev/null)
+
+  if ! echo "$sans" | grep -q "DNS:www.$d\b" && resuelve_aqui "www.$d"; then
+    f="$STATE/$d.www.fail"
+    if ! { [ -f "$f" ] && [ -n "$(find "$f" -mmin -360)" ]; }; then
+      echo "$d: ampliando el certificado para incluir www.$d"
+      # Si el certificado ya lleva mapa.$d (BlueMap, ver abajo), se conserva al ampliarlo.
+      extra=""; echo "$sans" | grep -q "DNS:mapa.$d\b" && extra="-d mapa.$d"
+      if certbot certonly --webroot -w "$WWW/$d" -d "$d" -d "www.$d" $extra --cert-name "$d" --expand \
+           --non-interactive --agree-tos --register-unsafely-without-email; then
+        rm -f "$f"; cambio=1
+        sans=$(openssl x509 -in "$LIVE/fullchain.pem" -noout -ext subjectAltName 2>/dev/null)
+      else
+        echo "$d: la ampliación a www falló; se reintenta en 6 h"; touch "$f"
+      fi
+    fi
+  fi
+
+  sn="$d"; echo "$sans" | grep -q "DNS:www.$d\b" && sn="$d www.$d"
+  archivo="$CONF/00-b-$d-https.conf"
+  nuevo=$(cat <<C
+# Generado por vtuberdex-https. No editar.
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name $sn;
+    ssl_certificate     $LIVE/fullchain.pem;
+    ssl_certificate_key $LIVE/privkey.pem;
+    include /etc/nginx/snippets/vtuberdex-locations.conf;
+    location / {
+        include /etc/nginx/snippets/vtuberdex-proxy.conf;
+    }
+}
+C
+)
+  if [ "$(cat "$archivo" 2>/dev/null)" != "$nuevo" ]; then
+    echo "$nuevo" > "$archivo"
+    if ! nginx -t >/dev/null 2>&1; then
+      echo "$d: nginx -t falló con el bloque HTTPS propio; se revierte"; rm -f "$archivo"; continue
+    fi
+    echo "$d: bloque HTTPS propio activado ($sn)"; cambio=1
+  fi
+  for h in $sn; do [ -e "$MARK/$h" ] || { touch "$MARK/$h"; cambio=1; }; done
+done
+# --- BlueMap en su propio origen: mapa.vtuberdex.com (auditoría de seguridad 2026-11-19) -------------------
+# BlueMap es de terceros y vivía en vtuberdex.com/mapa/: un XSS ahí alcanzaría la sesión del mantenedor. Cuando
+# mapa.vtuberdex.com resuelve aquí, se amplía el certificado de vtuberdex.com con ese nombre, se escribe su 443 y
+# /mapa/ de la web pasa a ser un 301 al subdominio. Mientras no haya DNS no se hace nada (el mapa sigue en /mapa/).
+MAPA=mapa.vtuberdex.com; LIVE=/etc/letsencrypt/live/vtuberdex.com
+if [ -f "$LIVE/fullchain.pem" ]; then
+  sans=$(openssl x509 -in "$LIVE/fullchain.pem" -noout -ext subjectAltName 2>/dev/null)
+  if ! echo "$sans" | grep -q "DNS:$MAPA\b" && resuelve_aqui "$MAPA"; then
+    f="$STATE/mapa.fail"
+    if ! { [ -f "$f" ] && [ -n "$(find "$f" -mmin -360)" ]; }; then
+      doms="-d vtuberdex.com"; echo "$sans" | grep -q "DNS:www.vtuberdex.com\b" && doms="$doms -d www.vtuberdex.com"
+      echo "vtuberdex.com: ampliando el certificado para incluir $MAPA"
+      if certbot certonly --webroot -w "$WWW/vtuberdex.com" $doms -d "$MAPA" --cert-name vtuberdex.com --expand \
+           --non-interactive --agree-tos --register-unsafely-without-email; then
+        rm -f "$f"; cambio=1
+        sans=$(openssl x509 -in "$LIVE/fullchain.pem" -noout -ext subjectAltName 2>/dev/null)
+      else
+        echo "$MAPA: la ampliación falló; se reintenta en 6 h"; touch "$f"
+      fi
+    fi
+  fi
+  if echo "$sans" | grep -q "DNS:$MAPA\b"; then
+    https_mapa=$(cat <<C
+# Generado por vtuberdex-https. No editar.
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name $MAPA;
+    ssl_certificate     $LIVE/fullchain.pem;
+    ssl_certificate_key $LIVE/privkey.pem;
+    include /etc/nginx/snippets/vtuberdex-seguridad.conf;
+    location / {
+        include /etc/nginx/snippets/vtuberdex-mapa-proxy.conf;
+    }
+}
+C
+)
+    http_mapa=$(cat <<C
+# Generado por vtuberdex-https (con certificado). No editar.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $MAPA;
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/vtuberdex.com;
+    }
+    location / {
+        return 301 https://$MAPA\$request_uri;
+    }
+}
+C
+)
+    redireccion=$(cat <<C
+# Generado por vtuberdex-https (estado: el mapa vive en $MAPA). No editar.
+location = /mapa { return 301 https://$MAPA/; }
+location ^~ /mapa/ {
+    rewrite ^/mapa/(.*)\$ https://$MAPA/\$1 permanent;
+}
+C
+)
+    for par in "$CONF/00-d-mapa.vtuberdex.com-https.conf|https_mapa" "$CONF/00-c-mapa.vtuberdex.com.conf|http_mapa" "/etc/nginx/snippets/vtuberdex-mapa.conf|redireccion"; do
+      archivo=${par%%|*}; nombre=${par##*|}; contenido=${!nombre}
+      if [ "$(cat "$archivo" 2>/dev/null)" != "$contenido" ]; then
+        cp -a "$archivo" "$archivo.previo" 2>/dev/null
+        echo "$contenido" > "$archivo"; cambio=1; mapa_cambio=1
+      fi
+    done
+    if [ "${mapa_cambio:-0}" = 1 ] && ! nginx -t >/dev/null 2>&1; then
+      echo "$MAPA: nginx -t falló; se revierte"
+      for a in "$CONF/00-d-mapa.vtuberdex.com-https.conf" "$CONF/00-c-mapa.vtuberdex.com.conf" /etc/nginx/snippets/vtuberdex-mapa.conf; do
+        if [ -f "$a.previo" ]; then mv -f "$a.previo" "$a"; else rm -f "$a"; fi
+      done
+    else
+      rm -f "$CONF"/00-*-mapa.vtuberdex.com*.conf.previo /etc/nginx/snippets/vtuberdex-mapa.conf.previo
+      [ "${mapa_cambio:-0}" = 1 ] && echo "$MAPA: activo (HTTPS) y /mapa/ redirige al subdominio"
+    fi
+  fi
+fi
+
+[ "$cambio" = 1 ] && nginx -t >/dev/null 2>&1 && systemctl reload nginx
+exit 0
