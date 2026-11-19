@@ -21,6 +21,7 @@
  * una ficha y volver) y el hook solo la consulta. `__limpiarCachePaginas` es para los
  * tests, que comparten módulo.
  */
+import { urlDelLibro } from "@/lib/variante-libro.mjs";
 import type { ApiListResponse, SearchParams, VtuberCard } from "@/lib/types";
 import { searchParamsToQuery } from "@/lib/query";
 
@@ -86,18 +87,24 @@ export function paginasVecinas(
  * URLs de imagen que una página de cartas va a necesitar para sus texturas: personaje
  * (o carta), logo, fondo y emblemas de facción. Sin duplicados ni vacíos.
  */
-export function imagenesDeCartas(items: readonly VtuberCard[]): string[] {
+export function imagenesDeCartas(
+  items: readonly VtuberCard[],
+  { libro = false }: { libro?: boolean } = {},
+): string[] {
+  // El libro dibuja a 512: pide la MISMA variante que su fábrica de texturas (`urlDelLibro`), o la
+  // precarga bajaría el original y la carta otra imagen distinta.
+  const url = (src: string) => (libro ? urlDelLibro(src) : src);
   const urls = new Set<string>();
   for (const card of items) {
     const arte = card.images.character ?? card.images.card;
     if (arte) {
-      urls.add(arte);
+      urls.add(url(arte));
     }
     if (card.images.logo) {
-      urls.add(card.images.logo);
+      urls.add(url(card.images.logo));
     }
     if (card.images.background) {
-      urls.add(card.images.background);
+      urls.add(url(card.images.background));
     }
     for (const faccion of card.factionIcons ?? []) {
       if (faccion.icon) {

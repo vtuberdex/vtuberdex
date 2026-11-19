@@ -1366,7 +1366,11 @@ subir (`lib/imagen-cliente.ts`): emblema `EMBLEMA_MAX_LADO` 256 (se dibuja a 88 
 (llegaron logos de 10.799 px) y WebP `CALIDAD_WEBP` 0,84 (era 0,92; no se distingue ampliado al doble). Lo ya guardado se
 redujo con `scripts/reducir-imagenes.mjs` (emblemas a PNG con paleta, logos topados, personaje/fondo del mantenedor solo
 recodificados: la resolución no se toca). Originales y base previa en `~/backups/vtuberdex-antes-reducir-imagenes-20261119/`.
-Ojo: `publish:images` compara TAMAÑOS con `data/images/`, así que volvería a subir los emblemas y logos del catálogo en grande:
+**Variante del libro (`?w=512`)**: las texturas del libro miden 512, así que la fábrica pide personaje, fondo y logo con
+`?w=512` (`lib/variante-libro.mjs`, `urlDelLibro`) y la ruta `/images` los reduce con sharp (viaja con Next en el standalone) con
+la misma caché que el original; nginx guarda cada variante (la clave lleva la query). Solo ese ancho y esas carpetas (otro `w` = 404, para
+no generar tamaños sin límite). La ficha (1008) pide el original. La precarga del libro usa `imagenesDeCartas(items, { libro: true })`: si
+pidiera otra URL que la fábrica, bajaría dos veces. Ojo: `publish:images` compara TAMAÑOS con `data/images/`, así que volvería a subir los emblemas y logos del catálogo en grande:
 corre `reducir-imagenes` otra vez después. Las imágenes de las páginas vecinas del libro esperan a las de la página visible
 y no se precargan con ahorro de datos o 2G (`use-vtuber-search.ts`).
 

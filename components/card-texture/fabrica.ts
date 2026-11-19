@@ -45,6 +45,7 @@ import { drawCharacterLayer } from "./capa-personaje";
 import { drawTitleLayer } from "./capa-titulo";
 import { emptyLayer } from "./lienzo";
 import { loadImage } from "./imagen";
+import { ANCHO_LIBRO, urlDelLibro } from "@/lib/variante-libro.mjs";
 import {
   inkAndSkinMaskAsync,
   logoMaskAsync,
@@ -182,9 +183,19 @@ export function fuentesCompletas(card: VtuberCard, fuentes: Fuentes): boolean {
   );
 }
 
-async function cargarFuentes(card: VtuberCard): Promise<Fuentes> {
+/**
+ * Las imágenes que se dibujan en una textura de `width`. Si cabe en el ancho del libro (512) se pide la
+ * variante de 512 (`urlDelLibro`): bajar el original de 720-1008 para encogerlo aquí era tirar ~la mitad.
+ */
+async function cargarFuentes(
+  card: VtuberCard,
+  width: number,
+): Promise<Fuentes> {
+  const urls = urlsDeCarta(card).map((src) =>
+    width <= ANCHO_LIBRO ? urlDelLibro(src) : src,
+  );
   const [art, logo, background] = await Promise.all(
-    urlsDeCarta(card).map((src) => loadImage(src)),
+    urls.map((src) => loadImage(src)),
   );
   return { art, logo, background };
 }
@@ -485,7 +496,7 @@ export async function generarTexturas(
   }
 
   precalentarMascaras();
-  const fuentes = await cargarFuentes(card);
+  const fuentes = await cargarFuentes(card, width);
   if (cancelada()) {
     return null;
   }
