@@ -73,7 +73,7 @@ const cargarImagenes = (items: VtuberCard[]): Promise<unknown> => {
     return Promise.resolve();
   }
   return Promise.allSettled(
-    imagenesDeCartas(items).map((src) => loadImage(src)),
+    imagenesDeCartas(items, { libro: true }).map((src) => loadImage(src)),
   );
 };
 

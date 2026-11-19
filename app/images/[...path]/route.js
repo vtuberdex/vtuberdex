@@ -25,6 +25,10 @@ import path from "node:path";
 import { resolveImageUrl, usesLocalImages } from "../../../lib/db.mjs";
 import { leerAssetRemoto, tursoConfigurado } from "../../../lib/ediciones.mjs";
 import { CARPETAS_PUBLICADAS } from "../../../lib/carpetas.mjs";
+import {
+  ANCHO_LIBRO,
+  CARPETAS_CON_VARIANTE,
+} from "../../../lib/variante-libro.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -260,18 +264,10 @@ function servirDeDisco(key, etagPedido) {
   return noPublicada(key);
 }
 
-export async function GET(request, { params }) {
+/** El original de `key`. `etagPedido` es el `If-None-Match` ya traducido al ETag del original. */
+async function servirOriginal(request, { params }, etagPedido) {
   const { path: segments } = await params;
   const key = `images/${Array.isArray(segments) ? segments.join("/") : segments}`;
-  /**
-   * El validador que manda el cliente, si lo manda.
-   *
-   * Se lee de la petición y no del `query`: la versión `?v=` de la URL identifica la
-   * REVISIÓN del recurso, mientras que `If-None-Match` es lo que el navegador usa para
-   * preguntar "¿sigue valiendo lo que tengo?". Son dos cosas distintas y la segunda es la
-   * que convierte una revalidación en un 304 sin cuerpo.
-   */
-  const etagPedido = request.headers.get("if-none-match");
 
   /**
    * El manifiesto decide qué se sirve, pero solo para las carpetas PUBLICADAS.
@@ -336,4 +332,86 @@ export async function GET(request, { params }) {
       "cache-control": "public, max-age=86400, s-maxage=604800, immutable",
     },
   });
+}
+
+/** Sufijo del ETag de la variante: el original y la de 512 son recursos distintos. */
+const SUFIJO_ETAG_LIBRO = `-w${ANCHO_LIBRO}`;
+
+/** `"abc"` -> `"abc-w512"` (y sin comillas, igual). */
+function etagDeLaVariante(etag) {
+  return etag.endsWith('"')
+    ? `${etag.slice(0, -1)}${SUFIJO_ETAG_LIBRO}"`
+    : `${etag}${SUFIJO_ETAG_LIBRO}`;
+}
+
+/**
+ * La variante del libro (`?w=512`, ver `lib/variante-libro.mjs`): la misma imagen reducida a 512 de
+ * ancho, con las MISMAS cabeceras de caché que el original (si este es inmutable, la variante también).
+ * Sin sharp (no debería pasar: viaja con Next) se sirve el original: nunca se rompe la imagen.
+ */
+async function reducirParaElLibro(respuesta) {
+  const tipo = respuesta.headers.get("content-type") ?? "";
+  if (respuesta.status !== 200 || !tipo.startsWith("image/")) {
+    return respuesta;
+  }
+  let sharp;
+  try {
+    ({ default: sharp } = await import("sharp"));
+  } catch {
+    return respuesta;
+  }
+  const original = Buffer.from(await respuesta.arrayBuffer());
+  const reducida = await sharp(original, { failOn: "none" })
+    .resize({ width: ANCHO_LIBRO, withoutEnlargement: true })
+    .webp({ quality: 82, alphaQuality: 90 })
+    .toBuffer();
+  const cabeceras = new Headers(respuesta.headers);
+  cabeceras.set("content-type", "image/webp");
+  cabeceras.set("content-length", String(reducida.byteLength));
+  const etag = cabeceras.get("etag");
+  if (etag) {
+    cabeceras.set("etag", etagDeLaVariante(etag));
+  }
+  return new Response(reducida, { status: 200, headers: cabeceras });
+}
+
+export async function GET(request, contexto) {
+  /**
+   * El validador que manda el cliente, si lo manda.
+   *
+   * Se lee de la petición y no del `query`: la versión `?v=` de la URL identifica la
+   * REVISIÓN del recurso, mientras que `If-None-Match` es lo que el navegador usa para
+   * preguntar "¿sigue valiendo lo que tengo?". Son dos cosas distintas y la segunda es la
+   * que convierte una revalidación en un 304 sin cuerpo. Para la variante del libro se le
+   * quita su sufijo y se compara con el del original.
+   */
+  const etagPedido = request.headers.get("if-none-match");
+  const ancho = new URL(request.url).searchParams.get("w");
+  if (ancho === null) {
+    return servirOriginal(request, contexto, etagPedido);
+  }
+  const { path: segmentos } = await contexto.params;
+  const carpeta = Array.isArray(segmentos)
+    ? segmentos[0]
+    : String(segmentos).split("/")[0];
+  // Solo el ancho del libro y solo donde tiene sentido: otro `w` no genera ni cachea nada.
+  if (ancho !== String(ANCHO_LIBRO) || !CARPETAS_CON_VARIANTE.has(carpeta)) {
+    return new Response(null, {
+      status: 404,
+      headers: { "cache-control": "no-store" },
+    });
+  }
+  const respuesta = await servirOriginal(
+    request,
+    contexto,
+    etagPedido?.replace(SUFIJO_ETAG_LIBRO, "") ?? null,
+  );
+  if (respuesta.status === 304) {
+    const cabeceras = new Headers(respuesta.headers);
+    if (etagPedido) {
+      cabeceras.set("etag", etagPedido);
+    }
+    return new Response(null, { status: 304, headers: cabeceras });
+  }
+  return reducirParaElLibro(respuesta);
 }
