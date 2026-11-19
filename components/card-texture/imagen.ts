@@ -18,6 +18,39 @@
 
 const LIMITE_IMAGENES = 96;
 
+/**
+ * Esperas (ms) antes de cada reintento de una imagen que falló. POR QUÉ: pasando páginas rápido, nginx
+ * respondía 429 a ráfagas de imágenes (medido 2026-11-19: 211 en pocos minutos a una sola persona) y la
+ * carta se dibujaba con «SIN IMAGEN» aunque la imagen existiera; un 429 se pasa en un segundo. `onerror`
+ * no dice el código, así que se reintenta cualquier fallo: una URL rota de verdad cuesta tres peticiones.
+ */
+export const REINTENTOS_MS = [400, 1500, 4000] as const;
+
+function cargarUnaVez(src: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
+}
+
+async function cargarConReintentos(
+  src: string,
+): Promise<HTMLImageElement | null> {
+  let image = await cargarUnaVez(src);
+  for (const espera of REINTENTOS_MS) {
+    if (image) {
+      break;
+    }
+    await new Promise((r) => setTimeout(r, espera));
+    image = await cargarUnaVez(src);
+  }
+  return image;
+}
+
 const memoria = new Map<string, Promise<HTMLImageElement | null>>();
 
 export function loadImage(src: string): Promise<HTMLImageElement | null> {
@@ -31,16 +64,11 @@ export function loadImage(src: string): Promise<HTMLImageElement | null> {
     memoria.set(src, hit);
     return hit;
   }
-  const promesa = new Promise<HTMLImageElement | null>((resolve) => {
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.decoding = "async";
-    image.onload = () => resolve(image);
-    image.onerror = () => {
+  const promesa = cargarConReintentos(src).then((image) => {
+    if (!image) {
       memoria.delete(src);
-      resolve(null);
-    };
-    image.src = src;
+    }
+    return image;
   });
   memoria.set(src, promesa);
   while (memoria.size > LIMITE_IMAGENES) {
