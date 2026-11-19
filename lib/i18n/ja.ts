@@ -1,9 +1,9 @@
 // Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
-import { formulariosJa } from "./textos/formularios";
-import { miFichaJa } from "./textos/mificha";
-import { nivelesJa } from "./textos/niveles";
-import { minecraftJa } from "./textos/minecraft";
-import { fichasJa } from "./textos/fichas";
+import { formulariosJa } from "./textos/formularios.ja";
+import { miFichaJa } from "./textos/mificha.ja";
+import { nivelesJa } from "./textos/niveles.ja";
+import { minecraftJa } from "./textos/minecraft.ja";
+import { fichasJa } from "./textos/fichas.ja";
 import type { Mensajes } from "./es";
 
 export const ja: Mensajes = {

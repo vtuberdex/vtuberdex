@@ -1,7 +1,8 @@
 // Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /**
  * Geometría del libro de cartas: dónde va cada funda, cómo gira la hoja y a qué
- * distancia se pone la cámara. Es matemática pura (sin React ni WebGL) para que
+ * distancia se pone la cámara. Es matemática pura (sin React, WebGL ni three: las MATRICES están en
+ * `card-binder-matrices.ts`, para que el DOM del libro no arrastre three al chunk del catálogo) para que
  * `card-binder-layout.test.ts` la fije sin navegador: jsdom no puede ver la escena,
  * pero sí puede comprobar que una carta de la hoja derecha ATERRIZA exactamente en su
  * funda de la izquierda al terminar el giro.
@@ -12,8 +13,6 @@
  *   · Los HUECOS (slots) van en orden de lectura: 0..3 la hoja izquierda (fila a fila),
  *     4..7 la derecha. `items[i]` del catálogo cae en el slot `i`.
  */
-import { Matrix4, Vector3 } from "three";
-
 import { BINDER, GEOMETRY, RENDER } from "@/components/card3d-config";
 
 export type Side = "left" | "right";
@@ -109,59 +108,6 @@ export function easeFlip(progress: number): number {
  */
 export function sheetAngle(dir: FlipDir, progress: number): number {
   return -dir * Math.PI * easeFlip(progress);
-}
-
-/**
- * Matriz de la hoja que gira: rotación alrededor del lomo. El pivote es el origen, así
- * que basta la rotación; la hoja y sus cartas llevan su posición en coordenadas locales.
- */
-export function sheetMatrix(theta: number, target = new Matrix4()): Matrix4 {
-  return target.makeRotationY(theta);
-}
-
-const _pos = new Vector3();
-
-/**
- * Pose LOCAL (respecto de la hoja que gira) de una carta montada en ella.
- *
- * Cara frontal: la carta va en su funda de origen, por encima de la hoja. Dorso: la
- * carta va en su funda de DESTINO pero girada media vuelta, es decir, al empezar el
- * giro está reflejada detrás de la hoja de origen (x opuesta, z negativa, mirando a
- * -z) y, cuando la hoja completa los 180 grados, las dos medias vueltas se anulan y
- * cae exactamente en su funda de destino mirando a la cámara. Así una carta entrante
- * nunca cambia de sitio en el mundo al terminar: solo deja de depender de la hoja.
- */
-export function sheetCardLocalMatrix(
-  position: SlotPosition,
-  face: "front" | "back",
-  target = new Matrix4(),
-): Matrix4 {
-  const z = BINDER.sheetZ + BINDER.cardLift;
-  target.makeTranslation(position.x, position.y, z);
-  if (face === "back") {
-    const flip = new Matrix4().makeRotationY(Math.PI);
-    target.premultiply(flip);
-  }
-  return target;
-}
-
-/** Matriz de una carta fija en su funda (no participa del giro). */
-export function staticCardMatrix(
-  position: SlotPosition,
-  lift = 0,
-  target = new Matrix4(),
-): Matrix4 {
-  return target.makeTranslation(position.x, position.y, BINDER.cardLift + lift);
-}
-
-/** Posición mundial que resulta de una matriz (para los tests y el ocultamiento). */
-export function worldPosition(matrix: Matrix4): {
-  x: number;
-  y: number;
-  z: number;
-} {
-  _pos.setFromMatrixPosition(matrix);
-  return { x: _pos.x, y: _pos.y, z: _pos.z };
 }
 
 /**

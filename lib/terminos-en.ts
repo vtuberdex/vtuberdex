@@ -5,6 +5,7 @@
  * paragraphs per clause (`terminos-i18n.test.ts` enforces it).
  */
 import type { Clausula } from "./terminos";
+import type { TerminosTraducidos } from "./terminos-i18n";
 
 export const PREAMBULO_EN: string[] = [
   "These Terms and Conditions (the “Terms”) comprehensively, completely and bindingly govern the relationship between VTuberDex (the “Project”, “we” or “the Maintainer”) and any natural or legal person who, by any means, requests the registration of a VTuber card in the catalog, requests its removal, visits the site, interacts with it or uses any of its features (the “Holder”, “the User” or “you”).",
@@ -285,3 +286,23 @@ export const CLAUSULAS_EN: Clausula[] = [
     ],
   },
 ];
+
+/** Lo que muestra `/terminos` en este idioma (se carga bajo demanda: ver `terminos-i18n.ts`). */
+export const TERMINOS_EN: TerminosTraducidos = {
+  fechaVigencia: "October 20, 2026",
+  preambulo: PREAMBULO_EN,
+  clausulas: CLAUSULAS_EN,
+  textosPagina: {
+    titulo: "Terms and Conditions",
+    versionLinea: "Version {version} · in force since {fecha}",
+    notaTraduccion:
+      "Courtesy translation. The Spanish version is the only legally binding text and prevails in case of any discrepancy.",
+    indice: "Contents",
+    indiceEtiqueta: "Table of clauses",
+    pieAntes: "By submitting a",
+    pieInscripcion: "registration",
+    pieO: "or a",
+    pieBaja: "removal",
+    pieDespues: "form you accept this entire document.",
+  },
+};

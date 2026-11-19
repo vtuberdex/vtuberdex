@@ -22,13 +22,15 @@ import {
   isStaticCardVisible,
   planPlacements,
   sheetAngle,
-  sheetCardLocalMatrix,
-  sheetMatrix,
   slotPosition,
   slotSide,
+} from "@/components/card-binder-layout";
+import {
+  sheetCardLocalMatrix,
+  sheetMatrix,
   staticCardMatrix,
   worldPosition,
-} from "@/components/card-binder-layout";
+} from "@/components/card-binder-matrices";
 
 const close = (a: number, b: number, eps = 1e-6) => Math.abs(a - b) < eps;
 

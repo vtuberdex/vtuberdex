@@ -1,6 +1,5 @@
 // Copyright (c) 2026 VTuberDex. Todos los derechos reservados. Ver LICENSE.
 /** Serialización de filtros a querystring y parseo inverso (URL = estado). */
-import { z } from "zod";
 
 import type { SearchParams, SortKey } from "@/lib/types";
 
@@ -78,19 +77,86 @@ export function searchParamsToQuery(params: SearchParams): string {
   return query.toString();
 }
 
-const searchParamsSchema = z.object({
-  q: z.string().max(120).optional(),
-  countries: z.union([z.string(), z.array(z.string())]).optional(),
-  languages: z.union([z.string(), z.array(z.string())]).optional(),
-  groups: z.union([z.string(), z.array(z.string())]).optional(),
-  artists: z.union([z.string(), z.array(z.string())]).optional(),
-  factions: z.union([z.string(), z.array(z.string())]).optional(),
-  language: z.string().max(10).optional(),
-  sort: z.enum(["dex", "dex-desc", "name", "power"]).optional(),
-  premium: z.enum(["1", "true"]).optional(),
-  page: z.coerce.number().int().min(1).max(10_000).optional(),
-  perPage: z.coerce.number().int().min(1).max(100).optional(),
-});
+/**
+ * Validación del querystring, a mano y no con zod A PROPÓSITO: este módulo va en el JS del catálogo y
+ * zod sumaba ~33 KB comprimidos (medido con `next analyze`, 2026-11-19) para ocho campos. La regla es
+ * la misma que tenía el esquema: si un campo presente es inválido, TODA la búsqueda vuelve al defecto.
+ * `URLSearchParams` solo da cadenas, así que no hay listas que comprobar aquí.
+ */
+type Crudo = Record<string, string>;
+interface Validado {
+  q?: string;
+  countries?: string;
+  languages?: string;
+  groups?: string;
+  artists?: string;
+  factions?: string;
+  language?: string;
+  sort?: string;
+  premium?: string;
+  page?: number;
+  perPage?: number;
+}
+
+/** Entero en [min, max] como lo leía `z.coerce.number().int()`: `""` es 0 y `"1.5"` no es entero. */
+function entero(valor: string, min: number, max: number): number | null {
+  const n = Number(valor);
+  return Number.isInteger(n) && n >= min && n <= max ? n : null;
+}
+
+const ORDENES = new Set(["dex", "dex-desc", "name", "power"]);
+
+function validarBusqueda(raw: Crudo): Validado | null {
+  const salida: Validado = {};
+  for (const campo of [
+    "countries",
+    "languages",
+    "groups",
+    "artists",
+    "factions",
+  ] as const) {
+    if (raw[campo] !== undefined) {
+      salida[campo] = raw[campo];
+    }
+  }
+  if (raw.q !== undefined) {
+    if (raw.q.length > 120) {
+      return null;
+    }
+    salida.q = raw.q;
+  }
+  if (raw.language !== undefined) {
+    if (raw.language.length > 10) {
+      return null;
+    }
+    salida.language = raw.language;
+  }
+  if (raw.sort !== undefined) {
+    if (!ORDENES.has(raw.sort)) {
+      return null;
+    }
+    salida.sort = raw.sort;
+  }
+  if (raw.premium !== undefined) {
+    if (raw.premium !== "1" && raw.premium !== "true") {
+      return null;
+    }
+    salida.premium = raw.premium;
+  }
+  for (const [campo, max] of [
+    ["page", 10_000],
+    ["perPage", 100],
+  ] as const) {
+    if (raw[campo] !== undefined) {
+      const n = entero(raw[campo], 1, max);
+      if (n === null) {
+        return null;
+      }
+      salida[campo] = n;
+    }
+  }
+  return salida;
+}
 
 const asList = (value: string | string[] | undefined): string[] => {
   if (Array.isArray(value)) {
@@ -102,11 +168,10 @@ const asList = (value: string | string[] | undefined): string[] => {
 /** URL -> SearchParams (tolerante: valores inválidos caen al default). */
 export function searchParamsFromUrl(search: string): SearchParams {
   const raw = Object.fromEntries(new URLSearchParams(search));
-  const parsed = searchParamsSchema.safeParse(raw);
-  if (!parsed.success) {
+  const data = validarBusqueda(raw);
+  if (!data) {
     return { ...DEFAULT_SEARCH };
   }
-  const data = parsed.data;
   return {
     q: data.q ?? "",
     countries: listOf(asList(data.countries)),

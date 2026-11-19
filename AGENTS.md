@@ -862,6 +862,20 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
 
 ## Trampas conocidas (ya nos costaron tiempo)
 
+- **three y R3F van en chunks propios (`next/dynamic`), no en el JS de la ruta (2026-11-19).** Medido con
+  `next analyze`: el catálogo cargaba 578 KB comprimidos de entrada (three 180 + R3F 51) y CUALQUIER página con un enlace
+  al catálogo los bajaba al precargarlo (`/terminos` bajaba 572 KB de JS). Hoy `card-binder.tsx` es solo DOM y carga la
+  escena (`card-binder-escena.tsx`) en diferido; `detail-page.tsx` hace lo mismo con `HoloCard` y `dados-panel.tsx` con la
+  mesa. Inicial: `/` 270 KB, `/v/[slug]` 272, `/terminos` 246. **Basta UN import de `three` en el árbol del DOM para
+  deshacerlo** (three es un solo módulo enorme: no se recorta por nombre): por eso las matrices del libro están en
+  `card-binder-matrices.ts` y no en `card-binder-layout.ts`, y `WebGLBoundary` vive en su archivo. Para medirlo:
+  `npx next analyze --output` (y separar los grupos `async` del resto; el resumen por ruta los suma).
+- **Idiomas bajo demanda**: `lib/i18n/mensajes.ts` solo trae el español; en/ja se cargan al elegirlos (`cargarDiccionario`) y
+  el proveedor no cambia de idioma hasta tenerlos (nunca se mezclan). Los textos de cada sección están en `textos/X.ts`
+  (español) y `textos/X.en.ts`/`X.ja.ts`: **una clave nueva va en los tres archivos**. Los términos igual
+  (`cargarTerminos`). Las pruebas precargan todo en `test/setup.ts`.
+- **zod no va al cliente**: `lib/query.ts` valida el querystring a mano con la misma regla del esquema que reemplazó (un campo
+  inválido = búsqueda por defecto; `lib/query.test.ts`). zod sigue en el servidor (`server/src/validation.mjs`).
 - **Consola limpia en Firefox (2026-11-19)**: cada aviso tenía causa propia. `THREE.Clock` obsoleto (r183) → el reloj de R3F
   se cambia por `RelojTimer` sobre `THREE.Timer` en el `onCreated` de cada `<Canvas>` (`components/reloj-timer.ts`, que también
   calla SOLO dos avisos sin acción posible: la construcción de `Clock` que hace R3F por dentro y `KHR_parallel_shader_compile`).

@@ -9,6 +9,7 @@
  * Router) en vez de por `useParams` de react-router: así el componente no
  * depende del enrutador y los tests pueden montarlo con cualquier slug.
  */
+import dynamic from "next/dynamic";
 import { VrtonBanners } from "@/components/vrton-banners";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -22,7 +23,6 @@ import { useI18n } from "@/lib/i18n";
 import { nombreDePais } from "@/lib/i18n/nombres";
 import { cardPalette, gradientCss, mixHex, rgba } from "@/lib/color";
 import type { VtuberDetail, Neighbors } from "@/lib/types";
-import { HoloCard } from "@/components/holo-card";
 import { INTENSITY } from "@/components/card3d-config";
 import { SkillList } from "@/components/skill-list";
 import { StatBars } from "@/components/stat-bars";
@@ -33,6 +33,19 @@ import { PremiumBadge } from "@/components/premium-badge";
 import { DonatePayPal } from "@/components/donate-paypal";
 import { LikeButton } from "@/components/like-button";
 import { TextoTraducible } from "@/components/texto-traducible";
+
+/**
+ * La carta 3D (three + R3F) en un chunk propio, como el libro (`card-binder.tsx`): así el JS de la ficha
+ * no la trae dentro y la página se pinta y se hidrata antes. El canvas ya se montaba solo en el cliente;
+ * mientras llega se reserva la caja con la proporción de la carta (sin salto de diseño).
+ */
+const HoloCard = dynamic(
+  () => import("@/components/holo-card").then((m) => m.HoloCard),
+  {
+    ssr: false,
+    loading: () => <div className="relative aspect-[5/7] w-full" />,
+  },
+);
 
 type Payload = (VtuberDetail & { neighbors: Neighbors }) | null;
 

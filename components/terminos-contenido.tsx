@@ -5,14 +5,33 @@
  * navegador (el HTML del servidor es siempre español, que es lo que indexan los buscadores). El texto
  * autoritativo es el español; en/ja son traducciones de cortesía (`lib/terminos-i18n.ts`).
  */
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { useI18n } from "@/lib/i18n";
 import { TERMINOS_VERSION } from "@/lib/terminos";
-import { terminosDe } from "@/lib/terminos-i18n";
+import {
+  cargarTerminos,
+  terminosCargados,
+  terminosDe,
+} from "@/lib/terminos-i18n";
 
 export function TerminosContenido() {
   const { locale } = useI18n();
+  // La traducción de cortesía se pide al elegir el idioma; mientras llega se ve el texto vinculante.
+  const [, alCargar] = useState(0);
+  useEffect(() => {
+    if (terminosCargados(locale)) {
+      return;
+    }
+    let vigente = true;
+    cargarTerminos(locale)
+      .then(() => vigente && alCargar((n) => n + 1))
+      .catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [locale]);
   const {
     fechaVigencia,
     preambulo,

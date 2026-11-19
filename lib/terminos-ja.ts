@@ -4,6 +4,7 @@
  * `id` と各条項の段落数をスペイン語版と同じに保つ（`terminos-i18n.test.ts` が検査する）。
  */
 import type { Clausula } from "./terminos";
+import type { TerminosTraducidos } from "./terminos-i18n";
 
 export const PREAMBULO_JA: string[] = [
   "この利用規約（以下「本規約」）は、VTuberDex（以下「本プロジェクト」「当方」または「運営者」）と、いかなる手段であれ、カタログへのVTuberカードの登録を申請し、その削除（退会）を申請し、本サイトを閲覧し、これと関わり、またはその機能を利用するすべての自然人および法人（以下「登録者」「利用者」または「あなた」）との関係を、包括的、完全かつ拘束力をもって定めるものです。",
@@ -284,3 +285,24 @@ export const CLAUSULAS_JA: Clausula[] = [
     ],
   },
 ];
+
+/** Lo que muestra `/terminos` en este idioma (se carga bajo demanda: ver `terminos-i18n.ts`). */
+export const TERMINOS_JA: TerminosTraducidos = {
+  fechaVigencia: "2026年10月20日",
+  preambulo: PREAMBULO_JA,
+  clausulas: CLAUSULAS_JA,
+  textosPagina: {
+    titulo: "利用規約",
+    versionLinea: "バージョン {version} · {fecha}より有効",
+    notaTraduccion:
+      "これは参考訳です。法的に有効なのはスペイン語版のみで、内容に食い違いがある場合はスペイン語版が優先します。",
+    indice: "目次",
+    indiceEtiqueta: "条項の目次",
+    pieAntes: "",
+    pieInscripcion: "登録",
+    pieO: "または",
+    pieBaja: "退会",
+    pieDespues:
+      "フォームを送信することで、この文書の全体に同意したものとみなされます。",
+  },
+};

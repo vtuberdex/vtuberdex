@@ -92,19 +92,26 @@ const fuenteLibro = readFileSync(
   path.resolve(process.cwd(), "components/card-binder.tsx"),
   "utf8",
 );
+/** El `<Canvas>` del libro vive en su escena, que el libro carga con `next/dynamic`. */
+const fuenteEscena = readFileSync(
+  path.resolve(process.cwd(), "components/card-binder-escena.tsx"),
+  "utf8",
+);
 
 describe("layout del canvas del libro", () => {
   it("el canvas del libro vive en una caja posicionada dentro de una raíz `relative`", () => {
-    expect(bloqueCanvas(fuenteLibro)).toContain(
+    expect(bloqueCanvas(fuenteEscena)).toContain(
       "style={CANVAS_FUERA_DE_FLUJO}",
     );
     expect(fuenteLibro).not.toContain('<div className="absolute inset-0">\n');
+    // La escena se monta DENTRO de la superficie de gestos del libro, que es la raíz posicionada.
+    expect(fuenteLibro).toContain("<BinderLienzo");
     // La raíz que lo contiene es la superficie de gestos, posicionada.
     expect(fuenteLibro).toMatch(/className="relative mx-auto select-none"/);
   });
 
   it("el canvas del libro no se declara con tamaño propio", () => {
-    const bloque = bloqueCanvas(fuenteLibro);
+    const bloque = bloqueCanvas(fuenteEscena);
     expect(bloque).not.toMatch(/style=\{\{/);
     expect(bloque).not.toMatch(/\bwidth:|\bheight:/);
   });

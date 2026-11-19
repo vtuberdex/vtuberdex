@@ -6,8 +6,6 @@
  * `lib/i18n/es.ts` porque son arrays de párrafos, no textos de interfaz.
  */
 import type { Locale } from "./i18n/locales";
-import { CLAUSULAS_EN, PREAMBULO_EN } from "./terminos-en";
-import { CLAUSULAS_JA, PREAMBULO_JA } from "./terminos-ja";
 import {
   CLAUSULAS,
   FECHA_VIGENCIA,
@@ -37,7 +35,12 @@ export interface TerminosTraducidos {
   textosPagina: TextosPagina;
 }
 
-const TERMINOS: Record<Locale, TerminosTraducidos> = {
+/**
+ * Términos ya cargados. El español va siempre (es el texto vinculante y el HTML del servidor); la
+ * traducción de cortesía en inglés o japonés se pide solo si se elige ese idioma (`cargarTerminos`).
+ * Antes los tres viajaban en el JS de `/terminos` (~37 KB comprimidos) para mostrar uno.
+ */
+const TERMINOS: Partial<Record<Locale, TerminosTraducidos>> = {
   es: {
     fechaVigencia: FECHA_VIGENCIA,
     preambulo: PREAMBULO,
@@ -55,45 +58,29 @@ const TERMINOS: Record<Locale, TerminosTraducidos> = {
       pieDespues: "aceptas la totalidad de este documento.",
     },
   },
-  en: {
-    fechaVigencia: "October 20, 2026",
-    preambulo: PREAMBULO_EN,
-    clausulas: CLAUSULAS_EN,
-    textosPagina: {
-      titulo: "Terms and Conditions",
-      versionLinea: "Version {version} · in force since {fecha}",
-      notaTraduccion:
-        "Courtesy translation. The Spanish version is the only legally binding text and prevails in case of any discrepancy.",
-      indice: "Contents",
-      indiceEtiqueta: "Table of clauses",
-      pieAntes: "By submitting a",
-      pieInscripcion: "registration",
-      pieO: "or a",
-      pieBaja: "removal",
-      pieDespues: "form you accept this entire document.",
-    },
-  },
-  ja: {
-    fechaVigencia: "2026年10月20日",
-    preambulo: PREAMBULO_JA,
-    clausulas: CLAUSULAS_JA,
-    textosPagina: {
-      titulo: "利用規約",
-      versionLinea: "バージョン {version} · {fecha}より有効",
-      notaTraduccion:
-        "これは参考訳です。法的に有効なのはスペイン語版のみで、内容に食い違いがある場合はスペイン語版が優先します。",
-      indice: "目次",
-      indiceEtiqueta: "条項の目次",
-      pieAntes: "",
-      pieInscripcion: "登録",
-      pieO: "または",
-      pieBaja: "退会",
-      pieDespues:
-        "フォームを送信することで、この文書の全体に同意したものとみなされます。",
-    },
-  },
 };
 
+const CARGADORES: Record<
+  Exclude<Locale, "es">,
+  () => Promise<TerminosTraducidos>
+> = {
+  en: () => import("./terminos-en").then((m) => m.TERMINOS_EN),
+  ja: () => import("./terminos-ja").then((m) => m.TERMINOS_JA),
+};
+
+/** Los términos en `locale` si ya están cargados; si no, los vinculantes en español. */
 export function terminosDe(locale: Locale): TerminosTraducidos {
-  return TERMINOS[locale] ?? TERMINOS.es;
+  return TERMINOS[locale] ?? (TERMINOS.es as TerminosTraducidos);
+}
+
+export function terminosCargados(locale: Locale): boolean {
+  return TERMINOS[locale] !== undefined;
+}
+
+/** Trae la traducción de `locale` si falta (un fallo se puede reintentar). */
+export async function cargarTerminos(locale: Locale): Promise<void> {
+  if (terminosCargados(locale) || locale === "es") {
+    return;
+  }
+  TERMINOS[locale] = await CARGADORES[locale]();
 }
