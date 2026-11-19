@@ -22,18 +22,28 @@ import "./globals.css";
  * eso `globals.css` fija ese peso en los títulos: pedir negrita fabricaría una falsa.
  * Las CARTAS no las usan: sus lienzos dibujan con la constante `FONT` de
  * `card-texture/dimensiones.ts`.
+ *
+ * `preload: false` A PROPÓSITO (2026-11-19). En las páginas DINÁMICAS (`/`, `/v/[slug]`) Next manda la
+ * precarga dos veces: como cabecera HTTP `Link` y, más tarde, como `<link rel="preload">` que inserta el
+ * cliente. Para entonces el CSS ya pidió las fuentes, y Firefox avisaba «precargado con precarga de enlace
+ * no se usó en unos pocos segundos» por cada una (comprobado en Firefox 160 por WebDriver BiDi: cada
+ * `.woff2` se pedía DOS veces; sin JS, una). Chromium descarta el duplicado sin avisar. Sin precarga, el
+ * `@font-face` de la hoja del `<head>` las pide una vez; son 42 KB y `display: swap` con el respaldo de
+ * métricas ajustadas de `next/font` evita el salto de diseño.
  */
 const knewave = Knewave({
   subsets: ["latin"],
   weight: "400",
   variable: "--font-knewave",
   display: "swap",
+  preload: false,
 });
 const asul = Asul({
   subsets: ["latin"],
   weight: ["400", "700"],
   variable: "--font-asul",
   display: "swap",
+  preload: false,
 });
 
 /**

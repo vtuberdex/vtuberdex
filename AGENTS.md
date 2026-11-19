@@ -862,6 +862,13 @@ estructurados que genera el servidor (`lib/seo.ts` puro y probado; `lib/seo-dato
 
 ## Trampas conocidas (ya nos costaron tiempo)
 
+- **Fuentes sin `preload` (`app/layout.tsx`) y cómo probar con FIREFOX.** En páginas dinámicas Next precarga las fuentes dos veces
+  (cabecera `Link` + `<link rel="preload">` que inserta el cliente después) y Firefox avisa «precargado … no se usó en unos pocos
+  segundos»; Chromium no dice nada. Con `preload: false` cada `.woff2` se pide una vez y la primera pintura no cambia (medido: fuentes a
+  644 ms, FCP 663). **Firefox headless está en `~/.local/share/vtuberdex-build/firefox-dl/firefox/`** (no en /tmp): arráncalo con
+  `--headless --profile <perfil temporal> --remote-debugging-port 9444` y háblale por WebDriver BiDi (`ws://127.0.0.1:9444/session`,
+  `log.entryAdded`, `network.beforeRequestSent`, `script.addPreloadScript`); una sesión a la vez (`session.end` al terminar). Los avisos
+  de plataforma (CSS, red) no salen por BiDi ni por stdout: se deducen de la red. WebGL no funciona ahí (sin Mesa en el sistema).
 - **Primera vista desde el servidor (2026-11-19).** `/` y `/v/[slug]` resuelven en el servidor la página o ficha que pide la
   URL y la pasan como prop (`inicial`) a `CatalogPage`/`DetailPage`: las cartas ya no esperan sesión → API para empezar a bajar
   imágenes, y el HTML lleva los enlaces y la ficha (bueno también para buscadores). La lógica es UNA (`lib/fichas-publicas.mjs`:
