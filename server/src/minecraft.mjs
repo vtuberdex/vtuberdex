@@ -245,18 +245,20 @@ export async function crearCodigoDeVinculo(
       }
     }
   }
+  /**
+   * Solo se anulan los códigos anteriores DEL MISMO pedido: el de esa cuenta (desde el juego) o los sin
+   * cuenta (desde «Mi ficha»). Antes se borraban todos los de la ficha, y cualquier jugador que escribiera
+   * `/vtd email <correo de una VTuber>` le anulaba el código que ella había pedido (auditoría 2026-11-19).
+   */
+  const cuenta =
+    typeof uuid === "string" && uuidValido(uuid) ? uuid.toLowerCase() : null;
   await e.execute(
-    "DELETE FROM codigo_minecraft WHERE vtuber_id = ? OR expira <= ?",
-    [Number(vtuberId), ahora],
+    "DELETE FROM codigo_minecraft WHERE (vtuber_id = ? AND uuid IS ?) OR expira <= ?",
+    [Number(vtuberId), cuenta, ahora],
   );
   await e.execute(
     "INSERT INTO codigo_minecraft (hash, vtuber_id, expira, uuid) VALUES (?, ?, ?, ?)",
-    [
-      hash(codigo),
-      Number(vtuberId),
-      ahora + CODIGO_TTL_MS,
-      typeof uuid === "string" && uuidValido(uuid) ? uuid.toLowerCase() : null,
-    ],
+    [hash(codigo), Number(vtuberId), ahora + CODIGO_TTL_MS, cuenta],
   );
   return { codigo, expira: new Date(ahora + CODIGO_TTL_MS).toISOString() };
 }

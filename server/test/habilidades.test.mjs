@@ -6,6 +6,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  estiloDeHabilidadSeguro,
+  htmlDeHabilidadSeguro,
   ESTADOS,
   bloqueDeEvolucion,
   buscarEstado,
@@ -211,10 +213,7 @@ test("la subfacción acredita a su madre solo con la relación en los datos", ()
   // Sin la relación no se adivina: el slug se llama igual pero NO cuenta.
   assert.equal(tieneFaccion(["glovecaller-elfs"], "glovecaller"), false);
   // La etiqueta con paréntesis también funciona: se compara canónica.
-  assert.equal(
-    tieneFaccion(["Glovecaller (Elfs)"], "glovecaller", mapa),
-    true,
-  );
+  assert.equal(tieneFaccion(["Glovecaller (Elfs)"], "glovecaller", mapa), true);
 });
 
 test("la herencia sube varios niveles y un ciclo en los datos no la cuelga", () => {
@@ -222,7 +221,10 @@ test("la herencia sube varios niveles y un ciclo en los datos no la cuelga", () 
     "glovecaller-elfs": "glovecaller",
     "glovecaller-elite": "glovecaller-elfs",
   };
-  assert.equal(tieneFaccion(["glovecaller-elite"], "glovecaller", cadena), true);
+  assert.equal(
+    tieneFaccion(["glovecaller-elite"], "glovecaller", cadena),
+    true,
+  );
   const ciclo = { a: "b", b: "a" };
   assert.equal(tieneFaccion(["a"], "c", ciclo), false);
 });
@@ -309,10 +311,7 @@ test("tieneFaccion: acepta slug, etiqueta y variantes con errata de la misma fac
   );
   assert.equal(tieneFaccion(["netherbane-oni"], "mythical-legacy"), false);
   assert.equal(tieneFaccion([], ""), false);
-  assert.equal(
-    tieneFaccion(["Netherbane (Alfa)"], "mythical-legacy"),
-    false,
-  );
+  assert.equal(tieneFaccion(["Netherbane (Alfa)"], "mythical-legacy"), false);
 });
 
 test("una ficha de una subfacción puede usar los estados exclusivos de su facción madre", () => {
@@ -351,10 +350,9 @@ test("una ficha de una subfacción puede usar los estados exclusivos de su facci
     [],
   );
   // Sin la relación en los datos se sigue acusando, y otra facción no se cuela.
-  assert.deepEqual(
-    fortificacionBloqueada(["glovecaller-elfs"]),
-    ["Fortificación"],
-  );
+  assert.deepEqual(fortificacionBloqueada(["glovecaller-elfs"]), [
+    "Fortificación",
+  ]);
   assert.deepEqual(fortificacionBloqueada(["abyssal"], mapaGlovecaller), [
     "Fortificación",
   ]);
@@ -364,17 +362,23 @@ test("los recorridos de texto (sin regex cuadráticas) dan lo mismo que las rege
   // `[[Estado]]`: un token sin cerrar, vacío o con `[` dentro se queda como estaba.
   assert.equal(expandirEstados("[[Miedo]]"), s("Miedo"));
   assert.equal(expandirEstados("a [[No existe]] b"), "a [[No existe]] b");
-  assert.equal(expandirEstados("[[]] [[Miedo] [[Miedo"), "[[]] [[Miedo] [[Miedo");
+  assert.equal(
+    expandirEstados("[[]] [[Miedo] [[Miedo"),
+    "[[]] [[Miedo] [[Miedo",
+  );
   // Como la regex: el token va del primer `[[` al primer `]`, así que aquí el nombre es «[Miedo».
   assert.equal(expandirEstados("[[[Miedo]]"), "[[[Miedo]]");
   // Texto plano: fuera etiquetas (también `<>`), blancos antes de cada salto y `<` sueltos.
-  assert.equal(textoPlanoDe("Hola <b>mundo</b>  \t<br>fin  "), "Hola mundo\nfin");
+  assert.equal(
+    textoPlanoDe("Hola <b>mundo</b>  \t<br>fin  "),
+    "Hola mundo\nfin",
+  );
   assert.equal(textoPlanoDe("a<>b << c"), "ab  c");
   // Enumeraciones: «obtienes A, B y C» entrega las tres; un verbo sin span detrás no cuenta.
   assert.deepEqual(
-    estadosEntregados(`obtienes nada. Aplicas ${s("Miedo")}, ${s("Confusión")} y ${s("Sangrado")}`).map(
-      (e) => `${e.verbo}:${e.texto}`,
-    ),
+    estadosEntregados(
+      `obtienes nada. Aplicas ${s("Miedo")}, ${s("Confusión")} y ${s("Sangrado")}`,
+    ).map((e) => `${e.verbo}:${e.texto}`),
     ["aplicas:Miedo", "aplicas:Confusión", "aplicas:Sangrado"],
   );
   // Entradas patológicas para las regex de antes: deben acabar al instante.
@@ -382,4 +386,30 @@ test("los recorridos de texto (sin regex cuadráticas) dan lo mismo que las rege
   expandirEstados("[[".repeat(20000) + "]");
   textoPlanoDe("<".repeat(20000) + " ".repeat(20000) + "x");
   assert.ok(performance.now() - inicio < 1000);
+});
+
+test("el style de un <span> es lista blanca: solo colores y degradados (auditoría 2026-11-19)", () => {
+  // Lo que usan los kits de verdad.
+  for (const ok of [
+    "color: #ff4d6d; font-weight: bold",
+    "background: linear-gradient(90deg, #00e5ff, #ff00e5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700",
+    "color: rgba(255, 0, 0, 0.8); font-size: 1.1em",
+  ]) {
+    assert.equal(estiloDeHabilidadSeguro(ok), true, ok);
+  }
+  // Lo que antes pasaba y servía para rastrear o tapar la página.
+  for (const malo of [
+    'background-image:image-set("https://evil/x.png" 1x)',
+    "position:fixed;inset:0;background:#000",
+    "background:url(x)",
+    "color:red;behavior:url(x)",
+    "background:var(--x)",
+    "color:expression(alert(1))",
+  ]) {
+    assert.equal(estiloDeHabilidadSeguro(malo), false, malo);
+  }
+  assert.equal(
+    htmlDeHabilidadSeguro('<span style="position:fixed;inset:0">x</span>'),
+    false,
+  );
 });

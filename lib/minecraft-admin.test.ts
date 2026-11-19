@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -373,19 +373,20 @@ describe("saneado de rutas antes de escribir en disco", () => {
 });
 
 describe("ramas de error del mantenedor", () => {
-  it("el alta responde 502 si el correo no sale", async () => {
+  it("si el correo no sale, la respuesta NO lo delata (antes un 502 decía que el correo era de la lista)", async () => {
     correo.__usarTransporte({
       sendMail: async () => {
         throw new Error("smtp caido");
       },
     });
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const alta = await admin.enviarEnlaceMantenedor({
       email: "mantenedor@example.com",
     });
-    expect(alta.ok).toBe(false);
-    expect(alta.status).toBe(502);
-    expect(alta.cuerpo.error).toBe("correo_no_enviado");
-    expect(String(alta.cuerpo.detail)).toContain("smtp caido");
+    expect(alta).toMatchObject({ ok: true, enviado: false });
+    expect(JSON.stringify(alta)).not.toContain("smtp caido");
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 
   it("rechaza un server.properties con bytes nulos", () => {

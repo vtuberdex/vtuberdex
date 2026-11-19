@@ -5,9 +5,14 @@ import crypto from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
 import {
-  DIRECTO_TRAMO_MIN, XP_DIRECTO_MAX_DIA, XP_DIRECTO_MINIMO, XP_DIRECTO_POR_TRAMO,
+  DIRECTO_TRAMO_MIN,
+  XP_DIRECTO_MAX_DIA,
+  XP_DIRECTO_MINIMO,
+  XP_DIRECTO_POR_TRAMO,
   xpDirectoDelTramo,
-  XP_ENTREGA_MAX_DIA, XP_JUEGO_MAX_DIA, topeXpJuegoDia,
+  XP_ENTREGA_MAX_DIA,
+  XP_JUEGO_MAX_DIA,
+  topeXpJuegoDia,
   XP_POR_LIKE,
   experienciaConLikes,
 } from "../src/experiencia.mjs";
@@ -115,6 +120,17 @@ test("pedir otro código invalida el anterior", async () => {
   );
 });
 
+test("un pedido desde OTRA cuenta no anula el código de la primera (auditoría 2026-11-19)", async () => {
+  const e = nuevo();
+  // La VTuber pide su código desde el juego; otro jugador escribe `/vtd email <su correo>`.
+  const suyo = await crearCodigoDeVinculo(e, { vtuberId: 7, uuid: JUGADOR });
+  await crearCodigoDeVinculo(e, { vtuberId: 7, uuid: OTRO });
+  assert.deepEqual(
+    await vincular(e, { codigo: suyo.codigo, uuid: JUGADOR, jugador: "Luna" }),
+    { vtuberId: 7 },
+  );
+});
+
 test("una ficha, una cuenta: vincular otra reemplaza por los dos lados", async () => {
   const e = nuevo();
   await vinculado(e, 7, JUGADOR);
@@ -191,7 +207,8 @@ test("el tope diario recorta el último lote y deja pasar al día siguiente", as
   assert.equal(topado.sumado, 0);
   assert.equal(topado.hoy, XP_JUEGO_MAX_DIA);
   assert.equal(
-    (await sumarXp(e, lote({ mob: 70 }, { ...alto, dia: "2026-10-08" }))).sumado,
+    (await sumarXp(e, lote({ mob: 70 }, { ...alto, dia: "2026-10-08" })))
+      .sumado,
     70,
   );
   assert.equal(await xpDeJuego(e, 7), XP_JUEGO_MAX_DIA + 70);
@@ -217,7 +234,7 @@ test("el cupo del día sale del tramo de nivel de la ficha", async () => {
   assert.equal((await sumarXp(e, lote({ mob: 70 }, { nivel: 31 }))).sumado, 0);
 });
 
-test('la XP de entrega tiene su tope aparte y no resta del de siempre', async () => {
+test("la XP de entrega tiene su tope aparte y no resta del de siempre", async () => {
   const e = nuevo();
   await vinculado(e);
   let entrega = 0;
@@ -234,7 +251,7 @@ test('la XP de entrega tiene su tope aparte y no resta del de siempre', async ()
   assert.equal(await xpDeJuego(e, 7), XP_ENTREGA_MAX_DIA + 70);
 });
 
-test('el tope de lo de siempre no se come la XP de entrega', async () => {
+test("el tope de lo de siempre no se come la XP de entrega", async () => {
   const e = nuevo();
   await vinculado(e);
   // Nivel 91: el tramo más alto, así el bucle de abajo termina en `XP_JUEGO_MAX_DIA`.
@@ -246,10 +263,13 @@ test('el tope de lo de siempre no se come la XP de entrega', async () => {
   assert.equal((await sumarXp(e, lote({ entrega: 80 }))).sumado, 80);
 });
 
-test('un lote de entrega no se mezcla con otros motivos', async () => {
+test("un lote de entrega no se mezcla con otros motivos", async () => {
   const e = nuevo();
   await vinculado(e);
-  assert.equal((await error(sumarXp(e, lote({ entrega: 50, mob: 5 })))).code, 'entrega_aparte');
+  assert.equal(
+    (await error(sumarXp(e, lote({ entrega: 50, mob: 5 })))).code,
+    "entrega_aparte",
+  );
 });
 
 test("lotes concurrentes no pasan del tope", async () => {
@@ -521,7 +541,10 @@ test("XP por directo: sin tope diario (-1) y con retorno decreciente por tramo",
   let anterior = xpDirectoDelTramo(0);
   for (let n = 1; n < 200; n += 1) {
     const xp = xpDirectoDelTramo(n);
-    assert.ok(xp <= anterior, `el tramo ${n} no puede valer más que el anterior`);
+    assert.ok(
+      xp <= anterior,
+      `el tramo ${n} no puede valer más que el anterior`,
+    );
     assert.ok(xp >= XP_DIRECTO_MINIMO, "nunca baja del mínimo");
     anterior = xp;
   }
@@ -533,10 +556,15 @@ test("premiar un directo: una vez por tramo, sin tope y sumado a la XP de la fic
   const e = nuevo();
   const t0 = Date.UTC(2026, 9, 7, 12, 0, 0);
   const tramo = DIRECTO_TRAMO_MIN * 60_000;
-  const pagar = (ahora, vtuberId = 7) => premiarDirecto(e, { vtuberId, plataforma: "twitch", dia: DIA, ahora });
+  const pagar = (ahora, vtuberId = 7) =>
+    premiarDirecto(e, { vtuberId, plataforma: "twitch", dia: DIA, ahora });
 
   assert.equal(await pagar(t0), xpDirectoDelTramo(0));
-  assert.equal(await pagar(t0 + 60_000), 0, "mirar el mismo tramo otra vez no paga de nuevo");
+  assert.equal(
+    await pagar(t0 + 60_000),
+    0,
+    "mirar el mismo tramo otra vez no paga de nuevo",
+  );
   assert.equal(await pagar(t0 + tramo), xpDirectoDelTramo(1));
   let total = xpDirectoDelTramo(0) + xpDirectoDelTramo(1);
   assert.equal(await xpDeJuego(e, 7), total);
@@ -561,7 +589,12 @@ test("premiar un directo: una vez por tramo, sin tope y sumado a la XP de la fic
 test("la XP por directo NO gasta el tope diario de Minecraft", async () => {
   const e = nuevo();
   await vinculado(e);
-  await premiarDirecto(e, { vtuberId: 7, plataforma: "kick", dia: DIA, ahora: Date.UTC(2026, 9, 7, 12) });
+  await premiarDirecto(e, {
+    vtuberId: 7,
+    plataforma: "kick",
+    dia: DIA,
+    ahora: Date.UTC(2026, 9, 7, 12),
+  });
   const r = await sumarXp(e, lote({ mob: 100 }));
   assert.equal(r.sumado, 100);
   assert.equal(r.hoy, 100);
