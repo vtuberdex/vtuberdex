@@ -84,10 +84,45 @@ describe("explorador por carpetas", () => {
     expect(r.escribible).toBe(true);
   });
 
-  it("dentro de plugins/ solo salen carpetas de configuración, sin las omitidas ni los secretos", async () => {
+  it("dentro de plugins/ salen las carpetas de configuración, sin las omitidas", async () => {
     const r = await listar({ dir: base, ruta: "plugins", rol: "mantenedor" });
-    expect(rutas(r.carpetas)).toEqual(["plugins/MythicMobs", "plugins/Solo"]);
+    expect(rutas(r.carpetas)).toEqual([
+      "plugins/MythicMobs",
+      "plugins/Solo",
+      "plugins/VTuberDex",
+    ]);
     expect(r.migas.map((m) => m.nombre)).toEqual(["plugins"]);
+  });
+
+  it("la carpeta del plugin con el token abre solo Stats.yml al mantenedor", async () => {
+    const dentro = await listar({
+      dir: base,
+      ruta: "plugins/VTuberDex",
+      rol: "mantenedor",
+    });
+    expect(dentro.ok).toBe(true);
+    expect(rutas(dentro.archivos)).toEqual(["plugins/VTuberDex/Stats.yml"]);
+    expect(dentro.carpetas).toEqual([]);
+    const leido = await leerArchivo({
+      dir: base,
+      ruta: "plugins/VTuberDex/Stats.yml",
+      rol: "mantenedor",
+    });
+    expect(leido).toMatchObject({ ok: true, contenido: "vida: 5000\n" });
+    // Lo que lleva el token sigue fuera del alcance del mantenedor.
+    for (const ruta of [
+      "plugins/VTuberDex/config.yml",
+      "plugins/VTuberDex/extra.yml",
+    ]) {
+      const r = (await leerArchivo({ dir: base, ruta, rol: "mantenedor" })) as {
+        ok: boolean;
+        status?: number;
+        cuerpo?: { error: string };
+      };
+      expect(r.ok).toBe(false);
+      expect(r.status).toBe(403);
+      expect(r.cuerpo?.error).toBe("solo_admin");
+    }
   });
 
   it("el admin sí ve la carpeta del plugin que lleva el token", async () => {
