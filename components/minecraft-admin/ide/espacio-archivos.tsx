@@ -698,6 +698,14 @@ export function EspacioArchivos() {
           onDragLeave={() => setDestinoArrastre(null)}
           onDrop={dir ? (ev) => void alSoltar(ev, ruta) : (ev) => void alSoltar(ev, carpeta)}
           onClick={() => (dir ? (setSeleccion(ruta), alternarCarpeta(ruta)) : void abrirArchivo(ruta))}
+          onKeyDown={(ev) => {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              ev.stopPropagation();
+              const activar = () => (dir ? (setSeleccion(ruta), alternarCarpeta(ruta)) : void abrirArchivo(ruta));
+              activar();
+            }
+          }}
           onContextMenu={(ev) => abrirMenu(ev, ruta, e)}
           title={`${ruta}\n${e.modo} · ${dir ? "carpeta" : tamanoLegible(e.bytes)}${e.destino ? `\n→ ${e.destino}` : ""}${plugin ? `\n${TEXTO_PLUGIN[plugin.estado]}` : ""}`}
           style={{ paddingLeft: 6 + nivel * 14 }}
@@ -932,7 +940,6 @@ export function EspacioArchivos() {
           role="menu"
           style={{ left: Math.min(menu.x, window.innerWidth - 270), top: Math.min(menu.y, window.innerHeight - 20 - opcionesDe(menu).length * 26) }}
           className="fixed z-[60] w-64 rounded-lg border border-dex-line bg-dex-panel py-1 text-xs text-dex-ink shadow-2xl"
-          onClick={(ev) => ev.stopPropagation()}
         >
           {opcionesDe(menu).map((o, i) =>
             o === "—" ? (
@@ -1161,13 +1168,14 @@ function Modal({ titulo, children, alCerrar }: { titulo: string; children: React
     return () => window.removeEventListener("keydown", tecla);
   }, [alCerrar]);
   return (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center bg-black/50 pt-[15vh]" onClick={alCerrar}>
+    <div className="fixed inset-0 z-[70] flex items-start justify-center pt-[15vh]">
+      {/* El fondo es un botón: clic fuera cierra, y Escape también (arriba). */}
+      <button type="button" aria-label="Cerrar diálogo" tabIndex={-1} className="absolute inset-0 cursor-default bg-black/50" onClick={alCerrar} />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
-        className="w-[min(32rem,92vw)] space-y-3 rounded-xl border border-dex-line bg-dex-panel p-4 shadow-2xl"
-        onClick={(ev) => ev.stopPropagation()}
+        className="relative w-[min(32rem,92vw)] space-y-3 rounded-xl border border-dex-line bg-dex-panel p-4 shadow-2xl"
       >
         <h3 className="text-sm font-bold text-dex-ink">{titulo}</h3>
         {children}
