@@ -9,6 +9,7 @@ import {
   crearCarpeta,
   falloDeEscritura,
   guardarArchivo,
+  leerArchivo,
   listarCarpeta,
   validarCarpetaRelativa,
 } from "./minecraft-archivos.mjs";
@@ -62,6 +63,7 @@ beforeAll(async () => {
   await w("plugins/MythicMobs/Models/piel.png", "png");
   await w("plugins/VTuberDex/config.yml", "token: secreto\n");
   await w("plugins/VTuberDex/extra.yml", "token: secreto\n");
+  await w("plugins/VTuberDex/Stats.yml", "vida: 5000\n");
   await w("plugins/dynmap/config.yml", "d: 1\n");
   await w("plugins/Solo/config.yml", "solo: 1\n");
   await w("world/level.dat", "x");
@@ -83,10 +85,45 @@ describe("explorador por carpetas", () => {
     expect(r.escribible).toBe(true);
   });
 
-  it("dentro de plugins/ solo salen carpetas de configuración, sin las omitidas ni los secretos", async () => {
+  it("dentro de plugins/ salen las carpetas de configuración, sin las omitidas", async () => {
     const r = await listar({ dir: base, ruta: "plugins", rol: "mantenedor" });
-    expect(rutas(r.carpetas)).toEqual(["plugins/MythicMobs", "plugins/Solo"]);
+    expect(rutas(r.carpetas)).toEqual([
+      "plugins/MythicMobs",
+      "plugins/Solo",
+      "plugins/VTuberDex",
+    ]);
     expect(r.migas.map((m) => m.nombre)).toEqual(["plugins"]);
+  });
+
+  it("la carpeta del plugin con el token abre solo Stats.yml al mantenedor", async () => {
+    const dentro = await listar({
+      dir: base,
+      ruta: "plugins/VTuberDex",
+      rol: "mantenedor",
+    });
+    expect(dentro.ok).toBe(true);
+    expect(rutas(dentro.archivos)).toEqual(["plugins/VTuberDex/Stats.yml"]);
+    expect(dentro.carpetas).toEqual([]);
+    const leido = await leerArchivo({
+      dir: base,
+      ruta: "plugins/VTuberDex/Stats.yml",
+      rol: "mantenedor",
+    });
+    expect(leido).toMatchObject({ ok: true, contenido: "vida: 5000\n" });
+    // Lo que lleva el token sigue fuera del alcance del mantenedor.
+    for (const ruta of [
+      "plugins/VTuberDex/config.yml",
+      "plugins/VTuberDex/extra.yml",
+    ]) {
+      const r = (await leerArchivo({ dir: base, ruta, rol: "mantenedor" })) as {
+        ok: boolean;
+        status?: number;
+        cuerpo?: { error: string };
+      };
+      expect(r.ok).toBe(false);
+      expect(r.status).toBe(403);
+      expect(r.cuerpo?.error).toBe("solo_admin");
+    }
   });
 
   it("el admin sí ve la carpeta del plugin que lleva el token", async () => {
@@ -140,11 +177,18 @@ describe("explorador por carpetas", () => {
     }
     const mantenedor = await rechaza({
       dir: base,
-      ruta: "plugins/VTuberDex",
+      ruta: "plugins/VTuberDex/data",
       rol: "mantenedor",
     });
     expect(mantenedor.ok).toBe(false);
     expect(mantenedor.status).toBe(403);
+    // La carpeta en sí sí se puede abrir (solo su Stats.yml se ve dentro).
+    const abierta = await listar({
+      dir: base,
+      ruta: "plugins/VTuberDex",
+      rol: "mantenedor",
+    });
+    expect(abierta.ok).toBe(true);
     expect(validarCarpetaRelativa("", "mantenedor")).toEqual({
       ok: true,
       relativa: "",
