@@ -62,6 +62,7 @@ beforeAll(async () => {
   await w("plugins/MythicMobs/Models/piel.png", "png");
   await w("plugins/VTuberDex/config.yml", "token: secreto\n");
   await w("plugins/VTuberDex/extra.yml", "token: secreto\n");
+  await w("plugins/VTuberDex/Stats.yml", "vida: 5000\n");
   await w("plugins/dynmap/config.yml", "d: 1\n");
   await w("plugins/Solo/config.yml", "solo: 1\n");
   await w("world/level.dat", "x");
