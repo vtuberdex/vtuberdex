@@ -176,11 +176,18 @@ describe("explorador por carpetas", () => {
     }
     const mantenedor = await rechaza({
       dir: base,
-      ruta: "plugins/VTuberDex",
+      ruta: "plugins/VTuberDex/data",
       rol: "mantenedor",
     });
     expect(mantenedor.ok).toBe(false);
     expect(mantenedor.status).toBe(403);
+    // La carpeta en sí sí se puede abrir (solo su Stats.yml se ve dentro).
+    const abierta = await listar({
+      dir: base,
+      ruta: "plugins/VTuberDex",
+      rol: "mantenedor",
+    });
+    expect(abierta.ok).toBe(true);
     expect(validarCarpetaRelativa("", "mantenedor")).toEqual({
       ok: true,
       relativa: "",
