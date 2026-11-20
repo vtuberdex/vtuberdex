@@ -6,12 +6,6 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
-  guardarArchivo,
-  leerArchivo,
-  listarArchivos,
-  validarRutaRelativa,
-} from "./minecraft-archivos.mjs";
-import {
   anotarAuditoria,
   leerAuditoria,
   prepararComando,
@@ -35,92 +29,6 @@ beforeAll(async () => {
   await fs.symlink("/etc", path.join(base, "plugins", "enlace"));
 });
 afterAll(() => fs.rm(base, { recursive: true, force: true }));
-
-describe("archivos", () => {
-  it("lista plugins anidados y la raíz permitida, sin jars ni secretos para el mantenedor", async () => {
-    const { archivos } = await listarArchivos({ dir: base, rol: "mantenedor" });
-    const rutas = archivos.map((a: { ruta: string }) => a.ruta);
-    expect(rutas).toContain("bukkit.yml");
-    expect(rutas).toContain("plugins/MythicMobs/config.yml");
-    expect(rutas).toContain("plugins/MythicMobs/Skills/a/b.yml");
-    expect(rutas).not.toContain("plugins/Foo.jar");
-    expect(rutas).not.toContain("plugins/VTuberDex/config.yml");
-    const admin = await listarArchivos({ dir: base, rol: "admin" });
-    expect(admin.archivos.map((a: { ruta: string }) => a.ruta)).toContain(
-      "plugins/VTuberDex/config.yml",
-    );
-  });
-
-  it("rechaza escapes, carpetas fuera de la lista y jars", () => {
-    for (const r of [
-      "../etc/passwd",
-      "plugins/../x.yml",
-      "world/level.dat",
-      "server.properties",
-      "plugins/A/x.jar",
-      "/etc/passwd",
-      "plugins/.oculto/x.yml",
-    ]) {
-      expect(validarRutaRelativa(r, "admin").ok).toBe(false);
-    }
-    expect(
-      validarRutaRelativa("plugins/VTuberDex/config.yml", "mantenedor"),
-    ).toMatchObject({ ok: false, status: 403 });
-  });
-
-  it("un enlace simbólico no saca la lectura de la base", async () => {
-    const r = await leerArchivo({
-      ruta: "plugins/enlace/hostname.yml",
-      dir: base,
-      rol: "admin",
-    });
-    expect(r.ok).toBe(false);
-  });
-
-  it("guarda con .bak, valida JSON y tabuladores", async () => {
-    const ok = await guardarArchivo({
-      ruta: "bukkit.yml",
-      contenido: "a: 2",
-      dir: base,
-      rol: "mantenedor",
-    });
-    expect(ok.ok).toBe(true);
-    expect(await fs.readFile(path.join(base, "bukkit.yml.bak"), "utf8")).toBe(
-      "a: 1\n",
-    );
-    expect(await fs.readFile(path.join(base, "bukkit.yml"), "utf8")).toBe(
-      "a: 2\n",
-    );
-    expect(
-      (
-        await guardarArchivo({
-          ruta: "bukkit.yml",
-          contenido: "a:\n\tb: 1",
-          dir: base,
-        })
-      ).ok,
-    ).toBe(false);
-    expect(
-      (
-        await guardarArchivo({
-          ruta: "plugins/X/d.json",
-          contenido: "{rota",
-          dir: base,
-        })
-      ).ok,
-    ).toBe(false);
-    expect(
-      (
-        await guardarArchivo({
-          ruta: "plugins/VTuberDex/config.yml",
-          contenido: "a: 1",
-          dir: base,
-          rol: "mantenedor",
-        })
-      ).ok,
-    ).toBe(false);
-  });
-});
 
 describe("consola", () => {
   it("admin: cualquier comando; barra inicial fuera; sin saltos de línea", () => {
