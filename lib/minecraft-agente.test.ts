@@ -14,7 +14,7 @@ import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { GET as fsGET, POST as fsPOST, PUT as fsPUT } from "../app/api/minecraft-admin/fs/route.js";
-import { POST as termPOST } from "../app/api/minecraft-admin/terminal/route.js";
+import { GET as termLista, POST as termPOST } from "../app/api/minecraft-admin/terminal/route.js";
 import {
   DELETE as termDELETE,
   GET as termSalida,
@@ -249,7 +249,56 @@ describe("/api/minecraft-admin/terminal", () => {
     expect(texto).toContain(raiz);
     await lector.cancel();
 
+    const tamano = await termEntrada(
+      pedir(`/api/minecraft-admin/terminal/${id}?op=tamano`, {
+        method: "POST",
+        headers: { ...conPanel, "content-type": "application/json" },
+        body: JSON.stringify({ filas: 40, columnas: 160 }),
+      }),
+      contexto,
+    );
+    expect(tamano.status).toBe(200);
+    const mala = await termEntrada(
+      pedir(`/api/minecraft-admin/terminal/${id}?op=otra`, { method: "POST", headers: conPanel }),
+      contexto,
+    );
+    expect(mala.status).toBe(400);
+    const lista = await (await termLista(pedir("/api/minecraft-admin/terminal"))).json();
+    expect(lista.terminales.map((t: { id: string }) => t.id)).toContain(id);
+    const deOtro = await (await termLista(pedir("/api/minecraft-admin/terminal", { quien: ADMIN }))).json();
+    expect(deOtro.terminales).toEqual([]);
+    const idMalo = await termSalida(pedir("/api/minecraft-admin/terminal/x"), {
+      params: Promise.resolve({ id: "../x" }),
+    });
+    expect(idMalo.status).toBe(404);
+
     const cerrada = await termDELETE(pedir(`/api/minecraft-admin/terminal/${id}`, { method: "DELETE", headers: conPanel }), contexto);
     expect(cerrada.status).toBe(200);
   }, 15000);
+});
+
+describe("sin agente", () => {
+  it("503 si no está configurado y 502 si no responde", async () => {
+    const socket = process.env.VTUBERDEX_MC_AGENTE_SOCKET;
+    try {
+      delete process.env.VTUBERDEX_MC_AGENTE_SOCKET;
+      const r = await fsGET(pedir("/api/minecraft-admin/fs?op=listar"));
+      expect(r.status).toBe(503);
+      process.env.VTUBERDEX_MC_AGENTE_SOCKET = path.join(base, "no-existe.sock");
+      const caido = await fsGET(pedir("/api/minecraft-admin/fs?op=descargar&ruta=x"));
+      expect(caido.status).toBe(502);
+      expect((await fsGET(pedir("/api/minecraft-admin/fs?op=borrar"))).status).toBe(400);
+    } finally {
+      process.env.VTUBERDEX_MC_AGENTE_SOCKET = socket;
+    }
+  });
+
+  it("acciones sin cuerpo válido y descarga de algo que no existe", async () => {
+    const r = await fsPOST(
+      pedir("/api/minecraft-admin/fs", { method: "POST", headers: conPanel, body: "no es json" }),
+    );
+    expect(r.status).toBe(400);
+    const noHay = await fsGET(pedir("/api/minecraft-admin/fs?op=descargar&ruta=no-existe"));
+    expect(noHay.status).toBe(404);
+  });
 });

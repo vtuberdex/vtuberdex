@@ -18,7 +18,15 @@ const version = JSON.parse(
 ).version;
 const marca = path.join(destino, ".version");
 
-if (fs.existsSync(marca) && fs.readFileSync(marca, "utf8") === version) {
+// Se lee directamente (sin `existsSync` antes): si no está, es que hay que copiar.
+const copiada = (() => {
+  try {
+    return fs.readFileSync(marca, "utf8");
+  } catch {
+    return "";
+  }
+})();
+if (copiada === version) {
   process.exit(0);
 }
 fs.rmSync(destino, { recursive: true, force: true });

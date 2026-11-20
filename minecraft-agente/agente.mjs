@@ -747,7 +747,12 @@ export function crearServidor(cfg) {
   return http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://agente");
     const params = url.searchParams;
-    const quien = String(req.headers["x-agente-quien"] ?? "").slice(0, 200);
+    // Va a los registros del journal: sin saltos de línea (no se deja forjar otra línea) y solo
+    // caracteres de un correo.
+    const quien = String(req.headers["x-agente-quien"] ?? "")
+      .replace(/[\r\n]/g, "")
+      .replace(/[^\w.@+-]/g, "")
+      .slice(0, 200);
     try {
       if (!tokenValido(req.headers["x-agente-token"], cfg.token)) {
         req.resume();
