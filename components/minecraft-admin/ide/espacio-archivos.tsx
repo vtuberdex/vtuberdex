@@ -988,8 +988,20 @@ export function EspacioArchivos() {
           alCancelar={() => setDialogo(null)}
           alAceptar={async (modo, recursivo) => {
             try {
-              await accion({ accion: "permisos", ruta: dialogo.ruta, modo, recursivo });
-              avisar(`Permisos de ${dialogo.ruta}: ${modo}${recursivo ? " (recursivo)" : ""}`, "bien");
+              const r = await accion<{ totalSinCambiar?: number; sinCambiar?: string[] }>({
+                accion: "permisos",
+                ruta: dialogo.ruta,
+                modo,
+                recursivo,
+              });
+              if (r.totalSinCambiar) {
+                avisar(
+                  `Permisos ${modo} aplicados, salvo ${r.totalSinCambiar} que no son del usuario minecraft (ej. ${r.sinCambiar?.[0] ?? ""})`,
+                  "mal",
+                );
+              } else {
+                avisar(`Permisos de ${dialogo.ruta}: ${modo}${recursivo ? " (recursivo)" : ""}`, "bien");
+              }
               setDialogo(null);
               await refrescar(padre(dialogo.ruta), dialogo.ruta);
             } catch (e) {

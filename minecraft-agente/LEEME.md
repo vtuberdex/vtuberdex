@@ -33,6 +33,18 @@ Alcance decidido con el dueño del servidor (2026-11-20): admin y mantenedor tie
 acceso, sin carpetas ocultas. Quien usa la terminal puede leer `plugins/VTuberDex/config.yml`
 (token de la web para el plugin) y `server.properties` (clave RCON).
 
+## Permisos (lo que ya costó)
+
+- **Solo el dueño puede hacer chmod.** El agente es `minecraft`; el panel viejo subía archivos como
+  `vtuberdex` (174 archivos y carpetas). El 2026-11-20 se pasaron a `minecraft:minecraft` (lista de
+  dueños anteriores en `/var/lib/vtuberdex-mc-dueños-antes-*.txt`). Si vuelve a haber archivos de otro
+  usuario, «Permisos…» los salta y lo avisa en vez de fallar entero.
+- **ACL de `plugins/`.** La web (`user:vtuberdex`) lee los jars para el estado de los plugins. Con ACL,
+  los bits de grupo de chmod son la máscara: `chmod 700` la dejaba sin leer. Tras el chmod el agente
+  pone `m::r[w]X` a lo que tiene ACL extendida (`conservarLecturaDeLaWeb`).
+- **Activar/desactivar plugins lo renombra el agente** (`plugins/estado` → `mover`): la web ya no
+  necesita escribir en `plugins/`.
+
 ## Instalar / actualizar
 
 ```bash

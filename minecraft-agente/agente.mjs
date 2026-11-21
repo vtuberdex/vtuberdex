@@ -403,15 +403,74 @@ function ejecutar(comando, args, opciones = {}) {
 
 const MODO_VALIDO = /^[0-7]{3,4}$/;
 
-async function cambiarModo(absoluta, modo, recursivo) {
+/**
+ * chmod (recursivo si se pide). Devuelve las rutas que no se pudieron cambiar: solo el DUEÑO puede
+ * hacer chmod, así que un archivo de otro usuario (p. ej. uno que subió la web como `vtuberdex`)
+ * falla con EPERM; en recursivo se sigue con el resto en vez de dejarlo a medias.
+ */
+async function cambiarModo(absoluta, modo, recursivo, fallidas = []) {
   const l = await fsp.lstat(absoluta);
-  if (l.isSymbolicLink()) {return;} // chmod seguiría el enlace
-  await fsp.chmod(absoluta, modo);
+  if (l.isSymbolicLink()) {
+    return fallidas; // chmod seguiría el enlace
+  }
+  try {
+    await fsp.chmod(absoluta, modo);
+  } catch (e) {
+    if (e?.code !== "EPERM" && e?.code !== "EACCES") {
+      throw e;
+    }
+    fallidas.push(absoluta);
+  }
   if (recursivo && l.isDirectory()) {
     for (const nombre of await fsp.readdir(absoluta)) {
-      await cambiarModo(path.join(absoluta, nombre), modo, true);
+      await cambiarModo(path.join(absoluta, nombre), modo, true, fallidas);
     }
   }
+  return fallidas;
+}
+
+/**
+ * Con ACL, los bits de GRUPO de chmod son la «máscara», que limita también a los usuarios con nombre
+ * de la ACL (`user:vtuberdex`, la web: lee los jars para el estado de los plugins y logs/). Un
+ * `chmod 700` dejaba a la web sin leer. Tras el chmod, a lo que tiene ACL extendida se le pone una
+ * máscara con lo que se eligió para el grupo MÁS lectura (y paso en carpetas). Sin getfacl/setfacl
+ * (pruebas, otra máquina) no hace nada.
+ */
+async function conservarLecturaDeLaWeb(absoluta, modo, recursivo) {
+  const listado = await salidaDe("getfacl", [
+    "--skip-base",
+    "--absolute-names",
+    ...(recursivo ? ["-R"] : []),
+    absoluta,
+  ]);
+  if (listado === null) {
+    return;
+  }
+  const conAcl = listado
+    .split("\n")
+    .filter((l) => l.startsWith("# file: "))
+    .map((l) => l.slice(8));
+  const grupo = (modo >> 3) & 7;
+  const mascara = `m::r${grupo & 2 ? "w" : ""}X`;
+  for (let i = 0; i < conAcl.length; i += 200) {
+    await ejecutar("setfacl", ["-m", mascara, "--", ...conAcl.slice(i, i + 200)]);
+  }
+}
+
+/** Salida estándar de un comando, o null si no existe o falla. */
+function salidaDe(comando, args) {
+  return new Promise((resolve) => {
+    const hijo = spawn(comando, args, {
+      stdio: ["ignore", "pipe", "ignore"],
+      env: { PATH: "/usr/bin:/bin", LANG: "C.UTF-8" },
+    });
+    let texto = "";
+    hijo.stdout.on("data", (d) => {
+      texto += d.toString();
+    });
+    hijo.on("error", () => resolve(null));
+    hijo.on("close", (codigo) => resolve(codigo === 0 ? texto : null));
+  });
 }
 
 const ARCHIVO_COMPRIMIDO = /\.(zip|jar|tar|tar\.gz|tgz|tar\.xz|txz|tar\.bz2|tbz2)$/i;
@@ -484,8 +543,20 @@ async function accion(cfg, cuerpo) {
       const modo = String(cuerpo.modo ?? "");
       if (!MODO_VALIDO.test(modo)) {throw fallo(400, "modo_invalido", "ej. 644 o 755");}
       const { relativa, absoluta } = await r(cuerpo.ruta);
-      await cambiarModo(absoluta, Number.parseInt(modo, 8), Boolean(cuerpo.recursivo));
-      return { ok: true, ruta: relativa, modo: modo.padStart(3, "0") };
+      const valor = Number.parseInt(modo, 8);
+      const recursivo = Boolean(cuerpo.recursivo);
+      const fallidas = await cambiarModo(absoluta, valor, recursivo);
+      await conservarLecturaDeLaWeb(absoluta, valor, recursivo);
+      const relativas = fallidas.map((f) => path.relative(cfg.raiz, f) || ".");
+      if (fallidas.includes(absoluta) && !recursivo) {
+        throw fallo(403, "sin_permiso", `${relativa} no es del usuario minecraft (solo su dueño puede cambiarle los permisos)`);
+      }
+      return {
+        ok: true,
+        ruta: relativa,
+        modo: modo.padStart(3, "0"),
+        ...(relativas.length ? { sinCambiar: relativas.slice(0, 50), totalSinCambiar: relativas.length } : {}),
+      };
     }
     case "descomprimir": {
       const archivo = await r(cuerpo.ruta, { permitirRaiz: false });

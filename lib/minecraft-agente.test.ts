@@ -23,6 +23,7 @@ import {
 import { configDe, crearServidor, normalizarRelativa } from "../minecraft-agente/agente.mjs";
 import { COOKIE_MANTENEDOR, crearSesionMantenedor } from "./minecraft-admin.mjs";
 import { usarArchivoDeAuditoria } from "./minecraft-consola.mjs";
+import { POST as pluginEstado } from "../app/api/minecraft-admin/plugins/estado/route.js";
 
 const crearSesion = crearSesionMantenedor as unknown as (o: { email?: string; role?: string }) => string | null;
 
@@ -300,5 +301,60 @@ describe("sin agente", () => {
     expect(r.status).toBe(400);
     const noHay = await fsGET(pedir("/api/minecraft-admin/fs?op=descargar&ruta=no-existe"));
     expect(noHay.status).toBe(404);
+  });
+});
+
+describe("plugins/estado por el agente", () => {
+  it("desactiva y activa renombrando como minecraft; repetir no falla; VTuberDex protegido", async () => {
+    await fs.writeFile(path.join(raiz, "plugins", "Bar.jar"), "jar");
+    const cambiar = (archivo: string, habilitado: boolean) =>
+      pluginEstado(
+        pedir("/api/minecraft-admin/plugins/estado", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ archivo, habilitado }),
+        }),
+      );
+    const apagado = await cambiar("Bar.jar", false);
+    expect(apagado.status).toBe(200);
+    expect((await apagado.json()).archivo).toBe("Bar.jar.disabled");
+    await expect(fs.access(path.join(raiz, "plugins", "Bar.jar.disabled"))).resolves.toBeUndefined();
+    const otraVez = await cambiar("Bar.jar", false);
+    expect(otraVez.status).toBe(200);
+    expect((await cambiar("Bar.jar.disabled", true)).status).toBe(200);
+    await expect(fs.access(path.join(raiz, "plugins", "Bar.jar"))).resolves.toBeUndefined();
+    expect((await cambiar("NoHay.jar", true)).status).toBe(404);
+    expect((await cambiar("VTuberDex.jar", false)).status).toBe(403);
+    expect((await cambiar("../x.jar", false)).status).toBe(400);
+  });
+});
+
+describe("permisos con ACL", () => {
+  const hayAcl = (() => {
+    try {
+      execFileSync("setfacl", ["--version"], { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  it.skipIf(!hayAcl)("un chmod 600 no le quita la lectura a un usuario con nombre de la ACL", async () => {
+    const archivo = path.join(raiz, "plugins", "Acl.jar");
+    await fs.writeFile(archivo, "jar");
+    const yo = os.userInfo().username;
+    execFileSync("setfacl", ["-m", `u:${yo}:rw`, archivo]);
+    const r = await fsPOST(
+      pedir("/api/minecraft-admin/fs", {
+        method: "POST",
+        headers: { ...conPanel, "content-type": "application/json" },
+        body: JSON.stringify({ accion: "permisos", ruta: "plugins/Acl.jar", modo: "600" }),
+      }),
+    );
+    expect(r.status).toBe(200);
+    const acl = execFileSync("getfacl", ["--absolute-names", archivo]).toString();
+    // Sin el arreglo la máscara quedaba en «---» y el usuario de la ACL no leía.
+    expect(acl).toMatch(/^mask::r--$/m);
+    expect(acl).toMatch(/^group::/m);
   });
 });
