@@ -671,6 +671,25 @@ JAVA_HOME=…/jdk25 ./gradlew build`.
 - **Probado a medias con un cliente real**: un Bedrock (Android) entró por Geyser/Floodgate el 2026-10-08 y destapó la trampa h2c;
   tras el arreglo falta jugar el flujo completo (sala de espera → `/vtd email` → `/vtd codigo` → stats y BossBar).
 
+## Panel `/minecraft-admin`: pestaña «Archivos y plugins» (explorador, editor y terminal)
+
+Desde 2026-11-20 «Plugins» y «Archivos» son UNA pestaña tipo VS Code (`components/minecraft-admin/ide/`):
+explorador de TODA `/srv/minecraft` (arrastrar archivos/carpetas desde el escritorio, mover dentro del árbol,
+instalar/extraer zip y tar, comprimir, permisos, descargar carpetas como .tar.gz), Monaco con pestañas
+(Ctrl+S; 409 `cambiado_en_disco` si el archivo cambió desde que se abrió) y terminal bash abajo. Los jars de
+`plugins/` muestran su estado (`/api/minecraft-admin/plugins`) y se activan/desactivan desde el árbol.
+- **Lo hace el agente `vtuberdex-mc-agente`** (`minecraft-agente/`, usuario `minecraft`, socket UNIX + token),
+  no la web: ver `minecraft-agente/LEEME.md`. Rutas: `/api/minecraft-admin/fs` y `/api/minecraft-admin/terminal[/id]`
+  (`lib/minecraft-agente.mjs`). Lo que cambia algo exige la cabecera `X-Panel: 1` (CSRF) y va a la auditoría;
+  lo tecleado en la terminal va al journal del agente.
+- **Alcance**: admin y mantenedor IGUAL, sin carpetas ocultas (decidido por el dueño el 2026-11-20). La terminal
+  corre en bubblewrap: solo ve `/srv/minecraft`, `/usr` y lo mínimo de `/etc`; PID propio (no ve ni mata Paper).
+- **Monaco se sirve del propio sitio** (`scripts/copiar-monaco.mjs` → `public/monaco/vs`, en `dev` y `build`;
+  `monaco-editor` fijado a la versión que espera `@monaco-editor/loader`). No cargarlo de un CDN: el panel tiene
+  sesión con terminal.
+- **El autodeploy NO actualiza el agente**: tras cambiar `minecraft-agente/*`, `sudo minecraft-agente/instalar.sh`.
+- Se quitaron `lib/minecraft-archivos.mjs`, `/api/minecraft-admin/archivos` y las secciones viejas (listas cerradas).
+
 ## Entregas estilo Death Stranding (plugin `vtuberdex-entregas`, XP `entrega`)
 
 Un TERCER plugin, aparte del principal y de las mochilas (`~/.motita/workspace/vtuberdex-entregas`, paquete `com.vtuberdex.entregas`), que

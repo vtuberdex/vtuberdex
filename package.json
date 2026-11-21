@@ -8,8 +8,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "node scripts/build-db.mjs --if-missing && next build",
+    "dev": "node scripts/copiar-monaco.mjs && next dev",
+    "build": "node scripts/build-db.mjs --if-missing && node scripts/copiar-monaco.mjs && next build",
     "start": "next start",
     "test": "vitest run && npm --prefix server test",
     "test:watch": "vitest",
@@ -35,8 +35,12 @@
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
+    "@monaco-editor/react": "^4.7.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "monaco-editor": "0.55.1",
     "next": "^16.4.6",
     "nodemailer": "^10.4.0",
     "react": "19.3.1",

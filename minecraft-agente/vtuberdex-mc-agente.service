@@ -1,0 +1,50 @@
+# Agente de archivos y terminal del panel /minecraft-admin (ver minecraft-agente/LEEME.md).
+# Corre como `minecraft`: lo que crea queda con el dueño correcto y la terminal ve lo mismo que el servidor.
+[Unit]
+Description=VTuberDex: agente de archivos y terminal del panel de Minecraft
+After=network.target
+
+[Service]
+User=minecraft
+Group=minecraft
+# AGENTE_TOKEN (el mismo valor que VTUBERDEX_MC_AGENTE_TOKEN de la web). Lo lee systemd como root.
+EnvironmentFile=/etc/vtuberdex-mc-agente.env
+Environment=NODE_ENV=production AGENTE_RAIZ=/srv/minecraft AGENTE_SOCKET=/run/vtuberdex-mc-agente/agente.sock
+WorkingDirectory=/srv/minecraft
+ExecStart=/opt/node-v22.23.3/bin/node /opt/vtuberdex-mc-agente/agente.mjs
+Restart=on-failure
+RestartSec=3
+UMask=0002
+# El socket vive aquí. Se conserva entre reinicios: la web lo abre por ruta y no debe perderlo.
+RuntimeDirectory=vtuberdex-mc-agente
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+
+# Aislamiento: solo escribe en la carpeta del servidor; no ve los datos ni los secretos de la web.
+# Sin RestrictNamespaces: bubblewrap necesita espacios de nombres de usuario para la caja de la terminal.
+# Sin RestrictSUIDSGID ni ProtectKernelTunables (probado 2026-11-20 con systemd 257 y bwrap 0.12): el
+# primero filtra las llamadas de montaje nuevas (`Can't open source /usr: Function not implemented`) y el
+# segundo deja /proc/sys montado encima y bwrap no puede montar el /proc de la caja. bwrap ya pone
+# no_new_privs a la shell, así que un setuid creado en la carpeta no da nada dentro de la terminal.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/srv/minecraft
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+LockPersonality=true
+InaccessiblePaths=-/etc/vtuberdex.env -/etc/vtuberdex-mc-agente.env -/var/lib/vtuberdex -/var/www -/srv/vtuberdex -/opt/miyuki
+
+# Recursos: una terminal (o un tar enorme) no debe quitarle CPU ni memoria al juego ni a la web.
+Nice=10
+CPUWeight=20
+IOWeight=20
+MemoryMax=1500M
+TasksMax=512
+OOMScoreAdjust=500
+
+[Install]
+WantedBy=multi-user.target
