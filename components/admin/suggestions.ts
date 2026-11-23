@@ -19,6 +19,10 @@ export const STANDARD_STATS = [
   "Ataque mágico",
   "Defensa mágica",
   "Velocidad",
+  "Evasión",
+  "Precisión",
+  "Crítico",
+  "Suerte",
 ];
 
 export const SOCIAL_SHORTCUTS: Array<{

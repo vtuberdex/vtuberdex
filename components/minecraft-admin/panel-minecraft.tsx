@@ -27,19 +27,10 @@ import {
   type LineaDeConsola,
   type Panorama,
 } from "./pestana-servidor";
-import { SeccionArchivos } from "./seccion-archivos";
+import { EspacioArchivos } from "./ide/espacio-archivos";
 import { SeccionConsola } from "./seccion-consola";
 import { SeccionExperiencia } from "./seccion-experiencia";
-import { SeccionPlugins } from "./seccion-plugins";
-import {
-  CLASE_BOTON,
-  CLASE_CAMPO,
-  CLASE_CAMPO_MONO,
-  CLASE_TARJETA,
-  FUENTE_MONO,
-  Pildora,
-  Seccion,
-} from "./ui";
+import { CLASE_BOTON, CLASE_CAMPO, CLASE_TARJETA, Pildora } from "./ui";
 
 type Estado = {
   plugins: string[];
@@ -58,18 +49,17 @@ type Estado = {
 };
 
 type Sesion = "comprobando" | "dentro" | "fuera";
-type Pestana = "servidor" | "plugins" | "archivos" | "experiencia";
-type Destino = "servidor" | "plugin";
+type Pestana = "servidor" | "archivos" | "experiencia";
 
 /**
- * Cuatro pestañas y no seis: la consola se unió a «Servidor» (registro, comandos y moderación en
- * el mismo sitio) y el editor de `server.properties` se unió a «Archivos», que ya edita lo mismo
- * con el explorador. Antes había dos formas de tocar un `.yml` y ninguna decía cuál usar.
+ * Tres pestañas: la consola se unió a «Servidor» (registro, comandos y moderación en el mismo
+ * sitio) y «Plugins» se unió a «Archivos» (2026-11-20): un espacio tipo VS Code sobre toda la
+ * carpeta del servidor (explorador, editor Monaco y terminal) donde los jars de `plugins/` muestran
+ * si están activos y se activan desde el propio árbol. Ver `ide/espacio-archivos.tsx`.
  */
 const PESTANAS: { id: Pestana; titulo: string }[] = [
   { id: "servidor", titulo: "Servidor" },
-  { id: "plugins", titulo: "Plugins" },
-  { id: "archivos", titulo: "Archivos" },
+  { id: "archivos", titulo: "Archivos y plugins" },
   { id: "experiencia", titulo: "Experiencia" },
 ];
 
@@ -182,8 +172,7 @@ function FormularioDeEntrada({
         <h1 className="text-3xl text-dex-ink">Mantenedor de Minecraft</h1>
         <p className="text-sm text-dex-muted">
           Estado del servidor en vivo, plugins y configuración. El acceso se
-          abre con un enlace de un solo uso enviado al correo del
-          mantenedor.
+          abre con un enlace de un solo uso enviado al correo del mantenedor.
         </p>
       </header>
       <section className={`${CLASE_TARJETA} space-y-4`}>
@@ -335,144 +324,6 @@ function BarraLateral({
   );
 }
 
-/** Subir un .jar a la carpeta de plugins. */
-function SubirPlugin({
-  ocupado,
-  alElegirArchivo,
-  alSubir,
-}: Readonly<{
-  ocupado: boolean;
-  alElegirArchivo: (archivo: File | null) => void;
-  alSubir: (evento: React.SubmitEvent) => void;
-}>) {
-  const elegir = (e: React.ChangeEvent<HTMLInputElement>) =>
-    alElegirArchivo(e.target.files?.[0] ?? null);
-  return (
-    <Seccion
-      titulo="Subir plugin"
-      bajada="Solo .jar, hasta 50 MB. Un jar es código que corre en el servidor: sube solo plugins de confianza. Queda en la carpeta y se carga al reiniciar."
-    >
-      <form
-        onSubmit={alSubir}
-        className="flex flex-col gap-3 sm:flex-row sm:items-center"
-      >
-        <input
-          type="file"
-          accept=".jar"
-          onChange={elegir}
-          className="text-sm text-dex-muted file:mr-3 file:rounded-xl file:border file:border-dex-line file:bg-dex-panel-soft file:px-3 file:py-1.5 file:text-dex-ink"
-        />
-        <button type="submit" disabled={ocupado} className={CLASE_BOTON.primario}>
-          Subir .jar
-        </button>
-      </form>
-    </Seccion>
-  );
-}
-
-/** Pestaña «Configuración»: server.properties o el .yml de un plugin, en un textarea. */
-function PestanaConfiguracion({
-  destino,
-  nombreConfig,
-  texto,
-  ocupado,
-  alCambiarDestino,
-  alCambiarNombre,
-  alCambiarTexto,
-  alAbrir,
-  alGuardar,
-}: Readonly<{
-  destino: Destino;
-  nombreConfig: string;
-  texto: string;
-  ocupado: boolean;
-  alCambiarDestino: (destino: Destino) => void;
-  alCambiarNombre: (nombre: string) => void;
-  alCambiarTexto: (texto: string) => void;
-  alAbrir: () => void;
-  alGuardar: (evento: React.SubmitEvent) => void;
-}>) {
-  const aServidor = () => alCambiarDestino("servidor");
-  const aPlugin = () => alCambiarDestino("plugin");
-  const cambiarNombre = (e: React.ChangeEvent<HTMLInputElement>) =>
-    alCambiarNombre(e.target.value);
-  const cambiarTexto = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
-    alCambiarTexto(e.target.value);
-  return (
-    <Seccion
-      titulo="Configuración"
-      bajada="Se aplica al reiniciar el servidor. Los valores de RCON no se muestran ni se pueden cambiar si no eres admin."
-    >
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            name="destino"
-            checked={destino === "servidor"}
-            onChange={aServidor}
-            className="accent-[var(--color-dex-accent)]"
-          />
-          <span>server.properties</span>
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            name="destino"
-            checked={destino === "plugin"}
-            onChange={aPlugin}
-            className="accent-[var(--color-dex-accent)]"
-          />
-          <span>Plugin (.yml)</span>
-        </label>
-        {destino === "plugin" ? (
-          <input
-            type="text"
-            value={nombreConfig}
-            onChange={cambiarNombre}
-            className={`${CLASE_CAMPO_MONO} !w-56`}
-            aria-label="Archivo del plugin"
-          />
-        ) : null}
-        <button
-          type="button"
-          onClick={alAbrir}
-          className={CLASE_BOTON.secundario}
-        >
-          Abrir
-        </button>
-      </div>
-      <form onSubmit={alGuardar} className="space-y-3">
-        <textarea
-          value={texto}
-          onChange={cambiarTexto}
-          rows={18}
-          spellCheck={false}
-          aria-label="Contenido de la configuración"
-          className={`${CLASE_CAMPO} ${FUENTE_MONO} text-xs leading-relaxed`}
-        />
-        <button type="submit" disabled={ocupado} className={CLASE_BOTON.primario}>
-          Guardar configuración
-        </button>
-      </form>
-    </Seccion>
-  );
-}
-
-/** Aviso de que el servicio web no puede leer la carpeta del servidor (no aplica a «Servidor», que va por RCON). */
-function AvisoCarpeta({ directorio }: Readonly<{ directorio?: string }>) {
-  return (
-    <p
-      role="alert"
-      className="rounded-2xl border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-400"
-    >
-      El panel no puede leer la carpeta del servidor
-      {directorio ? ` (${directorio})` : ""}. Falta
-      darle permiso al servicio web o definir VTUBERDEX_MINECRAFT_DIR;
-      por eso no aparecen plugins ni archivos de configuración.
-    </p>
-  );
-}
-
 export function PanelMinecraftAdmin() {
   const [estado, setEstado] = useState<Estado>(ESTADO_VACIO);
   const [sesion, setSesion] = useState<Sesion>("comprobando");
@@ -480,11 +331,6 @@ export function PanelMinecraftAdmin() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
-
-  const [archivo, setArchivo] = useState<File | null>(null);
-  const [destino, setDestino] = useState<Destino>("servidor");
-  const [nombreConfig, setNombreConfig] = useState("config.yml");
-  const [texto, setTexto] = useState("");
 
   const esAdmin = estado.rol === "admin";
   const [pestana, setPestana] = useState<Pestana>("servidor");
@@ -724,78 +570,6 @@ export function PanelMinecraftAdmin() {
     [email, operar],
   );
 
-  const subir = useCallback(
-    (evento: React.SubmitEvent) => {
-      evento.preventDefault();
-      if (!archivo) {
-        setAviso(null);
-        setError("elige un archivo .jar");
-        return undefined;
-      }
-      return operar(async () => {
-        const nombre = encodeURIComponent(archivo.name);
-        const r = await exigirOk(
-          await fetch(`/api/minecraft-admin/plugins?nombre=${nombre}`, {
-            method: "POST",
-            headers: { "content-type": "application/java-archive" },
-            body: archivo,
-          }),
-          "no se pudo subir el plugin",
-        );
-        const meta = (await r.json()) as { plugin?: string };
-        setAviso(`Plugin guardado: ${meta.plugin ?? archivo.name}`);
-        setArchivo(null);
-        await cargar();
-      }, "no se pudo subir el plugin");
-    },
-    [archivo, operar, cargar],
-  );
-
-  const abrirConfiguracion = useCallback(async () => {
-    setError(null);
-    setAviso(null);
-    const parametros = new URLSearchParams({ tipo: destino });
-    if (destino === "plugin") {
-      parametros.set("archivo", nombreConfig);
-    }
-    const r = await fetch(`/api/minecraft-admin/configuracion?${parametros}`, {
-      cache: "no-store",
-    });
-    if (!r.ok) {
-      setError(await leerError(r, "no se pudo abrir la configuración"));
-      return;
-    }
-    const cuerpo = (await r.json()) as { contenido?: string };
-    setTexto(cuerpo.contenido ?? "");
-  }, [destino, nombreConfig]);
-  const abrirConfiguracionSinEsperar = useCallback(
-    () => void abrirConfiguracion(),
-    [abrirConfiguracion],
-  );
-
-  const guardarConfiguracion = useCallback(
-    (evento: React.SubmitEvent) => {
-      evento.preventDefault();
-      return operar(async () => {
-        await exigirOk(
-          await fetch("/api/minecraft-admin/configuracion", {
-            method: "PUT",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              tipo: destino,
-              archivo: destino === "plugin" ? nombreConfig : undefined,
-              contenido: texto,
-            }),
-          }),
-          "no se pudo guardar la configuración",
-        );
-        setAviso("Configuración guardada.");
-        await cargar();
-      }, "no se pudo guardar la configuración");
-    },
-    [destino, nombreConfig, texto, operar, cargar],
-  );
-
   // Una vista por pestaña en una tabla (y no seis ternarios en el JSX): crear los elementos no
   // monta nada, solo se pinta el de la pestaña elegida.
   const vistas: Record<Pestana, React.ReactNode> = {
@@ -821,31 +595,7 @@ export function PanelMinecraftAdmin() {
         <SeccionConsola esAdmin={esAdmin} />
       </>
     ),
-    plugins: (
-      <SeccionPlugins respaldo={estado.plugins ?? []}>
-        <SubirPlugin
-          ocupado={ocupado}
-          alElegirArchivo={setArchivo}
-          alSubir={subir}
-        />
-      </SeccionPlugins>
-    ),
-    archivos: (
-      <>
-        <SeccionArchivos />
-        <PestanaConfiguracion
-          destino={destino}
-          nombreConfig={nombreConfig}
-          texto={texto}
-          ocupado={ocupado}
-          alCambiarDestino={setDestino}
-          alCambiarNombre={setNombreConfig}
-          alCambiarTexto={setTexto}
-          alAbrir={abrirConfiguracionSinEsperar}
-          alGuardar={guardarConfiguracion}
-        />
-      </>
-    ),
+    archivos: <EspacioArchivos />,
     experiencia: esAdmin ? <SeccionExperiencia /> : null,
   };
 
@@ -889,10 +639,6 @@ export function PanelMinecraftAdmin() {
         />
 
         <div className="min-w-0 space-y-6">
-          {estado.legible === false && pestana !== "servidor" ? (
-            <AvisoCarpeta directorio={estado.directorio} />
-          ) : null}
-
           {vistas[pestana]}
 
           <Mensajes aviso={aviso} error={error} />

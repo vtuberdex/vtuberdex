@@ -37,6 +37,12 @@ async function registrarLatido(request, cuerpo) {
 }
 
 export async function POST(request) {
+  // Si el cliente anuncia un cuerpo grande, se corta ANTES de leerlo (auditoría 2026-11-19): leerlo entero
+  // para después compararlo dejaba que cualquiera hiciera reservar memoria hasta el límite de nginx (1 MB).
+  const anunciado = Number(request.headers.get("content-length"));
+  if (Number.isFinite(anunciado) && anunciado > MAX_BYTES) {
+    return new Response(null, { status: 413 });
+  }
   try {
     const texto = await request.text();
     if (texto.length > MAX_BYTES) {

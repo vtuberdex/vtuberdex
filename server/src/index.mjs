@@ -100,7 +100,12 @@ const isMain =
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMain) {
   const port = Number(process.env.PORT ?? 4000);
-  const host = process.env.HOST ?? "0.0.0.0";
+  /**
+   * Solo en local por defecto (auditoría 2026-11-19): este proceso ESCRIBE el catálogo y tiene login por
+   * contraseña, y el repo está clonado en la misma VPS que sirve el sitio. Next le habla por 127.0.0.1
+   * (`VTUBERDEX_ADMIN_URL`), así que no necesita escuchar fuera; para la LAN, `HOST=0.0.0.0` explícito.
+   */
+  const host = process.env.HOST ?? "127.0.0.1";
   const { app } = createApp({ dbPath: process.env.VTUBERDEX_DB });
   const server = app.listen(port, host, () => {
     console.log(`[vtuberdex] API escuchando en http://${host}:${port}`);
