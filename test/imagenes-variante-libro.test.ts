@@ -83,5 +83,8 @@ describe("/images con ?w=512 (variante del libro)", () => {
   it("otro ancho u otra carpeta no generan nada (404)", async () => {
     expect((await pedir("character/a.webp?w=300")).status).toBe(404);
     expect((await pedir("faction/a.png?w=512")).status).toBe(404);
+    // Un parámetro extra (o repetido) no puede saltarse la caché para forzar otra recodificación.
+    expect((await pedir("character/a.webp?w=512&z=123")).status).toBe(404);
+    expect((await pedir("character/a.webp?w=512&w=512")).status).toBe(404);
   });
 });

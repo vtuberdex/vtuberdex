@@ -279,14 +279,12 @@ describe("experiencia manual", () => {
 });
 
 describe("/minecraft-admin", () => {
-  it("renderiza el listado de plugins, la subida y el editor de configuración", async () => {
+  it("plugins y archivos son una sola pestaña con el explorador del servidor", async () => {
     montarFetch();
     render(<MinecraftAdminPage />);
-    await abrirPestana("Plugins");
-    expect(await screen.findByText("Vault.jar")).toBeTruthy();
-    expect(screen.getByText(/Plugins instalados/)).toBeTruthy();
-    expect(screen.getByText("Subir plugin")).toBeTruthy();
-    // «Configuración» ya no es una pestaña propia: el editor vive dentro de «Archivos».
+    await abrirPestana("Archivos y plugins");
+    expect(await screen.findByRole("tree", { name: "Archivos del servidor" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Plugins" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Configuración" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Consola" })).toBeNull();
   });
@@ -323,18 +321,15 @@ describe("/minecraft-admin", () => {
     expect(screen.queryByLabelText("Comando RCON")).toBeNull();
   });
 
-  it("un mantenedor que no es admin sube jars y edita la configuración, pero no veta", async () => {
+  it("un mantenedor que no es admin tiene la pestaña de archivos, pero no veta", async () => {
     montarFetch({ plugins: ["Vault.jar"], rol: "mantenedor" });
     render(<MinecraftAdminPage />);
     await screen.findByRole("button", { name: "Quién juega" });
-    expect(screen.getByRole("tab", { name: "Archivos" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Archivos y plugins" })).toBeTruthy();
     expect(screen.queryByRole("tab", { name: "Experiencia" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Vetar" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Quitar veto" })).toBeNull();
     expect(screen.getByRole("button", { name: "Expulsar" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("tab", { name: "Plugins" }));
-    expect(await screen.findByText("Vault.jar")).toBeTruthy();
-    expect(screen.getByText("Subir plugin")).toBeTruthy();
   });
 
   it("una acción rápida envía su comando fijo", async () => {
@@ -414,93 +409,6 @@ describe("/minecraft-admin", () => {
     ).toBeTruthy();
   });
 
-  it("sube el jar elegido con el nombre en la url", async () => {
-    montarFetch();
-    const { container } = render(<MinecraftAdminPage />);
-    await abrirPestana("Plugins");
-    const input = container.querySelector(
-      'input[type="file"]',
-    ) as HTMLInputElement;
-    const archivo = new File([new Uint8Array([1, 2, 3])], "Nuevo.jar", {
-      type: "application/java-archive",
-    });
-    fireEvent.change(input, { target: { files: [archivo] } });
-    fireEvent.click(screen.getByRole("button", { name: "Subir .jar" }));
-    await waitFor(() => {
-      const subida = llamadas.find((l) => l.url.includes("/plugins?nombre="));
-      expect(subida).toBeTruthy();
-    });
-    const subida = llamadas.find((l) => l.url.includes("/plugins?nombre="))!;
-    expect(decodeURIComponent(subida.url)).toContain("Nuevo.jar");
-    expect(subida.init?.method).toBe("POST");
-  });
-
-  it("abre la configuración del servidor y la guarda", async () => {
-    montarFetch();
-    render(<MinecraftAdminPage />);
-    await abrirPestana("Archivos");
-    fireEvent.click(screen.getByRole("radio", { name: /server\.properties/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
-    const area = screen.getByLabelText(
-      "Contenido de la configuración",
-    ) as HTMLTextAreaElement;
-    await waitFor(() => expect(area.value).toContain("motd=Hola"));
-    fireEvent.change(area, { target: { value: "motd=Nuevo\n" } });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Guardar configuración" }),
-    );
-    await waitFor(() => {
-      const guardado = llamadas.find(
-        (l) => l.url.includes("/configuracion") && l.init?.method === "PUT",
-      );
-      expect(guardado).toBeTruthy();
-      expect(String(guardado!.init!.body)).toContain("motd=Nuevo");
-    });
-  });
-
-  it("abre la configuración de un plugin por su nombre de archivo", async () => {
-    montarFetch();
-    render(<MinecraftAdminPage />);
-    await abrirPestana("Archivos");
-    fireEvent.click(screen.getByRole("radio", { name: /Plugin/ }));
-    fireEvent.change(screen.getByLabelText("Archivo del plugin"), {
-      target: { value: "config.yml" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
-    await waitFor(() => {
-      const abierta = llamadas.find(
-        (l) =>
-          l.url.includes("/configuracion?") && l.url.includes("tipo=plugin"),
-      );
-      expect(abierta).toBeTruthy();
-      expect(decodeURIComponent(abierta!.url)).toContain("config.yml");
-    });
-  });
-
-  it("muestra el error cuando la api rechaza la subida", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (entrada: unknown) => {
-        const url = String(entrada);
-        llamadas.push({ url });
-        if (url.includes("/plugins")) {
-          return respuesta({ error: "solo .jar" }, false);
-        }
-        return respuesta({ plugins: [], rol: "admin" });
-      }),
-    );
-    const { container } = render(<MinecraftAdminPage />);
-    await abrirPestana("Plugins");
-    const input = container.querySelector(
-      'input[type="file"]',
-    ) as HTMLInputElement;
-    fireEvent.change(input, {
-      target: { files: [new File([new Uint8Array([1])], "malo.zip")] },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Subir .jar" }));
-    expect(await screen.findByRole("alert")).toBeTruthy();
-  });
-
   it("avisa cuando el enlace del fragmento ya no se puede canjear", async () => {
     vi.stubGlobal(
       "fetch",
@@ -541,62 +449,4 @@ describe("/minecraft-admin", () => {
     expect(await screen.findByText("sin red")).toBeTruthy();
   });
 
-  it("no intenta subir nada si no hay archivo elegido", async () => {
-    montarFetch();
-    render(<MinecraftAdminPage />);
-    await abrirPestana("Plugins");
-    fireEvent.click(screen.getByRole("button", { name: "Subir .jar" }));
-    expect(await screen.findByText("elige un archivo .jar")).toBeTruthy();
-    expect(llamadas.some((l) => l.url.includes("/plugins?nombre="))).toBe(
-      false,
-    );
-  });
-
-  it("muestra el error de la api al abrir la configuración", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (entrada: unknown) => {
-        const url = String(entrada);
-        llamadas.push({ url });
-        if (url.includes("/configuracion")) {
-          return respuesta({ error: "no_existe" }, false);
-        }
-        return respuesta({ plugins: [], rol: "admin" });
-      }),
-    );
-    render(<MinecraftAdminPage />);
-    await abrirPestana("Archivos");
-    fireEvent.click(screen.getByRole("radio", { name: /server\.properties/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
-    expect(await screen.findByText("no_existe")).toBeTruthy();
-  });
-
-  it("muestra el error cuando el guardado de la configuración revienta", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (entrada: unknown, init?: RequestInit) => {
-        const url = String(entrada);
-        llamadas.push({ url, init });
-        if (url.includes("/configuracion")) {
-          if (init?.method === "PUT") {
-            throw new Error("se cayó el guardado");
-          }
-          return respuesta({ contenido: "motd=Hola\n" });
-        }
-        return respuesta({ plugins: [], rol: "admin" });
-      }),
-    );
-    render(<MinecraftAdminPage />);
-    await abrirPestana("Archivos");
-    fireEvent.click(screen.getByRole("radio", { name: /server\.properties/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Abrir" }));
-    const area = screen.getByLabelText(
-      "Contenido de la configuración",
-    ) as HTMLTextAreaElement;
-    await waitFor(() => expect(area.value).toContain("motd=Hola"));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Guardar configuración" }),
-    );
-    expect(await screen.findByText("se cayó el guardado")).toBeTruthy();
-  });
 });

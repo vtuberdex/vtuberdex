@@ -417,8 +417,19 @@ export async function GET(request, contexto) {
   const carpeta = Array.isArray(segmentos)
     ? segmentos[0]
     : String(segmentos).split("/")[0];
-  // Solo el ancho del libro y solo donde tiene sentido: otro `w` no genera ni cachea nada.
-  if (ancho !== String(ANCHO_LIBRO) || !CARPETAS_CON_VARIANTE.has(carpeta)) {
+  /**
+   * Solo el ancho del libro, solo donde tiene sentido y SIN otros parámetros: la clave de caché de nginx
+   * lleva la query entera, así que `?w=512&z=<aleatorio>` nunca acertaba y obligaba a recodificar con
+   * sharp en cada petición (auditoría 2026-11-19). Con `w` solo se admite además la versión `v`.
+   */
+  const parametros = [...new URL(request.url).searchParams.keys()];
+  const soloConocidos = parametros.every((p) => p === "w" || p === "v");
+  if (
+    ancho !== String(ANCHO_LIBRO) ||
+    !CARPETAS_CON_VARIANTE.has(carpeta) ||
+    !soloConocidos ||
+    new Set(parametros).size !== parametros.length
+  ) {
     return new Response(null, {
       status: 404,
       headers: { "cache-control": "no-store" },

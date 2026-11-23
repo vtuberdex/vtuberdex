@@ -276,10 +276,7 @@ function faccionCanonica(v) {
   while (fin > 0 && conGuiones[fin - 1] >= "0" && conGuiones[fin - 1] <= "9") {
     fin -= 1;
   }
-  return conGuiones
-    .slice(0, fin)
-    .replace(/-$/, "")
-    .replace("lecagy", "legacy");
+  return conGuiones.slice(0, fin).replace(/-$/, "").replace("lecagy", "legacy");
 }
 
 /**
@@ -346,7 +343,11 @@ export function tieneFaccion(facciones, slug, subfacciones = {}) {
  *   estados exclusivos de su madre.
  * @returns {Problema[]}
  */
-export function validarKit({ habilidades, facciones = null, subfacciones = {} }) {
+export function validarKit({
+  habilidades,
+  facciones = null,
+  subfacciones = {},
+}) {
   /** @type {Problema[]} */
   const problemas = [];
   const anotar = crearAnotador(problemas);
@@ -365,7 +366,12 @@ export function validarKit({ habilidades, facciones = null, subfacciones = {} })
     const html = h.effectHtml ?? "";
 
     revisarSpans(h.category, pieza, html, anotar);
-    const entregados = revisarEntregados(pieza, html, { facciones, subfacciones }, anotar);
+    const entregados = revisarEntregados(
+      pieza,
+      html,
+      { facciones, subfacciones },
+      anotar,
+    );
 
     registrarUso(usoPorEstado, entregados, pieza);
 
@@ -694,10 +700,61 @@ export function htmlDeHabilidadSeguro(html) {
       continue;
     }
     const span = /^<span style="([^"<>]*)">$/i.exec(etiqueta);
-    if (span && !/url\s*\(|expression|javascript:|@import|\\/i.test(span[1])) {
+    if (span && estiloDeHabilidadSeguro(span[1])) {
       continue;
     }
     return false;
+  }
+  return true;
+}
+
+/**
+ * Propiedades CSS que admite el `style` de un `<span>` de habilidad: exactamente las que usan las 2.508
+ * declaraciones del scrape y las del mantenedor (medido 2026-11-19). Antes se aceptaba cualquier estilo
+ * salvo unas palabras prohibidas, y `background-image:image-set("https://…")` o `position:fixed;inset:0`
+ * pasaban: un píxel de rastreo en cada ficha o una capa que tapa la página (auditoría 2026-11-19).
+ */
+const PROPIEDADES_DE_ESTILO = new Set([
+  "color",
+  "font-weight",
+  "font-size",
+  "background",
+  "-webkit-background-clip",
+  "-webkit-text-fill-color",
+]);
+/** Funciones CSS permitidas en un valor (los degradados de color de los estados). */
+const FUNCIONES_DE_ESTILO = new Set([
+  "linear-gradient",
+  "rgb",
+  "rgba",
+  "hsl",
+  "hsla",
+]);
+
+/** ¿Es un `style` de habilidad de los que se pueden inyectar? Lista blanca de propiedades y de valores. */
+export function estiloDeHabilidadSeguro(estilo) {
+  for (const declaracion of String(estilo).split(";")) {
+    if (!declaracion.trim()) {
+      continue;
+    }
+    const i = declaracion.indexOf(":");
+    if (i < 0) {
+      return false;
+    }
+    const propiedad = declaracion.slice(0, i).trim().toLowerCase();
+    const valor = declaracion.slice(i + 1).trim();
+    // Sin comillas, sin `:` (otro selector o esquema), sin `/` (rutas), sin escapes: solo colores y medidas.
+    if (
+      !PROPIEDADES_DE_ESTILO.has(propiedad) ||
+      !/^[\w\s#.,%()+-]*$/.test(valor)
+    ) {
+      return false;
+    }
+    for (const m of valor.matchAll(/([\w-]+)\s*\(/g)) {
+      if (!FUNCIONES_DE_ESTILO.has(m[1].toLowerCase())) {
+        return false;
+      }
+    }
   }
   return true;
 }

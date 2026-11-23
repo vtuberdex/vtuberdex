@@ -14,6 +14,7 @@ import {
   leerConfiguracion,
   respuestaJson,
 } from "../../../../lib/minecraft-admin.mjs";
+import { anotarAuditoria } from "../../../../lib/minecraft-consola.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,17 @@ export async function PUT(request) {
       archivo: cuerpo.archivo,
       contenido: cuerpo.contenido,
       rol: acceso.sesion.role,
+    });
+    // Cada guardado queda en la auditoría (antes no): `server.properties` decide quién entra al servidor.
+    await anotarAuditoria({
+      quien: acceso.sesion.email,
+      rol: acceso.sesion.role,
+      tipo: "configuracion-guardada",
+      detalle:
+        cuerpo.tipo === "plugin"
+          ? `plugin:${String(cuerpo.archivo ?? "")}`
+          : "server.properties",
+      ok: resultado.ok,
     });
     if (!resultado.ok) {
       return respuestaJson(resultado.cuerpo, resultado.status);

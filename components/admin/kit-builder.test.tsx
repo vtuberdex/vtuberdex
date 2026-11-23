@@ -259,13 +259,17 @@ describe("Paso «Atributos»", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Añadir atributos estándar" }),
     );
-    expect(screen.getAllByTestId("stat-row")).toHaveLength(7);
+    expect(screen.getAllByTestId("stat-row")).toHaveLength(11);
+    // Los cuatro de abajo de Velocidad (los que tienen las 211 fichas del scrape).
+    for (const atributo of ["Evasión", "Precisión", "Crítico", "Suerte"]) {
+      expect(screen.getByLabelText(`Valor de ${atributo}`)).toBeInTheDocument();
+    }
     expect(screen.queryByPlaceholderText("S+")).toBeNull();
     fireEvent.change(screen.getByLabelText("Valor de Ataque"), {
       target: { value: "50" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Quitar HP" }));
-    expect(screen.getAllByTestId("stat-row")).toHaveLength(6);
+    expect(screen.getAllByTestId("stat-row")).toHaveLength(10);
     expect(
       screen.getByRole("button", { name: "Añadir atributos estándar" }),
     ).toBeEnabled();

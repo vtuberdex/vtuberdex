@@ -20,7 +20,7 @@ export const formulariosJa: { [K in keyof typeof formulariosEs]: string } = {
   "baja.revisaCorreo": "メールを確認してください。",
   "baja.codigoEnviadoA": "コードを次のアドレスに送信しました：",
   "baja.codigoInstrucciones":
-    "ここに貼り付けて退会を確定するか、メール内のボタンを押してください。有効期間は24時間です。届かない場合は迷惑メールをご確認ください。",
+    "ここに貼り付けて退会を確定するか、メール内のボタンを押してください。有効期間は24時間です。届かない場合は迷惑メールをご確認ください。このアドレスにカードがない場合は、コードの代わりにお知らせが届きます。",
   "baja.paso2": "ステップ 2/2 · 退会の確認",
   "baja.codigo": "メールのコード",
   "baja.confirmando": "確認中…",
