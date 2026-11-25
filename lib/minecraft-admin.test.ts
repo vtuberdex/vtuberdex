@@ -142,6 +142,52 @@ describe("enlace mágico del mantenedor", () => {
     expect(tarde.cuerpo.error).toBe("enlace_caducado");
   });
 
+  it("deja pedir varios enlaces al día (antes, con 5, el sexto no salía y no se notaba)", async () => {
+    const aviso = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const inicio = 1_000_000;
+    for (let i = 0; i < 8; i++) {
+      await admin.enviarEnlaceMantenedor({
+        email: "mantenedor@example.com",
+        ahora: inicio + i * admin.ESPERA_ENTRE_ENLACES_MS,
+      });
+    }
+    expect(enviados).toHaveLength(8);
+    expect(aviso).not.toHaveBeenCalled();
+    aviso.mockRestore();
+  });
+
+  it("respeta el tope por minuto y por día, y lo deja en el log sin cambiar la respuesta", async () => {
+    const aviso = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const inicio = 1_000_000;
+    const pedir = (ahora: number) =>
+      admin.enviarEnlaceMantenedor({ email: "mantenedor@example.com", ahora });
+
+    await pedir(inicio);
+    const seguido = await pedir(inicio + 1_000);
+    expect(enviados).toHaveLength(1);
+    expect(seguido).toMatchObject({ ok: true, enviado: false });
+    expect(aviso).toHaveBeenCalledTimes(1);
+    expect(String(aviso.mock.calls[0][0])).toContain("tope de envíos");
+
+    for (let i = 1; i < admin.ENLACES_POR_DIA; i++) {
+      await pedir(inicio + i * admin.ESPERA_ENTRE_ENLACES_MS);
+    }
+    expect(enviados).toHaveLength(admin.ENLACES_POR_DIA);
+    const agotado = await pedir(
+      inicio + admin.ENLACES_POR_DIA * admin.ESPERA_ENTRE_ENLACES_MS,
+    );
+    expect(agotado).toMatchObject({ ok: true, enviado: false });
+    expect(enviados).toHaveLength(admin.ENLACES_POR_DIA);
+    // Pasadas 24 h desde el primero, vuelve a salir.
+    await pedir(inicio + 24 * 60 * 60 * 1000);
+    expect(enviados).toHaveLength(admin.ENLACES_POR_DIA + 1);
+    aviso.mockRestore();
+  });
+
+  it("la sesión del panel dura 8 h", () => {
+    expect(admin.VIDA_SESION_MANTENEDOR_MS).toBe(8 * 60 * 60 * 1000);
+  });
+
   it("no manda correo si la dirección no es válida", async () => {
     const alta = await admin.enviarEnlaceMantenedor({
       email: "no-es-un-correo",
