@@ -10,7 +10,7 @@
  *   Se arrastran archivos y carpetas desde el escritorio a cualquier carpeta, y dentro del árbol
  *   para moverlos. Los `.jar` de `plugins/` muestran si están activos y se activan desde aquí.
  * - Centro: Monaco con pestañas, Ctrl+S guarda; si el archivo cambió en el disco avisa.
- * - Abajo: terminal bash (redimensionable).
+ * - Abajo: consola del servidor de Minecraft y terminales bash (redimensionable).
  *
  * Todo lo hace el agente `vtuberdex-mc-agente` como usuario `minecraft`; la API autoriza y anota.
  */
@@ -747,7 +747,7 @@ export function EspacioArchivos() {
       {/* Barra superior */}
       <div className="flex items-center gap-2 border-b border-dex-line bg-dex-panel/60 px-3 py-1.5 text-xs">
         <span className="font-bold text-dex-ink">/srv/minecraft</span>
-        <span className="text-dex-muted">· explorador, editor y terminal</span>
+        <span className="text-dex-muted">· explorador, editor, consola y terminal</span>
         {ocupado ? <span className="ml-3 animate-pulse text-dex-accent">{ocupado}</span> : null}
         <div className="ml-auto flex gap-1">
           <button type="button" className={CLASE_BOTON.fantasma} onClick={() => setTerminalVisible((v) => !v)}>

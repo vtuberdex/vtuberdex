@@ -8,6 +8,9 @@
  *
  * Salida por Server-Sent Events (`/api/minecraft-admin/terminal/[id]`, bytes en base64); entrada
  * por POST agrupando lo tecleado cada ~15 ms y en orden (una petición detrás de otra).
+ *
+ * La primera pestaña, fija, es la CONSOLA DEL SERVIDOR de Minecraft (`consola-servidor.tsx`): el
+ * registro en vivo y comandos por RCON. No es una sesión bash ni se puede cerrar.
  */
 import "@xterm/xterm/css/xterm.css";
 
@@ -22,6 +25,10 @@ import {
   urlDeSalida,
   type Terminal as TerminalInfo,
 } from "./api";
+import { ConsolaServidor } from "./consola-servidor";
+
+/** `activa` vale esto cuando se ve la consola del servidor en vez de una terminal bash. */
+export const CONSOLA = "consola-servidor";
 
 type Props = {
   /** Comando que el explorador pide escribir (p. ej. `cd 'plugins/X'`), con un contador para repetirlo. */
@@ -236,7 +243,9 @@ export function PanelTerminal({ pedido, alError }: Props) {
   // Un pedido del explorador va a la terminal activa (o abre una).
   useEffect(() => {
     if (!pedido) {return;}
-    if (activa && !sesiones.find((s) => s.id === activa)?.fin) {
+    const bash = activa === CONSOLA ? sesiones.findLast((s) => !s.fin)?.id : activa;
+    if (bash && !sesiones.find((s) => s.id === bash)?.fin) {
+      setActiva(bash);
       setPedidoActivo(pedido);
     } else {
       void nueva().then((id) => id && setPedidoActivo(pedido));
@@ -248,7 +257,7 @@ export function PanelTerminal({ pedido, alError }: Props) {
     await cerrarTerminal(id);
     setSesiones((s) => {
       const resto = s.filter((x) => x.id !== id);
-      if (activa === id) {setActiva(resto.at(-1)?.id ?? null);}
+      if (activa === id) {setActiva(resto.at(-1)?.id ?? CONSOLA);}
       return resto;
     });
   };
@@ -258,6 +267,16 @@ export function PanelTerminal({ pedido, alError }: Props) {
       <div className="flex items-center gap-1 border-b border-dex-line/60 px-2 text-xs">
         <span className="mr-2 py-1.5 font-bold uppercase tracking-wide text-dex-muted">Terminal</span>
         <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setActiva(CONSOLA)}
+            title="Registro del servidor en vivo y comandos por RCON"
+            className={`whitespace-nowrap rounded-md px-2 py-1 ${
+              activa === CONSOLA ? "bg-dex-panel-soft text-dex-ink" : "text-dex-muted hover:text-dex-ink"
+            }`}
+          >
+            ⛏ Consola del servidor
+          </button>
           {sesiones.map((s, i) => (
             <div
               key={s.id}
@@ -289,8 +308,11 @@ export function PanelTerminal({ pedido, alError }: Props) {
         </button>
       </div>
       <div className="relative min-h-0 flex-1">
-        {cargando ? <p className="p-3 text-xs text-dex-muted">Abriendo terminal…</p> : null}
-        {!cargando && !sesiones.length ? (
+        <div className={activa === CONSOLA ? "absolute inset-0" : "hidden"}>
+          <ConsolaServidor visible={activa === CONSOLA} />
+        </div>
+        {cargando && activa !== CONSOLA ? <p className="p-3 text-xs text-dex-muted">Abriendo terminal…</p> : null}
+        {!cargando && !sesiones.length && activa !== CONSOLA ? (
           <p className="p-3 text-xs text-dex-muted">Sin terminales. Pulsa «+ Nueva».</p>
         ) : null}
         {sesiones.map((s) => (
