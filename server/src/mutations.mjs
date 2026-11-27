@@ -24,6 +24,9 @@ import {
   esGradoValido,
   hoy,
   mesesCalendario,
+  ORIGENES,
+  ORIGEN_POR_DEFECTO,
+  esOrigenValido,
 } from "./premium.mjs";
 import { normalizeText, slugify } from "./text.mjs";
 import { valorEquilibrado } from "./equilibrio.mjs";
@@ -570,6 +573,15 @@ export function sellarPremium(patch, ahora = hoy()) {
  *     donó antes de que existiera esta función).
  *   · «Hoy» es `premium.ahora` si el parche vino sellado del diario, o el día real si no.
  */
+/** El origen del parche; sin él, la donación. Uno fuera de la lista se rechaza (el esquema ya lo hace en HTTP). */
+function origenDe(premium) {
+  const origen = premium.origin ?? ORIGEN_POR_DEFECTO;
+  if (!esOrigenValido(origen)) {
+    throw new MutationError(400, "origen_invalido", `el origen debe ser uno de ${ORIGENES.join(", ")}`);
+  }
+  return origen;
+}
+
 function aplicarPremium(db, vtuberId, premium) {
   if (premium === null) {
     db.prepare("DELETE FROM premium WHERE vtuber_id = ?").run(vtuberId);
@@ -585,20 +597,26 @@ function aplicarPremium(db, vtuberId, premium) {
   const ahora = premium.ahora ?? hoy();
   const actual = db
     .prepare(
-      "SELECT grade, since, graded_at AS gradedAt FROM premium WHERE vtuber_id = ?",
+      "SELECT grade, since, graded_at AS gradedAt, origin FROM premium WHERE vtuber_id = ?",
     )
     .get(vtuberId);
   if (!actual) {
     const alta = premium.since ?? ahora;
     db.prepare(
-      "INSERT INTO premium (vtuber_id, grade, since, graded_at) VALUES (?, ?, ?, ?)",
-    ).run(vtuberId, premium.grade, alta, premium.gradedAt ?? alta);
+      "INSERT INTO premium (vtuber_id, grade, since, graded_at, origin) VALUES (?, ?, ?, ?, ?)",
+    ).run(
+      vtuberId,
+      premium.grade,
+      alta,
+      premium.gradedAt ?? alta,
+      origenDe(premium),
+    );
     return;
   }
   const { since, gradedAt } = fechasAlCambiar(actual, premium, ahora);
   db.prepare(
-    "UPDATE premium SET grade = ?, since = ?, graded_at = ? WHERE vtuber_id = ?",
-  ).run(premium.grade, since, gradedAt, vtuberId);
+    "UPDATE premium SET grade = ?, since = ?, graded_at = ?, origin = ? WHERE vtuber_id = ?",
+  ).run(premium.grade, since, gradedAt, premium.origin ?? actual.origin, vtuberId);
 }
 
 /** `since` y `graded_at` de una fila premium que ya existe, según las reglas de `aplicarPremium`. */

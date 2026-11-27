@@ -13,7 +13,7 @@
  * Sin contexto 2D (los tests de jsdom lo anulan a propósito) se devuelve el lienzo en blanco en
  * vez de fallar: la placa se ve sin rótulo, que es mejor que romper la carta entera.
  */
-import { DETERIORO, PREMIUM } from "@/components/card3d-config";
+import { DETERIORO, PREMIUM, marcoDe } from "@/components/card3d-config";
 import type { SlabLayout } from "@/components/premium-layout";
 import { corromperTexto, semillaDeCarta } from "@/lib/degradado";
 import {
@@ -111,7 +111,8 @@ export function dibujarHojaInterior(
   layout: SlabLayout,
   datos: DatosDeEtiqueta,
 ): HTMLCanvasElement {
-  const { insert, layout: medidas } = PREMIUM;
+  const { layout: medidas } = PREMIUM;
+  const insert = marcoDe(datos.premium.origin).insert;
   const escala = insert.pxWidth / layout.width;
   const canvas = document.createElement("canvas");
   canvas.width = insert.pxWidth;

@@ -49,6 +49,9 @@ export interface VtuberImages {
 export type UploadKind =
   "character" | "card" | "thumb" | "logo" | "radar" | "background";
 
+/** Origen del grado: Premium 8 (artistas), Misiones de Minecraft o Donación. */
+export type PremiumOrigin = "premium8" | "misiones" | "donacion";
+
 /** Un grado de la escala premium. Es texto: `'BL'` no es un número (ver `server/src/premium.mjs`). */
 /** Escala premium (8…BL) y de deterioro (7…1): ver `server/src/premium.mjs`. */
 export type PremiumGrade =
@@ -78,6 +81,8 @@ export interface PremiumInfo {
   since: string;
   /** Último cambio de grado (AAAA-MM-DD). */
   gradedAt: string;
+  /** Cómo se obtuvo el grado: decide el marco de la carta (ver `ORIGENES` en `server/src/premium.mjs`). */
+  origin?: PremiumOrigin;
   /** Número de certificado y código de donación, derivado del número de dex (`VTD-016` para la carta `#016`). */
   cert: string;
 }
@@ -364,7 +369,12 @@ export interface VtuberPatch {
   skills?: SkillInput[];
   socials?: SocialInput[];
   /** Carta premium: un grado de la escala, o `null` para devolverla a carta normal. */
-  premium?: { grade: PremiumGrade; since?: string; gradedAt?: string } | null;
+  premium?: {
+    grade: PremiumGrade;
+    since?: string;
+    gradedAt?: string;
+    origin?: PremiumOrigin;
+  } | null;
 }
 
 /** Alta de una ficha: igual que el parche pero con `name` obligatorio. */

@@ -1422,6 +1422,16 @@ export const TEXTURAS = {
  * escala igual en el libro (donde cabe en la funda) y en el detalle. El alto de la placa NO se
  * elige: es el de la funda (carta + 2 x `pocketPad`), y de ahí sale el ancho (`premium-layout`).
  */
+/** Las perillas del acrílico que un marco puede redefinir (ver `PREMIUM.marcos`). */
+type AcrilicoBase = {
+  base: number;
+  fresnel: number;
+  edge: number;
+  shineStrength: number;
+  bandStrength: number;
+  tint: string;
+};
+
 export const PREMIUM = {
   layout: {
     /** Margen entre el borde de la placa y la ventana/etiqueta, como fracción del ancho. */
@@ -1516,6 +1526,39 @@ export const PREMIUM = {
     windowLine: "#8d95a6",
   },
   /**
+   * MARCOS según el MÉTODO DE OBTENCIÓN del grado (`premium.origin`): cada origen tiene su identidad visual.
+   *   · premium8   Gradeo Premium 8, exclusivo de los artistas VTuber.
+   *   · misiones   Gradeo por Misiones de Minecraft.
+   *   · donacion   Gradeo por Donación (también el de las cartas anteriores a esta distinción).
+   *
+   * Cada marco REDEFINE solo lo que quiera sobre `acrylic` (el acrílico) e `insert` (la hoja interior);
+   * lo que no menciona se hereda. Hoy los tres están vacíos a propósito: el diseño es de quien los dibuja y,
+   * mientras no se rellenen, las cartas se ven exactamente igual que antes. Solo valen perillas que ya existen
+   * (colores y números): no añaden samplers ni uniformes nuevos, así que no tocan el presupuesto de los shaders.
+   * Ejemplo: `misiones: { acrylic: { tint: "#b8f2c0" }, insert: { frame: "#dff3e2" } }`.
+   */
+  marcos: {
+    premium8: {},
+    misiones: {},
+    donacion: {},
+  } as Record<
+    "premium8" | "misiones" | "donacion",
+    {
+      acrylic?: Partial<
+        Pick<
+          AcrilicoBase,
+          | "base"
+          | "fresnel"
+          | "edge"
+          | "shineStrength"
+          | "bandStrength"
+          | "tint"
+        >
+      >;
+      insert?: Partial<Record<"frame" | "frameShade" | "windowLine", string>>;
+    }
+  >,
+  /**
    * La ETIQUETA. Cada grado tiene su banda: azul para el 8, acero para el 9, dorada para el 10;
    * la Black Label (BL) es negra con letra plateada. Dos colores = degradado de la banda.
    */
@@ -1550,6 +1593,19 @@ export const PREMIUM = {
     } as Record<string, readonly [string, string]>,
   },
 } as const;
+
+/** El marco de un origen: el acrílico y la hoja base con lo que ese origen redefine. Sin origen, el de donación. */
+export function marcoDe(origen: string | null | undefined) {
+  const marcos = PREMIUM.marcos as Record<
+    string,
+    (typeof PREMIUM.marcos)["donacion"]
+  >;
+  const propio = marcos[origen ?? ""] ?? marcos.donacion;
+  return {
+    acrylic: { ...PREMIUM.acrylic, ...propio.acrylic },
+    insert: { ...PREMIUM.insert, ...propio.insert },
+  };
+}
 
 /**
  * DETERIORO de las cartas degradadas (grados 5…1 de `server/src/premium.mjs`).
