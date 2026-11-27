@@ -34,6 +34,7 @@ import type { PremiumInfo, VtuberCard } from "@/lib/types";
 import { GEOMETRY, PREMIUM, marcoDe } from "@/components/card3d-config";
 import { slabLayout, type SlabLayout } from "@/components/premium-layout";
 import { dibujarHojaInterior } from "@/components/premium-label";
+import { useFuenteDeMarco } from "@/components/use-fuente-de-marco";
 
 const VERTEX = /* glsl */ `
   varying vec3 vNormalView;
@@ -231,6 +232,10 @@ export function PremiumSlab({
     [layout, premium.origin],
   );
   const countryName = card.countries[0]?.name;
+  // La hoja es un lienzo: si su marco usa una fuente propia, se redibuja cuando esa fuente termina de cargar.
+  const versionDeFuente = useFuenteDeMarco(
+    marcoDe(premium.origin).etiqueta.fuente,
+  );
   // La hoja se redibuja solo si cambia algo que la etiqueta muestra, no en cada render.
   const insertTexture = useMemo(
     () => crearTexturaDeHoja(layout, card, premium),
@@ -245,6 +250,7 @@ export function PremiumSlab({
       premium.since,
       premium.gradedAt,
       premium.origin,
+      versionDeFuente,
     ],
   );
 

@@ -38,6 +38,7 @@
  * `shaders.ts`. Aquí solo están los números.
  */
 
+import { FUENTE_MINECRAFT } from "@/components/premium-minecraft";
 import {
   CARD_TEXTURE_HEIGHT,
   CARD_TEXTURE_WIDTH,
@@ -1569,8 +1570,15 @@ export const PREMIUM = {
         frame: "#e1efe5",
         frameShade: "#b6d1bf",
         windowLine: "#3f9d6b",
+        // Mosaico de bloques en vez del degradado liso (`premium-minecraft.ts`).
+        fondo: "minecraft",
       },
-      etiqueta: { tipo: "MISIONES", acento: "#2fae6d" },
+      etiqueta: {
+        tipo: "MISIONES",
+        acento: "#2fae6d",
+        // Cabecera y nota en Minecrafter; el nombre y el certificado se quedan en la fuente legible.
+        fuente: FUENTE_MINECRAFT,
+      },
     },
     donacion: {
       etiqueta: { tipo: "DONACIÓN", acento: "#4a7fd1" },
@@ -1589,8 +1597,12 @@ export const PREMIUM = {
           | "tint"
         >
       >;
-      insert?: Partial<Record<"frame" | "frameShade" | "windowLine", string>>;
-      etiqueta: { tipo: string; acento: string };
+      insert?: Partial<
+        Record<"frame" | "frameShade" | "windowLine", string>
+      > & {
+        fondo?: "minecraft";
+      };
+      etiqueta: { tipo: string; acento: string; fuente?: string };
     }
   >,
   /**
