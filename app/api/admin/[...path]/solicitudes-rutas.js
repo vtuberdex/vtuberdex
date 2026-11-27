@@ -156,7 +156,7 @@ export async function revocarReclamoRuta(vtuberId, misionId, usuario) {
     return NextResponse.json({ error: "query_invalida" }, { status: 400 });
   }
   try {
-    const { grado, gradoPrevio } = await revocarReclamo(
+    const { grado, gradoPrevio, origenPrevio } = await revocarReclamo(
       await ejecutorDeSolicitudes(),
       { vtuberId: id, misionId },
     );
@@ -176,11 +176,11 @@ export async function revocarReclamoRuta(vtuberId, misionId, usuario) {
           tipo: OP_EDITAR,
           id,
           patch: {
-            // El origen anterior no se guarda: un grado previo vino de donación (el caso normal).
+            // Reclamos anteriores a guardar el origen no lo traen: se asume donación (el caso normal).
             premium:
               gradoPrevio === null
                 ? null
-                : { grade: gradoPrevio, origin: "donacion" },
+                : { grade: gradoPrevio, origin: origenPrevio ?? "donacion" },
           },
         },
         usuario,
