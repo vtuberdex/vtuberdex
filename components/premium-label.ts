@@ -185,12 +185,16 @@ function coloresDeEtiqueta(negra: boolean) {
   };
 }
 
-/** Rótulo de la banda: BLACK LABEL, DETERIORADA (grados 5…1) o PREMIUM. */
-function tipoDeEtiqueta(negra: boolean, degradada: boolean): string {
+/** Rótulo de la banda: BLACK LABEL y DETERIORADA (grados 5…1) mandan; si no, el tipo del origen del grado. */
+export function tipoDeEtiqueta(
+  negra: boolean,
+  degradada: boolean,
+  origen?: string | null,
+): string {
   if (negra) {
     return "BLACK LABEL";
   }
-  return degradada ? "DETERIORADA" : "PREMIUM";
+  return degradada ? "DETERIORADA" : marcoDe(origen).etiqueta.tipo;
 }
 
 /** Con el deterioro avanzado la bandera del país deja de imprimirse (`DETERIORO.hideCountryFrom`). */
@@ -230,8 +234,14 @@ function dibujarEtiqueta(
   ctx.clip();
   ctx.fillStyle = banda;
   ctx.fillRect(x, y, w, bandaH);
-  if (colores.line) {
-    ctx.fillStyle = colores.line;
+  // Filete bajo la banda: dorado en la Black Label; en el resto, el acento del origen (el marco se reconoce de un vistazo).
+  const filete =
+    colores.line ??
+    (esGradoDegradado(grade)
+      ? null
+      : marcoDe(datos.premium.origin).etiqueta.acento);
+  if (filete) {
+    ctx.fillStyle = filete;
     ctx.fillRect(x, y + bandaH, w, Math.max(2, h * 0.025));
   }
   ctx.restore();
@@ -246,7 +256,7 @@ function dibujarEtiqueta(
   ctx.font = `700 ${Math.round(bandaH * 0.4)}px ${FUENTE}`;
   const degradada = esGradoDegradado(grade);
   ctx.fillText(
-    tipoDeEtiqueta(negra, degradada),
+    tipoDeEtiqueta(negra, degradada, datos.premium.origin),
     x + w - pad,
     y + bandaH / 2 + 1,
   );

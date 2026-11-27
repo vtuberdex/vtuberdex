@@ -226,7 +226,7 @@ describe("hoja interior y etiqueta", () => {
     expect(grabador.textos).toEqual(
       expect.arrayContaining([
         "VTUBERDEX",
-        "PREMIUM",
+        "DONACIÓN",
         "MADKODING",
         expect.stringMatching(/^#016 · Chile · \d+ meses seguidos$/),
         "10",
@@ -250,7 +250,7 @@ describe("hoja interior y etiqueta", () => {
     expect(grabador.textos).toEqual(
       expect.arrayContaining(["BLACK LABEL", "10", "PRISTINE"]),
     );
-    expect(grabador.textos).not.toContain("PREMIUM");
+    expect(grabador.textos).not.toContain("DONACIÓN");
   });
 
   test("un grado intermedio muestra su nota tal cual", () => {
