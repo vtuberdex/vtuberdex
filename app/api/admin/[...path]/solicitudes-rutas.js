@@ -16,7 +16,7 @@ import {
 import {
   MisionError,
   listarReclamos,
-  misionPorId,
+  misionesTodas,
   revocarReclamo,
 } from "../../../../server/src/misiones.mjs";
 import { resumenDeRechazos } from "../../../../server/src/rechazos.mjs";
@@ -100,7 +100,11 @@ export async function rechazosRuta(request) {
 export async function reclamosDeMisionesRuta() {
   try {
     const db = await dbConDiario();
-    const filas = await listarReclamos(await ejecutorDeSolicitudes());
+    const ejecutor = await ejecutorDeSolicitudes();
+    const filas = await listarReclamos(ejecutor);
+    const nombres = new Map(
+      (await misionesTodas(ejecutor)).map((m) => [m.id, m.nombre]),
+    );
     const items = filas.map((f) => {
       const ficha = db
         .prepare("SELECT slug, name FROM vtuber WHERE id = ?")
@@ -116,7 +120,7 @@ export async function reclamosDeMisionesRuta() {
       }
       return {
         ...f,
-        mision: misionPorId(f.misionId)?.nombre ?? f.misionId,
+        mision: nombres.get(f.misionId) ?? f.misionId,
         slug: ficha?.slug ?? null,
         name: ficha?.name ?? `#${f.vtuberId}`,
         gradoActual: actual,
@@ -145,7 +149,10 @@ export async function reclamosDeMisionesRuta() {
  */
 export async function revocarReclamoRuta(vtuberId, misionId, usuario) {
   const id = Number(vtuberId);
-  if (!Number.isInteger(id) || !misionPorId(misionId)) {
+  const conocida = (await misionesTodas(await ejecutorDeSolicitudes())).some(
+    (m) => m.id === String(misionId),
+  );
+  if (!Number.isInteger(id) || !conocida) {
     return NextResponse.json({ error: "query_invalida" }, { status: 400 });
   }
   try {
@@ -169,7 +176,11 @@ export async function revocarReclamoRuta(vtuberId, misionId, usuario) {
           tipo: OP_EDITAR,
           id,
           patch: {
-            premium: gradoPrevio === null ? null : { grade: gradoPrevio },
+            // El origen anterior no se guarda: un grado previo vino de donación (el caso normal).
+            premium:
+              gradoPrevio === null
+                ? null
+                : { grade: gradoPrevio, origin: "donacion" },
           },
         },
         usuario,

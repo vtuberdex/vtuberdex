@@ -42,9 +42,9 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 #   export PATH=/home/madkoding/.nvm/versions/node/v22.23.3/bin:$PATH
 
 # Tests (desde la raíz)
-npm test                   # 997 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 1410 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
-cd server  && npm test     # 154 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
+cd server  && npm test     # 247 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
 
 # Linter (raíz; cubre también server/ y scraper/)
 npm run lint               # eslint . — falla con cualquier error
@@ -386,7 +386,7 @@ cada mes que sigue donando, hasta el 10 y luego la **Black Label**. Escala: `8 �
 - **La escala vive UNA vez**, en `server/src/premium.mjs` (JS puro, sin Node ni DOM). Validación
   (`validation.mjs`), regla (`mutations.mjs`), búsqueda (`search.mjs`) y cliente (`lib/premium.ts`
   la reexporta) la importan; no la copies. El grado es **texto** (`'BL'` no es un número).
-- **Datos**: tabla `premium (vtuber_id PK, grade, since, graded_at)`, sin CHECK de la escala (SQLite
+- **Datos**: tabla `premium (vtuber_id PK, grade, since, graded_at, origin)` (`origin` = método de obtención, ver «Marcos por origen»), sin CHECK de la escala (SQLite
   no deja alterarlo). Sin fila = carta normal. El certificado y el código de donación (`VTD-016` para la carta `#016`) se **derivan del número de dex**, no se guardan (antes del id interno, que no coincidía con lo visible; los códigos viejos de 6 dígitos se rechazan a propósito).
   Se edita por el mismo PATCH de siempre: `{ premium: { grade } }` o `{ premium: null }` (`aplicarParche`),
   así que **local (Express) y producción (diario de Turso) comparten la regla** sin código nuevo en las rutas.
@@ -489,6 +489,27 @@ calcula ni «procesar» una baja los aplica solo**.
   Una ficha con varios canales cobra una vez por tramo, y **un canal paga a una sola ficha** (la de id más bajo que lo declara: `sinCanalesRepetidos`). **YouTube NO paga**: revisar ~800 fichas gastaría las 10.000 unidades diarias en horas.
   Falta instalar el servicio en la VPS (como `vtuberdex-voces`) y definir las credenciales en `/etc/vtuberdex.env`. Perillas: `XP_DIRECTO_*` en
   `server/src/experiencia.mjs`.
+
+## Panel: eventos de XP, misiones editables y marcos por origen
+
+Tres añadidos del panel `/minecraft-admin` (solo admin) y de la carta. Todo queda con su autor.
+
+- **XP ADICIONAL (no gasta el tope diario)**: los motivos `MOTIVOS_SIN_TOPE` (`logro`, `evento`) de `server/src/minecraft.mjs` NO
+  entran en el tope diario por nivel: `sumarXp` parte el lote en la parte con tope (fila `<id>`) y la adicional (fila `<id>:extra`).
+  Mob/jefe/tiempo/entrega siguen topados. Las misiones pagan por `xp_mision`, que ya iba aparte. `XP_POR_LOTE_MAX` es 1.000.000 (cordura).
+- **Eventos globales y regalos** (`server/src/eventos-xp.mjs`, ruta `/api/minecraft-admin/eventos`, pestaña «Eventos de XP»): un evento
+  con fechas y multiplicador (>1, ≤10, ≤60 días) paga un bono `floor(sumado·(m−1))` en `xp_evento` (idempotente, `lote:evento`) tras cada
+  `recibirXp`; el regalo suma una vez una cantidad a TODAS las fichas con `vinculo_minecraft` (`regalo_xp` + `xp_manual`). `xpDeHoyTodas` incluye `xp_evento`.
+- **Misiones editables** (`server/src/misiones.mjs`, ruta `/api/minecraft-admin/misiones`, pestaña «Misiones»): `MISIONES` es la BASE;
+  `mision_config` guarda ajustes (campos, desactivar `activa:false`, o misión propia con id nuevo). `misionesVigentes(ejecutor)` es lo que usan
+  avances, ficha, reclamos, resumen y `/api/minecraft/reglas` (caché 60 s); `restablecerMision` quita el ajuste. El progreso nunca se borra.
+  `textoPropio` en la ficha: si el panel cambió nombre/descripción se muestra ese texto y no la traducción fija por id. Una misión propia
+  solo tiene texto en español.
+- **Marcos por origen**: `premium.origin` ∈ `ORIGENES` (`premium8` artistas · `misiones` Minecraft · `donacion`, el de por defecto y el de las
+  cartas anteriores). Se fija por el parche `{ premium: { grade, origin } }`; al subir de grado sin `origin` se conserva. Reclamar por misiones
+  lo fija a `misiones`; el mantenedor lo cambia en la fila de la pestaña Premium. `PREMIUM.marcos` (`card3d-config.ts`) redefine acrílico/hoja
+  por origen vía `marcoDe()`; hoy los tres están vacíos (mismo look) a la espera del diseño. Solo perillas existentes: no tocan samplers.
+  Al revocar un reclamo el grado previo vuelve con origen `donacion` (el origen anterior no se guarda).
 
 ## Rangos y misiones de Minecraft (XP y grado de carta)
 
@@ -609,7 +630,7 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
 - **La XP del juego es un dato más de la curva**: `experienciaConLikes(base, likes, xpJuego)` la suma como la de los likes; niveles,
   puntos y aviso de subida salen solos. `xpJuego` = `SUM(cantidad)` de `xp_juego` (incluida la de entregas) (ejecutor de `lib/solicitudes.mjs`), la leen la ficha
   pública, el like y «Mi ficha» (`xpJuegoDe` vale 0 si el almacén falla). El LISTADO no la aplica (tampoco los likes).
-- **Lotes idempotentes con tope en UNA sentencia**: lotes de ≤ `XP_POR_LOTE_MAX` (100) con `idLote` UUID fijado al crearlo (un
+- **Lotes idempotentes con tope en UNA sentencia**: lotes de ≤ `XP_POR_LOTE_MAX` (1.000.000: solo cordura; antes 100 y rechazaba las misiones de 1.500 XP) con `idLote` UUID fijado al crearlo (un
   reintento no suma dos veces); el INSERT recorta a lo que cabe en `XP_JUEGO_MAX_DIA` (600, día de Chile). Motivos: `MOTIVOS_XP`.
 - **Rutas**: `GET /api/minecraft/reglas` pública; `email`, `vincular`, `jugador/:uuid` (GET/DELETE), `xp` y `puntos` exigen `X-Minecraft-Token` =
   `VTUBERDEX_MINECRAFT_TOKEN` (≥16; sin él, 404). `POST /api/minecraft/puntos` `{ uuid, stat, cantidad? }` (1..50) gasta puntos de stats con `subirStat` (las mismas reglas que «Mi ficha»; lo usa la ventana `/vtd stats` del plugin) y responde `{ ok, aplicados, puntosStats }`; si se acaban a mitad, vale lo aplicado. «Mi ficha»: `POST /api/mi-ficha/minecraft`. No usan `responderRegistrando`.

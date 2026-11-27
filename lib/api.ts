@@ -358,6 +358,8 @@ export interface MisionVista {
   repetible: "diaria" | "semanal" | null;
   requisitos: Array<{ contador: string; etiqueta: string; meta: number; progreso: number }>;
   completada: boolean;
+  /** El panel cambió el nombre o la descripción (o es propia): se muestra ese texto y no la traducción fija. */
+  textoPropio?: boolean;
   /** Solo en las misiones de grado. */
   grado?: string;
   reclamada?: boolean;

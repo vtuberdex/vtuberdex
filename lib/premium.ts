@@ -25,13 +25,18 @@ import {
 } from "@/server/src/premium.mjs";
 
 import { esFichaDeteriorada as esFichaDeterioradaServidor } from "@/server/src/ficha-deteriorada.mjs";
-import type { PremiumGrade, PremiumInfo } from "@/lib/types";
+import type { PremiumGrade, PremiumInfo, PremiumOrigin } from "@/lib/types";
 
 export { hoy };
-export {
-  numeroDeCertificado,
-  rangoDeGrado,
-} from "@/server/src/premium.mjs";
+
+/** Los orígenes del grado, con el nombre que ve el mantenedor. */
+export const ORIGENES = ["premium8", "misiones", "donacion"] as const;
+export const NOMBRE_DE_ORIGEN: Record<PremiumOrigin, string> = {
+  premium8: "Gradeo Premium 8 (artistas)",
+  misiones: "Misiones de Minecraft",
+  donacion: "Donación",
+};
+export { numeroDeCertificado, rangoDeGrado } from "@/server/src/premium.mjs";
 
 /** La escala completa, de menor a mayor. */
 export const GRADOS = GRADOS_SERVIDOR as readonly PremiumGrade[];
@@ -109,12 +114,10 @@ export const mismoMes = (a: string, b: string = hoy()): boolean =>
 /** ¿Es una ficha deteriorada (grado 1, la de las bajas)? El público no ve sus datos ni su logo. */
 /** Una carta (con su `premium`) o directamente su grado. */
 export type CartaOGrado =
-  | { premium?: { grade: string } | null }
-  | string
-  | null
-  | undefined;
+  { premium?: { grade: string } | null } | string | null | undefined;
 
-export const esFichaDeteriorada = (cartaOGrado: CartaOGrado): boolean => esFichaDeterioradaServidor(cartaOGrado);
+export const esFichaDeteriorada = (cartaOGrado: CartaOGrado): boolean =>
+  esFichaDeterioradaServidor(cartaOGrado);
 
 /**
  * Grado con que se pinta una ficha sin correo, SIN placa (no es una carta premium). Es el 6 y no el 4: el 4 rompía

@@ -20,7 +20,8 @@ import {
   nombreDeGrado,
   textoDeRacha,
 } from "@/lib/premium";
-import type { PremiumGrade, VtuberCard } from "@/lib/types";
+import { NOMBRE_DE_ORIGEN, ORIGENES } from "@/lib/premium";
+import type { PremiumGrade, PremiumOrigin, VtuberCard } from "@/lib/types";
 import { PremiumBadge } from "@/components/premium-badge";
 import {
   Reason,
@@ -32,7 +33,7 @@ import {
 
 export type Guardar = (
   row: VtuberCard,
-  premium: { grade: PremiumGrade } | null,
+  premium: { grade: PremiumGrade; origin?: PremiumOrigin } | null,
   okText: string,
 ) => Promise<void>;
 
@@ -283,6 +284,31 @@ function PanelMas({
       </div>
 
       <div className="space-y-1">
+        <label className={labelClass}>
+          Origen del grado{" "}
+          <select
+            aria-label={`Origen del grado de ${row.name}`}
+            value={premium.origin ?? "donacion"}
+            disabled={busy}
+            onChange={(event) =>
+              guardar(
+                row,
+                {
+                  grade: premium.grade,
+                  origin: event.target.value as PremiumOrigin,
+                },
+                `${row.name}: origen ${NOMBRE_DE_ORIGEN[event.target.value as PremiumOrigin]}.`,
+              )
+            }
+            className={`${inputClass} w-56`}
+          >
+            {ORIGENES.map((origen) => (
+              <option key={origen} value={origen}>
+                {NOMBRE_DE_ORIGEN[origen]}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className={labelClass}>
           Fijar grado{" "}
           <select

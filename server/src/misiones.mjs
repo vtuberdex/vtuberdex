@@ -104,6 +104,12 @@ const DDL = `
     revocado     TEXT,
     PRIMARY KEY (vtuber_id, mision_id)
   );
+  CREATE TABLE IF NOT EXISTS mision_config (
+    id          TEXT PRIMARY KEY,
+    datos       TEXT NOT NULL,
+    actor       TEXT NOT NULL,
+    actualizado TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS mision_estado (
     vtuber_id  INTEGER NOT NULL,
     mision_id  TEXT NOT NULL,
@@ -116,6 +122,147 @@ const DDL = `
 const propias = preparadorDeTablas(DDL);
 async function conTablas(ejecutor) {
   return propias(await prepararTablasMinecraft(ejecutor));
+}
+
+
+/* ------------------------------------------------------------- misiones editables */
+
+/**
+ * MISIONES EDITABLES DESDE EL PANEL
+ * El catálogo de arriba es la base. El panel guarda ajustes en `mision_config` (una fila por misión, con quién y cuándo):
+ * sobre una del catálogo cambian campos o la desactivan (`activa: false`); con un id nuevo crean una propia. Quitar la fila
+ * devuelve la de catálogo a su valor original (y borra una propia). Nada se borra del progreso de nadie: desactivar solo la
+ * oculta y deja de contarle avances.
+ */
+const CAMPOS_EDITABLES = ['nombre', 'descripcion', 'xp', 'requisitos', 'repetible', 'grado', 'tipo', 'activa'];
+const ID_MISION = /^[a-z0-9][a-z0-9.-]{1,39}$/;
+export const XP_MISION_MAX = 1_000_000;
+export const META_MAX = 100_000_000;
+
+/** Devuelve `null` si la misión es válida, o `{ error, detail }` con el motivo. */
+export function validarMision(m) {
+  const texto = (v, min, max) => typeof v === 'string' && v.trim().length >= min && v.trim().length <= max && !/\p{Cc}/u.test(v);
+  if (!ID_MISION.test(String(m.id))) {
+    return { error: 'id_invalido', detail: 'minúsculas, números, puntos y guiones (2 a 40)' };
+  }
+  if (!texto(m.nombre, 3, 60)) {
+    return { error: 'nombre_invalido', detail: 'entre 3 y 60 caracteres, en una línea' };
+  }
+  if (!texto(m.descripcion, 3, 200)) {
+    return { error: 'descripcion_invalida', detail: 'entre 3 y 200 caracteres, en una línea' };
+  }
+  if (m.tipo !== 'secundaria' && m.tipo !== 'grado') {
+    return { error: 'tipo_invalido', detail: 'secundaria o grado' };
+  }
+  if (!['diaria', 'semanal', null].includes(m.repetible)) {
+    return { error: 'repetible_invalido', detail: 'diaria, semanal o única (null)' };
+  }
+  if (!Number.isInteger(m.xp) || m.xp < 0 || m.xp > XP_MISION_MAX) {
+    return { error: 'xp_invalida', detail: `un entero de 0 a ${XP_MISION_MAX}` };
+  }
+  const pares = m.requisitos && typeof m.requisitos === 'object' && !Array.isArray(m.requisitos) ? Object.entries(m.requisitos) : [];
+  if (!pares.length || pares.some(([c, meta]) => !(c in CONTADORES) || !Number.isInteger(meta) || meta < 1 || meta > META_MAX)) {
+    return { error: 'requisitos_invalidos', detail: `al menos un contador conocido con una meta entera de 1 a ${META_MAX}` };
+  }
+  if (m.tipo === 'grado') {
+    if (m.repetible !== null) {
+      return { error: 'repetible_invalido', detail: 'una misión de grado es única' };
+    }
+    const i = GRADOS.indexOf(String(m.grado));
+    if (i < 0 || i > GRADOS.indexOf(GRADO_MAXIMO_POR_MISIONES)) {
+      return { error: 'grado_invalido', detail: `un grado de ${GRADOS[0]} a ${GRADO_MAXIMO_POR_MISIONES}` };
+    }
+  }
+  return null;
+}
+
+/** Aplica un ajuste sobre la base (o arma la propia). Devuelve `{ mision }` o `{ fallo }`. */
+function fusionar(id, base, datos) {
+  const m = { id, repetible: null, xp: 0, ...(base ?? {}) };
+  for (const campo of CAMPOS_EDITABLES) {
+    if (campo in datos) {
+      m[campo] = datos[campo];
+    }
+  }
+  if (m.tipo !== 'grado') {
+    delete m.grado;
+  }
+  const activa = m.activa !== false;
+  delete m.activa;
+  const fallo = validarMision(m);
+  return fallo ? { fallo } : { mision: Object.freeze({ ...m, activa, propia: !base }) };
+}
+
+/** Todas las misiones con los ajustes aplicados (también las desactivadas, con `activa: false`). */
+export async function misionesTodas(ejecutor) {
+  const e = await conTablas(ejecutor);
+  const { rows } = await e.execute('SELECT id, datos FROM mision_config');
+  const ajustes = new Map();
+  for (const r of rows) {
+    try {
+      ajustes.set(String(r.id), JSON.parse(String(r.datos)));
+    } catch {
+      /* un ajuste ilegible se ignora: la misión vuelve a su valor de catálogo */
+    }
+  }
+  const lista = MISIONES.map((b) => fusionar(b.id, b, ajustes.get(b.id) ?? {}).mision ?? Object.freeze({ ...b, activa: true, propia: false }));
+  for (const [id, datos] of ajustes) {
+    const propia = porId.has(id) ? null : fusionar(id, null, datos).mision;
+    if (propia) {
+      lista.push(propia);
+    }
+  }
+  return lista;
+}
+
+/** Las que cuentan hoy: las activas. */
+export async function misionesVigentes(ejecutor) {
+  return (await misionesTodas(ejecutor)).filter((m) => m.activa);
+}
+
+/** Una misión activa por id, con los ajustes aplicados; `null` si no existe o está desactivada. */
+export async function misionVigentePorId(ejecutor, id) {
+  return (await misionesVigentes(ejecutor)).find((m) => m.id === String(id)) ?? null;
+}
+
+/**
+ * Guarda el ajuste de UNA misión: de catálogo basta con lo que cambia; una nueva necesita todos los campos.
+ * @returns {Promise<{ ok: true, mision: object } | { ok: false, status: number, cuerpo: object }>}
+ */
+export async function guardarMision(ejecutor, { id, cambios, actor, ahora = Date.now() }) {
+  const clave = String(id ?? '');
+  const quien = String(actor ?? '').trim();
+  if (!quien) {
+    return { ok: false, status: 400, cuerpo: { error: 'actor_invalido' } };
+  }
+  const base = porId.get(clave) ?? null;
+  const datos = {};
+  for (const campo of CAMPOS_EDITABLES) {
+    if (cambios && campo in cambios) {
+      datos[campo] = cambios[campo];
+    }
+  }
+  if (base && 'tipo' in datos && datos.tipo !== base.tipo) {
+    return { ok: false, status: 400, cuerpo: { error: 'tipo_invalido', detail: 'no se cambia el tipo de una misión del catálogo' } };
+  }
+  const { mision, fallo } = fusionar(clave, base, datos);
+  if (!mision) {
+    return { ok: false, status: 400, cuerpo: fallo };
+  }
+  const e = await conTablas(ejecutor);
+  await e.execute(
+    `INSERT INTO mision_config (id, datos, actor, actualizado) VALUES (?, ?, ?, ?)
+       ON CONFLICT (id) DO UPDATE SET datos = excluded.datos, actor = excluded.actor, actualizado = excluded.actualizado`,
+    [clave, JSON.stringify(datos), quien, new Date(ahora).toISOString()],
+  );
+  return { ok: true, mision };
+}
+
+/** Quita el ajuste: la de catálogo vuelve a su valor original y una propia se elimina (su progreso queda guardado). */
+export async function restablecerMision(ejecutor, { id }) {
+  const e = await conTablas(ejecutor);
+  const r = await e.execute('DELETE FROM mision_config WHERE id = ?', [String(id)]);
+  return Number(r.rowsAffected ?? 0) > 0;
 }
 
 const DIA = /^\d{4}-\d{2}-\d{2}$/;
@@ -241,7 +388,7 @@ export async function registrarAvances(ejecutor, { vtuberId, idLote, avances, di
   }
 
   const completadas = [];
-  for (const mision of MISIONES) {
+  for (const mision of await misionesVigentes(e)) {
     const tocados = Object.keys(mision.requisitos).filter((c) => c in limpio);
     if (tocados.length && (await avanzarMision(e, { id, mision, tocados, limpio, dia, ahora }))) {
       completadas.push({ id: mision.id, nombre: mision.nombre, tipo: mision.tipo, xp: mision.xp, ...(mision.grado ? { grado: mision.grado } : {}) });
@@ -287,7 +434,8 @@ export async function misionesDeFicha(ejecutor, { vtuberId, dia, gradoActual = n
     e.execute('SELECT mision_id, periodo, contador, progreso FROM mision_progreso WHERE vtuber_id = ?', [id]),
     e.execute('SELECT mision_id, periodo, completada, reclamada FROM mision_estado WHERE vtuber_id = ?', [id]),
   ]);
-  const vista = MISIONES.map((m) => {
+  const vigentes = await misionesVigentes(e);
+  const vista = vigentes.map((m) => {
     const periodo = periodoDe(m, dia);
     const estado = estados.rows.find((r) => r.mision_id === m.id && r.periodo === periodo);
     const mias = progresos.rows.filter((r) => r.mision_id === m.id && r.periodo === periodo);
@@ -297,6 +445,8 @@ export async function misionesDeFicha(ejecutor, { vtuberId, dia, gradoActual = n
       tipo: m.tipo,
       nombre: m.nombre,
       descripcion: m.descripcion,
+      // Las traducciones fijas son del texto de catálogo: si el panel lo cambió (o es propia) manda el texto del panel.
+      textoPropio: m.propia || m.nombre !== porId.get(m.id)?.nombre || m.descripcion !== porId.get(m.id)?.descripcion,
       xp: m.xp,
       repetible: m.repetible,
       requisitos: Object.entries(m.requisitos).map(([contador, meta]) => ({
@@ -328,7 +478,7 @@ export async function misionesDeFicha(ejecutor, { vtuberId, dia, gradoActual = n
  * La marca va PRIMERO y es un UPDATE condicional: dos clics a la vez no reclaman dos veces.
  */
 export async function reclamarGrado(ejecutor, { vtuberId, misionId, gradoActual = null, ahora = Date.now() }) {
-  const mision = misionPorId(misionId);
+  const mision = await misionVigentePorId(ejecutor, misionId);
   if (mision?.tipo !== 'grado') {
     throw new MisionError(404, 'mision_no_encontrada', 'Esa misión no existe o no da un grado.');
   }
@@ -420,7 +570,7 @@ export async function resumenDeMisiones(ejecutor) {
   const hechas = new Set(
     (await e.execute("SELECT vtuber_id, mision_id FROM mision_estado WHERE periodo = 'unica'")).rows.map((r) => `${r.vtuber_id}:${r.mision_id}`),
   );
-  return MISIONES.map((m) => {
+  return (await misionesVigentes(e)).map((m) => {
     const fila = estados.rows.find((r) => r.mision_id === m.id);
     const avances = new Map();
     for (const r of progresos.rows) {
