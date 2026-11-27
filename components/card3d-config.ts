@@ -1531,16 +1531,50 @@ export const PREMIUM = {
    *   · misiones   Gradeo por Misiones de Minecraft.
    *   · donacion   Gradeo por Donación (también el de las cartas anteriores a esta distinción).
    *
-   * Cada marco REDEFINE solo lo que quiera sobre `acrylic` (el acrílico) e `insert` (la hoja interior);
-   * lo que no menciona se hereda. Hoy los tres están vacíos a propósito: el diseño es de quien los dibuja y,
-   * mientras no se rellenen, las cartas se ven exactamente igual que antes. Solo valen perillas que ya existen
-   * (colores y números): no añaden samplers ni uniformes nuevos, así que no tocan el presupuesto de los shaders.
-   * Ejemplo: `misiones: { acrylic: { tint: "#b8f2c0" }, insert: { frame: "#dff3e2" } }`.
+   * Cada marco REDEFINE lo que quiera sobre `acrylic` (el acrílico) e `insert` (la hoja interior) y define su
+   * `etiqueta`: el rótulo del tipo (en la banda de arriba) y un `acento`, el filete de color que la subraya. Lo que no
+   * redefine se hereda. Solo valen perillas que ya existen (colores y números): no añaden samplers ni uniformes nuevos,
+   * así que no tocan el presupuesto de los shaders. La banda de la etiqueta sigue siendo del GRADO (azul 8, acero 9, oro 10…):
+   * el origen se lee en el acrílico, la hoja, el filete y el rótulo, nunca pisando el color del grado.
+   *
+   * Reglas para que se distingan aun con la carta inclinada: tonos separados (dorado / esmeralda / azul), no tamaños ni capas.
+   *   · premium8   DORADO cálido, el más brillante: pieza de colección, exclusiva de artistas.
+   *   · misiones   ESMERALDA, más sobrio: «ganado jugando» en el servidor.
+   *   · donacion   AZUL frío: el acrílico de siempre; las cartas existentes lo conservan.
    */
   marcos: {
-    premium8: {},
-    misiones: {},
-    donacion: {},
+    premium8: {
+      acrylic: {
+        tint: "#ffe2a0",
+        edge: 0.8,
+        fresnel: 0.66,
+        shineStrength: 0.55,
+        bandStrength: 0.32,
+      },
+      insert: {
+        frame: "#f4e7c3",
+        frameShade: "#d9c183",
+        windowLine: "#c9a24a",
+      },
+      etiqueta: { tipo: "PREMIUM 8", acento: "#c9a24a" },
+    },
+    misiones: {
+      acrylic: {
+        tint: "#b4f0cb",
+        edge: 0.55,
+        fresnel: 0.52,
+        bandStrength: 0.22,
+      },
+      insert: {
+        frame: "#e1efe5",
+        frameShade: "#b6d1bf",
+        windowLine: "#3f9d6b",
+      },
+      etiqueta: { tipo: "MISIONES", acento: "#2fae6d" },
+    },
+    donacion: {
+      etiqueta: { tipo: "DONACIÓN", acento: "#4a7fd1" },
+    },
   } as Record<
     "premium8" | "misiones" | "donacion",
     {
@@ -1556,6 +1590,7 @@ export const PREMIUM = {
         >
       >;
       insert?: Partial<Record<"frame" | "frameShade" | "windowLine", string>>;
+      etiqueta: { tipo: string; acento: string };
     }
   >,
   /**
@@ -1604,6 +1639,7 @@ export function marcoDe(origen: string | null | undefined) {
   return {
     acrylic: { ...PREMIUM.acrylic, ...propio.acrylic },
     insert: { ...PREMIUM.insert, ...propio.insert },
+    etiqueta: propio.etiqueta,
   };
 }
 

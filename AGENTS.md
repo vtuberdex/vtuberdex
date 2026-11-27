@@ -507,8 +507,10 @@ Tres añadidos del panel `/minecraft-admin` (solo admin) y de la carta. Todo que
   solo tiene texto en español.
 - **Marcos por origen**: `premium.origin` ∈ `ORIGENES` (`premium8` artistas · `misiones` Minecraft · `donacion`, el de por defecto y el de las
   cartas anteriores). Se fija por el parche `{ premium: { grade, origin } }`; al subir de grado sin `origin` se conserva. Reclamar por misiones
-  lo fija a `misiones`; el mantenedor lo cambia en la fila de la pestaña Premium. `PREMIUM.marcos` (`card3d-config.ts`) redefine acrílico/hoja
-  por origen vía `marcoDe()`; hoy los tres están vacíos (mismo look) a la espera del diseño. Solo perillas existentes: no tocan samplers.
+  lo fija a `misiones`; el mantenedor lo cambia en la fila de la pestaña Premium. `PREMIUM.marcos` (`card3d-config.ts`) redefine acrílico, hoja
+  interior y `etiqueta` (rótulo del tipo y filete de acento) por origen vía `marcoDe()`: `premium8` dorado («PREMIUM 8»), `misiones` esmeralda
+  («MISIONES»), `donacion` azul («DONACIÓN», sin origen = donación). La banda sigue siendo del GRADO; BLACK LABEL y DETERIORADA mandan sobre el rótulo.
+  Solo perillas existentes: no tocan samplers. Diseño propuesto por Claude: ajustable tocando solo esa tabla.
   Al revocar un reclamo el grado previo vuelve con su origen (`mision_reclamo.origen_previo`; los reclamos anteriores a esa columna vuelven como `donacion`).
 
 ## Rangos y misiones de Minecraft (XP y grado de carta)
