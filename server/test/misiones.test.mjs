@@ -160,9 +160,9 @@ test('un reclamo deja rastro con el grado anterior, se puede revocar una vez y n
   }
   await reclamarGrado(e, { vtuberId: 7, misionId: 'grado-7', gradoActual: '6' });
   const [reclamo] = await listarReclamos(e);
-  assert.deepEqual({ ...reclamo, reclamado: undefined }, { vtuberId: 7, misionId: 'grado-7', grado: '7', gradoPrevio: '6', reclamado: undefined, revocado: null });
+  assert.deepEqual({ ...reclamo, reclamado: undefined }, { vtuberId: 7, misionId: 'grado-7', grado: '7', gradoPrevio: '6', origenPrevio: null, reclamado: undefined, revocado: null });
 
-  assert.deepEqual(await revocarReclamo(e, { vtuberId: 7, misionId: 'grado-7' }), { grado: '7', gradoPrevio: '6' });
+  assert.deepEqual(await revocarReclamo(e, { vtuberId: 7, misionId: 'grado-7' }), { grado: '7', gradoPrevio: '6', origenPrevio: null });
   assert.equal((await error(revocarReclamo(e, { vtuberId: 7, misionId: 'grado-7' }))).code, 'reclamo_no_encontrado');
   assert.ok((await listarReclamos(e))[0].revocado);
   // Revocado, la misión sigue reclamada: no hay forma de volver a pedir el grado.
@@ -234,4 +234,24 @@ test('grado-8: exige 6000 de minería y 100000 de distancia, alcanzables con el 
   assert.ok(g8.requisitos.distancia < 500000);
   const g7 = MISIONES.find((m) => m.id === 'grado-7');
   assert.ok(g8.requisitos.distancia >= g7.requisitos.distancia, 'el 8 no pide menos distancia que el 7');
+});
+
+test('el reclamo guarda el origen que tenía el grado previo y revocar lo devuelve', async () => {
+  const e = nuevo();
+  const g7 = MISIONES.find((m) => m.id === 'grado-7');
+  for (const [contador, meta] of Object.entries(g7.requisitos)) {
+    for (let hecho = 0; hecho < meta; hecho += AVANCE_POR_LOTE_MAX) {
+      await registrarAvances(e, lote({ [contador]: Math.min(AVANCE_POR_LOTE_MAX, meta - hecho) }));
+    }
+  }
+  await reclamarGrado(e, { vtuberId: 7, misionId: 'grado-7', gradoActual: '6', origenActual: 'premium8' });
+  assert.deepEqual(await revocarReclamo(e, { vtuberId: 7, misionId: 'grado-7' }), { grado: '7', gradoPrevio: '6', origenPrevio: 'premium8' });
+});
+
+test('una base con la tabla de reclamos anterior (sin origen_previo) se actualiza sola', async () => {
+  const db = new DatabaseSync(':memory:');
+  db.exec('CREATE TABLE mision_reclamo (vtuber_id INTEGER NOT NULL, mision_id TEXT NOT NULL, grado TEXT NOT NULL, grado_previo TEXT, reclamado TEXT NOT NULL, revocado TEXT, PRIMARY KEY (vtuber_id, mision_id))');
+  const e = ejecutorSqlite(db);
+  assert.deepEqual(await listarReclamos(e), []);
+  assert.ok(db.prepare('PRAGMA table_info(mision_reclamo)').all().some((c) => c.name === 'origen_previo'));
 });

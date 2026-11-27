@@ -509,7 +509,7 @@ Tres añadidos del panel `/minecraft-admin` (solo admin) y de la carta. Todo que
   cartas anteriores). Se fija por el parche `{ premium: { grade, origin } }`; al subir de grado sin `origin` se conserva. Reclamar por misiones
   lo fija a `misiones`; el mantenedor lo cambia en la fila de la pestaña Premium. `PREMIUM.marcos` (`card3d-config.ts`) redefine acrílico/hoja
   por origen vía `marcoDe()`; hoy los tres están vacíos (mismo look) a la espera del diseño. Solo perillas existentes: no tocan samplers.
-  Al revocar un reclamo el grado previo vuelve con origen `donacion` (el origen anterior no se guarda).
+  Al revocar un reclamo el grado previo vuelve con su origen (`mision_reclamo.origen_previo`; los reclamos anteriores a esa columna vuelven como `donacion`).
 
 ## Rangos y misiones de Minecraft (XP y grado de carta)
 

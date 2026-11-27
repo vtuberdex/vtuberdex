@@ -100,6 +100,7 @@ const DDL = `
     mision_id    TEXT NOT NULL,
     grado        TEXT NOT NULL,
     grado_previo TEXT,
+    origen_previo TEXT,
     reclamado    TEXT NOT NULL,
     revocado     TEXT,
     PRIMARY KEY (vtuber_id, mision_id)
@@ -120,8 +121,23 @@ const DDL = `
   );
 `;
 const propias = preparadorDeTablas(DDL);
+const columnasAnadidas = new WeakMap();
 async function conTablas(ejecutor) {
-  return propias(await prepararTablasMinecraft(ejecutor));
+  const e = await propias(await prepararTablasMinecraft(ejecutor));
+  // `CREATE TABLE IF NOT EXISTS` no añade columnas a una tabla que ya existe: una base anterior al origen la recibe aquí.
+  if (!columnasAnadidas.has(ejecutor)) {
+    columnasAnadidas.set(
+      ejecutor,
+      Promise.resolve(e.execute('ALTER TABLE mision_reclamo ADD COLUMN origen_previo TEXT')).catch((error) => {
+        if (!/duplicate column name/i.test(String(error?.message ?? error))) {
+          columnasAnadidas.delete(ejecutor);
+          throw error;
+        }
+      }),
+    );
+  }
+  await columnasAnadidas.get(ejecutor);
+  return e;
 }
 
 
@@ -477,7 +493,7 @@ export async function misionesDeFicha(ejecutor, { vtuberId, dia, gradoActual = n
  * aplica el grado a la carta y, si eso falla, llama a `soltarReclamo` para que se pueda reintentar.
  * La marca va PRIMERO y es un UPDATE condicional: dos clics a la vez no reclaman dos veces.
  */
-export async function reclamarGrado(ejecutor, { vtuberId, misionId, gradoActual = null, ahora = Date.now() }) {
+export async function reclamarGrado(ejecutor, { vtuberId, misionId, gradoActual = null, origenActual = null, ahora = Date.now() }) {
   const mision = await misionVigentePorId(ejecutor, misionId);
   if (mision?.tipo !== 'grado') {
     throw new MisionError(404, 'mision_no_encontrada', 'Esa misión no existe o no da un grado.');
@@ -503,9 +519,9 @@ export async function reclamarGrado(ejecutor, { vtuberId, misionId, gradoActual 
   }
   // El rastro del reclamo (con el grado que tenía antes) es lo que permite al mantenedor revisarlo y revocarlo.
   await e.execute(
-    `INSERT INTO mision_reclamo (vtuber_id, mision_id, grado, grado_previo, reclamado) VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT (vtuber_id, mision_id) DO UPDATE SET grado = excluded.grado, grado_previo = excluded.grado_previo, reclamado = excluded.reclamado, revocado = NULL`,
-    [Number(vtuberId), mision.id, mision.grado, gradoActual == null || gradoActual === '' ? null : String(gradoActual), new Date(ahora).toISOString()],
+    `INSERT INTO mision_reclamo (vtuber_id, mision_id, grado, grado_previo, origen_previo, reclamado) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (vtuber_id, mision_id) DO UPDATE SET grado = excluded.grado, grado_previo = excluded.grado_previo, origen_previo = excluded.origen_previo, reclamado = excluded.reclamado, revocado = NULL`,
+    [Number(vtuberId), mision.id, mision.grado, gradoActual == null || gradoActual === '' ? null : String(gradoActual), gradoActual == null || gradoActual === '' || !origenActual ? null : String(origenActual), new Date(ahora).toISOString()],
   );
   return { grado: mision.grado, mision: mision.id };
 }
@@ -514,13 +530,14 @@ export async function reclamarGrado(ejecutor, { vtuberId, misionId, gradoActual 
 export async function listarReclamos(ejecutor) {
   const e = await conTablas(ejecutor);
   const { rows } = await e.execute(
-    'SELECT vtuber_id, mision_id, grado, grado_previo, reclamado, revocado FROM mision_reclamo ORDER BY reclamado DESC',
+    'SELECT vtuber_id, mision_id, grado, grado_previo, origen_previo, reclamado, revocado FROM mision_reclamo ORDER BY reclamado DESC',
   );
   return rows.map((r) => ({
     vtuberId: Number(r.vtuber_id),
     misionId: String(r.mision_id),
     grado: String(r.grado),
     gradoPrevio: r.grado_previo == null ? null : String(r.grado_previo),
+    origenPrevio: r.origen_previo == null ? null : String(r.origen_previo),
     reclamado: String(r.reclamado),
     revocado: r.revocado == null ? null : String(r.revocado),
   }));
@@ -530,7 +547,7 @@ export async function listarReclamos(ejecutor) {
  * Revoca un reclamo: lo marca (UPDATE condicional, una sola vez) y devuelve qué grado quitar y a cuál volver. La misión
  * sigue completada y reclamada: quien abusó no puede volver a reclamarla. Aplicar el cambio a la carta lo hace quien llama,
  * y solo si la carta todavía lleva ese grado (si una donación la subió después, no se toca).
- * @returns {Promise<{ grado: string, gradoPrevio: string | null }>}
+ * @returns {Promise<{ grado: string, gradoPrevio: string | null, origenPrevio: string | null }>}
  */
 export async function revocarReclamo(ejecutor, { vtuberId, misionId, ahora = Date.now() }) {
   const e = await conTablas(ejecutor);
@@ -541,8 +558,12 @@ export async function revocarReclamo(ejecutor, { vtuberId, misionId, ahora = Dat
   if (!Number(r.rowsAffected ?? 0)) {
     throw new MisionError(404, 'reclamo_no_encontrado', 'No hay un reclamo vigente de esa misión.');
   }
-  const { rows } = await e.execute('SELECT grado, grado_previo FROM mision_reclamo WHERE vtuber_id = ? AND mision_id = ?', [Number(vtuberId), String(misionId)]);
-  return { grado: String(rows[0].grado), gradoPrevio: rows[0].grado_previo == null ? null : String(rows[0].grado_previo) };
+  const { rows } = await e.execute('SELECT grado, grado_previo, origen_previo FROM mision_reclamo WHERE vtuber_id = ? AND mision_id = ?', [Number(vtuberId), String(misionId)]);
+  return {
+    grado: String(rows[0].grado),
+    gradoPrevio: rows[0].grado_previo == null ? null : String(rows[0].grado_previo),
+    origenPrevio: rows[0].origen_previo == null ? null : String(rows[0].origen_previo),
+  };
 }
 
 /** Deshace la marca de `reclamarGrado` (el grado no se pudo aplicar a la carta). */
