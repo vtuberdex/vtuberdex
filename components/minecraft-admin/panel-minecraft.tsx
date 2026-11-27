@@ -30,6 +30,7 @@ import {
 import { EspacioArchivos } from "./ide/espacio-archivos";
 import { SeccionConsola } from "./seccion-consola";
 import { SeccionEventos } from "./seccion-eventos";
+import { SeccionMisiones } from "./seccion-misiones";
 import { SeccionExperiencia } from "./seccion-experiencia";
 import { CLASE_BOTON, CLASE_CAMPO, CLASE_TARJETA, Pildora } from "./ui";
 
@@ -50,7 +51,7 @@ type Estado = {
 };
 
 type Sesion = "comprobando" | "dentro" | "fuera";
-type Pestana = "servidor" | "archivos" | "experiencia" | "eventos";
+type Pestana = "servidor" | "archivos" | "experiencia" | "eventos" | "misiones";
 
 /**
  * Tres pestañas: la consola se unió a «Servidor» (registro, comandos y moderación en el mismo
@@ -63,6 +64,7 @@ const PESTANAS: { id: Pestana; titulo: string }[] = [
   { id: "archivos", titulo: "Archivos y plugins" },
   { id: "experiencia", titulo: "Experiencia" },
   { id: "eventos", titulo: "Eventos de XP" },
+  { id: "misiones", titulo: "Misiones" },
 ];
 
 /** Puntos que guardan las gráficas (5 s × 36 = 3 minutos). */
@@ -290,7 +292,11 @@ function BarraLateral({
         className="flex gap-1 overflow-x-auto rounded-2xl border border-dex-line bg-dex-panel/60 p-1.5 lg:flex-col lg:overflow-visible"
       >
         {PESTANAS.filter(
-          (p) => esAdmin || (p.id !== "experiencia" && p.id !== "eventos"),
+          (p) =>
+            esAdmin ||
+            (p.id !== "experiencia" &&
+              p.id !== "eventos" &&
+              p.id !== "misiones"),
         ).map((p) => (
           <BotonDePestana
             key={p.id}
@@ -602,6 +608,7 @@ export function PanelMinecraftAdmin() {
     archivos: <EspacioArchivos />,
     experiencia: esAdmin ? <SeccionExperiencia /> : null,
     eventos: esAdmin ? <SeccionEventos /> : null,
+    misiones: esAdmin ? <SeccionMisiones /> : null,
   };
 
   if (sesion === "comprobando") {

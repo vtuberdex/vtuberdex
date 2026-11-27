@@ -273,7 +273,9 @@ export function SeccionStats({
 
 /** Las claves de misiones y contadores que existen en los textos (es es la fuente de claves). */
 const TEXTOS_MISION = new Set<string>(
-  Object.keys(miFichaEs).filter((k) => k.startsWith("mision.") || k.startsWith("contador.")),
+  Object.keys(miFichaEs).filter(
+    (k) => k.startsWith("mision.") || k.startsWith("contador."),
+  ),
 );
 
 /** Nombre, descripción y etiquetas se traducen por id; si el servidor trae una misión que esta versión no conoce, sale su texto en español. */
@@ -300,7 +302,9 @@ function BarrasDeMision({ mision }: Readonly<{ mision: MisionVista }>) {
           <div className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full bg-dex-accent"
-              style={{ width: `${Math.min(100, (r.progreso / r.meta) * 100)}%` }}
+              style={{
+                width: `${Math.min(100, (r.progreso / r.meta) * 100)}%`,
+              }}
             />
           </div>
         </li>
@@ -320,7 +324,7 @@ function MisionSecundaria({ mision: m }: Readonly<{ mision: MisionVista }>) {
     >
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="font-semibold text-dex-ink">
-          {texto(`mision.${m.id}.nombre`, m.nombre)}
+          {m.textoPropio ? m.nombre : texto(`mision.${m.id}.nombre`, m.nombre)}
           {m.repetible && (
             <span className="ml-2 text-[11px] font-normal text-dex-muted">
               {m.repetible === "semanal"
@@ -336,7 +340,9 @@ function MisionSecundaria({ mision: m }: Readonly<{ mision: MisionVista }>) {
         </span>
       </div>
       <p className="text-xs text-dex-muted">
-        {texto(`mision.${m.id}.descripcion`, m.descripcion)}
+        {m.textoPropio
+          ? m.descripcion
+          : texto(`mision.${m.id}.descripcion`, m.descripcion)}
       </p>
       {!m.completada && <BarrasDeMision mision={m} />}
     </li>
@@ -477,7 +483,7 @@ function MisionDeGrado({
     >
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="font-semibold text-dex-ink">
-          {texto(`mision.${m.id}.nombre`, m.nombre)}
+          {m.textoPropio ? m.nombre : texto(`mision.${m.id}.nombre`, m.nombre)}
         </span>
         {m.reclamada && (
           <span className="font-mono text-xs text-dex-accent">
@@ -486,7 +492,9 @@ function MisionDeGrado({
         )}
       </div>
       <p className="text-xs text-dex-muted">
-        {texto(`mision.${m.id}.descripcion`, m.descripcion)}
+        {m.textoPropio
+          ? m.descripcion
+          : texto(`mision.${m.id}.descripcion`, m.descripcion)}
       </p>
       {!m.completada && <BarrasDeMision mision={m} />}
       <AccionDeGrado
