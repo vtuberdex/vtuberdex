@@ -65,8 +65,12 @@ import { preparadorDeTablas } from "./db/tablas.mjs";
 
 /** Vida del código de vínculo. */
 export const CODIGO_TTL_MS = 10 * 60 * 1000;
-/** XP máxima de un lote. El plugin manda cada ~30 s: más que esto en un lote es un plugin roto o trucado. */
-export const XP_POR_LOTE_MAX = 100;
+/**
+ * XP máxima de un lote. Antes eran 100 (el plugin manda cada ~30 s), pero las misiones del juego pagan 1.500 XP o más y un
+ * lote de esa quest se rechazaba con `lote_excesivo`. Hoy es solo una barrera de cordura contra un plugin roto; lo que
+ * limita de verdad lo ganado es el tope DIARIO (`topeXpJuegoDia`), que se aplica en la misma sentencia del INSERT.
+ */
+export const XP_POR_LOTE_MAX = 1_000_000;
 /** De dónde sale la XP: lista cerrada (se guarda el desglose para poder ajustar después lo que vale cada cosa). */
 export const MOTIVOS_XP = Object.freeze([
   "mob",

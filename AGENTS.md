@@ -609,7 +609,7 @@ PROPIA y lo ganado suma experiencia en la web. **La web es la fuente de la verda
 - **La XP del juego es un dato más de la curva**: `experienciaConLikes(base, likes, xpJuego)` la suma como la de los likes; niveles,
   puntos y aviso de subida salen solos. `xpJuego` = `SUM(cantidad)` de `xp_juego` (incluida la de entregas) (ejecutor de `lib/solicitudes.mjs`), la leen la ficha
   pública, el like y «Mi ficha» (`xpJuegoDe` vale 0 si el almacén falla). El LISTADO no la aplica (tampoco los likes).
-- **Lotes idempotentes con tope en UNA sentencia**: lotes de ≤ `XP_POR_LOTE_MAX` (100) con `idLote` UUID fijado al crearlo (un
+- **Lotes idempotentes con tope en UNA sentencia**: lotes de ≤ `XP_POR_LOTE_MAX` (1.000.000: solo cordura; antes 100 y rechazaba las misiones de 1.500 XP) con `idLote` UUID fijado al crearlo (un
   reintento no suma dos veces); el INSERT recorta a lo que cabe en `XP_JUEGO_MAX_DIA` (600, día de Chile). Motivos: `MOTIVOS_XP`.
 - **Rutas**: `GET /api/minecraft/reglas` pública; `email`, `vincular`, `jugador/:uuid` (GET/DELETE), `xp` y `puntos` exigen `X-Minecraft-Token` =
   `VTUBERDEX_MINECRAFT_TOKEN` (≥16; sin él, 404). `POST /api/minecraft/puntos` `{ uuid, stat, cantidad? }` (1..50) gasta puntos de stats con `subirStat` (las mismas reglas que «Mi ficha»; lo usa la ventana `/vtd stats` del plugin) y responde `{ ok, aplicados, puntosStats }`; si se acaban a mitad, vale lo aplicado. «Mi ficha»: `POST /api/mi-ficha/minecraft`. No usan `responderRegistrando`.
