@@ -42,7 +42,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 #   export PATH=/home/madkoding/.nvm/versions/node/v22.23.3/bin:$PATH
 
 # Tests (desde la raíz)
-npm test                   # 1410 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 1427 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 247 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
 
@@ -511,6 +511,13 @@ Tres añadidos del panel `/minecraft-admin` (solo admin) y de la carta. Todo que
   interior y `etiqueta` (rótulo del tipo y filete de acento) por origen vía `marcoDe()`: `premium8` dorado («PREMIUM 8»), `misiones` esmeralda
   («MISIONES»), `donacion` azul («DONACIÓN», sin origen = donación). La banda sigue siendo del GRADO; BLACK LABEL y DETERIORADA mandan sobre el rótulo.
   Solo perillas existentes: no tocan samplers. Diseño propuesto por Claude: ajustable tocando solo esa tabla.
+  **Marco de misiones = tema Minecraft** (`components/premium-minecraft.ts`): `marcos.misiones.insert.fondo = "minecraft"` pinta la hoja con un
+  MOSAICO de bloques dibujado por código (hierba, tierra, piedra; determinista por cert+grado; original, SIN texturas de Mojang) y
+  `etiqueta.fuente = "Minecrafter"` pone esa fuente SOLO en la cabecera (`VTUBERDEX`, `MISIONES`) y la nota del grado; nombre, país y certificado
+  conservan la fuente legible. Es de un único peso (se pide en 400) y NO trae el punto (`8.5`): la pila de la etiqueta cae a la normal POR GLIFO.
+  Archivo `app/fonts/Minecrafter-Reg.ttf` (NO en `public/`, que git ignora) + `@font-face` en `app/globals.css` con ruta relativa para que Next lo empaquete (sin `next/font`: solo la usa un lienzo). Un lienzo no se redibuja
+  al llegar una fuente: `useFuenteDeMarco` espera `document.fonts.load` y sube una versión que repinta la textura de la hoja. **La licencia del
+  archivo no consta (el .ttf no trae texto de licencia): confirmar con quien lo aportó que permite uso web público.**
   Al revocar un reclamo el grado previo vuelve con su origen (`mision_reclamo.origen_previo`; los reclamos anteriores a esa columna vuelven como `donacion`).
 
 ## Rangos y misiones de Minecraft (XP y grado de carta)
