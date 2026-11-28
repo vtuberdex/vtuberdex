@@ -28,6 +28,11 @@ export const DEFAULT_DB_PATH = process.env.VTUBERDEX_DB
  */
 const MIGRATIONS = [
   {
+    /** Origen del grado premium (premium8 / misiones / donacion). Las cartas que ya existían vienen de donaciones. */
+    id: "2026-11-premium-origin",
+    sql: `ALTER TABLE premium ADD COLUMN origin TEXT NOT NULL DEFAULT 'donacion';`,
+  },
+  {
     id: "2026-09-add-card-text",
     sql: `ALTER TABLE vtuber ADD COLUMN card_text TEXT;
           ALTER TABLE vtuber ADD COLUMN card_text_confidence INTEGER;`,

@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/*
+ * Minecrafter: la fuente de la cabecera y la nota del marco de misiones (`components/premium-minecraft.ts`).
+ * Se declara aquí y NO con next/font porque solo la usa un lienzo: `document.fonts.load` la baja cuando una
+ * carta de misiones se dibuja, así que nadie más la paga. `swap` + respaldo por glifo en la pila del lienzo.
+ */
+@font-face {
+  font-family: "Minecrafter";
+  src: url("./fonts/Minecrafter-Reg.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ============================================================================
    Tema del VTuberDex.
    Los colores "de marca" vienen del propio dato (themeColor de cada VTuber),

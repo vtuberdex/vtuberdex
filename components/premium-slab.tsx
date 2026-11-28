@@ -31,9 +31,11 @@ import {
 } from "three";
 
 import type { PremiumInfo, VtuberCard } from "@/lib/types";
-import { GEOMETRY, PREMIUM } from "@/components/card3d-config";
+import { GEOMETRY, PREMIUM, marcoDe } from "@/components/card3d-config";
 import { slabLayout, type SlabLayout } from "@/components/premium-layout";
 import { dibujarHojaInterior } from "@/components/premium-label";
+import { useArteDeMarco } from "@/components/use-arte-de-marco";
+import { useFuenteDeMarco } from "@/components/use-fuente-de-marco";
 
 const VERTEX = /* glsl */ `
   varying vec3 vNormalView;
@@ -150,8 +152,11 @@ export function crearCuerpo(layout: SlabLayout): ExtrudeGeometry {
   return geometry;
 }
 
-export function crearMaterialDeAcrilico(layout: SlabLayout): ShaderMaterial {
-  const a = PREMIUM.acrylic;
+export function crearMaterialDeAcrilico(
+  layout: SlabLayout,
+  origen?: string | null,
+): ShaderMaterial {
+  const a = marcoDe(origen).acrylic;
   return new ShaderMaterial({
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
@@ -223,8 +228,17 @@ export function PremiumSlab({
     [cardWidth, cardHeight, outerPad],
   );
   const body = useMemo(() => crearCuerpo(layout), [layout]);
-  const acrylic = useMemo(() => crearMaterialDeAcrilico(layout), [layout]);
+  const acrylic = useMemo(
+    () => crearMaterialDeAcrilico(layout, premium.origin),
+    [layout, premium.origin],
+  );
   const countryName = card.countries[0]?.name;
+  // La hoja es un lienzo: si su marco usa una fuente propia, se redibuja cuando esa fuente termina de cargar.
+  const versionDeFuente = useFuenteDeMarco(
+    marcoDe(premium.origin).etiqueta.fuente,
+  );
+  // Igual con el arte ornamentado del marco (donación): la hoja se repinta cuando la imagen termina de bajar.
+  const versionDeArte = useArteDeMarco(marcoDe(premium.origin).insert.arte);
   // La hoja se redibuja solo si cambia algo que la etiqueta muestra, no en cada render.
   const insertTexture = useMemo(
     () => crearTexturaDeHoja(layout, card, premium),
@@ -238,6 +252,9 @@ export function PremiumSlab({
       premium.cert,
       premium.since,
       premium.gradedAt,
+      premium.origin,
+      versionDeFuente,
+      versionDeArte,
     ],
   );
 

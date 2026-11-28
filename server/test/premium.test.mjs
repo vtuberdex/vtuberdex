@@ -187,6 +187,7 @@ test("aplicarParche convierte una ficha en premium y la API la devuelve con su c
     grade: "10",
     since: "2026-05-01",
     gradedAt: "2026-09-01",
+    origin: "donacion",
     cert: numeroDeCertificado(carta.dexNumber),
   });
   // El certificado es lo que el visitante lee en la carta: el MISMO número que su `#NNN`.
