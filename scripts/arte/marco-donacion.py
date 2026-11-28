@@ -141,13 +141,11 @@ def esquina_superior_izquierda(draw):
     esp = espiral(cx1, cy1, R, 4.5, 1.55, -math.pi / 2, -1)
     cuerpo = esp[::-1] + cola[::-1]  # del centro de la espiral, saliendo, hasta la punta lejana
     # Se recorre desde el centro de la voluta: ancho fino en el centro, máximo en la boca, y otra vez fino en la punta.
-    n = len(cuerpo)
     corte = len(esp)
     trazo(draw, cuerpo[:corte], 2.0, 6.6, caps=True)
     trazo(draw, cuerpo[corte - 1 :], 6.6, 0.8, caps=True)
 
     # Enredadera lateral: la misma pieza espejada sobre la diagonal.
-    cx2, cy2 = cy1, cx1
     cola2 = [(y, x) for (x, y) in cola]
     esp2 = [(y, x) for (x, y) in esp]
     cuerpo2 = esp2[::-1] + cola2[::-1]
