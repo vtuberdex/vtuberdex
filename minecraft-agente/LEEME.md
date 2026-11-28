@@ -33,6 +33,17 @@ Alcance decidido con el dueño del servidor (2026-11-20): admin y mantenedor tie
 acceso, sin carpetas ocultas. Quien usa la terminal puede leer `plugins/VTuberDex/config.yml`
 (token de la web para el plugin) y `server.properties` (clave RCON).
 
+## Reinicio forzoso
+
+Botón «Reinicio forzoso» de la barra lateral → `POST /api/minecraft-admin/reinicio-forzoso` → agente
+`POST /servidor/matar`. El agente manda SIGKILL al proceso del servidor (mismo usuario `minecraft`,
+carpeta de trabajo = la raíz y `-jar paper.jar`; el jar se cambia con `AGENTE_JAR_SERVIDOR`) y systemd
+lo vuelve a levantar (`Restart=always`). No recibe ningún PID del cliente. **No guarda el mundo**: es
+para cuando el servidor está colgado y el `stop` por RCON no responde (2026-11-28: el watchdog de Paper
+paró el hilo principal y la JVM no salió por un bloqueo del profiler de spark). Queda en la auditoría
+(`reinicio-forzoso`) y en `journalctl -u vtuberdex-mc-agente`. En la VPS hay además un vigilante
+(`mc-vigilante.timer`, fuera del repositorio) que hace lo mismo solo tras 5 min sin respuesta por RCON.
+
 ## Permisos (lo que ya costó)
 
 - **Solo el dueño puede hacer chmod.** El agente es `minecraft`; el panel viejo subía archivos como

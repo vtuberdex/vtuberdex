@@ -95,6 +95,14 @@ async function exigirOk(r: Response, porDefecto: string): Promise<Response> {
 const mensajeDe = (e: unknown, porDefecto: string) =>
   e instanceof Error ? e.message : porDefecto;
 
+/** Códigos de `/api/minecraft-admin/reinicio-forzoso` dichos para una persona. */
+const ERRORES_DE_REINICIO_FORZOSO: Record<string, string> = {
+  servidor_no_encontrado:
+    "no hay ningún proceso del servidor: quizá ya se está reiniciando",
+  agente_caido: "el agente no responde (servicio vtuberdex-mc-agente)",
+  agente_no_configurado: "el agente no está configurado en esta instalación",
+};
+
 /**
  * Una pasada del panorama. `"fuera"` = la sesión caducó; `null` = nada que pintar (error, o una
  * respuesta que no es un panorama: un proxy, un error de otra ruta).
@@ -263,6 +271,7 @@ function BarraLateral({
   alElegirPestana,
   alReiniciar,
   alCancelarReinicio,
+  alForzarReinicio,
 }: Readonly<{
   panorama: Panorama | null;
   esAdmin: boolean;
@@ -272,6 +281,7 @@ function BarraLateral({
   alElegirPestana: (id: Pestana) => void;
   alReiniciar: () => void;
   alCancelarReinicio: () => void;
+  alForzarReinicio: () => void;
 }>) {
   const estadoServidor = estadoDelServidor(panorama);
   return (
@@ -329,6 +339,16 @@ function BarraLateral({
             Cancelar ({cuentaReinicio} s)
           </button>
         )}
+        {/* No se bloquea con `ocupado`: es justo para cuando el servidor no contesta y las demás
+            acciones se quedan esperando. */}
+        <button
+          type="button"
+          onClick={alForzarReinicio}
+          title="Mata el proceso sin guardar. Solo si el servidor está colgado y el reinicio normal no responde."
+          className={`${CLASE_BOTON.secundario} w-full text-xs`}
+        >
+          Reinicio forzoso
+        </button>
       </div>
     </aside>
   );
@@ -526,6 +546,38 @@ export function PanelMinecraftAdmin() {
   }, [ejecutar]);
   const cancelarReinicio = useCallback(() => setCuentaReinicio(null), []);
 
+  // Reinicio forzoso: el agente mata el proceso (SIGKILL) y systemd lo levanta. No pasa por RCON,
+  // así que funciona con el servidor colgado; a cambio no avisa a nadie ni guarda el mundo.
+  const forzarReinicio = useCallback(() => {
+    if (
+      !window.confirm(
+        "¿Forzar el reinicio? Se mata el proceso SIN guardar: se pierde lo jugado desde el último autoguardado. Úsalo solo si el servidor está colgado y «Reiniciar servidor» no responde. Vuelve en unos 5 minutos.",
+      )
+    ) {
+      return;
+    }
+    setCuentaReinicio(null);
+    void (async () => {
+      setError(null);
+      setAviso(null);
+      try {
+        await exigirOk(
+          await fetch("/api/minecraft-admin/reinicio-forzoso", {
+            method: "POST",
+            headers: { "x-panel": "1" },
+          }),
+          "no se pudo forzar el reinicio",
+        );
+        setAviso(
+          "Proceso del servidor detenido a la fuerza: vuelve a arrancar solo en unos minutos.",
+        );
+      } catch (e) {
+        const codigo = mensajeDe(e, "no se pudo forzar el reinicio");
+        setError(ERRORES_DE_REINICIO_FORZOSO[codigo] ?? codigo);
+      }
+    })();
+  }, []);
+
   const anunciar = useCallback(
     (evento: React.SubmitEvent) => {
       evento.preventDefault();
@@ -648,6 +700,7 @@ export function PanelMinecraftAdmin() {
           alElegirPestana={setPestana}
           alReiniciar={iniciarReinicio}
           alCancelarReinicio={cancelarReinicio}
+          alForzarReinicio={forzarReinicio}
         />
 
         <div className="min-w-0 space-y-6">
