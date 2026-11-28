@@ -15,6 +15,7 @@
  */
 import { DETERIORO, PREMIUM, marcoDe } from "@/components/card3d-config";
 import type { SlabLayout } from "@/components/premium-layout";
+import { arteDeMarco } from "@/components/premium-marco-arte";
 import { dibujarFondoMinecraft } from "@/components/premium-minecraft";
 import { corromperTexto, semillaDeCarta } from "@/lib/degradado";
 import {
@@ -162,6 +163,25 @@ export function dibujarHojaInterior(
         datos.premium.grade,
       ),
     );
+    ctx.restore();
+  }
+
+  // Arte ornamentado del marco (donación): va a lienzo completo y recortado a las esquinas de la placa, DEBAJO de la
+  // ventana y la etiqueta. Sus huecos son transparentes y las volutas de las esquinas llegan a invadir los bordes de la
+  // etiqueta: pintadas encima pisaban el texto; debajo quedan escondidas tras ella, como metidas bajo el papel.
+  const arte = insert.arte ? arteDeMarco(insert.arte) : null;
+  if (arte) {
+    ctx.save();
+    rectanguloRedondeado(
+      ctx,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+      px(medidas.cornerRadius),
+    );
+    ctx.clip();
+    ctx.drawImage(arte, 0, 0, canvas.width, canvas.height);
     ctx.restore();
   }
 

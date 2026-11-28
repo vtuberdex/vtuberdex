@@ -42,7 +42,7 @@ scraper/ ──▶ scraper/out/dataset.json + data/images/ ──▶ server/seed
 #   export PATH=/home/madkoding/.nvm/versions/node/v22.23.3/bin:$PATH
 
 # Tests (desde la raíz)
-npm test                   # 1427 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
+npm test                   # 1437 tests (vitest): utilidades, componentes, páginas, carta 3D, libro
 cd scraper && npm test     # 25 tests (node --test): parsers y normalización
 cd server  && npm test     # 247 tests: búsqueda, facetas, API HTTP, mantenedor, migraciones, habilidades
 
@@ -511,6 +511,11 @@ Tres añadidos del panel `/minecraft-admin` (solo admin) y de la carta. Todo que
   interior y `etiqueta` (rótulo del tipo y filete de acento) por origen vía `marcoDe()`: `premium8` dorado («PREMIUM 8»), `misiones` esmeralda
   («MISIONES»), `donacion` azul («DONACIÓN», sin origen = donación). La banda sigue siendo del GRADO; BLACK LABEL y DETERIORADA mandan sobre el rótulo.
   Solo perillas existentes: no tocan samplers. Diseño propuesto por Claude: ajustable tocando solo esa tabla.
+  **Marco de donación = hoja negra con filigrana dorada** (estilo del boceto del mantenedor, 2026-11-28; el dibujo es ORIGINAL y lo genera `scripts/arte/marco-donacion.py`, que necesita Pillow y numpy: `python3 scripts/arte/marco-donacion.py`): `marcos.donacion.insert.arte = "donacion"` pinta la imagen
+  `components/marcos/donacion.webp` (alfa; 640×1036, proporción 1:1,62 como la placa) a lienzo completo y DEBAJO de la ventana y la etiqueta
+  (`premium-marco-arte.ts`; encima, las volutas de las esquinas pisaban el texto). El interior es transparente: solo queda el dorado, y el negro de la hoja lo pone `insert.frame`. **Para sustituirla por el arte final del artista**: mismo
+  contrato (1:1,62, alfa, adorno en el ~7 % exterior) y se reemplaza el archivo, sin tocar código. El lienzo es síncrono: `useArteDeMarco` baja
+  la imagen y repinta la hoja al llegar (si falla, la hoja queda negra y legible; el fallo no se memoiza). El acrílico de donación sigue azul.
   **Marco de misiones = tema Minecraft** (`components/premium-minecraft.ts`): `marcos.misiones.insert.fondo = "minecraft"` pinta la hoja con un
   MOSAICO de bloques dibujado por código (hierba, tierra, piedra; determinista por cert+grado; original, SIN texturas de Mojang) y
   `etiqueta.fuente = "Minecrafter"` pone esa fuente SOLO en la cabecera (`VTUBERDEX`, `MISIONES`) y la nota del grado; nombre, país y certificado
