@@ -34,6 +34,7 @@ import type { PremiumInfo, VtuberCard } from "@/lib/types";
 import { GEOMETRY, PREMIUM, marcoDe } from "@/components/card3d-config";
 import { slabLayout, type SlabLayout } from "@/components/premium-layout";
 import { dibujarHojaInterior } from "@/components/premium-label";
+import { useArteDeMarco } from "@/components/use-arte-de-marco";
 import { useFuenteDeMarco } from "@/components/use-fuente-de-marco";
 
 const VERTEX = /* glsl */ `
@@ -236,6 +237,8 @@ export function PremiumSlab({
   const versionDeFuente = useFuenteDeMarco(
     marcoDe(premium.origin).etiqueta.fuente,
   );
+  // Igual con el arte ornamentado del marco (donación): la hoja se repinta cuando la imagen termina de bajar.
+  const versionDeArte = useArteDeMarco(marcoDe(premium.origin).insert.arte);
   // La hoja se redibuja solo si cambia algo que la etiqueta muestra, no en cada render.
   const insertTexture = useMemo(
     () => crearTexturaDeHoja(layout, card, premium),
@@ -251,6 +254,7 @@ export function PremiumSlab({
       premium.gradedAt,
       premium.origin,
       versionDeFuente,
+      versionDeArte,
     ],
   );
 
