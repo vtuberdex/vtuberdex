@@ -8,7 +8,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import type { Server } from "node:http";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -24,6 +24,7 @@ import { configDe, crearServidor, normalizarRelativa } from "../minecraft-agente
 import { COOKIE_MANTENEDOR, crearSesionMantenedor } from "./minecraft-admin.mjs";
 import { usarArchivoDeAuditoria } from "./minecraft-consola.mjs";
 import { POST as pluginEstado } from "../app/api/minecraft-admin/plugins/estado/route.js";
+import { POST as reinicioForzoso } from "../app/api/minecraft-admin/reinicio-forzoso/route.js";
 
 const crearSesion = crearSesionMantenedor as unknown as (o: { email?: string; role?: string }) => string | null;
 
@@ -356,5 +357,69 @@ describe("permisos con ACL", () => {
     // Sin el arreglo la máscara quedaba en «---» y el usuario de la ACL no leía.
     expect(acl).toMatch(/^mask::r--$/m);
     expect(acl).toMatch(/^group::/m);
+  });
+});
+
+describe("/api/minecraft-admin/reinicio-forzoso", () => {
+  const forzar = (init: RequestInit & { quien?: string } = {}) =>
+    reinicioForzoso(pedir("/api/minecraft-admin/reinicio-forzoso", { method: "POST", ...init }));
+
+  /** `spawn` vuelve antes del `exec`: hasta entonces `/proc/<pid>/cmdline` es el del padre. */
+  const yaArranco = async (pid: number | undefined) => {
+    for (let i = 0; i < 200; i += 1) {
+      const linea = await fs.readFile(`/proc/${pid}/cmdline`, "utf8").catch(() => "");
+      if (linea.includes("setInterval")) {return;}
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    throw new Error("el proceso de prueba no arrancó");
+  };
+
+  it("exige sesión y la cabecera del panel", async () => {
+    const sinSesion = await reinicioForzoso(
+      new Request("http://x/api/minecraft-admin/reinicio-forzoso", { method: "POST", headers: conPanel }),
+    );
+    expect(sinSesion.status).toBe(401);
+    expect((await forzar()).status).toBe(403);
+  });
+
+  it("sin proceso del servidor responde 404 y no mata nada", async () => {
+    // Mismo usuario y misma carpeta, pero sin `-jar paper.jar`: no es el servidor.
+    const otro = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { cwd: raiz, stdio: "ignore" });
+    try {
+      await yaArranco(otro.pid);
+      const r = await forzar({ headers: conPanel });
+      expect(r.status).toBe(404);
+      expect((await r.json()).error).toBe("servidor_no_encontrado");
+      expect(otro.exitCode).toBeNull();
+      expect(otro.signalCode).toBeNull();
+    } finally {
+      otro.kill("SIGKILL");
+    }
+  });
+
+  it("mata con SIGKILL solo al proceso lanzado con -jar paper.jar en la raíz", async () => {
+    const codigo = "setInterval(() => {}, 1000)";
+    const servidorFalso = spawn(process.execPath, ["-e", codigo, "--", "-jar", "paper.jar"], {
+      cwd: raiz,
+      stdio: "ignore",
+    });
+    // Mismo comando en otra carpeta: no es el de esta raíz.
+    const enOtraCarpeta = spawn(process.execPath, ["-e", codigo, "--", "-jar", "paper.jar"], {
+      cwd: base,
+      stdio: "ignore",
+    });
+    try {
+      await Promise.all([yaArranco(servidorFalso.pid), yaArranco(enOtraCarpeta.pid)]);
+      const muerto = new Promise<NodeJS.Signals | null>((resolve) => servidorFalso.on("exit", (_c, senal) => resolve(senal)));
+      const r = await forzar({ headers: conPanel });
+      expect(r.status).toBe(200);
+      expect(await r.json()).toEqual({ ok: true });
+      expect(await muerto).toBe("SIGKILL");
+      expect(enOtraCarpeta.exitCode).toBeNull();
+      expect(enOtraCarpeta.signalCode).toBeNull();
+    } finally {
+      servidorFalso.kill("SIGKILL");
+      enOtraCarpeta.kill("SIGKILL");
+    }
   });
 });

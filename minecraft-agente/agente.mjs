@@ -22,6 +22,9 @@
  *    `/etc` y `/srv/minecraft`; nada de `/home`, `/var`, `/run` ni los procesos de la máquina (PID
  *    propio). Entorno limpio: no hereda nada del agente, tampoco el token.
  * 4. Una terminal es de quien la abrió (`X-Agente-Quien`): otra persona no la lee ni le escribe.
+ * 5. El reinicio forzoso (`POST /servidor/matar`) solo manda SIGKILL al proceso del servidor: el
+ *    de este mismo usuario, con la raíz como carpeta de trabajo y `-jar <jar del servidor>` en su
+ *    línea de órdenes. No recibe ningún PID ni nombre del cliente.
  */
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
@@ -89,6 +92,7 @@ export function configDe(env = process.env) {
     sandbox: env.AGENTE_SANDBOX === "ninguno" ? "ninguno" : "bwrap",
     shell: env.AGENTE_SHELL || "/bin/bash",
     python: env.AGENTE_PYTHON || "/usr/bin/python3",
+    jarDelServidor: env.AGENTE_JAR_SERVIDOR || "paper.jar",
   };
 }
 
@@ -811,6 +815,51 @@ function barrerTerminales() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Reinicio forzoso del servidor                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * PIDs del servidor de Minecraft: procesos de ESTE usuario cuya carpeta de trabajo es la raíz y que
+ * se lanzaron con `-jar <jar del servidor>`. No se fía del nombre del ejecutable (cambia con la
+ * versión de Java) ni de ningún dato del cliente.
+ */
+export async function procesosDelServidor(cfg, proc = "/proc") {
+  const yo = process.getuid?.();
+  const encontrados = [];
+  for (const nombre of await fsp.readdir(proc)) {
+    if (!/^\d+$/.test(nombre) || Number(nombre) === process.pid) {continue;}
+    const base = path.join(proc, nombre);
+    try {
+      if ((await fsp.stat(base)).uid !== yo) {continue;}
+      if ((await fsp.readlink(path.join(base, "cwd"))) !== cfg.raiz) {continue;}
+      const args = (await fsp.readFile(path.join(base, "cmdline"), "utf8")).split("\0");
+      const i = args.indexOf("-jar");
+      if (i !== -1 && args[i + 1] === cfg.jarDelServidor) {encontrados.push(Number(nombre));}
+    } catch {
+      /* el proceso terminó mientras se miraba, o no es nuestro: no cuenta */
+    }
+  }
+  return encontrados;
+}
+
+/**
+ * Mata el servidor con SIGKILL. Es para cuando quedó colgado y el `stop` por RCON no responde:
+ * no guarda el mundo (se pierde lo jugado desde el último autoguardado). systemd lo vuelve a
+ * levantar solo (`Restart=always` en `vtuberdex-minecraft.service`).
+ */
+async function matarServidor(cfg, quien) {
+  const pids = await procesosDelServidor(cfg);
+  if (pids.length === 0) {
+    throw fallo(404, "servidor_no_encontrado", "no hay ningún proceso del servidor: quizá ya se está reiniciando");
+  }
+  for (const pid of pids) {
+    console.log(`[agente] reinicio forzoso pedido por ${quien}: SIGKILL a ${pid}`);
+    process.kill(pid, "SIGKILL");
+  }
+  return { ok: true, pids };
+}
+
+/* ------------------------------------------------------------------ */
 /* Enrutado                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -841,6 +890,7 @@ export function crearServidor(cfg) {
       if (ruta === "/fs/accion" && metodo === "POST") {return json(res, 200, await accion(cfg, await leerJson(req)));}
 
       if (!quien) {throw fallo(400, "falta_quien");}
+      if (ruta === "/servidor/matar" && metodo === "POST") {return json(res, 200, await matarServidor(cfg, quien));}
       if (ruta === "/term" && metodo === "GET") {
         const propias = [...sesiones.values()].filter((s) => s.quien === quien);
         return json(res, 200, { terminales: propias.map(resumen) });
