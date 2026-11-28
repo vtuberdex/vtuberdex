@@ -511,10 +511,9 @@ Tres añadidos del panel `/minecraft-admin` (solo admin) y de la carta. Todo que
   interior y `etiqueta` (rótulo del tipo y filete de acento) por origen vía `marcoDe()`: `premium8` dorado («PREMIUM 8»), `misiones` esmeralda
   («MISIONES»), `donacion` azul («DONACIÓN», sin origen = donación). La banda sigue siendo del GRADO; BLACK LABEL y DETERIORADA mandan sobre el rótulo.
   Solo perillas existentes: no tocan samplers. Diseño propuesto por Claude: ajustable tocando solo esa tabla.
-  **Marco de donación = hoja negra con filigrana dorada** (boceto del mantenedor, 2026-11-28): `marcos.donacion.insert.arte = "donacion"` pinta la imagen
+  **Marco de donación = hoja negra con filigrana dorada** (estilo del boceto del mantenedor, 2026-11-28; el dibujo es ORIGINAL y lo genera `scripts/arte/marco-donacion.py`, que necesita Pillow y numpy: `python3 scripts/arte/marco-donacion.py`): `marcos.donacion.insert.arte = "donacion"` pinta la imagen
   `components/marcos/donacion.webp` (alfa; 640×1036, proporción 1:1,62 como la placa) a lienzo completo y DEBAJO de la ventana y la etiqueta
-  (`premium-marco-arte.ts`; encima, las volutas de las esquinas pisaban el texto). El interior del boceto (gris, rayas de «Placeholder», el negro)
-  es transparente: solo queda el dorado, y el negro de la hoja lo pone `insert.frame`. **Para sustituirla por el arte final del artista**: mismo
+  (`premium-marco-arte.ts`; encima, las volutas de las esquinas pisaban el texto). El interior es transparente: solo queda el dorado, y el negro de la hoja lo pone `insert.frame`. **Para sustituirla por el arte final del artista**: mismo
   contrato (1:1,62, alfa, adorno en el ~7 % exterior) y se reemplaza el archivo, sin tocar código. El lienzo es síncrono: `useArteDeMarco` baja
   la imagen y repinta la hoja al llegar (si falla, la hoja queda negra y legible; el fallo no se memoiza). El acrílico de donación sigue azul.
   **Marco de misiones = tema Minecraft** (`components/premium-minecraft.ts`): `marcos.misiones.insert.fondo = "minecraft"` pinta la hoja con un
