@@ -56,6 +56,16 @@ export const TODOS_LOS_GRADOS = Object.freeze([
   ...GRADOS,
 ]);
 
+/**
+ * CÓMO se obtuvo el grado. Define el MARCO de la carta (identidad visual propia de cada uno):
+ *   · `premium8`  Gradeo Premium 8, exclusivo de los artistas VTuber.
+ *   · `misiones`  Gradeo por Misiones de Minecraft (se completó una misión de grado en el servidor).
+ *   · `donacion`  Gradeo por Donación (el sistema de donaciones). Es el origen de las cartas anteriores a esta columna.
+ */
+export const ORIGENES = Object.freeze(["premium8", "misiones", "donacion"]);
+export const ORIGEN_POR_DEFECTO = "donacion";
+export const esOrigenValido = (origen) => ORIGENES.includes(origen);
+
 /** Grado con el que entra una carta nueva: el mínimo de la escala. */
 export const GRADO_INICIAL = GRADOS[0];
 

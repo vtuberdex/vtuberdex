@@ -216,7 +216,9 @@ CREATE TABLE IF NOT EXISTS premium (
   vtuber_id INTEGER PRIMARY KEY REFERENCES vtuber (id) ON DELETE CASCADE,
   grade     TEXT NOT NULL,
   since     TEXT NOT NULL,
-  graded_at TEXT NOT NULL
+  graded_at TEXT NOT NULL,
+  -- Cómo se obtuvo el grado (premium8 / misiones / donacion): decide el marco de la carta. Ver `premium.mjs`.
+  origin    TEXT NOT NULL DEFAULT 'donacion'
 );
 
 -- --- búsqueda full-text (FTS5 + triggers de sincronización) ------------------

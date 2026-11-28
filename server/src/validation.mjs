@@ -6,7 +6,7 @@
 import { z } from "zod";
 
 import { htmlDeHabilidadSeguro } from "./habilidades.mjs";
-import { TODOS_LOS_GRADOS } from "./premium.mjs";
+import { ORIGENES, TODOS_LOS_GRADOS } from "./premium.mjs";
 
 export const listQuerySchema = z.object({
   q: z.string().max(120).optional().default(""),
@@ -100,6 +100,8 @@ const premiumSchema = z
     grade: z.enum(TODOS_LOS_GRADOS),
     since: FECHA.optional(),
     gradedAt: FECHA.optional(),
+    /** Cómo se obtuvo el grado; sin él, al crear es la donación y al subir de grado se conserva el que había. */
+    origin: z.enum(ORIGENES).optional(),
   })
   .nullable();
 

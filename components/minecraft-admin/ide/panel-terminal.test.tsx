@@ -176,6 +176,25 @@ describe("PanelTerminal", () => {
     expect(screen.getByText(/bash 1/)).toBeTruthy();
   });
 
+  it("la pestaña fija «Consola del servidor» lee el registro; un pedido del explorador vuelve a bash", async () => {
+    montar([{ id: "vieja-123456", titulo: "bash", creada: 1, terminada: false }]);
+    const { rerender } = render(<PanelTerminal pedido={null} alError={() => {}} />);
+    await waitFor(() => expect(terminales.length).toBe(1));
+    expect(llamadas.some((l) => l.url.startsWith("/api/minecraft-admin/registros"))).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: /Consola del servidor/ }));
+    expect(screen.getByRole("textbox", { name: "Comando del servidor" })).toBeTruthy();
+    await waitFor(() =>
+      expect(llamadas.some((l) => l.url.startsWith("/api/minecraft-admin/registros"))).toBe(true),
+    );
+
+    rerender(<PanelTerminal pedido={{ texto: "cd '/srv/minecraft/plugins'\r", n: 1 }} alError={() => {}} />);
+    await waitFor(() => {
+      const entrada = llamadas.find((l) => l.url.includes("op=entrada"));
+      expect(new TextDecoder().decode(entrada?.init?.body as Uint8Array)).toContain("cd '/srv/minecraft/plugins'");
+    });
+  });
+
   it("si la API falla lo avisa", async () => {
     vi.stubGlobal(
       "fetch",

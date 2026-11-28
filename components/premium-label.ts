@@ -13,8 +13,9 @@
  * Sin contexto 2D (los tests de jsdom lo anulan a propósito) se devuelve el lienzo en blanco en
  * vez de fallar: la placa se ve sin rótulo, que es mejor que romper la carta entera.
  */
-import { DETERIORO, PREMIUM } from "@/components/card3d-config";
+import { DETERIORO, PREMIUM, marcoDe } from "@/components/card3d-config";
 import type { SlabLayout } from "@/components/premium-layout";
+import { dibujarFondoMinecraft } from "@/components/premium-minecraft";
 import { corromperTexto, semillaDeCarta } from "@/lib/degradado";
 import {
   esBlackLabel,
@@ -36,6 +37,14 @@ export interface DatosDeEtiqueta {
 
 const FUENTE =
   '"Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif';
+
+/**
+ * Pila de fuentes de un marco: la propia primero y la de siempre de respaldo. El lienzo cae a la siguiente
+ * POR GLIFO, así que lo que la fuente propia no trae (Minecrafter no tiene el punto de «8.5») sale igual.
+ */
+function pilaDeFuente(propia?: string): string {
+  return propia ? `"${propia}", ${FUENTE}` : FUENTE;
+}
 
 /**
  * Tamaño de fuente (px) con el que `texto` cabe en `ancho`: parte de `tamano` y baja de a 1 px
@@ -111,7 +120,8 @@ export function dibujarHojaInterior(
   layout: SlabLayout,
   datos: DatosDeEtiqueta,
 ): HTMLCanvasElement {
-  const { insert, layout: medidas } = PREMIUM;
+  const { layout: medidas } = PREMIUM;
+  const insert = marcoDe(datos.premium.origin).insert;
   const escala = insert.pxWidth / layout.width;
   const canvas = document.createElement("canvas");
   canvas.width = insert.pxWidth;
@@ -125,7 +135,8 @@ export function dibujarHojaInterior(
   const aX = (x: number) => (x + layout.width / 2) * escala;
   const aY = (y: number) => (layout.height / 2 - y) * escala;
 
-  // Marco: gris claro con un degradado suave, como el plástico interior de la placa.
+  // Marco: gris claro con un degradado suave, como el plástico interior de la placa. El de misiones lleva
+  // el mosaico de Minecraft, recortado a las esquinas redondeadas de la placa.
   const marco = ctx.createLinearGradient(0, 0, 0, canvas.height);
   marco.addColorStop(0, insert.frame);
   marco.addColorStop(1, insert.frameShade);
@@ -139,6 +150,20 @@ export function dibujarHojaInterior(
     px(medidas.cornerRadius),
   );
   ctx.fill();
+  if (insert.fondo === "minecraft") {
+    ctx.save();
+    ctx.clip();
+    dibujarFondoMinecraft(
+      ctx,
+      canvas.width,
+      canvas.height,
+      semillaDeCarta(
+        Number(datos.premium.cert.replace(/\D/g, "")) || 0,
+        datos.premium.grade,
+      ),
+    );
+    ctx.restore();
+  }
 
   // Ventana: fondo oscuro (si la carta aún no cargó se ve un hueco, no el marco) y un filo
   // doble: sombra por dentro y línea por fuera, que es lo que hace parecer un rebaje.
@@ -184,12 +209,16 @@ function coloresDeEtiqueta(negra: boolean) {
   };
 }
 
-/** Rótulo de la banda: BLACK LABEL, DETERIORADA (grados 5…1) o PREMIUM. */
-function tipoDeEtiqueta(negra: boolean, degradada: boolean): string {
+/** Rótulo de la banda: BLACK LABEL y DETERIORADA (grados 5…1) mandan; si no, el tipo del origen del grado. */
+export function tipoDeEtiqueta(
+  negra: boolean,
+  degradada: boolean,
+  origen?: string | null,
+): string {
   if (negra) {
     return "BLACK LABEL";
   }
-  return degradada ? "DETERIORADA" : "PREMIUM";
+  return degradada ? "DETERIORADA" : marcoDe(origen).etiqueta.tipo;
 }
 
 /** Con el deterioro avanzado la bandera del país deja de imprimirse (`DETERIORO.hideCountryFrom`). */
@@ -229,23 +258,34 @@ function dibujarEtiqueta(
   ctx.clip();
   ctx.fillStyle = banda;
   ctx.fillRect(x, y, w, bandaH);
-  if (colores.line) {
-    ctx.fillStyle = colores.line;
+  // Filete bajo la banda: dorado en la Black Label; en el resto, el acento del origen (el marco se reconoce de un vistazo).
+  const filete =
+    colores.line ??
+    (esGradoDegradado(grade)
+      ? null
+      : marcoDe(datos.premium.origin).etiqueta.acento);
+  if (filete) {
+    ctx.fillStyle = filete;
     ctx.fillRect(x, y + bandaH, w, Math.max(2, h * 0.025));
   }
   ctx.restore();
 
   const pad = h * 0.07;
+  // Fuente propia del marco (Minecrafter en misiones): solo cabecera y nota. Es de un único peso, así que se
+  // pide en 400 (a 800 el navegador la engorda por su cuenta y se pastea).
+  const propia = marcoDe(datos.premium.origin).etiqueta.fuente;
+  const pila = pilaDeFuente(propia);
+  const pesoPropio = propia ? "400" : null;
   ctx.textBaseline = "middle";
   ctx.fillStyle = negra ? (colores.line ?? "#fff") : "#ffffff";
-  ctx.font = `800 ${Math.round(bandaH * 0.52)}px ${FUENTE}`;
+  ctx.font = `${pesoPropio ?? "800"} ${Math.round(bandaH * 0.52)}px ${pila}`;
   ctx.textAlign = "left";
   ctx.fillText("VTUBERDEX", x + pad, y + bandaH / 2 + 1);
   ctx.textAlign = "right";
-  ctx.font = `700 ${Math.round(bandaH * 0.4)}px ${FUENTE}`;
+  ctx.font = `${pesoPropio ?? "700"} ${Math.round(bandaH * 0.4)}px ${pila}`;
   const degradada = esGradoDegradado(grade);
   ctx.fillText(
-    tipoDeEtiqueta(negra, degradada),
+    tipoDeEtiqueta(negra, degradada, datos.premium.origin),
     x + w - pad,
     y + bandaH / 2 + 1,
   );
@@ -259,7 +299,7 @@ function dibujarEtiqueta(
   ctx.textAlign = "center";
   const centroDerecho = divisor + bloqueDerecho / 2;
   const nota = notaVisible(grade);
-  ctx.font = `800 ${Math.round((h - bandaH) * 0.62)}px ${FUENTE}`;
+  ctx.font = `${pesoPropio ?? "800"} ${Math.round((h - bandaH) * 0.62)}px ${pila}`;
   ctx.fillText(nota, centroDerecho, y + bandaH + (h - bandaH) * 0.44);
   ctx.fillStyle = colores.mutedInk;
   ctx.font = `700 ${Math.round((h - bandaH) * 0.15)}px ${FUENTE}`;

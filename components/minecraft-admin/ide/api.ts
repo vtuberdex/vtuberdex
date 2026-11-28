@@ -259,3 +259,25 @@ export function lenguajeDe(ruta: string) {
 export const esComprimido = (nombre: string) =>
   /\.(zip|tar|tar\.gz|tgz|tar\.xz|txz|tar\.bz2|tbz2)$/i.test(nombre);
 export const esJar = (nombre: string) => /\.jar(\.disabled)?$/i.test(nombre);
+
+/* Consola del servidor de Minecraft (pestaña fija del panel de abajo). */
+
+/** Cola de `logs/latest.log` (las IP ya vienen ocultas y sin las líneas del RCON del dashboard). */
+export async function colaDelServidor(lineas = 300) {
+  const r = await comprobar(
+    await fetch(`/api/minecraft-admin/registros?${q({ lineas })}`, { cache: "no-store" }),
+  );
+  return ((await r.json()) as { lineas?: string[] }).lineas ?? [];
+}
+
+/** Un comando por RCON. El servidor decide qué puede cada rol; la respuesta es el texto del servidor. */
+export async function comandoDelServidor(comando: string) {
+  const r = await comprobar(
+    await fetch("/api/minecraft-admin/consola", {
+      method: "POST",
+      headers: { ...PANEL, "content-type": "application/json" },
+      body: JSON.stringify({ comando }),
+    }),
+  );
+  return ((await r.json()) as { respuesta?: string }).respuesta ?? "";
+}

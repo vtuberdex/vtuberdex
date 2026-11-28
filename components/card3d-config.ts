@@ -38,6 +38,7 @@
  * `shaders.ts`. Aquí solo están los números.
  */
 
+import { FUENTE_MINECRAFT } from "@/components/premium-minecraft";
 import {
   CARD_TEXTURE_HEIGHT,
   CARD_TEXTURE_WIDTH,
@@ -1422,6 +1423,16 @@ export const TEXTURAS = {
  * escala igual en el libro (donde cabe en la funda) y en el detalle. El alto de la placa NO se
  * elige: es el de la funda (carta + 2 x `pocketPad`), y de ahí sale el ancho (`premium-layout`).
  */
+/** Las perillas del acrílico que un marco puede redefinir (ver `PREMIUM.marcos`). */
+type AcrilicoBase = {
+  base: number;
+  fresnel: number;
+  edge: number;
+  shineStrength: number;
+  bandStrength: number;
+  tint: string;
+};
+
 export const PREMIUM = {
   layout: {
     /** Margen entre el borde de la placa y la ventana/etiqueta, como fracción del ancho. */
@@ -1516,6 +1527,85 @@ export const PREMIUM = {
     windowLine: "#8d95a6",
   },
   /**
+   * MARCOS según el MÉTODO DE OBTENCIÓN del grado (`premium.origin`): cada origen tiene su identidad visual.
+   *   · premium8   Gradeo Premium 8, exclusivo de los artistas VTuber.
+   *   · misiones   Gradeo por Misiones de Minecraft.
+   *   · donacion   Gradeo por Donación (también el de las cartas anteriores a esta distinción).
+   *
+   * Cada marco REDEFINE lo que quiera sobre `acrylic` (el acrílico) e `insert` (la hoja interior) y define su
+   * `etiqueta`: el rótulo del tipo (en la banda de arriba) y un `acento`, el filete de color que la subraya. Lo que no
+   * redefine se hereda. Solo valen perillas que ya existen (colores y números): no añaden samplers ni uniformes nuevos,
+   * así que no tocan el presupuesto de los shaders. La banda de la etiqueta sigue siendo del GRADO (azul 8, acero 9, oro 10…):
+   * el origen se lee en el acrílico, la hoja, el filete y el rótulo, nunca pisando el color del grado.
+   *
+   * Reglas para que se distingan aun con la carta inclinada: tonos separados (dorado / esmeralda / azul), no tamaños ni capas.
+   *   · premium8   DORADO cálido, el más brillante: pieza de colección, exclusiva de artistas.
+   *   · misiones   ESMERALDA, más sobrio: «ganado jugando» en el servidor.
+   *   · donacion   AZUL frío: el acrílico de siempre; las cartas existentes lo conservan.
+   */
+  marcos: {
+    premium8: {
+      acrylic: {
+        tint: "#ffe2a0",
+        edge: 0.8,
+        fresnel: 0.66,
+        shineStrength: 0.55,
+        bandStrength: 0.32,
+      },
+      insert: {
+        frame: "#f4e7c3",
+        frameShade: "#d9c183",
+        windowLine: "#c9a24a",
+      },
+      etiqueta: { tipo: "PREMIUM 8", acento: "#c9a24a" },
+    },
+    misiones: {
+      acrylic: {
+        tint: "#b4f0cb",
+        edge: 0.55,
+        fresnel: 0.52,
+        bandStrength: 0.22,
+      },
+      insert: {
+        frame: "#e1efe5",
+        frameShade: "#b6d1bf",
+        windowLine: "#3f9d6b",
+        // Mosaico de bloques en vez del degradado liso (`premium-minecraft.ts`).
+        fondo: "minecraft",
+      },
+      etiqueta: {
+        tipo: "MISIONES",
+        acento: "#2fae6d",
+        // Cabecera y nota en Minecrafter; el nombre y el certificado se quedan en la fuente legible.
+        fuente: FUENTE_MINECRAFT,
+      },
+    },
+    donacion: {
+      etiqueta: { tipo: "DONACIÓN", acento: "#4a7fd1" },
+    },
+  } as Record<
+    "premium8" | "misiones" | "donacion",
+    {
+      acrylic?: Partial<
+        Pick<
+          AcrilicoBase,
+          | "base"
+          | "fresnel"
+          | "edge"
+          | "shineStrength"
+          | "bandStrength"
+          | "tint"
+        >
+      >;
+      insert?: Partial<
+        Record<"frame" | "frameShade" | "windowLine", string>
+      > & {
+        fondo?: "minecraft";
+      };
+      etiqueta: { tipo: string; acento: string; fuente?: string };
+    }
+  >,
+  /**
    * La ETIQUETA. Cada grado tiene su banda: azul para el 8, acero para el 9, dorada para el 10;
    * la Black Label (BL) es negra con letra plateada. Dos colores = degradado de la banda.
    */
@@ -1550,6 +1640,20 @@ export const PREMIUM = {
     } as Record<string, readonly [string, string]>,
   },
 } as const;
+
+/** El marco de un origen: el acrílico y la hoja base con lo que ese origen redefine. Sin origen, el de donación. */
+export function marcoDe(origen: string | null | undefined) {
+  const marcos = PREMIUM.marcos as Record<
+    string,
+    (typeof PREMIUM.marcos)["donacion"]
+  >;
+  const propio = marcos[origen ?? ""] ?? marcos.donacion;
+  return {
+    acrylic: { ...PREMIUM.acrylic, ...propio.acrylic },
+    insert: { ...PREMIUM.insert, ...propio.insert },
+    etiqueta: propio.etiqueta,
+  };
+}
 
 /**
  * DETERIORO de las cartas degradadas (grados 5…1 de `server/src/premium.mjs`).

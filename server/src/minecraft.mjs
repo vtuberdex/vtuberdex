@@ -65,8 +65,12 @@ import { preparadorDeTablas } from "./db/tablas.mjs";
 
 /** Vida del código de vínculo. */
 export const CODIGO_TTL_MS = 10 * 60 * 1000;
-/** XP máxima de un lote. El plugin manda cada ~30 s: más que esto en un lote es un plugin roto o trucado. */
-export const XP_POR_LOTE_MAX = 100;
+/**
+ * XP máxima de un lote. Antes eran 100 (el plugin manda cada ~30 s), pero las misiones del juego pagan 1.500 XP o más y un
+ * lote de esa quest se rechazaba con `lote_excesivo`. Hoy es solo una barrera de cordura contra un plugin roto; lo que
+ * limita de verdad lo ganado es el tope DIARIO (`topeXpJuegoDia`), que se aplica en la misma sentencia del INSERT.
+ */
+export const XP_POR_LOTE_MAX = 1_000_000;
 /** De dónde sale la XP: lista cerrada (se guarda el desglose para poder ajustar después lo que vale cada cosa). */
 export const MOTIVOS_XP = Object.freeze([
   "mob",
@@ -76,6 +80,13 @@ export const MOTIVOS_XP = Object.freeze([
   "evento",
   "entrega",
 ]);
+/**
+ * Motivos que son XP ADICIONAL y no cuentan para el tope diario: lo que paga una misión o un logro del juego (1.500 XP
+ * o más) no es «farmeo» del día. Antes todo lo que llegaba por `/api/minecraft/xp` gastaba el mismo cupo, así que una
+ * misión grande quedaba recortada al tope del nivel (300 al principio). Se guardan en su propia fila del lote
+ * (`<idLote>:extra`) y el cupo diario solo suma las filas sin estos motivos.
+ */
+export const MOTIVOS_SIN_TOPE = Object.freeze(["logro", "evento"]);
 /** La XP de entregas viaja en lotes propios: tiene su tope diario y mezclarla haría ambiguo a cuál cuenta. */
 export const MOTIVO_ENTREGA = "entrega";
 /** Sin 0/O, 1/I/L ni U: se dicta y se escribe a mano en el chat del juego. */
@@ -142,6 +153,34 @@ const DDL = `
     creado     TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_xp_manual_ficha ON xp_manual (vtuber_id);
+  CREATE TABLE IF NOT EXISTS evento_xp (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre        TEXT NOT NULL,
+    multiplicador REAL NOT NULL,
+    inicio        TEXT NOT NULL,
+    fin           TEXT NOT NULL,
+    actor         TEXT NOT NULL,
+    creado        TEXT NOT NULL,
+    cancelado     TEXT
+  );
+  CREATE TABLE IF NOT EXISTS xp_evento (
+    id         TEXT PRIMARY KEY,
+    evento_id  INTEGER NOT NULL,
+    vtuber_id  INTEGER NOT NULL,
+    cantidad   INTEGER NOT NULL,
+    dia        TEXT NOT NULL,
+    creado     TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_xp_evento_ficha ON xp_evento (vtuber_id);
+  CREATE INDEX IF NOT EXISTS idx_xp_evento_evento ON xp_evento (evento_id);
+  CREATE TABLE IF NOT EXISTS regalo_xp (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    motivo    TEXT NOT NULL,
+    cantidad  INTEGER NOT NULL,
+    fichas    INTEGER NOT NULL,
+    actor     TEXT NOT NULL,
+    creado    TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS sesion_minecraft (
     uuid       TEXT NOT NULL,
     red        TEXT NOT NULL,
@@ -531,7 +570,21 @@ function desgloseValido(detalle) {
       `Un lote suma como mucho ${XP_POR_LOTE_MAX} XP.`,
     );
   }
-  return { limpio, total, entrega: MOTIVO_ENTREGA in limpio };
+  const extra = {};
+  const base = {};
+  for (const [motivo, valor] of Object.entries(limpio)) {
+    (MOTIVOS_SIN_TOPE.includes(motivo) ? extra : base)[motivo] = valor;
+  }
+  const suma = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+  return {
+    limpio,
+    total,
+    entrega: MOTIVO_ENTREGA in limpio,
+    base,
+    baseTotal: suma(base),
+    extra,
+    extraTotal: suma(extra),
+  };
 }
 
 /**
@@ -554,7 +607,8 @@ export async function sumarXp(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dia))) {
     throw new Error(`día inválido: ${dia}`);
   }
-  const { limpio, total, entrega } = desgloseValido(detalle);
+  const { entrega, base, baseTotal, extra, extraTotal } =
+    desgloseValido(detalle);
   const tope = entrega ? XP_ENTREGA_MAX_DIA : topeXpJuegoDia(nivel);
   const e = await conTablas(ejecutor);
   const vinculo = await vinculoDeJugador(e, uuid);
@@ -566,48 +620,70 @@ export async function sumarXp(
     );
   }
   const id = idLote.toLowerCase();
-  const previo = await e.execute(
-    "SELECT cantidad FROM xp_juego WHERE id_lote = ?",
-    [id],
-  );
-  if (previo.rows.length) {
+  // La parte con tope va en la fila `<id>`; la adicional (misiones y logros) en `<id>:extra`, o en `<id>` si es lo único.
+  const idExtra = baseTotal > 0 ? `${id}:extra` : id;
+  const sumaDelLote = async () => {
+    const r = await e.execute(
+      "SELECT COALESCE(SUM(cantidad), 0) AS n, COUNT(*) AS filas FROM xp_juego WHERE id_lote IN (?, ?)",
+      [id, `${id}:extra`],
+    );
+    return { n: Number(r.rows[0]?.n ?? 0), filas: Number(r.rows[0]?.filas ?? 0) };
+  };
+  const previo = await sumaDelLote();
+  if (previo.filas) {
     return {
       vtuberId: vinculo.vtuberId,
-      sumado: Number(previo.rows[0].cantidad),
+      sumado: previo.n,
       duplicado: true,
       ...(await deHoy(e, vinculo.vtuberId, dia, nivel)),
     };
   }
-  // «Es de entrega» se lee del desglose guardado: un lote de entrega solo trae ese motivo (ver desgloseValido).
-  await e.execute(
-    `INSERT INTO xp_juego (id_lote, vtuber_id, uuid, cantidad, detalle, dia, creado)
-     SELECT ?, ?, ?, MIN(?, ? - hoy), ?, ?, ?
-       FROM (SELECT COALESCE(SUM(cantidad), 0) AS hoy FROM xp_juego
-              WHERE vtuber_id = ? AND dia = ? AND (json_extract(detalle, '$.entrega') IS NOT NULL) = ?)
-      WHERE hoy < ?
-     ON CONFLICT (id_lote) DO NOTHING`,
-    [
-      id,
-      vinculo.vtuberId,
-      uuid.toLowerCase(),
-      total,
-      tope,
-      JSON.stringify(limpio),
-      dia,
-      new Date(ahora).toISOString(),
-      vinculo.vtuberId,
-      dia,
-      entrega ? 1 : 0,
-      tope,
-    ],
-  );
-  const escrito = await e.execute(
-    "SELECT cantidad FROM xp_juego WHERE id_lote = ?",
-    [id],
-  );
+  const creado = new Date(ahora).toISOString();
+  if (baseTotal > 0) {
+    // «Es de entrega» se lee del desglose guardado: un lote de entrega solo trae ese motivo (ver desgloseValido).
+    // El cupo solo suma las filas CON tope: las de misiones y logros (`SIN_TOPE`) no lo gastan.
+    await e.execute(
+      `INSERT INTO xp_juego (id_lote, vtuber_id, uuid, cantidad, detalle, dia, creado)
+       SELECT ?, ?, ?, MIN(?, ? - hoy), ?, ?, ?
+         FROM (SELECT COALESCE(SUM(cantidad), 0) AS hoy FROM xp_juego
+                WHERE vtuber_id = ? AND dia = ? AND (json_extract(detalle, '$.entrega') IS NOT NULL) = ?
+                  AND json_extract(detalle, '$.logro') IS NULL AND json_extract(detalle, '$.evento') IS NULL)
+        WHERE hoy < ?
+       ON CONFLICT (id_lote) DO NOTHING`,
+      [
+        id,
+        vinculo.vtuberId,
+        uuid.toLowerCase(),
+        baseTotal,
+        tope,
+        JSON.stringify(base),
+        dia,
+        creado,
+        vinculo.vtuberId,
+        dia,
+        entrega ? 1 : 0,
+        tope,
+      ],
+    );
+  }
+  if (extraTotal > 0) {
+    await e.execute(
+      `INSERT INTO xp_juego (id_lote, vtuber_id, uuid, cantidad, detalle, dia, creado)
+       VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id_lote) DO NOTHING`,
+      [
+        idExtra,
+        vinculo.vtuberId,
+        uuid.toLowerCase(),
+        extraTotal,
+        JSON.stringify(extra),
+        dia,
+        creado,
+      ],
+    );
+  }
   return {
     vtuberId: vinculo.vtuberId,
-    sumado: Number(escrito.rows[0]?.cantidad ?? 0),
+    sumado: (await sumaDelLote()).n,
     duplicado: false,
     ...(await deHoy(e, vinculo.vtuberId, dia, nivel)),
   };
@@ -619,7 +695,9 @@ export async function sumarXp(
  */
 async function deHoy(e, vtuberId, dia, nivel = 1) {
   const { rows } = await e.execute(
-    `SELECT COALESCE(SUM(CASE WHEN json_extract(detalle, '$.entrega') IS NULL THEN cantidad ELSE 0 END), 0) AS n,
+    `SELECT COALESCE(SUM(CASE WHEN json_extract(detalle, '$.entrega') IS NULL
+                               AND json_extract(detalle, '$.logro') IS NULL AND json_extract(detalle, '$.evento') IS NULL
+                              THEN cantidad ELSE 0 END), 0) AS n,
             COALESCE(SUM(CASE WHEN json_extract(detalle, '$.entrega') IS NULL THEN 0 ELSE cantidad END), 0) AS entrega
        FROM xp_juego WHERE vtuber_id = ? AND dia = ?`,
     [vtuberId, dia],
@@ -647,8 +725,18 @@ export async function xpDeHoyTodas(ejecutor, vtuberId, dia) {
   const { rows } = await e.execute(
     `SELECT (SELECT COALESCE(SUM(cantidad), 0) FROM xp_juego WHERE vtuber_id = ? AND dia = ?)
           + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_directo WHERE vtuber_id = ? AND dia = ?)
-          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_mision WHERE vtuber_id = ? AND dia = ?) AS n`,
-    [Number(vtuberId), dia, Number(vtuberId), dia, Number(vtuberId), dia],
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_mision WHERE vtuber_id = ? AND dia = ?)
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_evento WHERE vtuber_id = ? AND dia = ?) AS n`,
+    [
+      Number(vtuberId),
+      dia,
+      Number(vtuberId),
+      dia,
+      Number(vtuberId),
+      dia,
+      Number(vtuberId),
+      dia,
+    ],
   );
   return Number(rows[0]?.n ?? 0);
 }
@@ -670,8 +758,10 @@ export async function xpDeJuegoVarias(ejecutor, ids) {
        SELECT vtuber_id AS id, cantidad AS n FROM xp_mision WHERE vtuber_id IN (${marcas})
        UNION ALL
        SELECT vtuber_id AS id, cantidad AS n FROM xp_manual WHERE vtuber_id IN (${marcas})
+       UNION ALL
+       SELECT vtuber_id AS id, cantidad AS n FROM xp_evento WHERE vtuber_id IN (${marcas})
      ) GROUP BY id`,
-    [...lista, ...lista, ...lista, ...lista],
+    [...lista, ...lista, ...lista, ...lista, ...lista],
   );
   return new Map(rows.map((r) => [Number(r.id), Number(r.n)]));
 }
@@ -683,8 +773,15 @@ export async function xpDeJuego(ejecutor, vtuberId) {
     `SELECT (SELECT COALESCE(SUM(cantidad), 0) FROM xp_juego WHERE vtuber_id = ?)
           + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_directo WHERE vtuber_id = ?)
           + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_mision WHERE vtuber_id = ?)
-          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_manual WHERE vtuber_id = ?) AS n`,
-    [Number(vtuberId), Number(vtuberId), Number(vtuberId), Number(vtuberId)],
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_manual WHERE vtuber_id = ?)
+          + (SELECT COALESCE(SUM(cantidad), 0) FROM xp_evento WHERE vtuber_id = ?) AS n`,
+    [
+      Number(vtuberId),
+      Number(vtuberId),
+      Number(vtuberId),
+      Number(vtuberId),
+      Number(vtuberId),
+    ],
   );
   return Number(rows[0]?.n ?? 0);
 }

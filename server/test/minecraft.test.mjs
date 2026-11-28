@@ -599,3 +599,27 @@ test("la XP por directo NO gasta el tope diario de Minecraft", async () => {
   assert.equal(r.sumado, 100);
   assert.equal(r.hoy, 100);
 });
+
+test("la XP de misiones y logros es ADICIONAL: no gasta el tope diario y no se recorta", async () => {
+  const e = nuevo();
+  await vinculado(e);
+  const tope = topeXpJuegoDia(1);
+  // Una misión de 1.500 XP supera el tope del nivel 1 y entra entera.
+  const mision = await sumarXp(e, lote({ logro: 1500 }));
+  assert.equal(mision.sumado, 1500);
+  assert.equal(mision.hoy, 0);
+  // El cupo del día sigue entero para jugar normal.
+  const juego = await sumarXp(e, lote({ mob: tope + 50 }));
+  assert.equal(juego.sumado, tope);
+  assert.equal(juego.hoy, tope);
+  // Un lote mixto separa las dos partes: la de juego se topa, la adicional pasa completa.
+  const idLote = crypto.randomUUID();
+  const mixto = await sumarXp(e, lote({ mob: 10, evento: 200 }, { idLote }));
+  assert.equal(mixto.sumado, 200);
+  assert.equal(mixto.hoy, tope);
+  // Reintentar el mismo lote no suma dos veces.
+  const repetido = await sumarXp(e, lote({ mob: 10, evento: 200 }, { idLote }));
+  assert.equal(repetido.duplicado, true);
+  assert.equal(repetido.sumado, 200);
+  assert.equal(await xpDeJuego(e, 7), 1500 + tope + 200);
+});

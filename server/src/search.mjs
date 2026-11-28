@@ -26,9 +26,9 @@ const SORT_SQL = {
  * en SOLO LECTURA y por tanto sin el esquema nuevo) se devuelven NULL: la carta sale normal en
  * vez de que la consulta entera falle con `no such table: premium`.
  */
-const PREMIUM_COLUMNAS = `, pr.grade AS premiumGrade, pr.since AS premiumSince, pr.graded_at AS premiumGradedAt`;
+const PREMIUM_COLUMNAS = `, pr.grade AS premiumGrade, pr.since AS premiumSince, pr.graded_at AS premiumGradedAt, pr.origin AS premiumOrigin`;
 const PREMIUM_UNION = `LEFT JOIN premium pr ON pr.vtuber_id = v.id`;
-const SIN_PREMIUM_COLUMNAS = `, NULL AS premiumGrade, NULL AS premiumSince, NULL AS premiumGradedAt`;
+const SIN_PREMIUM_COLUMNAS = `, NULL AS premiumGrade, NULL AS premiumSince, NULL AS premiumGradedAt, NULL AS premiumOrigin`;
 
 /**
  * ¿Tiene esta base la tabla `premium`? Solo se recuerda el SÍ: una base escribible la crea al
@@ -189,6 +189,7 @@ export function mapCard(row) {
           grade: row.premiumGrade,
           since: row.premiumSince,
           gradedAt: row.premiumGradedAt,
+          origin: row.premiumOrigin ?? "donacion",
           cert: numeroDeCertificado(row.dexNumber),
         }
       : null,

@@ -728,7 +728,11 @@ describe("misiones", () => {
     const cuerpo = await ok.json();
     expect(cuerpo.grado).toBe("6");
     expect(APLICAR).toHaveBeenCalledWith(
-      { tipo: "vtuber.editar", id: 7, patch: { premium: { grade: "6" } } },
+      {
+        tipo: "vtuber.editar",
+        id: 7,
+        patch: { premium: { grade: "6", origin: "misiones" } },
+      },
       "mision",
     );
     expect(
