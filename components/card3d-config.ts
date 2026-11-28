@@ -38,6 +38,7 @@
  * `shaders.ts`. Aquí solo están los números.
  */
 
+import type { ClaveDeArte } from "@/components/premium-marco-arte";
 import { FUENTE_MINECRAFT } from "@/components/premium-minecraft";
 import {
   CARD_TEXTURE_HEIGHT,
@@ -1581,6 +1582,14 @@ export const PREMIUM = {
       },
     },
     donacion: {
+      // Hoja NEGRA con filigrana dorada (boceto del mantenedor): el negro es la base y el borde ornamentado es el
+      // arte `marcos/donacion.webp`, pintado encima (`premium-marco-arte.ts`). El acrílico sigue siendo el azul de siempre.
+      insert: {
+        frame: "#0d0d10",
+        frameShade: "#050507",
+        windowLine: "#c9a24a",
+        arte: "donacion",
+      },
       etiqueta: { tipo: "DONACIÓN", acento: "#4a7fd1" },
     },
   } as Record<
@@ -1601,6 +1610,7 @@ export const PREMIUM = {
         Record<"frame" | "frameShade" | "windowLine", string>
       > & {
         fondo?: "minecraft";
+        arte?: ClaveDeArte;
       };
       etiqueta: { tipo: string; acento: string; fuente?: string };
     }
